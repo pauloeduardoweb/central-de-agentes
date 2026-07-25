@@ -1,0 +1,6 @@
+{
+  "name": "Central de Agentes GPT - Geração Z Pro",
+  "description": "Hub e Central de Agentes GPTs integrados para a plataforma Geração Z Pro (geracaozpro.com). Crie, gerencie e execute agentes inteligentes de IA.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
