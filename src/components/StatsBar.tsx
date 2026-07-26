@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Heart, Sparkles, MessageSquare, MessageCircle, Globe, ExternalLink, PlusCircle } from 'lucide-react';
+import { Bot, Heart, Sparkles, MessageSquare, MessageCircle, Globe, ExternalLink, Award } from 'lucide-react';
 import { Agent } from '../types';
 
 const ChatGPTIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -17,14 +17,14 @@ interface StatsBarProps {
   activeCategory?: string;
   onOpenOfficialAgent?: () => void;
   onOpenSiteModal?: () => void;
-  onOpenCreate?: () => void;
+  onOpenCertificados?: () => void;
 }
 
 export const StatsBar: React.FC<StatsBarProps> = ({
   agents,
   onOpenOfficialAgent,
   onOpenSiteModal,
-  onOpenCreate,
+  onOpenCertificados,
 }) => {
   const totalAgents = agents.filter((a) => a.category !== 'Suporte').length;
   const favoriteAgents = agents.filter((a) => a.isFavorite).length;
@@ -226,10 +226,10 @@ export const StatsBar: React.FC<StatsBarProps> = ({
         </div>
       </a>
 
-      {/* 8. Criar Novo Agente */}
+      {/* 8. Certificados */}
       <button
-        onClick={onOpenCreate}
-        className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-pink-400 border border-pink-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95"
+        onClick={onOpenCertificados}
+        className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95"
       >
         <div 
           className="absolute inset-0 opacity-15 pointer-events-none"
@@ -239,18 +239,18 @@ export const StatsBar: React.FC<StatsBarProps> = ({
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 via-rose-600 to-purple-700 text-white border border-pink-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-pink-500/30">
+        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/30">
           <img 
             src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
             referrerPolicy="no-referrer"
           />
-          <PlusCircle className="w-5 h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
+          <Award className="w-5 h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
         </div>
         <div className="overflow-hidden relative z-10">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-pink-300 truncate">Personalizar IA</p>
-          <p className="text-xs font-black text-white truncate">Criar Novo Agente</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-300 truncate">Geração Z Pro</p>
+          <p className="text-xs font-black text-white truncate">Certificados</p>
         </div>
       </button>
 
