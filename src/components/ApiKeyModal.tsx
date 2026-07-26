@@ -40,8 +40,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       return;
     }
 
-    if (!cleanKey.startsWith('AIza')) {
-      setError('Chave inválida! Chaves da API do Gemini oficiais do Google AI Studio começam com "AIzaSy...". Clique no link "Criar chave grátis" para obter a sua.');
+    if (cleanKey.length < 10) {
+      setError('Chave muito curta ou inválida. Por favor, cole a chave de API completa obtida no Google AI Studio.');
       return;
     }
 
@@ -122,7 +122,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </label>
             <input
               type="password"
-              placeholder="Cole sua chave aqui (ex: AIzaSy...)"
+              placeholder="Cole sua chave de API aqui..."
               value={apiKey}
               onChange={(e) => {
                 setApiKey(e.target.value);
