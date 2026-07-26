@@ -373,4 +373,3 @@ export default app;
 if (process.env.VERCEL !== '1' && process.env.VERCEL !== 'true' && !process.env.VERCEL) {
   startServer();
 }
-
