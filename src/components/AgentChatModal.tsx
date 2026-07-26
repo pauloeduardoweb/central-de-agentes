@@ -243,18 +243,14 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
       } catch (jsonErr) {
         console.error('Server response is not valid JSON:', responseText);
         if (!response.ok) {
-          throw new Error(
-            responseText.includes('GEMINI_API_KEY') || responseText.includes('API key')
-              ? 'A chave GEMINI_API_KEY não foi configurada nas variáveis do servidor.'
-              : 'Ocorreu um erro no servidor ao processar sua mensagem. Verifique a chave GEMINI_API_KEY.'
-          );
+          throw new Error(responseText || `Erro no servidor HTTP ${response.status}.`);
         } else {
           throw new Error('A resposta do servidor não veio no formato JSON esperado.');
         }
       }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro na comunicação com o agente.');
+        throw new Error(data.error || `Erro (${response.status}) na comunicação com o agente.`);
       }
 
       const assistantMessage: ChatMessage = {
