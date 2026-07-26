@@ -3,7 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
-import { isValidStudentCode } from './src/data/studentCodes';
+import { isValidStudentCode } from './src/data/studentCodes.ts';
 
 dotenv.config();
 
@@ -126,7 +126,7 @@ app.post('/api/chat', async (req, res) => {
   if (!validateStudentAccess(req, res)) return;
 
   try {
-    const { systemInstruction, messages, temperature = 0.7, model = 'gemini-3.6-flash', customApiKey } = req.body;
+    const { systemInstruction, messages, temperature = 0.7, model = 'gemini-2.5-flash', customApiKey } = req.body;
     const headerApiKey = req.headers['x-gemini-api-key'] as string;
     const apiKeyToUse = headerApiKey || customApiKey;
 
@@ -166,7 +166,7 @@ app.post('/api/chat', async (req, res) => {
     });
 
     const response = await ai.models.generateContent({
-      model: model || 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: contents,
       config: {
         systemInstruction: systemInstruction || 'Você é um assistente de IA prestativo e amigável.',
@@ -179,8 +179,15 @@ app.post('/api/chat', async (req, res) => {
   } catch (err: any) {
     console.error('Error in /api/chat:', err);
     const msg = err.message || '';
+    if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid') || msg.includes('invalid API key')) {
+      return res.status(400).json({
+        error: 'Sua Chave API do Gemini parece inválida. A chave oficial do Google AI Studio deve começar com "AIzaSy...". Obtenha a sua chave em https://aistudio.google.com/app/apikey',
+      });
+    }
     if (msg.includes('GEMINI_API_KEY_MISSING') || msg.includes('GEMINI_API_KEY') || msg.includes('API key')) {
-      return res.status(500).json({ error: 'A chave GEMINI_API_KEY não está configurada. Configure no Vercel ou adicione a sua chave no aplicativo.' });
+      return res.status(500).json({
+        error: 'A chave GEMINI_API_KEY não está configurada ou é inválida. Clique no botão amarelo para inserir sua chave.',
+      });
     }
     res.status(500).json({ error: msg || 'Erro ao processar conversa com o agente.' });
   }
@@ -216,7 +223,7 @@ Retorne obrigatoriamente um objeto JSON estruturado com os seguintes campos:
 - temperature: Número entre 0.1 e 1.0 (nível de criatividade adequado para o papel)`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         systemInstruction: systemPrompt,
@@ -304,7 +311,7 @@ ${taskPrompt}
 ${historyContext ? `HISTÓRICO DE RESPOSTAS DOS OUTROS AGENTES:\n${historyContext}\n\nSua vez de contribuir com base nas respostas acima e na sua especialização.` : 'Sua vez de dar a primeira contribuição especializada para a tarefa acima.'}`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
+        model: 'gemini-2.5-flash',
         contents: fullPrompt,
         config: {
           systemInstruction: agent.systemInstruction || `Você é o agente ${agent.name}.`,
