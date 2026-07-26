@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Sparkles, Loader2, Bot, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { Agent, CategoryType, AgentCapabilities } from '../types';
 import { AgentIcon, COLOR_MAP } from './AgentIcon';
+import { getAuthHeaders, getDeviceId } from '../utils/deviceId';
 
 interface AgentEditorModalProps {
   initialAgent?: Agent | null;
@@ -62,10 +63,17 @@ export const AgentEditorModal: React.FC<AgentEditorModalProps> = ({
     setAiError(null);
 
     try {
+      const storedKey = localStorage.getItem('user_gemini_api_key') || '';
+      const storedCode = localStorage.getItem('user_student_access_code') || '';
       const response = await fetch('/api/generate-agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: aiPrompt }),
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          customApiKey: storedKey || undefined,
+          studentAccessCode: storedCode || undefined,
+          deviceId: getDeviceId(),
+        }),
       });
 
       if (!response.ok) {

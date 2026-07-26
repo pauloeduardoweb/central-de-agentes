@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Users, Sparkles, Send, Loader2, Copy, Check, Bot, AlertCircle } from 'lucide-react';
 import { Agent } from '../types';
 import { AgentIcon, getColorTheme } from './AgentIcon';
+import { getAuthHeaders, getDeviceId } from '../utils/deviceId';
 
 interface MultiAgentModalProps {
   agents: Agent[];
@@ -39,11 +40,16 @@ export const MultiAgentModal: React.FC<MultiAgentModalProps> = ({ agents, onClos
     const selectedAgentsObjects = agents.filter((a) => selectedAgentIds.includes(a.id));
 
     try {
+      const storedKey = localStorage.getItem('user_gemini_api_key') || '';
+      const storedCode = localStorage.getItem('user_student_access_code') || '';
       const response = await fetch('/api/multi-agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           taskPrompt,
+          customApiKey: storedKey || undefined,
+          studentAccessCode: storedCode || undefined,
+          deviceId: getDeviceId(),
           agents: selectedAgentsObjects.map((a) => ({
             name: a.name,
             systemInstruction: a.systemInstruction,
