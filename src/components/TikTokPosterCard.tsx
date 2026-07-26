@@ -17,6 +17,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
 }) => {
   const [showVideoModal, setShowVideoModal] = React.useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = React.useState(0);
+  const [showMobileOverlay, setShowMobileOverlay] = React.useState(false);
 
   const videoList = React.useMemo(() => {
     if (agent.exampleVideoUrls && agent.exampleVideoUrls.length > 0) {
@@ -737,18 +738,36 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
     <div className={`group relative flex flex-col rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 shadow-xl ${theme.hoverBorder} hover:shadow-2xl transition-all duration-300 ${cardAspectRatio}`}>
       
       {/* Upper Poster Area */}
-      <div className="relative flex-1 overflow-hidden cursor-pointer" onClick={() => onSelectChat(agent)}>
+      <div 
+        className="relative flex-1 overflow-hidden cursor-pointer" 
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowMobileOverlay((prev) => !prev);
+        }}
+      >
         {renderPosterGraphic()}
 
-        {/* Hover Overlay with Direct ChatGPT & Chat Buttons */}
-        <div className="absolute inset-0 bg-slate-950/85 opacity-0 group-hover:opacity-100 backdrop-blur-xs transition-opacity flex flex-col items-center justify-center p-4 text-center space-y-2.5 z-20">
-          
+        {/* Hover / Touch Overlay with Direct ChatGPT & Chat Buttons */}
+        <div 
+          className={`absolute inset-0 bg-slate-950/90 backdrop-blur-xs transition-opacity flex flex-col items-center justify-center p-4 text-center space-y-2.5 z-20 ${
+            showMobileOverlay 
+              ? 'opacity-100 pointer-events-auto' 
+              : 'opacity-0 pointer-events-none md:pointer-events-auto md:group-hover:opacity-100'
+          }`}
+          onClick={(e) => {
+            // Close mobile overlay if background tapped
+            if (e.target === e.currentTarget) {
+              setShowMobileOverlay(false);
+            }
+          }}
+        >
           {showExampleButton && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setCurrentVideoIndex(0);
                 setShowVideoModal(true);
+                setShowMobileOverlay(false);
               }}
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-lg shadow-orange-500/20 transform group-hover:scale-105 transition-all border border-amber-300/60"
             >
@@ -758,7 +777,10 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
 
           {agent.chatGptUrl && (
             <button
-              onClick={handleOpenChatGPT}
+              onClick={(e) => {
+                setShowMobileOverlay(false);
+                handleOpenChatGPT(e);
+              }}
               className={`w-full py-2.5 px-4 rounded-xl bg-gradient-to-r ${
                 agent.chatGptUrl.includes('wa.me')
                   ? 'from-emerald-500 via-teal-600 to-green-600 hover:from-emerald-400 hover:to-green-500 shadow-emerald-500/40 border border-emerald-300/60'
@@ -781,7 +803,10 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
 
           {targetGeminiUrl && (
             <button
-              onClick={handleOpenGemini}
+              onClick={(e) => {
+                setShowMobileOverlay(false);
+                handleOpenGemini(e);
+              }}
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-lg transform group-hover:scale-105 transition-all border border-blue-400/30"
             >
               <ExternalLink className="w-4 h-4" />
@@ -790,7 +815,11 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
           )}
 
           <button
-            onClick={() => onSelectChat(agent)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMobileOverlay(false);
+              onSelectChat(agent);
+            }}
             className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center space-x-2 border border-slate-700 transition-all"
           >
             <Play className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400" />
@@ -802,129 +831,115 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               e.stopPropagation();
               onToggleFavorite(agent.id);
             }}
-            className={`mt-2.5 w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 border transition-all ${
-              agent.isFavorite
-                ? 'bg-rose-500/25 hover:bg-rose-500/40 text-rose-200 border-rose-500/60 shadow-lg shadow-rose-500/20'
-                : 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 hover:text-white border-slate-700/80 hover:border-slate-500'
-            }`}
+            className="w-full py-1.5 px-3 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-[11px] font-medium flex items-center justify-center space-x-1.5 transition-colors"
           >
-            <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-red-400'}`} />
-            <span>{agent.isFavorite ? 'Remover dos Favoritos' : 'Favoritar Agente'}</span>
+            <Heart className={`w-3.5 h-3.5 ${agent.isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
+            <span>{agent.isFavorite ? 'Favorito' : 'Favoritar Agente'}</span>
           </button>
         </div>
       </div>
 
-      {/* Embedded Video Modal directly on screen */}
+      {/* Video Modal (Examples Modal) */}
       {showVideoModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 transition-all"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowVideoModal(false);
-          }}
-        >
-          <div
-            className="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col space-y-3"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-sm sm:max-w-md bg-slate-900 border border-cyan-500/30 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
               <div className="flex items-center space-x-2">
-                <span className="text-base">▶️</span>
+                <span className="text-lg">▶️</span>
                 <div>
-                  <h3 className="text-sm font-black text-white">{agent.name} — Exemplo em Vídeo</h3>
-                  <p className="text-[11px] text-slate-400">
-                    {videoList.length > 1
-                      ? `Exemplo ${currentVideoIndex + 1} de ${videoList.length}`
-                      : videoList.length === 1
-                      ? 'Exemplo prático de publicação em vídeo'
-                      : 'Vídeo de exemplo em breve'}
+                  <h3 className="text-sm font-black text-white leading-tight">
+                    Vídeo Exemplo #{currentVideoIndex + 1}
+                  </h3>
+                  <p className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
+                    {agent.name}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowVideoModal(false)}
-                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-                title="Fechar"
+                className="p-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Pagination Controls for multiple videos */}
-            {videoList.length > 1 && (
-              <div className="flex items-center justify-between bg-slate-950/80 p-2 rounded-xl border border-slate-800/90">
-                <button
-                  onClick={() => setCurrentVideoIndex((prev) => (prev > 0 ? prev - 1 : videoList.length - 1))}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center space-x-1 border border-slate-700/80 transition-colors"
-                >
-                  <span>&larr; Anterior</span>
-                </button>
+            {/* Video Container (Vertical 9:16 aspect ratio) */}
+            <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center overflow-hidden">
+              {currentVideoUrl ? (
+                currentVideoUrl.includes('vimeo') ? (
+                  <iframe
+                    src={getVimeoEmbedUrl(currentVideoUrl) || ''}
+                    className="w-full h-full border-0"
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    allowFullScreen
+                    title={`Exemplo ${agent.name}`}
+                  />
+                ) : (
+                  <video
+                    src={currentVideoUrl}
+                    controls
+                    autoPlay
+                    loop
+                    className="w-full h-full object-cover"
+                  />
+                )
+              ) : (
+                <div className="text-center p-6">
+                  <p className="text-slate-400 text-sm">Nenhum vídeo cadastrado.</p>
+                </div>
+              )}
+            </div>
 
-                <div className="flex items-center space-x-1.5">
+            {/* Navigation / Multiple Videos Indicator */}
+            {videoList.length > 1 && (
+              <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-medium">
+                  Vídeo {currentVideoIndex + 1} de {videoList.length}
+                </span>
+                <div className="flex items-center space-x-2">
                   {videoList.map((_, idx) => (
                     <button
                       key={idx}
                       onClick={() => setCurrentVideoIndex(idx)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                      className={`h-2.5 rounded-full transition-all ${
                         idx === currentVideoIndex
-                          ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-md shadow-amber-500/20 scale-105'
-                          : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                          ? 'w-6 bg-cyan-400'
+                          : 'w-2.5 bg-slate-700 hover:bg-slate-600'
                       }`}
-                    >
-                      {idx + 1}/{videoList.length}
-                    </button>
+                    />
                   ))}
                 </div>
+              </div>
+            )}
 
+            {/* Modal Footer CTA */}
+            <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-2">
+              {agent.chatGptUrl && (
                 <button
-                  onClick={() => setCurrentVideoIndex((prev) => (prev < videoList.length - 1 ? prev + 1 : 0))}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center space-x-1 border border-slate-700/80 transition-colors"
+                  onClick={handleOpenChatGPT}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md"
                 >
-                  <span>Próximo &rarr;</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Criar no GPT</span>
                 </button>
-              </div>
-            )}
-
-            {videoList.length > 0 ? (
-              <div className="relative w-full aspect-[9/16] max-h-[60vh] sm:max-h-[65vh] rounded-xl overflow-hidden bg-black border border-slate-800 shadow-inner mx-auto">
-                <iframe
-                  key={currentVideoUrl}
-                  src={getVimeoEmbedUrl(currentVideoUrl) || currentVideoUrl}
-                  title={`Exemplo em Vídeo - ${agent.name}`}
-                  className="w-full h-full border-0"
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            ) : (
-              <div className="relative w-full aspect-[9/16] max-h-[50vh] sm:max-h-[55vh] rounded-xl overflow-hidden bg-slate-950/90 border border-slate-800/80 shadow-inner mx-auto flex flex-col items-center justify-center p-6 text-center space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500/20 via-orange-500/20 to-rose-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 text-2xl shadow-lg shadow-orange-500/10">
-                  ▶️
-                </div>
-                <div className="space-y-1.5 max-w-xs">
-                  <h4 className="text-base font-black text-white">Vídeo de Exemplo em Breve</h4>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Nenhum vídeo cadastrado no momento para o agente <strong className="text-amber-300">{agent.name}</strong>. Os vídeos de exemplo serão adicionados em breve!
-                  </p>
-                </div>
-                <div className="px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/80 text-[11px] font-bold text-slate-400">
-                  Módulo {agent.category}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-1 text-xs text-slate-400">
-              <span className="truncate">{agent.category} • {agent.name}</span>
-              {videoList.length > 1 && (
-                <span className="font-bold text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
-                  Exemplo {currentVideoIndex + 1} de {videoList.length}
-                </span>
+              )}
+              {targetGeminiUrl && (
+                <button
+                  onClick={handleOpenGemini}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Criar no Gemini</span>
+                </button>
               )}
             </div>
+
           </div>
         </div>
       )}
+
     </div>
   );
 };
-
