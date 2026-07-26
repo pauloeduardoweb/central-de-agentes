@@ -1,7 +1,7 @@
 import { Agent, ChatMessage, ChatSession, TeamGroup } from '../types';
 import { DEFAULT_AGENTS } from '../data/defaultAgents';
 
-const AGENTS_STORAGE_KEY = 'gpt_central_agents_v14';
+const AGENTS_STORAGE_KEY = 'gpt_central_agents_v15';
 const CHAT_SESSIONS_STORAGE_KEY = 'gpt_central_chats_v1';
 const TEAMS_STORAGE_KEY = 'gpt_central_teams_v1';
 
