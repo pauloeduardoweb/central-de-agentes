@@ -34,6 +34,7 @@ app.get('/api/health', (_req, res) => {
 
 // Chat endpoint for agent execution
 app.post('/api/chat', async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   try {
     const { systemInstruction, messages, temperature = 0.7, model = 'gemini-3.6-flash' } = req.body;
 
@@ -44,7 +45,6 @@ app.post('/api/chat', async (req, res) => {
     const ai = getGeminiClient();
 
     // Format chat contents for Gemini
-    // We pass systemInstruction in config and handle text + optional inline image data
     const contents = messages.map((msg: { role: string; content?: string; image?: string }) => {
       const parts: any[] = [];
 
@@ -82,11 +82,15 @@ app.post('/api/chat', async (req, res) => {
       },
     });
 
-    const replyText = response.text || 'Desculpe, não consegui gerar uma resposta momento.';
+    const replyText = response.text || 'Desculpe, não consegui gerar uma resposta no momento.';
     res.json({ reply: replyText });
   } catch (err: any) {
     console.error('Error in /api/chat:', err);
-    res.status(500).json({ error: err.message || 'Erro ao processar conversa com o agente.' });
+    const msg = err.message || '';
+    if (msg.includes('GEMINI_API_KEY') || msg.includes('API key')) {
+      return res.status(500).json({ error: 'A chave GEMINI_API_KEY não foi configurada no ambiente do servidor.' });
+    }
+    res.status(500).json({ error: msg || 'Erro ao processar conversa com o agente.' });
   }
 });
 
