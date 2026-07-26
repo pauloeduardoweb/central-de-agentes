@@ -119,6 +119,26 @@ function validateStudentAccess(req: express.Request, res: express.Response): boo
   return true;
 }
 
+// Helper to call Gemini with model fallback across supported public models
+async function generateContentWithFallback(ai: GoogleGenAI, params: { contents: any; config?: any }) {
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  let lastErr: any = null;
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: params.contents,
+        config: params.config,
+      });
+      if (response) return response;
+    } catch (err: any) {
+      lastErr = err;
+      console.warn(`[Gemini API] Modelo ${model} falhou, tentando o próximo:`, err?.message || err);
+    }
+  }
+  throw lastErr || new Error('Falha ao comunicar com os modelos do Gemini.');
+}
+
 // Chat endpoint for agent execution
 app.post('/api/chat', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
@@ -164,9 +184,7 @@ app.post('/api/chat', async (req, res) => {
       };
     });
 
-    // Use gemini-3.6-flash model
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+    const response = await generateContentWithFallback(ai, {
       contents: contents,
       config: {
         systemInstruction: systemInstruction || 'Você é um assistente de IA prestativo e amigável.',
@@ -219,8 +237,7 @@ Retorne obrigatoriamente um objeto JSON estruturado com os seguintes campos:
 - capabilities: Objeto com booleanos { codeInterpreter: boolean, webSearch: boolean, imageGeneration: boolean, jsonOutput: boolean }
 - temperature: Número entre 0.1 e 1.0 (nível de criatividade adequado para o papel)`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+    const response = await generateContentWithFallback(ai, {
       contents: prompt,
       config: {
         systemInstruction: systemPrompt,
@@ -307,8 +324,7 @@ ${taskPrompt}
 
 ${historyContext ? `HISTÓRICO DE RESPOSTAS DOS OUTROS AGENTES:\n${historyContext}\n\nSua vez de contribuir com base nas respostas acima e na sua especialização.` : 'Sua vez de dar a primeira contribuição especializada para a tarefa acima.'}`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
+      const response = await generateContentWithFallback(ai, {
         contents: fullPrompt,
         config: {
           systemInstruction: agent.systemInstruction || `Você é o agente ${agent.name}.`,
@@ -354,7 +370,7 @@ async function startServer() {
 
 export default app;
 
-if (process.env.VERCEL !== '1') {
+if (process.env.VERCEL !== '1' && process.env.VERCEL !== 'true' && !process.env.VERCEL) {
   startServer();
 }
 
