@@ -1,7 +1,9 @@
 import React from 'react';
+import { getSafeImageUrl } from '../utils/imageUrl';
 
 export const TechGridBackground: React.FC = () => {
-  const bgImageUrl = 'https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png';
+  const rawUrl = 'https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png';
+  const bgImageUrl = getSafeImageUrl(rawUrl);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
@@ -9,6 +11,12 @@ export const TechGridBackground: React.FC = () => {
       <img
         src={bgImageUrl}
         alt="Background Grid"
+        onError={(e) => {
+          const target = e.currentTarget;
+          if (target.src !== rawUrl) {
+            target.src = rawUrl;
+          }
+        }}
         className="absolute inset-0 w-full h-full object-cover object-center opacity-90"
         referrerPolicy="no-referrer"
       />

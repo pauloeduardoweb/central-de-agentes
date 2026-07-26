@@ -987,14 +987,14 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 bg-white dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8">
-            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3">
+          <div className="text-center py-16 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800 p-8">
+            <div className="w-12 h-12 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3">
               <FolderOpen className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+            <h3 className="text-sm font-bold text-white mb-1">
               Nenhum agente encontrado nesta categoria
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-4">
+            <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">
               Não encontramos nenhum agente que corresponda à sua busca ou filtros selecionados para {selectedCategory}.
             </p>
             <button

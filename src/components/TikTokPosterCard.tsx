@@ -160,8 +160,10 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             alt={agent.name}
             onError={(e) => {
               const target = e.currentTarget;
-              if (agent.coverImage && target.src !== agent.coverImage) {
+              if (target.src.includes('wsrv.nl') && agent.coverImage) {
                 target.src = agent.coverImage;
+              } else if (agent.coverImage && !target.src.includes('wsrv.nl')) {
+                target.src = `https://wsrv.nl/?url=${encodeURIComponent(agent.coverImage)}`;
               }
             }}
             className="absolute inset-0 w-full h-full object-cover object-center opacity-100 group-hover:scale-105 transition-transform duration-500 pointer-events-none"
@@ -682,8 +684,10 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               alt={agent.name}
               onError={(e) => {
                 const target = e.currentTarget;
-                if (target.src !== rawBg) {
+                if (target.src.includes('wsrv.nl') && rawBg) {
                   target.src = rawBg;
+                } else if (rawBg && !target.src.includes('wsrv.nl')) {
+                  target.src = `https://wsrv.nl/?url=${encodeURIComponent(rawBg)}`;
                 }
               }}
               className={`absolute inset-0 w-full h-full object-cover object-center ${hideCardOverlays ? 'opacity-100 group-hover:scale-105 transition-transform duration-700 pointer-events-none' : 'opacity-60 group-hover:scale-105 transition-transform duration-700 pointer-events-none mix-blend-luminosity'}`}

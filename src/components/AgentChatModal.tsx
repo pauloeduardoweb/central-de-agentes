@@ -4,6 +4,7 @@ import { Agent, ChatMessage } from '../types';
 import { AgentIcon, getColorTheme } from './AgentIcon';
 import { getStoredChatSession, saveChatSession, clearChatSession } from '../utils/storage';
 import { LightningChatBackground } from './LightningChatBackground';
+import { getAuthHeaders, getDeviceId } from '../utils/deviceId';
 
 interface AgentChatModalProps {
   agent: Agent;
@@ -23,6 +24,8 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -212,13 +215,19 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
     setIsLoading(true);
 
     try {
+      const storedKey = localStorage.getItem('user_gemini_api_key') || '';
+      const storedCode = localStorage.getItem('user_student_access_code') || '';
+
       // Call server backend /api/chat
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           systemInstruction: agent.systemInstruction,
           temperature: agent.temperature,
+          customApiKey: storedKey || undefined,
+          studentAccessCode: storedCode || undefined,
+          deviceId: getDeviceId(),
           messages: updatedMessages.map((m) => ({
             role: m.role,
             content: m.content,
@@ -293,6 +302,17 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
   const handleLockPromptAgain = () => {
     setIsPromptUnlocked(false);
     setShowInstructions(false);
+  };
+
+  const handleSaveApiKey = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (apiKeyInput.trim()) {
+      localStorage.setItem('user_gemini_api_key', apiKeyInput.trim());
+    } else {
+      localStorage.removeItem('user_gemini_api_key');
+    }
+    setShowApiKeyModal(false);
+    setErrorMsg(null);
   };
 
   const handleClearChat = () => {
@@ -562,9 +582,20 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
 
           {/* Error Banner */}
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-              <span>{errorMsg}</span>
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                <span>{errorMsg}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setApiKeyInput(localStorage.getItem('user_gemini_api_key') || '');
+                  setShowApiKeyModal(true);
+                }}
+                className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs shrink-0 transition-colors shadow-xs flex items-center space-x-1"
+              >
+                <span>🔑 Inserir Chave API</span>
+              </button>
             </div>
           )}
 
@@ -821,6 +852,64 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition-all shadow-md shadow-amber-500/20"
                 >
                   Desbloquear
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* API Key Modal */}
+      {showApiKeyModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => setShowApiKeyModal(false)}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Configurar Chave API Gemini</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Insira sua chave do Google AI Studio para ativar os agentes:</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveApiKey} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                  Chave API Gemini:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Cole sua chave aqui (ex: AQ.Ab8RN6IPIN...)"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  autoFocus
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+                <p>💡 A chave será salva no seu navegador para uso contínuo nos agentes.</p>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowApiKeyModal(false)}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white transition-all shadow-md shadow-emerald-500/20"
+                >
+                  Salvar e Usar
                 </button>
               </div>
             </form>
