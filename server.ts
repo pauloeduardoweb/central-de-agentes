@@ -2,12 +2,13 @@ import express from 'express';
 import path from 'path';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
-import { isValidStudentCode } from './src/data/studentCodes';
+import { isValidStudentCode } from './src/data/studentCodes.js';
 
 dotenv.config();
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 const PORT = 3000;
 
@@ -17,14 +18,7 @@ function getGeminiClient(customApiKey?: string) {
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY_MISSING');
   }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
+  return new GoogleGenAI({ apiKey });
 }
 
 // Memory registry for device-code bindings
@@ -121,7 +115,7 @@ function validateStudentAccess(req: express.Request, res: express.Response): boo
 
 // Helper to call Gemini with model fallback across supported public models
 async function generateContentWithFallback(ai: GoogleGenAI, params: { contents: any; config?: any }) {
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
   let lastErr: any = null;
   for (const model of models) {
     try {
@@ -344,6 +338,12 @@ ${historyContext ? `HISTÓRICO DE RESPOSTAS DOS OUTROS AGENTES:\n${historyContex
     console.error('Error in /api/multi-agent:', err);
     res.status(500).json({ error: err.message || 'Erro no modo multi-agente.' });
   }
+});
+
+// Global Express error handler for serverless runtime safety
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled server error:', err);
+  res.status(500).json({ error: err?.message || 'Erro interno do servidor.' });
 });
 
 // Setup Vite development or static production serving
