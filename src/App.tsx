@@ -10,14 +10,18 @@ import { AgentEditorModal } from './components/AgentEditorModal';
 import { ChatGPTImportModal } from './components/ChatGPTImportModal';
 import { MultiAgentModal } from './components/MultiAgentModal';
 import { ExportModal } from './components/ExportModal';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import { TechGridBackground } from './components/TechGridBackground';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
+import { unbindCurrentDevice } from './utils/deviceId';
 import { Check } from 'lucide-react';
 
 export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('Tiktok 2K');
+  const [userApiKey, setUserApiKey] = useState<string>('');
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   // Modal controls
   const [selectedChatAgent, setSelectedChatAgent] = useState<Agent | null>(null);
@@ -35,7 +39,33 @@ export default function App() {
   useEffect(() => {
     const loaded = getStoredAgents();
     setAgents(loaded);
+
+    const savedKey = localStorage.getItem('user_gemini_api_key') || '';
+    const savedCode = localStorage.getItem('user_student_access_code') || '';
+    setUserApiKey(savedKey);
+
+    if (!savedKey || !savedCode) {
+      setShowApiKeyModal(true);
+    }
   }, []);
+
+  const handleSaveApiKey = (key: string, accessCode: string) => {
+    localStorage.setItem('user_gemini_api_key', key);
+    localStorage.setItem('user_student_access_code', accessCode);
+    setUserApiKey(key);
+    setShowApiKeyModal(false);
+    triggerToast('Acesso de Aluno ativado com sucesso!');
+  };
+
+  const handleDisconnectApiKey = async () => {
+    await unbindCurrentDevice();
+    localStorage.removeItem('user_gemini_api_key');
+    localStorage.removeItem('user_student_access_code');
+    setUserApiKey('');
+    setShowApiKeyModal(true);
+    triggerToast('Chave API desconectada!');
+  };
+
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -190,6 +220,9 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         onOpenMultiAgent={() => setShowMultiAgentModal(true)}
         onOpenExport={() => setShowExportModal(true)}
         onResetDefaults={handleResetDefaults}
+        onOpenApiKeyModal={() => setShowApiKeyModal(true)}
+        onDisconnectApiKey={handleDisconnectApiKey}
+        hasApiKey={Boolean(userApiKey)}
         agentCount={agents.filter((a) => a.category !== 'Suporte').length}
       />
 
@@ -283,6 +316,14 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
             triggerToast('Backup restaurado com sucesso!');
           }}
           onClose={() => setShowExportModal(false)}
+        />
+      )}
+
+      {showApiKeyModal && (
+        <ApiKeyModal
+          isMandatoryOnboarding={!userApiKey}
+          onSave={handleSaveApiKey}
+          onClose={() => setShowApiKeyModal(false)}
         />
       )}
 
