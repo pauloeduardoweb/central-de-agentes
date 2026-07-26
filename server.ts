@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
-import { isValidStudentCode } from './src/data/studentCodes.ts';
+import { isValidStudentCode } from './src/data/studentCodes';
 
 dotenv.config();
 
@@ -125,7 +125,7 @@ app.post('/api/chat', async (req, res) => {
   if (!validateStudentAccess(req, res)) return;
 
   try {
-    const { systemInstruction, messages, temperature = 0.7, model = 'gemini-2.5-flash', customApiKey } = req.body;
+    const { systemInstruction, messages, temperature = 0.7, customApiKey } = req.body;
     const headerApiKey = req.headers['x-gemini-api-key'] as string;
     const apiKeyToUse = (headerApiKey || customApiKey || '').trim();
 
@@ -164,8 +164,9 @@ app.post('/api/chat', async (req, res) => {
       };
     });
 
+    // Use gemini-3.6-flash model
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: contents,
       config: {
         systemInstruction: systemInstruction || 'Você é um assistente de IA prestativo e amigável.',
@@ -219,7 +220,7 @@ Retorne obrigatoriamente um objeto JSON estruturado com os seguintes campos:
 - temperature: Número entre 0.1 e 1.0 (nível de criatividade adequado para o papel)`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
       config: {
         systemInstruction: systemPrompt,
@@ -307,7 +308,7 @@ ${taskPrompt}
 ${historyContext ? `HISTÓRICO DE RESPOSTAS DOS OUTROS AGENTES:\n${historyContext}\n\nSua vez de contribuir com base nas respostas acima e na sua especialização.` : 'Sua vez de dar a primeira contribuição especializada para a tarefa acima.'}`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: fullPrompt,
         config: {
           systemInstruction: agent.systemInstruction || `Você é o agente ${agent.name}.`,
