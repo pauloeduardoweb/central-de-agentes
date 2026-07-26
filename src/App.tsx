@@ -166,7 +166,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
   };
 
   return (
-    <div className="min-h-screen bg-[#03131c] text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white pb-20 relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#03131c] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white pb-20 relative overflow-x-hidden">
       <TechGridBackground />
 
       <div className="relative z-10">
