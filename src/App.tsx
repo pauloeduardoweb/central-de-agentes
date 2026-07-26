@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
 import { GeracaoZProBanner } from './components/GeracaoZProBanner';
 import { GeracaoZProModal } from './components/GeracaoZProModal';
+import { CertificadosModal } from './components/CertificadosModal';
 import { AgentGrid } from './components/AgentGrid';
 import { AgentChatModal } from './components/AgentChatModal';
 import { AgentEditorModal } from './components/AgentEditorModal';
@@ -26,6 +27,7 @@ export default function App() {
   const [showMultiAgentModal, setShowMultiAgentModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showGeracaoZProModal, setShowGeracaoZProModal] = useState(false);
+  const [showCertificadosModal, setShowCertificadosModal] = useState(false);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -203,10 +205,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
           activeCategory={activeCategory}
           onOpenOfficialAgent={handleOpenOfficialAgent}
           onOpenSiteModal={() => setShowGeracaoZProModal(true)}
-          onOpenCreate={() => {
-            setEditingAgent(null);
-            setShowCreateModal(true);
-          }}
+          onOpenCertificados={() => setShowCertificadosModal(true)}
         />
 
         {/* Grid and Search */}
@@ -234,6 +233,12 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         <GeracaoZProModal
           onClose={() => setShowGeracaoZProModal(false)}
           onOpenOfficialAgent={handleOpenOfficialAgent}
+        />
+      )}
+
+      {showCertificadosModal && (
+        <CertificadosModal
+          onClose={() => setShowCertificadosModal(false)}
         />
       )}
 
