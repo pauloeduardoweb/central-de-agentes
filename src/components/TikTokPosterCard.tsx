@@ -1,7 +1,14 @@
 import React from 'react';
 import { MessageSquare, Sparkles, Heart, Copy, Zap, Flame, Play, ExternalLink, MessageCircle, X } from 'lucide-react';
 import { Agent } from '../types';
-import { getSafeImageUrl } from '../utils/imageUrl';
+
+function getSafeImageUrl(url?: string): string {
+  if (!url) return '';
+  if (url.includes('postimg.cc') || url.includes('postimg.org')) {
+    return `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
 
 interface TikTokPosterCardProps {
   agent: Agent;
