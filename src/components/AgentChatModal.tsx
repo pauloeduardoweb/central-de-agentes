@@ -306,8 +306,14 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
 
   const handleSaveApiKey = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (apiKeyInput.trim()) {
-      localStorage.setItem('user_gemini_api_key', apiKeyInput.trim());
+    const cleanKey = apiKeyInput.trim();
+    if (cleanKey) {
+      if (!cleanKey.startsWith('AIza')) {
+        setErrorMsg('Chave inválida! Chaves oficiais da API do Gemini começam com "AIzaSy...". Obtenha em https://aistudio.google.com/app/apikey');
+        setShowApiKeyModal(false);
+        return;
+      }
+      localStorage.setItem('user_gemini_api_key', cleanKey);
     } else {
       localStorage.removeItem('user_gemini_api_key');
     }
@@ -880,12 +886,21 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
 
             <form onSubmit={handleSaveApiKey} className="space-y-3">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  Chave API Gemini:
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Chave API Gemini:</span>
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-500 hover:underline inline-flex items-center space-x-1 text-[11px]"
+                  >
+                    <span>Obter chave grátis</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </label>
                 <input
                   type="text"
-                  placeholder="Cole sua chave aqui (ex: AQ.Ab8RN6IPIN...)"
+                  placeholder="Cole sua chave aqui (ex: AIzaSy...)"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   autoFocus
@@ -894,7 +909,7 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
               </div>
 
               <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
-                <p>💡 A chave será salva no seu navegador para uso contínuo nos agentes.</p>
+                <p>💡 A chave do Google AI Studio começa com <b>AIzaSy...</b> e será salva no seu navegador.</p>
               </div>
 
               <div className="flex items-center justify-end space-x-2 pt-1">
