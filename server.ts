@@ -3,6 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import { isValidStudentCode } from './src/data/studentCodes';
 
 dotenv.config();
 
@@ -12,10 +13,10 @@ app.use(express.json({ limit: '10mb' }));
 const PORT = 3000;
 
 // Lazy initialization of Gemini client
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
+function getGeminiClient(customApiKey?: string) {
+  const apiKey = customApiKey || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is missing.');
+    throw new Error('GEMINI_API_KEY_MISSING');
   }
   return new GoogleGenAI({
     apiKey,
@@ -27,22 +28,113 @@ function getGeminiClient() {
   });
 }
 
+// Memory registry for device-code bindings
+interface DeviceBinding {
+  deviceId: string;
+  registeredAt: number;
+  lastActiveAt: number;
+  ip?: string;
+}
+
+const activeCodeBindings = new Map<string, DeviceBinding>();
+const MASTER_CODES_LIST = ['mentor-bigode', 'bigode-mentor', 'bigode7144', '7144bigode'];
+
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Endpoint to unbind device when student disconnects
+app.post('/api/unbind', (req, res) => {
+  const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+  const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
+
+  if (studentCode && deviceId) {
+    const cleanCode = studentCode.trim().toLowerCase();
+    const binding = activeCodeBindings.get(cleanCode);
+    if (binding && binding.deviceId === deviceId) {
+      activeCodeBindings.delete(cleanCode);
+    }
+  }
+  res.json({ status: 'unbound' });
+});
+
+// Helper to validate student access code AND single-device binding lock
+function validateStudentAccess(req: express.Request, res: express.Response): boolean {
+  const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+  const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
+
+  if (!isValidStudentCode(studentCode)) {
+    res.status(403).json({
+      error: 'Acesso Negado: Código de Aluno inválido ou não informado. Solicite seu código individual na mentoria.',
+    });
+    return false;
+  }
+
+  const cleanCode = studentCode.trim().toLowerCase();
+
+  // Master Mentor codes are exempt from strict 1-device binding lock
+  if (MASTER_CODES_LIST.includes(cleanCode)) {
+    return true;
+  }
+
+  const now = Date.now();
+  const existingBinding = activeCodeBindings.get(cleanCode);
+
+  if (!existingBinding) {
+    if (deviceId) {
+      activeCodeBindings.set(cleanCode, {
+        deviceId,
+        registeredAt: now,
+        lastActiveAt: now,
+        ip: String(clientIp),
+      });
+    }
+    return true;
+  }
+
+  // Check if a different device is trying to use the same student code
+  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+  if (deviceId && existingBinding.deviceId !== deviceId) {
+    // If inactive for > 12 hours, allow re-binding
+    if (now - existingBinding.lastActiveAt > TWELVE_HOURS) {
+      activeCodeBindings.set(cleanCode, {
+        deviceId,
+        registeredAt: now,
+        lastActiveAt: now,
+        ip: String(clientIp),
+      });
+      return true;
+    }
+
+    res.status(403).json({
+      error: `Acesso Negado: O código de acesso (${studentCode.trim().toUpperCase()}) já está vinculado e em uso em outro dispositivo. Não é permitido compartilhar sua chave de acesso.`,
+    });
+    return false;
+  }
+
+  if (deviceId) {
+    existingBinding.lastActiveAt = now;
+  }
+  return true;
+}
+
 // Chat endpoint for agent execution
 app.post('/api/chat', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
+  if (!validateStudentAccess(req, res)) return;
+
   try {
-    const { systemInstruction, messages, temperature = 0.7, model = 'gemini-3.6-flash' } = req.body;
+    const { systemInstruction, messages, temperature = 0.7, model = 'gemini-3.6-flash', customApiKey } = req.body;
+    const headerApiKey = req.headers['x-gemini-api-key'] as string;
+    const apiKeyToUse = headerApiKey || customApiKey;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'Nenhuma mensagem enviada.' });
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(apiKeyToUse);
 
     // Format chat contents for Gemini
     const contents = messages.map((msg: { role: string; content?: string; image?: string }) => {
@@ -87,8 +179,8 @@ app.post('/api/chat', async (req, res) => {
   } catch (err: any) {
     console.error('Error in /api/chat:', err);
     const msg = err.message || '';
-    if (msg.includes('GEMINI_API_KEY') || msg.includes('API key')) {
-      return res.status(500).json({ error: 'A chave GEMINI_API_KEY não foi configurada no ambiente do servidor.' });
+    if (msg.includes('GEMINI_API_KEY_MISSING') || msg.includes('GEMINI_API_KEY') || msg.includes('API key')) {
+      return res.status(500).json({ error: 'A chave GEMINI_API_KEY não está configurada. Configure no Vercel ou adicione a sua chave no aplicativo.' });
     }
     res.status(500).json({ error: msg || 'Erro ao processar conversa com o agente.' });
   }
@@ -96,13 +188,17 @@ app.post('/api/chat', async (req, res) => {
 
 // AI Agent Generator endpoint
 app.post('/api/generate-agent', async (req, res) => {
+  if (!validateStudentAccess(req, res)) return;
   try {
-    const { prompt } = req.body;
+    const { prompt, customApiKey } = req.body;
+    const headerApiKey = req.headers['x-gemini-api-key'] as string;
+    const apiKeyToUse = headerApiKey || customApiKey;
+
     if (!prompt) {
       return res.status(400).json({ error: 'Forneça uma descrição do agente desejado.' });
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(apiKeyToUse);
 
     const systemPrompt = `Você é um especialista em engenharia de prompts e design de Custom GPTs do ChatGPT.
 Dado o pedido do usuário, crie uma configuração completa e de alta qualidade para um novo Agente do ChatGPT em Português.
@@ -182,13 +278,17 @@ Retorne obrigatoriamente um objeto JSON estruturado com os seguintes campos:
 
 // Multi-Agent Collaboration Endpoint
 app.post('/api/multi-agent', async (req, res) => {
+  if (!validateStudentAccess(req, res)) return;
   try {
-    const { taskPrompt, agents } = req.body;
+    const { taskPrompt, agents, customApiKey } = req.body;
+    const headerApiKey = req.headers['x-gemini-api-key'] as string;
+    const apiKeyToUse = headerApiKey || customApiKey;
+
     if (!taskPrompt || !agents || !Array.isArray(agents) || agents.length < 2) {
       return res.status(400).json({ error: 'Selecione pelo menos 2 agentes e forneça uma tarefa.' });
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(apiKeyToUse);
 
     // Generate response from each agent sequentially with awareness of previous outputs
     const conversationTrail: { agentName: string; content: string }[] = [];
