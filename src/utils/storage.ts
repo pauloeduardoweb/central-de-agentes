@@ -1,50 +1,156 @@
-import { Agent } from '../types';
+import { Agent, ChatMessage, ChatSession, TeamGroup } from '../types';
+import { DEFAULT_AGENTS } from '../data/defaultAgents';
 
-const STORAGE_KEY = 'geracaozpro_agents';
+const AGENTS_STORAGE_KEY = 'gpt_central_agents_v14';
+const CHAT_SESSIONS_STORAGE_KEY = 'gpt_central_chats_v1';
+const TEAMS_STORAGE_KEY = 'gpt_central_teams_v1';
 
-export const initialAgents: Agent[] = [
-  {
-    id: 'agent-geracaozpro-oficial',
-    name: 'Geração Z Pro Oficial',
-    tagline: 'Assistente Estratégico',
-    description: 'Agente oficial de suporte e estratégias da comunidade Geração Z Pro.',
-    category: 'Suporte',
-    iconName: 'Zap',
-    colorTheme: 'emerald',
-    systemInstruction: 'Você é o assistente oficial da Geração Z Pro. Ajude o usuário com estratégias de conteúdo, monetização e crescimento no TikTok.',
-    conversationStarters: ['Como posso monetizar meu TikTok?', 'Qual a melhor estratégia para o TikTok 2K?'],
-    capabilities: { codeInterpreter: true, webSearch: true, imageGeneration: true, jsonOutput: false },
-    temperature: 0.7,
-    isFavorite: true,
-    isCustom: false,
-    usageCount: 0,
-    createdAt: new Date().toISOString(),
-  }
-];
-
-export const getStoredAgents = (): Agent[] => {
+export function getStoredAgents(): Agent[] {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : initialAgents;
-  } catch (e) {
-    console.error('Erro ao carregar agentes do localStorage', e);
-    return initialAgents;
-  }
-};
+    const raw = localStorage.getItem(AGENTS_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(AGENTS_STORAGE_KEY, JSON.stringify(DEFAULT_AGENTS));
+      return DEFAULT_AGENTS;
+    }
+    const parsed: Agent[] = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const defaultMap = new Map(DEFAULT_AGENTS.map((d) => [d.id, d]));
+      let hasUpdates = false;
 
-export const saveAgents = (agents: Agent[]): void => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(agents));
-  } catch (e) {
-    console.error('Erro ao salvar agentes no localStorage', e);
-  }
-};
+      // Filter out deleted non-custom default agents
+      const validParsed = parsed.filter((agent) => agent.isCustom || defaultMap.has(agent.id));
+      if (validParsed.length !== parsed.length) {
+        hasUpdates = true;
+      }
 
-export const resetAgentsToDefault = (): Agent[] => {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (e) {
-    console.error('Erro ao resetar agentes', e);
+      const mergedList = validParsed.map((agent) => {
+        const def = defaultMap.get(agent.id);
+        if (def) {
+          if (
+            (def.chatGptUrl !== undefined && agent.chatGptUrl !== def.chatGptUrl) ||
+            (def.geminiUrl !== undefined && agent.geminiUrl !== def.geminiUrl) ||
+            (def.exampleVideoUrl !== undefined && agent.exampleVideoUrl !== def.exampleVideoUrl) ||
+            (def.exampleVideoUrls !== undefined && JSON.stringify(agent.exampleVideoUrls) !== JSON.stringify(def.exampleVideoUrls)) ||
+            (def.posterSlug !== undefined && agent.posterSlug !== def.posterSlug) ||
+            (def.coverImage !== undefined && agent.coverImage !== def.coverImage) ||
+            (def.chatBackgroundImage !== undefined && agent.chatBackgroundImage !== def.chatBackgroundImage) ||
+            (def.tagline !== undefined && agent.tagline !== def.tagline) ||
+            (def.description !== undefined && agent.description !== def.description) ||
+            (def.systemInstruction !== undefined && agent.systemInstruction !== def.systemInstruction)
+          ) {
+            hasUpdates = true;
+            return {
+              ...agent,
+              chatGptUrl: def.chatGptUrl,
+              geminiUrl: def.geminiUrl,
+              exampleVideoUrl: def.exampleVideoUrl,
+              exampleVideoUrls: def.exampleVideoUrls,
+              posterSlug: def.posterSlug,
+              coverImage: def.coverImage,
+              chatBackgroundImage: def.chatBackgroundImage,
+              tagline: def.tagline,
+              description: def.description,
+              systemInstruction: def.systemInstruction,
+              conversationStarters: def.conversationStarters || agent.conversationStarters,
+            };
+          }
+        }
+        return agent;
+      });
+
+      const existingIds = new Set(mergedList.map((a) => a.id));
+      const missingDefaults = DEFAULT_AGENTS.filter((def) => !existingIds.has(def.id));
+      if (missingDefaults.length > 0 || hasUpdates) {
+        const finalList = [...missingDefaults, ...mergedList];
+        localStorage.setItem(AGENTS_STORAGE_KEY, JSON.stringify(finalList));
+        return finalList;
+      }
+      return mergedList;
+    }
+    return DEFAULT_AGENTS;
+  } catch (err) {
+    console.error('Error reading stored agents:', err);
+    return DEFAULT_AGENTS;
   }
-  return initialAgents;
-};
+}
+
+export function saveAgents(agents: Agent[]): void {
+  try {
+    localStorage.setItem(AGENTS_STORAGE_KEY, JSON.stringify(agents));
+  } catch (err) {
+    console.error('Error saving agents:', err);
+  }
+}
+
+export function resetAgentsToDefault(): Agent[] {
+  localStorage.setItem(AGENTS_STORAGE_KEY, JSON.stringify(DEFAULT_AGENTS));
+  return DEFAULT_AGENTS;
+}
+
+export function getStoredChatSession(agentId: string): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
+    if (!raw) return [];
+    const sessions: Record<string, ChatSession> = JSON.parse(raw);
+    return sessions[agentId]?.messages || [];
+  } catch (err) {
+    console.error('Error reading chat session:', err);
+    return [];
+  }
+}
+
+export function saveChatSession(agentId: string, messages: ChatMessage[]): void {
+  try {
+    const raw = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
+    const sessions: Record<string, ChatSession> = raw ? JSON.parse(raw) : {};
+    sessions[agentId] = {
+      agentId,
+      messages,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(CHAT_SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+  } catch (err) {
+    console.error('Error saving chat session:', err);
+  }
+}
+
+export function clearChatSession(agentId: string): void {
+  try {
+    const raw = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
+    if (!raw) return;
+    const sessions: Record<string, ChatSession> = JSON.parse(raw);
+    delete sessions[agentId];
+    localStorage.setItem(CHAT_SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+  } catch (err) {
+    console.error('Error clearing chat session:', err);
+  }
+}
+
+export function getStoredTeams(): TeamGroup[] {
+  try {
+    const raw = localStorage.getItem(TEAMS_STORAGE_KEY);
+    if (!raw) {
+      const defaultTeam: TeamGroup = {
+        id: 'team-growth-squad',
+        name: 'Esquadrão de Growth & Produto',
+        description: 'Estratégia de negócios, copywriting e design UX em conjunto.',
+        agentIds: ['agent-business-strategist', 'agent-copywriter-pro', 'agent-ux-design-critique'],
+        createdAt: new Date().toISOString(),
+      };
+      localStorage.setItem(TEAMS_STORAGE_KEY, JSON.stringify([defaultTeam]));
+      return [defaultTeam];
+    }
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('Error getting teams:', err);
+    return [];
+  }
+}
+
+export function saveTeams(teams: TeamGroup[]): void {
+  try {
+    localStorage.setItem(TEAMS_STORAGE_KEY, JSON.stringify(teams));
+  } catch (err) {
+    console.error('Error saving teams:', err);
+  }
+}
