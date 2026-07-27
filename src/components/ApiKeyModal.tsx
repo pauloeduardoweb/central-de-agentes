@@ -58,7 +58,15 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       }
 
       if (!res.ok) {
-        setError(data.message || data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) é inválido.`);
+        if (res.status === 500) {
+          setError(data.message || data.error || 'O servidor de autenticação está temporariamente indisponível.');
+        } else if (res.status === 409) {
+          setError(data.message || data.error || 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.');
+        } else if (res.status === 401) {
+          setError(data.message || data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) é inválido.`);
+        } else {
+          setError(data.message || data.error || 'O servidor de autenticação está temporariamente indisponível.');
+        }
         setLoading(false);
         return;
       }
