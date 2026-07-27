@@ -5,7 +5,7 @@ import { getDeviceId } from '../utils/deviceId';
 
 interface ApiKeyModalProps {
   onClose: () => void;
-  onSave: (apiKey: string, accessCode: string) => void;
+  onSave: (apiKey: string, accessCode: string, sessionId?: string) => void;
   isMandatoryOnboarding?: boolean;
 }
 
@@ -59,16 +59,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       }
 
       if (!res.ok) {
-        if (res.status === 403 && data.error) {
+        if ((res.status === 409 || res.status === 403 || res.status === 401) && data.error) {
           setError(data.error);
           setLoading(false);
-          return;
-        }
-
-        // Safety Fallback: If server returned non-403 (e.g. 404/500 or timeout),
-        // but the code IS valid according to isValidStudentCode, allow access
-        if (isValidStudentCode(cleanCode)) {
-          onSave('STUDENT_AUTHORIZED', cleanCode);
           return;
         }
 
@@ -77,7 +70,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         return;
       }
 
-      onSave('STUDENT_AUTHORIZED', cleanCode);
+      const returnedSessionId = data.sessionId || '';
+      onSave('STUDENT_AUTHORIZED', cleanCode, returnedSessionId);
     } catch (err: any) {
       if (isValidStudentCode(cleanCode)) {
         onSave('STUDENT_AUTHORIZED', cleanCode);
