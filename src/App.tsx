@@ -43,11 +43,14 @@ export default function App() {
     const loaded = getStoredAgents();
     setAgents(loaded);
 
-    const savedKey = localStorage.getItem('user_gemini_api_key') || 'STUDENT_AUTHORIZED';
     const savedCode = localStorage.getItem('user_student_access_code') || '';
-    setUserApiKey(savedKey);
+    const savedKey = localStorage.getItem('user_gemini_api_key') || '';
 
-    if (!savedCode || !isValidStudentCode(savedCode)) {
+    if (savedCode && isValidStudentCode(savedCode)) {
+      setUserApiKey(savedKey || 'STUDENT_AUTHORIZED');
+      setShowApiKeyModal(false);
+    } else {
+      setUserApiKey('');
       setShowApiKeyModal(true);
     }
   }, []);
@@ -230,7 +233,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
       />
 
       {/* Container */}
-      <main className="max-w-7xl mx-auto px-4 lg:px-8 pt-6">
+      <main className={`max-w-7xl mx-auto px-4 lg:px-8 pt-6 transition-all duration-300 ${!userApiKey ? 'filter blur-lg opacity-20 pointer-events-none select-none' : ''}`}>
         
         {/* Banner Oficial Geração Z Pro */}
         <GeracaoZProBanner />
