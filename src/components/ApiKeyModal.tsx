@@ -59,14 +59,31 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       }
 
       if (!res.ok) {
-        setError(data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) já está em uso em outro dispositivo ou é inválido.`);
+        if (res.status === 403 && data.error) {
+          setError(data.error);
+          setLoading(false);
+          return;
+        }
+
+        // Safety Fallback: If server returned non-403 (e.g. 404/500 or timeout),
+        // but the code IS valid according to isValidStudentCode, allow access
+        if (isValidStudentCode(cleanCode)) {
+          onSave('STUDENT_AUTHORIZED', cleanCode);
+          return;
+        }
+
+        setError(data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) é inválido.`);
         setLoading(false);
         return;
       }
 
       onSave('STUDENT_AUTHORIZED', cleanCode);
     } catch (err: any) {
-      setError('Não foi possível verificar a licença. Verifique sua conexão com a internet e tente novamente.');
+      if (isValidStudentCode(cleanCode)) {
+        onSave('STUDENT_AUTHORIZED', cleanCode);
+      } else {
+        setError('Não foi possível verificar a licença. Verifique sua conexão com a internet e tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
