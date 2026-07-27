@@ -26,6 +26,9 @@ export default function App() {
   const [studentCode, setStudentCode] = useState<string>(() => {
     return localStorage.getItem('user_student_access_code') || '';
   });
+  const [sessionId, setSessionId] = useState<string>(() => {
+    return localStorage.getItem('user_session_id') || '';
+  });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   // Modal controls
@@ -48,13 +51,15 @@ export default function App() {
 
     const savedCode = localStorage.getItem('user_student_access_code') || '';
     const savedKey = localStorage.getItem('user_gemini_api_key') || '';
+    const savedSessionId = localStorage.getItem('user_session_id') || '';
 
     if (savedCode && isValidStudentCode(savedCode)) {
       setUserApiKey(savedKey || 'STUDENT_AUTHORIZED');
       setStudentCode(savedCode);
+      setSessionId(savedSessionId);
       setShowApiKeyModal(false);
 
-      // Verify active device lock status with server on load
+      // Verify active session with server on load
       const deviceId = getDeviceId();
       fetch('/api/verify-code', {
         method: 'POST',
@@ -62,28 +67,116 @@ export default function App() {
           'Content-Type': 'application/json',
           'x-client-device-id': deviceId,
           'x-student-access-code': savedCode,
+          'x-session-id': savedSessionId,
         },
-        body: JSON.stringify({ studentAccessCode: savedCode, deviceId }),
-      }).then(async (res) => {
-        if (!res.ok && res.status === 403) {
-          // Code has been bound to another device! Revoke session on this device.
-          localStorage.removeItem('user_student_access_code');
-          localStorage.removeItem('user_gemini_api_key');
-          setUserApiKey('');
-          setStudentCode('');
-          setShowApiKeyModal(true);
-        }
-      }).catch(() => {});
+        body: JSON.stringify({ studentAccessCode: savedCode, deviceId, sessionId: savedSessionId }),
+      })
+        .then(async (res) => {
+          let data: any = {};
+          try {
+            data = await res.json();
+          } catch (e) {}
+
+          if (!res.ok && (res.status === 409 || res.status === 403 || res.status === 401)) {
+            // Code is active on another device or session revoked
+            localStorage.removeItem('user_student_access_code');
+            localStorage.removeItem('user_session_id');
+            localStorage.removeItem('user_gemini_api_key');
+            setUserApiKey('');
+            setStudentCode('');
+            setSessionId('');
+            setShowApiKeyModal(true);
+            if (data.error) triggerToast(data.error);
+          } else if (res.ok && data.sessionId) {
+            localStorage.setItem('user_session_id', data.sessionId);
+            setSessionId(data.sessionId);
+          }
+        })
+        .catch(() => {});
     } else {
       setUserApiKey('');
       setStudentCode('');
+      setSessionId('');
       setShowApiKeyModal(true);
     }
   }, []);
 
-  const handleSaveApiKey = (key: string, accessCode: string) => {
+  // Heartbeat loop every 30 seconds
+  useEffect(() => {
+    if (!studentCode || !sessionId) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        const deviceId = getDeviceId();
+        const res = await fetch('/api/session/heartbeat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-student-access-code': studentCode,
+            'x-session-id': sessionId,
+            'x-client-device-id': deviceId,
+          },
+          body: JSON.stringify({
+            studentAccessCode: studentCode,
+            sessionId: sessionId,
+            deviceId,
+          }),
+        });
+
+        if (!res.ok && (res.status === 401 || res.status === 409)) {
+          let data: any = {};
+          try {
+            data = await res.json();
+          } catch (e) {}
+
+          localStorage.removeItem('user_student_access_code');
+          localStorage.removeItem('user_session_id');
+          localStorage.removeItem('user_gemini_api_key');
+          setUserApiKey('');
+          setStudentCode('');
+          setSessionId('');
+          setShowApiKeyModal(true);
+          triggerToast(data.error || 'Esta chave já está sendo utilizada em outro dispositivo. Sua sessão foi encerrada.');
+        }
+      } catch (err) {
+        console.warn('[Heartbeat] Network check error:', err);
+      }
+    };
+
+    const interval = setInterval(sendHeartbeat, 30000); // 30s
+    return () => clearInterval(interval);
+  }, [studentCode, sessionId]);
+
+  // Page unload beacon (sendBeacon)
+  useEffect(() => {
+    const handleUnload = () => {
+      if (studentCode && sessionId) {
+        const payload = JSON.stringify({
+          studentAccessCode: studentCode,
+          sessionId: sessionId,
+          deviceId: getDeviceId(),
+        });
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon('/api/logout', blob);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+    };
+  }, [studentCode, sessionId]);
+
+  const handleSaveApiKey = (key: string, accessCode: string, newSessionId?: string) => {
     localStorage.setItem('user_gemini_api_key', key);
     localStorage.setItem('user_student_access_code', accessCode);
+    if (newSessionId) {
+      localStorage.setItem('user_session_id', newSessionId);
+      setSessionId(newSessionId);
+    }
     setUserApiKey(key);
     setStudentCode(accessCode);
     setShowApiKeyModal(false);
@@ -94,8 +187,10 @@ export default function App() {
     await unbindCurrentDevice();
     localStorage.removeItem('user_gemini_api_key');
     localStorage.removeItem('user_student_access_code');
+    localStorage.removeItem('user_session_id');
     setUserApiKey('');
     setStudentCode('');
+    setSessionId('');
     setShowApiKeyModal(true);
     triggerToast('Código de acesso removido do navegador.');
   };
