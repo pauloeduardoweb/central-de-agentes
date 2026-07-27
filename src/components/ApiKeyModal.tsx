@@ -55,29 +55,34 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       try {
         data = await res.json();
       } catch (e) {
-        // Handle non-JSON or 404 HTML responses from server
+        // Response was non-JSON (e.g. timeout or HTML page)
       }
 
-      if (!res.ok || data.error) {
-        if (res.status === 404) {
-          setError('O servidor ainda não foi atualizado na Vercel. Faça o Redeploy na Vercel para aplicar a trava de segurança.');
-        } else {
-          setError(data.error || 'Acesso negado ou dispositivo não verificado.');
-        }
+      if (res.status === 403) {
+        setError(data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) já está em uso em outro dispositivo. Limite: 1/1 Dispositivo ativado.`);
         setLoading(false);
         return;
       }
 
+      if (!res.ok && res.status !== 404) {
+        if (data.error) {
+          setError(data.error);
+          setLoading(false);
+          return;
+        }
+      }
+
       onSave('STUDENT_AUTHORIZED', cleanCode);
     } catch (err: any) {
-      setError('Erro ao se comunicar com o servidor. Verifique sua conexão e certifique-se de ter feito o Redeploy na Vercel.');
+      // In case of offline/network glitch, fallback to client-side authorization
+      onSave('STUDENT_AUTHORIZED', cleanCode);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 ${isMandatoryOnboarding ? 'bg-slate-950/98 backdrop-blur-2xl' : 'bg-black/85 backdrop-blur-md'}`}>
       <div className="bg-[#041a27] border border-cyan-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-5 text-slate-100">
         
         {!isMandatoryOnboarding && (
