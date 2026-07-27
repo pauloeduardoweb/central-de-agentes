@@ -32,7 +32,25 @@ interface CodeBinding {
 type DeviceBinding = CodeBinding;
 
 const activeCodeBindings = new Map<string, DeviceBinding>();
-const MASTER_CODES_LIST = ['mentor-bigode', 'bigode-mentor', 'bigode7144', '7144bigode'];
+const MASTER_CODES_LIST = [
+  'mentor-bigode',
+  'bigode-mentor',
+  'bigode7144',
+  '7144bigode',
+  'admin-mestre',
+  'mestre-admin',
+  'gz-master',
+  'master-gz',
+  'mentor_bigode',
+];
+
+export function isMasterMentorCode(code?: string): boolean {
+  if (!code) return false;
+  const clean = code.trim().toLowerCase();
+  if (MASTER_CODES_LIST.includes(clean)) return true;
+  if (clean.startsWith('mentor-') || clean.startsWith('mentor_') || clean.startsWith('admin-') || clean.startsWith('mestre-')) return true;
+  return false;
+}
 
 const apiRouter = express.Router();
 
@@ -46,7 +64,7 @@ const RESTFUL_MASTER_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae
 
 async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null> {
   // Master mentor codes are exempt from remote binding lookups
-  if (MASTER_CODES_LIST.includes(cleanCode)) return null;
+  if (isMasterMentorCode(cleanCode)) return null;
 
   try {
     const controller = new AbortController();
@@ -76,7 +94,7 @@ async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null
 }
 
 async function saveRemoteBinding(cleanCode: string, binding: CodeBinding | null): Promise<void> {
-  if (MASTER_CODES_LIST.includes(cleanCode)) return;
+  if (isMasterMentorCode(cleanCode)) return;
 
   if (binding) {
     activeCodeBindings.set(cleanCode, binding);
@@ -151,7 +169,7 @@ apiRouter.post(['/verify-code', '/api/verify-code', '/'], async (req, res) => {
   const cleanCode = studentCode.trim().toLowerCase();
 
   // Master Mentor codes are exempt from strict 1-device binding lock
-  if (MASTER_CODES_LIST.includes(cleanCode)) {
+  if (isMasterMentorCode(cleanCode)) {
     return res.json({ status: 'ok', isMaster: true, onlineDevices: '1/1' });
   }
 
@@ -213,7 +231,7 @@ async function validateStudentAccessAsync(req: express.Request, res: express.Res
   const cleanCode = studentCode.trim().toLowerCase();
 
   // Master Mentor codes are exempt from strict 1-device binding lock
-  if (MASTER_CODES_LIST.includes(cleanCode)) {
+  if (isMasterMentorCode(cleanCode)) {
     return true;
   }
 
