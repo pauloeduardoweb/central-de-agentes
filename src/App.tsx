@@ -15,7 +15,7 @@ import { ApiKeyModal } from './components/ApiKeyModal';
 import { TechGridBackground } from './components/TechGridBackground';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
-import { unbindCurrentDevice } from './utils/deviceId';
+import { getDeviceId, unbindCurrentDevice } from './utils/deviceId';
 import { isValidStudentCode } from './data/studentCodes';
 import { Check } from 'lucide-react';
 
@@ -49,6 +49,26 @@ export default function App() {
     if (savedCode && isValidStudentCode(savedCode)) {
       setUserApiKey(savedKey || 'STUDENT_AUTHORIZED');
       setShowApiKeyModal(false);
+
+      // Verify active device lock status with server on load
+      const deviceId = getDeviceId();
+      fetch('/api/verify-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-device-id': deviceId,
+          'x-student-access-code': savedCode,
+        },
+        body: JSON.stringify({ studentAccessCode: savedCode, deviceId }),
+      }).then(async (res) => {
+        if (!res.ok && res.status === 403) {
+          // Code has been bound to another device! Revoke session on this device.
+          localStorage.removeItem('user_student_access_code');
+          localStorage.removeItem('user_gemini_api_key');
+          setUserApiKey('');
+          setShowApiKeyModal(true);
+        }
+      }).catch(() => {});
     } else {
       setUserApiKey('');
       setShowApiKeyModal(true);
