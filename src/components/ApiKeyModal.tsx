@@ -58,24 +58,15 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         // Response was non-JSON (e.g. timeout or HTML page)
       }
 
-      if (res.status === 403) {
-        setError(data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) já está em uso em outro dispositivo. Limite: 1/1 Dispositivo ativado.`);
+      if (!res.ok) {
+        setError(data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) já está em uso em outro dispositivo ou é inválido.`);
         setLoading(false);
         return;
       }
 
-      if (!res.ok && res.status !== 404) {
-        if (data.error) {
-          setError(data.error);
-          setLoading(false);
-          return;
-        }
-      }
-
       onSave('STUDENT_AUTHORIZED', cleanCode);
     } catch (err: any) {
-      // In case of offline/network glitch, fallback to client-side authorization
-      onSave('STUDENT_AUTHORIZED', cleanCode);
+      setError('Não foi possível verificar a licença. Verifique sua conexão com a internet e tente novamente.');
     } finally {
       setLoading(false);
     }
