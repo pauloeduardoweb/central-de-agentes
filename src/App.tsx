@@ -61,15 +61,14 @@ export default function App() {
 
       // Verify active session with server on load
       const deviceId = getDeviceId();
-      fetch('/api/verify-code', {
+      fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-client-device-id': deviceId,
-          'x-student-access-code': savedCode,
           'x-session-id': savedSessionId,
         },
-        body: JSON.stringify({ studentAccessCode: savedCode, deviceId, sessionId: savedSessionId }),
+        body: JSON.stringify({ accessCode: savedCode, deviceId, sessionId: savedSessionId }),
       })
         .then(async (res) => {
           let data: any = {};
