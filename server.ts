@@ -22,12 +22,14 @@ function getGeminiClient(customApiKey?: string) {
 }
 
 // Memory registry for device-code bindings
-interface DeviceBinding {
+interface CodeBinding {
   deviceId: string;
   registeredAt: number;
   lastActiveAt: number;
   ip?: string;
 }
+
+type DeviceBinding = CodeBinding;
 
 const activeCodeBindings = new Map<string, DeviceBinding>();
 const MASTER_CODES_LIST = ['mentor-bigode', 'bigode-mentor', 'bigode7144', '7144bigode'];
@@ -39,23 +41,76 @@ apiRouter.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Persistent global store for student device lock
+const KV_STORE_URL = 'https://keyvalue.xyz/gz_pro_v2_bindings_secure';
+
+async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null> {
+  try {
+    const res = await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.trim().length > 0 && text.startsWith('{')) {
+        const parsed = JSON.parse(text);
+        if (parsed && parsed.deviceId) {
+          activeCodeBindings.set(cleanCode, parsed);
+          return parsed;
+        }
+      }
+    }
+    if (res.status === 404) {
+      activeCodeBindings.delete(cleanCode);
+      return null;
+    }
+  } catch (err) {
+    console.warn('[KV Store] Fetch error:', err);
+  }
+  return activeCodeBindings.get(cleanCode) || null;
+}
+
+async function saveRemoteBinding(cleanCode: string, binding: CodeBinding | null): Promise<void> {
+  if (binding) {
+    activeCodeBindings.set(cleanCode, binding);
+  } else {
+    activeCodeBindings.delete(cleanCode);
+  }
+
+  try {
+    if (binding) {
+      await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(binding),
+      });
+    } else {
+      await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
+        method: 'DELETE',
+      });
+    }
+  } catch (err) {
+    console.warn('[KV Store] Save error:', err);
+  }
+}
+
 // Endpoint to unbind device when student disconnects
-apiRouter.post('/unbind', (req, res) => {
+apiRouter.post('/unbind', async (req, res) => {
   const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
   const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
 
   if (studentCode && deviceId) {
     const cleanCode = studentCode.trim().toLowerCase();
-    const binding = activeCodeBindings.get(cleanCode);
+    const binding = await fetchRemoteBinding(cleanCode);
     if (binding && binding.deviceId === deviceId) {
-      activeCodeBindings.delete(cleanCode);
+      await saveRemoteBinding(cleanCode, null);
     }
   }
   res.json({ status: 'unbound' });
 });
 
 // Endpoint to verify student code and register 1-device lock
-apiRouter.post('/verify-code', (req, res) => {
+apiRouter.post('/verify-code', async (req, res) => {
   const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
   const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
   const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
@@ -70,7 +125,7 @@ apiRouter.post('/verify-code', (req, res) => {
 
   // Master Mentor codes are exempt from strict 1-device binding lock
   if (MASTER_CODES_LIST.includes(cleanCode)) {
-    return res.json({ status: 'ok', isMaster: true });
+    return res.json({ status: 'ok', isMaster: true, onlineDevices: '1/1' });
   }
 
   if (!deviceId) {
@@ -78,42 +133,45 @@ apiRouter.post('/verify-code', (req, res) => {
   }
 
   const now = Date.now();
-  const existingBinding = activeCodeBindings.get(cleanCode);
+  const existingBinding = await fetchRemoteBinding(cleanCode);
 
   if (!existingBinding) {
-    activeCodeBindings.set(cleanCode, {
+    const newBinding: CodeBinding = {
       deviceId,
       registeredAt: now,
       lastActiveAt: now,
       ip: String(clientIp),
-    });
-    return res.json({ status: 'ok', bound: true });
+    };
+    await saveRemoteBinding(cleanCode, newBinding);
+    return res.json({ status: 'ok', bound: true, onlineDevices: '1/1' });
   }
 
   if (existingBinding.deviceId === deviceId) {
     existingBinding.lastActiveAt = now;
-    return res.json({ status: 'ok', bound: true });
+    await saveRemoteBinding(cleanCode, existingBinding);
+    return res.json({ status: 'ok', bound: true, onlineDevices: '1/1' });
   }
 
   // Active on another device
   const TWELVE_HOURS = 12 * 60 * 60 * 1000;
-  if (now - existingBinding.lastActiveAt > TWELVE_HOURS) {
-    activeCodeBindings.set(cleanCode, {
+  if (now - (existingBinding.lastActiveAt || 0) > TWELVE_HOURS) {
+    const newBinding: CodeBinding = {
       deviceId,
       registeredAt: now,
       lastActiveAt: now,
       ip: String(clientIp),
-    });
-    return res.json({ status: 'ok', bound: true });
+    };
+    await saveRemoteBinding(cleanCode, newBinding);
+    return res.json({ status: 'ok', bound: true, onlineDevices: '1/1' });
   }
 
   return res.status(403).json({
-    error: `Acesso Negado: O código (${studentCode.trim().toUpperCase()}) já está em uso em outro dispositivo (celular ou computador). Você deve clicar em 'Sair' no seu outro aparelho primeiro para liberar o acesso aqui.`,
+    error: `Acesso Negado: O código (${studentCode.trim().toUpperCase()}) já está em uso em outro dispositivo (Computador/Celular). Limite: 1/1 Dispositivo ativado. Você deve clicar em 'Sair' no seu outro aparelho primeiro para liberar o acesso aqui.`,
   });
 });
 
 // Helper to validate student access code AND single-device binding lock
-function validateStudentAccess(req: express.Request, res: express.Response): boolean {
+async function validateStudentAccessAsync(req: express.Request, res: express.Response): Promise<boolean> {
   const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
   const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
   const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
@@ -133,16 +191,17 @@ function validateStudentAccess(req: express.Request, res: express.Response): boo
   }
 
   const now = Date.now();
-  const existingBinding = activeCodeBindings.get(cleanCode);
+  const existingBinding = await fetchRemoteBinding(cleanCode);
 
   if (!existingBinding) {
     if (deviceId) {
-      activeCodeBindings.set(cleanCode, {
+      const newBinding: CodeBinding = {
         deviceId,
         registeredAt: now,
         lastActiveAt: now,
         ip: String(clientIp),
-      });
+      };
+      await saveRemoteBinding(cleanCode, newBinding);
     }
     return true;
   }
@@ -151,24 +210,26 @@ function validateStudentAccess(req: express.Request, res: express.Response): boo
   const TWELVE_HOURS = 12 * 60 * 60 * 1000;
   if (deviceId && existingBinding.deviceId !== deviceId) {
     // If inactive for > 12 hours, allow re-binding
-    if (now - existingBinding.lastActiveAt > TWELVE_HOURS) {
-      activeCodeBindings.set(cleanCode, {
+    if (now - (existingBinding.lastActiveAt || 0) > TWELVE_HOURS) {
+      const newBinding: CodeBinding = {
         deviceId,
         registeredAt: now,
         lastActiveAt: now,
         ip: String(clientIp),
-      });
+      };
+      await saveRemoteBinding(cleanCode, newBinding);
       return true;
     }
 
     res.status(403).json({
-      error: `Acesso Negado: O código (${studentCode.trim().toUpperCase()}) já está em uso em outro dispositivo (celular ou computador). Você deve clicar em 'Sair' no seu outro aparelho primeiro para liberar o acesso aqui.`,
+      error: `Acesso Negado: O código (${studentCode.trim().toUpperCase()}) já está em uso em outro dispositivo. Limite: 1/1 Dispositivo ativado. Você deve clicar em 'Sair' no seu outro aparelho primeiro para liberar o acesso aqui.`,
     });
     return false;
   }
 
   if (deviceId) {
     existingBinding.lastActiveAt = now;
+    await saveRemoteBinding(cleanCode, existingBinding);
   }
   return true;
 }
@@ -219,7 +280,7 @@ function handleGeminiError(err: any, res: express.Response) {
 // Chat endpoint for agent execution
 apiRouter.post('/chat', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  if (!validateStudentAccess(req, res)) return;
+  if (!(await validateStudentAccessAsync(req, res))) return;
 
   try {
     const { systemInstruction, messages, temperature = 0.7, customApiKey } = req.body;
@@ -279,7 +340,8 @@ apiRouter.post('/chat', async (req, res) => {
 
 // AI Agent Generator endpoint
 apiRouter.post('/generate-agent', async (req, res) => {
-  if (!validateStudentAccess(req, res)) return;
+  if (!(await validateStudentAccessAsync(req, res))) return;
+
   try {
     const { prompt, customApiKey } = req.body;
     const headerApiKey = req.headers['x-gemini-api-key'] as string;
@@ -368,7 +430,8 @@ Retorne obrigatoriamente um objeto JSON estruturado com os seguintes campos:
 
 // Multi-Agent Collaboration Endpoint
 apiRouter.post('/multi-agent', async (req, res) => {
-  if (!validateStudentAccess(req, res)) return;
+  if (!(await validateStudentAccessAsync(req, res))) return;
+
   try {
     const { taskPrompt, agents, customApiKey } = req.body;
     const headerApiKey = req.headers['x-gemini-api-key'] as string;
