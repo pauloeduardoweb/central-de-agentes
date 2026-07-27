@@ -3,9 +3,20 @@ import path from 'path';
 import crypto from 'crypto';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
-import { isValidStudentCode } from './src/data/studentCodes';
+import {
+  lookupKeyType,
+  verifyLoadedKeysCount,
+  normalizeAccessCode,
+  maskCodeForLogs,
+} from './server/authKeys';
 
 dotenv.config();
+
+// Startup validation of keys count (Rule 18 & 19)
+const { masterCount, studentCount, totalCount } = verifyLoadedKeysCount();
+console.log(`Chaves mestras carregadas: ${masterCount}`);
+console.log(`Chaves de alunos carregadas: ${studentCount}`);
+console.log(`Total de chaves carregadas: ${totalCount}`);
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -36,25 +47,6 @@ export interface CodeSessionRecord {
 }
 
 const activeSessionStore = new Map<string, CodeSessionRecord>();
-const MASTER_CODES_LIST = [
-  'mentor-bigode',
-  'bigode-mentor',
-  'bigode7144',
-  '7144bigode',
-  'admin-mestre',
-  'mestre-admin',
-  'gz-master',
-  'master-gz',
-  'mentor_bigode',
-];
-
-export function isMasterMentorCode(code?: string): boolean {
-  if (!code) return false;
-  const clean = code.trim().toLowerCase();
-  if (MASTER_CODES_LIST.includes(clean)) return true;
-  if (clean.startsWith('mentor-') || clean.startsWith('mentor_') || clean.startsWith('admin-') || clean.startsWith('mestre-')) return true;
-  return false;
-}
 
 const apiRouter = express.Router();
 
@@ -67,7 +59,7 @@ apiRouter.get(['/health', '/api/health'], (_req, res) => {
 const RESTFUL_MASTER_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fa3a6f97f3351';
 
 async function fetchSessionRecord(cleanCode: string): Promise<CodeSessionRecord | null> {
-  if (isMasterMentorCode(cleanCode)) {
+  if (lookupKeyType(cleanCode) === 'MASTER') {
     const nowIso = new Date().toISOString();
     return {
       code: cleanCode.toUpperCase(),
@@ -87,7 +79,7 @@ async function fetchSessionRecord(cleanCode: string): Promise<CodeSessionRecord 
     const timeout = setTimeout(() => controller.abort(), 2500);
     const res = await fetch(RESTFUL_MASTER_URL, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' },
+      headers: { Accept: 'application/json' },
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -110,7 +102,7 @@ async function fetchSessionRecord(cleanCode: string): Promise<CodeSessionRecord 
 }
 
 async function saveSessionRecord(cleanCode: string, record: CodeSessionRecord | null): Promise<void> {
-  if (isMasterMentorCode(cleanCode)) return;
+  if (lookupKeyType(cleanCode) === 'MASTER') return;
 
   if (record) {
     activeSessionStore.set(cleanCode, record);
@@ -157,20 +149,20 @@ async function saveSessionRecord(cleanCode: string, record: CodeSessionRecord | 
 apiRouter.post(
   ['/logout', '/api/logout', '/session/logout', '/api/session/logout', '/unbind', '/api/unbind'],
   async (req, res) => {
-    let studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
-    let sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
+    try {
+      let studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+      let sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
-    if (req.body && typeof req.body === 'string') {
-      try {
-        const parsed = JSON.parse(req.body);
-        studentCode = studentCode || parsed.studentAccessCode;
-        sessionId = sessionId || parsed.sessionId;
-      } catch (e) {}
-    }
+      if (req.body && typeof req.body === 'string') {
+        try {
+          const parsed = JSON.parse(req.body);
+          studentCode = studentCode || parsed.studentAccessCode;
+          sessionId = sessionId || parsed.sessionId;
+        } catch (e) {}
+      }
 
-    if (studentCode) {
-      const cleanCode = studentCode.trim().toLowerCase();
-      if (!isMasterMentorCode(cleanCode)) {
+      const cleanCode = normalizeAccessCode(studentCode);
+      if (cleanCode && lookupKeyType(cleanCode) === 'STUDENT') {
         const currentRecord = await fetchSessionRecord(cleanCode);
         if (currentRecord && (!sessionId || currentRecord.activeSessionId === sessionId)) {
           currentRecord.activeSessionId = null;
@@ -183,180 +175,218 @@ apiRouter.post(
           await saveSessionRecord(cleanCode, currentRecord);
         }
       }
-    }
 
-    return res.json({ status: 'unbound', message: 'Sessão encerrada com sucesso.' });
+      return res.json({ status: 'unbound', message: 'Sessão encerrada com sucesso.' });
+    } catch (err: any) {
+      return res.status(500).json({
+        error: 'AUTH_CONFIGURATION_ERROR',
+        message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
+      });
+    }
   }
 );
 
 // Heartbeat Endpoint (Every 30s)
 apiRouter.post(['/session/heartbeat', '/api/session/heartbeat'], async (req, res) => {
-  const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
-  const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
+  try {
+    const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+    const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
-  if (!studentCode) {
-    return res.status(400).json({ error: 'Código de acesso ausente.' });
-  }
+    const cleanCode = normalizeAccessCode(studentCode);
+    const keyType = lookupKeyType(cleanCode);
 
-  const cleanCode = studentCode.trim().toLowerCase();
-
-  if (isMasterMentorCode(cleanCode)) {
-    return res.json({ status: 'ok', online: true, isMaster: true });
-  }
-
-  if (!sessionId) {
-    return res.status(401).json({ error: 'Sessão inválida ou não informada.' });
-  }
-
-  const currentRecord = await fetchSessionRecord(cleanCode);
-
-  if (!currentRecord || !currentRecord.activeSessionId || currentRecord.activeSessionId !== sessionId) {
-    return res.status(401).json({
-      error: 'Sessão inválida ou substituída em outro dispositivo. Acesso revogado.',
-      status: 'offline',
-    });
-  }
-
-  const now = Date.now();
-  currentRecord.lastHeartbeatAt = new Date(now).toISOString();
-  currentRecord.expiresAt = new Date(now + 120000).toISOString();
-  currentRecord.isOnline = true;
-  currentRecord.status = 'online';
-
-  await saveSessionRecord(cleanCode, currentRecord);
-
-  return res.json({
-    status: 'ok',
-    online: true,
-    lastHeartbeatAt: currentRecord.lastHeartbeatAt,
-    expiresAt: currentRecord.expiresAt,
-  });
-});
-
-// Endpoint to verify student code and register single session lock
-apiRouter.post(['/verify-code', '/api/verify-code', '/session/verify', '/api/session/verify', '/'], async (req, res) => {
-  const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
-  const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
-  const existingSessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
-
-  if (!isValidStudentCode(studentCode)) {
-    return res.status(403).json({
-      error: 'Acesso Negado: Código de Aluno inválido ou não reconhecido. Verifique o código da mentoria.',
-    });
-  }
-
-  const cleanCode = studentCode.trim().toLowerCase();
-
-  // Master Mentor codes are exempt from strict 1-session lock
-  if (isMasterMentorCode(cleanCode)) {
-    const masterSessionId = existingSessionId || 'MASTER-SESSION-' + crypto.randomUUID();
-    return res.json({
-      status: 'ok',
-      isMaster: true,
-      sessionId: masterSessionId,
-      activeSessionId: masterSessionId,
-      onlineDevices: '1/1',
-    });
-  }
-
-  const now = Date.now();
-  const currentRecord = await fetchSessionRecord(cleanCode);
-
-  // Check if session is currently active on another device/session
-  if (currentRecord && currentRecord.activeSessionId) {
-    const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
-    const isWithinHeartbeatWindow = now - lastHeartbeatTime <= 120000; // 2 minutes (120 seconds)
-
-    // Check if another device/session has an active heartbeat & isOnline
-    if (
-      currentRecord.isOnline &&
-      isWithinHeartbeatWindow &&
-      currentRecord.activeSessionId !== existingSessionId
-    ) {
-      // Rule 4: HTTP 409 Conflict with exact message
-      return res.status(409).json({
-        error: 'Esta chave já está sendo utilizada em outro dispositivo. Para entrar aqui, primeiro encerre a sessão anterior.',
-        activeSessionId: currentRecord.activeSessionId,
-        lastHeartbeatAt: currentRecord.lastHeartbeatAt,
+    if (keyType === 'INVALID') {
+      return res.status(401).json({
+        error: 'INVALID_ACCESS_CODE',
+        message: 'O código informado é inválido.',
       });
     }
+
+    if (keyType === 'MASTER') {
+      return res.json({ status: 'ok', online: true, isMaster: true });
+    }
+
+    if (!sessionId) {
+      return res.status(401).json({
+        error: 'SESSION_REQUIRED',
+        message: 'Sessão inválida. Efetue login novamente.',
+      });
+    }
+
+    const currentRecord = await fetchSessionRecord(cleanCode);
+
+    if (!currentRecord || !currentRecord.activeSessionId || currentRecord.activeSessionId !== sessionId) {
+      return res.status(409).json({
+        error: 'SESSION_ALREADY_ACTIVE',
+        message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+      });
+    }
+
+    const now = Date.now();
+    currentRecord.lastHeartbeatAt = new Date(now).toISOString();
+    currentRecord.expiresAt = new Date(now + 120000).toISOString();
+    currentRecord.isOnline = true;
+    currentRecord.status = 'online';
+
+    await saveSessionRecord(cleanCode, currentRecord);
+
+    return res.json({
+      status: 'ok',
+      online: true,
+      lastHeartbeatAt: currentRecord.lastHeartbeatAt,
+      expiresAt: currentRecord.expiresAt,
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'AUTH_CONFIGURATION_ERROR',
+      message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
+    });
   }
-
-  // Create new active session with crypto.randomUUID() as required by Rule 1
-  const newSessionId = crypto.randomUUID();
-  const effectiveDeviceId = deviceId || `device-${newSessionId.slice(0, 8)}`;
-  const nowIso = new Date(now).toISOString();
-  const expiresIso = new Date(now + 120000).toISOString();
-
-  const sessionRecord: CodeSessionRecord = {
-    code: studentCode.trim().toUpperCase(),
-    active: true,
-    activeSessionId: newSessionId,
-    deviceId: effectiveDeviceId,
-    sessionStartedAt: nowIso,
-    lastHeartbeatAt: nowIso,
-    expiresAt: expiresIso,
-    isOnline: true,
-    status: 'online',
-  };
-
-  await saveSessionRecord(cleanCode, sessionRecord);
-
-  return res.json({
-    status: 'ok',
-    bound: true,
-    sessionId: newSessionId,
-    sessionRecord,
-    onlineDevices: '1/1',
-  });
 });
 
-// Middleware Helper to validate student access code AND single session active lock
+// Endpoint to verify code and register single session lock
+apiRouter.post(['/verify-code', '/api/verify-code', '/session/verify', '/api/session/verify', '/'], async (req, res) => {
+  try {
+    const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+    const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
+    const existingSessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
+
+    const cleanCode = normalizeAccessCode(studentCode);
+    const keyType = lookupKeyType(cleanCode);
+
+    // Rule 9: Validation order
+    if (keyType === 'INVALID') {
+      return res.status(401).json({
+        error: 'INVALID_ACCESS_CODE',
+        message: 'O código informado é inválido.',
+      });
+    }
+
+    // Rule 10: Master keys allow multiple simultaneous sessions, no device lock
+    if (keyType === 'MASTER') {
+      const masterSessionId = existingSessionId || 'MASTER-SESSION-' + crypto.randomUUID();
+      return res.json({
+        status: 'ok',
+        isMaster: true,
+        sessionId: masterSessionId,
+        activeSessionId: masterSessionId,
+        onlineDevices: '1/1',
+      });
+    }
+
+    // Rule 11: Student keys require single active session
+    const now = Date.now();
+    const currentRecord = await fetchSessionRecord(cleanCode);
+
+    if (currentRecord && currentRecord.activeSessionId) {
+      const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
+      const isWithinHeartbeatWindow = now - lastHeartbeatTime <= 120000; // 2 minutes
+
+      if (
+        currentRecord.isOnline &&
+        isWithinHeartbeatWindow &&
+        currentRecord.activeSessionId !== existingSessionId
+      ) {
+        return res.status(409).json({
+          error: 'SESSION_ALREADY_ACTIVE',
+          message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+        });
+      }
+    }
+
+    const newSessionId = crypto.randomUUID();
+    const effectiveDeviceId = deviceId || `device-${newSessionId.slice(0, 8)}`;
+    const nowIso = new Date(now).toISOString();
+    const expiresIso = new Date(now + 120000).toISOString();
+
+    const sessionRecord: CodeSessionRecord = {
+      code: cleanCode,
+      active: true,
+      activeSessionId: newSessionId,
+      deviceId: effectiveDeviceId,
+      sessionStartedAt: nowIso,
+      lastHeartbeatAt: nowIso,
+      expiresAt: expiresIso,
+      isOnline: true,
+      status: 'online',
+    };
+
+    await saveSessionRecord(cleanCode, sessionRecord);
+
+    return res.json({
+      status: 'ok',
+      bound: true,
+      sessionId: newSessionId,
+      sessionRecord,
+      onlineDevices: '1/1',
+    });
+  } catch (err: any) {
+    console.error('[Verify Code Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'AUTH_CONFIGURATION_ERROR',
+      message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
+    });
+  }
+});
+
+// Middleware Helper to validate access code AND single session active lock
 async function validateSessionAsync(req: express.Request, res: express.Response): Promise<boolean> {
-  const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
-  const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
+  try {
+    const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+    const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
-  if (!isValidStudentCode(studentCode)) {
-    res.status(403).json({
-      error: 'Acesso Negado: Código de Aluno inválido ou não informado. Solicite seu código individual na mentoria.',
-    });
-    return false;
-  }
+    const cleanCode = normalizeAccessCode(studentCode);
+    const keyType = lookupKeyType(cleanCode);
 
-  const cleanCode = studentCode.trim().toLowerCase();
+    if (keyType === 'INVALID') {
+      res.status(401).json({
+        error: 'INVALID_ACCESS_CODE',
+        message: 'O código informado é inválido.',
+      });
+      return false;
+    }
 
-  // Master Mentor codes bypass strict session lock
-  if (isMasterMentorCode(cleanCode)) {
+    if (keyType === 'MASTER') {
+      return true;
+    }
+
+    if (!sessionId) {
+      res.status(401).json({
+        error: 'SESSION_REQUIRED',
+        message: 'Sessão não informada. Efetue login novamente.',
+      });
+      return false;
+    }
+
+    const currentRecord = await fetchSessionRecord(cleanCode);
+
+    if (!currentRecord || !currentRecord.activeSessionId || currentRecord.activeSessionId !== sessionId) {
+      res.status(409).json({
+        error: 'SESSION_ALREADY_ACTIVE',
+        message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+      });
+      return false;
+    }
+
+    const now = Date.now();
+    const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
+
+    if (now - lastHeartbeatTime > 120000) {
+      res.status(401).json({
+        error: 'SESSION_EXPIRED',
+        message: 'Sessão expirada por inatividade. Efetue login novamente.',
+      });
+      return false;
+    }
+
     return true;
-  }
-
-  if (!sessionId) {
-    res.status(401).json({
-      error: 'Acesso Não Autorizado: Sessão (sessionId) não identificada. Efetue login novamente.',
+  } catch (err) {
+    res.status(500).json({
+      error: 'AUTH_CONFIGURATION_ERROR',
+      message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
     });
     return false;
   }
-
-  const currentRecord = await fetchSessionRecord(cleanCode);
-
-  if (!currentRecord || !currentRecord.activeSessionId || currentRecord.activeSessionId !== sessionId) {
-    res.status(401).json({
-      error: 'Esta chave já está sendo utilizada em outro dispositivo. Sua sessão foi encerrada.',
-    });
-    return false;
-  }
-
-  const now = Date.now();
-  const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
-
-  if (now - lastHeartbeatTime > 120000) {
-    res.status(401).json({
-      error: 'Sessão Expirada por inatividade (> 2 minutos sem envio de heartbeat). Efetue login novamente.',
-    });
-    return false;
-  }
-
-  return true;
 }
 
 // Helper to call Gemini with model fallback across supported public models
@@ -418,12 +448,10 @@ apiRouter.post('/chat', async (req, res) => {
 
     const ai = getGeminiClient(apiKeyToUse);
 
-    // Format chat contents for Gemini
     const contents = messages.map((msg: { role: string; content?: string; image?: string }) => {
       const parts: any[] = [];
 
       if (msg.image) {
-        // Handle data URL e.g. "data:image/jpeg;base64,..."
         const match = msg.image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
         if (match) {
           parts.push({
@@ -568,7 +596,6 @@ apiRouter.post('/multi-agent', async (req, res) => {
 
     const ai = getGeminiClient(apiKeyToUse);
 
-    // Generate response from each agent sequentially with awareness of previous outputs
     const conversationTrail: { agentName: string; content: string }[] = [];
 
     for (const agent of agents) {
@@ -640,4 +667,3 @@ export default app;
 if (process.env.VERCEL !== '1' && process.env.VERCEL !== 'true' && !process.env.VERCEL) {
   startServer();
 }
-
