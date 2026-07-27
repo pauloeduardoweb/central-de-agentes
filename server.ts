@@ -54,6 +54,64 @@ apiRouter.post('/unbind', (req, res) => {
   res.json({ status: 'unbound' });
 });
 
+// Endpoint to verify student code and register 1-device lock
+apiRouter.post('/verify-code', (req, res) => {
+  const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+  const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
+
+  if (!isValidStudentCode(studentCode)) {
+    return res.status(403).json({
+      error: 'Acesso Negado: Código de Aluno inválido ou não reconhecido. Verifique o código da mentoria.',
+    });
+  }
+
+  const cleanCode = studentCode.trim().toLowerCase();
+
+  // Master Mentor codes are exempt from strict 1-device binding lock
+  if (MASTER_CODES_LIST.includes(cleanCode)) {
+    return res.json({ status: 'ok', isMaster: true });
+  }
+
+  if (!deviceId) {
+    return res.status(400).json({ error: 'Identificador de dispositivo ausente.' });
+  }
+
+  const now = Date.now();
+  const existingBinding = activeCodeBindings.get(cleanCode);
+
+  if (!existingBinding) {
+    activeCodeBindings.set(cleanCode, {
+      deviceId,
+      registeredAt: now,
+      lastActiveAt: now,
+      ip: String(clientIp),
+    });
+    return res.json({ status: 'ok', bound: true });
+  }
+
+  if (existingBinding.deviceId === deviceId) {
+    existingBinding.lastActiveAt = now;
+    return res.json({ status: 'ok', bound: true });
+  }
+
+  // Active on another device
+  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+  if (now - existingBinding.lastActiveAt > TWELVE_HOURS) {
+    activeCodeBindings.set(cleanCode, {
+      deviceId,
+      registeredAt: now,
+      lastActiveAt: now,
+      ip: String(clientIp),
+    });
+    return res.json({ status: 'ok', bound: true });
+  }
+
+  return res.status(403).json({
+    error: `Acesso Negado: O código (${studentCode.trim().toUpperCase()}) já está em uso em outro dispositivo (celular ou computador). Você deve clicar em 'Sair' no seu outro aparelho primeiro para liberar o acesso aqui.`,
+  });
+});
+
 // Helper to validate student access code AND single-device binding lock
 function validateStudentAccess(req: express.Request, res: express.Response): boolean {
   const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
@@ -104,7 +162,7 @@ function validateStudentAccess(req: express.Request, res: express.Response): boo
     }
 
     res.status(403).json({
-      error: `Acesso Negado: O código de acesso (${studentCode.trim().toUpperCase()}) já está vinculado e em uso em outro dispositivo. Não é permitido compartilhar sua chave de acesso.`,
+      error: `Acesso Negado: O código (${studentCode.trim().toUpperCase()}) já está em uso em outro dispositivo (celular ou computador). Você deve clicar em 'Sair' no seu outro aparelho primeiro para liberar o acesso aqui.`,
     });
     return false;
   }
