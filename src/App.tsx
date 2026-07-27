@@ -23,6 +23,9 @@ export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('Tiktok 2K');
   const [userApiKey, setUserApiKey] = useState<string>('');
+  const [studentCode, setStudentCode] = useState<string>(() => {
+    return localStorage.getItem('user_student_access_code') || '';
+  });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   // Modal controls
@@ -48,6 +51,7 @@ export default function App() {
 
     if (savedCode && isValidStudentCode(savedCode)) {
       setUserApiKey(savedKey || 'STUDENT_AUTHORIZED');
+      setStudentCode(savedCode);
       setShowApiKeyModal(false);
 
       // Verify active device lock status with server on load
@@ -66,11 +70,13 @@ export default function App() {
           localStorage.removeItem('user_student_access_code');
           localStorage.removeItem('user_gemini_api_key');
           setUserApiKey('');
+          setStudentCode('');
           setShowApiKeyModal(true);
         }
       }).catch(() => {});
     } else {
       setUserApiKey('');
+      setStudentCode('');
       setShowApiKeyModal(true);
     }
   }, []);
@@ -79,6 +85,7 @@ export default function App() {
     localStorage.setItem('user_gemini_api_key', key);
     localStorage.setItem('user_student_access_code', accessCode);
     setUserApiKey(key);
+    setStudentCode(accessCode);
     setShowApiKeyModal(false);
     triggerToast('Acesso do Aluno ativado com sucesso!');
   };
@@ -88,6 +95,7 @@ export default function App() {
     localStorage.removeItem('user_gemini_api_key');
     localStorage.removeItem('user_student_access_code');
     setUserApiKey('');
+    setStudentCode('');
     setShowApiKeyModal(true);
     triggerToast('Código de acesso removido do navegador.');
   };
@@ -249,6 +257,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         onOpenApiKeyModal={() => setShowApiKeyModal(true)}
         onDisconnectApiKey={handleDisconnectApiKey}
         hasApiKey={Boolean(userApiKey)}
+        studentCode={studentCode}
         agentCount={agents.filter((a) => a.category !== 'Suporte').length}
       />
 
