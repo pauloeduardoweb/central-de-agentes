@@ -59,13 +59,13 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       }
 
       if (!res.ok) {
-        if ((res.status === 409 || res.status === 403 || res.status === 401) && data.error) {
-          setError(data.error);
+        if ((res.status === 409 || res.status === 403 || res.status === 401) && (data.message || data.error)) {
+          setError(data.message || data.error);
           setLoading(false);
           return;
         }
 
-        setError(data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) é inválido.`);
+        setError(data.message || data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) é inválido.`);
         setLoading(false);
         return;
       }
