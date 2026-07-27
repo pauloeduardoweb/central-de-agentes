@@ -43,11 +43,11 @@ export default function App() {
     const loaded = getStoredAgents();
     setAgents(loaded);
 
-    const savedKey = localStorage.getItem('user_gemini_api_key') || '';
+    const savedKey = localStorage.getItem('user_gemini_api_key') || 'STUDENT_AUTHORIZED';
     const savedCode = localStorage.getItem('user_student_access_code') || '';
     setUserApiKey(savedKey);
 
-    if (!savedKey || !savedCode || !isValidStudentCode(savedCode)) {
+    if (!savedCode || !isValidStudentCode(savedCode)) {
       setShowApiKeyModal(true);
     }
   }, []);
@@ -57,7 +57,7 @@ export default function App() {
     localStorage.setItem('user_student_access_code', accessCode);
     setUserApiKey(key);
     setShowApiKeyModal(false);
-    triggerToast('Acesso de Aluno ativado com sucesso!');
+    triggerToast('Acesso do Aluno ativado com sucesso!');
   };
 
   const handleDisconnectApiKey = async () => {
@@ -66,7 +66,7 @@ export default function App() {
     localStorage.removeItem('user_student_access_code');
     setUserApiKey('');
     setShowApiKeyModal(true);
-    triggerToast('Chave API desconectada!');
+    triggerToast('Código de acesso removido do navegador.');
   };
 
 
