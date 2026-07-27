@@ -4,6 +4,7 @@ import { StatsBar } from './components/StatsBar';
 import { GeracaoZProBanner } from './components/GeracaoZProBanner';
 import { GeracaoZProModal } from './components/GeracaoZProModal';
 import { CertificadosModal } from './components/CertificadosModal';
+import { AfiliadosModal } from './components/AfiliadosModal';
 import { AgentGrid } from './components/AgentGrid';
 import { AgentChatModal } from './components/AgentChatModal';
 import { AgentEditorModal } from './components/AgentEditorModal';
@@ -32,6 +33,7 @@ export default function App() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showGeracaoZProModal, setShowGeracaoZProModal] = useState(false);
   const [showCertificadosModal, setShowCertificadosModal] = useState(false);
+  const [showAfiliadosModal, setShowAfiliadosModal] = useState(false);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -41,12 +43,7 @@ export default function App() {
     setAgents(loaded);
 
     const savedKey = localStorage.getItem('user_gemini_api_key') || '';
-    const savedCode = localStorage.getItem('user_student_access_code') || '';
     setUserApiKey(savedKey);
-
-    if (!savedKey || !savedCode) {
-      setShowApiKeyModal(true);
-    }
   }, []);
 
   const handleSaveApiKey = (key: string, accessCode: string) => {
@@ -237,6 +234,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
           agents={agents}
           activeCategory={activeCategory}
           onOpenOfficialAgent={handleOpenOfficialAgent}
+          onOpenAfiliados={() => setShowAfiliadosModal(true)}
           onOpenSiteModal={() => setShowGeracaoZProModal(true)}
           onOpenCertificados={() => setShowCertificadosModal(true)}
         />
@@ -272,6 +270,12 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
       {showCertificadosModal && (
         <CertificadosModal
           onClose={() => setShowCertificadosModal(false)}
+        />
+      )}
+
+      {showAfiliadosModal && (
+        <AfiliadosModal
+          onClose={() => setShowAfiliadosModal(false)}
         />
       )}
 
