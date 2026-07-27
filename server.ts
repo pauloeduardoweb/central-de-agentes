@@ -18,7 +18,7 @@ import {
 
 dotenv.config();
 
-// Startup validation of keys count (Rule 18 & 19)
+// Startup validation of keys count
 const { masterCount, studentCount, totalCount } = verifyLoadedKeysCount();
 console.log(`Chaves mestras carregadas: ${masterCount}`);
 console.log(`Chaves de alunos carregadas: ${studentCount}`);
@@ -38,21 +38,6 @@ function getGeminiClient(customApiKey?: string) {
   }
   return new GoogleGenAI({ apiKey });
 }
-
-// Session Record Interface according to specification
-export interface CodeSessionRecord {
-  code: string;
-  active: boolean;
-  activeSessionId: string | null;
-  deviceId: string | null;
-  sessionStartedAt: string | null;
-  lastHeartbeatAt: string | null;
-  expiresAt: string | null;
-  isOnline: boolean;
-  status: 'online' | 'offline';
-}
-
-const activeSessionStore = new Map<string, CodeSessionRecord>();
 
 const apiRouter = express.Router();
 
@@ -86,10 +71,10 @@ apiRouter.get(['/database/status', '/api/database/status'], async (_req, res) =>
   }
 });
 
-// Diagnostic Endpoint (Rule 9)
+// Diagnostic Endpoint for keys and MySQL connection
 apiRouter.get(['/auth/status', '/api/auth/status'], async (_req, res) => {
   try {
-    const { masterCount, studentCount, totalCount } = verifyLoadedKeysCount();
+    const { masterCount, studentCount } = verifyLoadedKeysCount();
     let dbConnected = false;
     let masterKeysCount = masterCount;
     let studentKeysCount = studentCount;
@@ -128,7 +113,69 @@ apiRouter.get(['/auth/status', '/api/auth/status'], async (_req, res) => {
   }
 });
 
-// Dynamic Code Key Type Lookup (MySQL first, fallback to in-memory authKeys)
+// Diagnostic Endpoint for session status by code (Rule 17)
+apiRouter.get(
+  ['/session/status/:codigo', '/api/session/status/:codigo'],
+  async (req, res) => {
+    try {
+      const codeParam = req.params.codigo;
+      const cleanCode = normalizeAccessCode(codeParam);
+
+      if (!cleanCode) {
+        return res.status(400).json({
+          sessionExists: false,
+          isOnline: false,
+          status: 'offline',
+          expiresAt: null,
+        });
+      }
+
+      if (isDatabaseConfigured()) {
+        await ensureSessionsTable();
+        const [rows]: any = await db.query(
+          `SELECT active_session_id, is_online, status, expires_at
+           FROM sessoes
+           WHERE codigo = ?
+           LIMIT 1`,
+          [cleanCode]
+        );
+
+        if (Array.isArray(rows) && rows.length > 0) {
+          const r = rows[0];
+          const sessionExists = Boolean(
+            r.active_session_id &&
+            r.expires_at &&
+            new Date(r.expires_at).getTime() > Date.now()
+          );
+
+          return res.json({
+            sessionExists,
+            isOnline: Boolean(r.is_online),
+            status: r.status === 'online' ? 'online' : 'offline',
+            expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
+          });
+        }
+      }
+
+      return res.json({
+        sessionExists: false,
+        isOnline: false,
+        status: 'offline',
+        expiresAt: null,
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        sessionExists: false,
+        isOnline: false,
+        status: 'offline',
+        expiresAt: null,
+        error: 'DATABASE_ERROR',
+      });
+    }
+  }
+);
+
+// Helper function to check key type (MySQL first, fallback to authKeys)
 async function checkCodeKeyType(cleanCode: string): Promise<'MASTER' | 'STUDENT' | 'INVALID'> {
   if (!cleanCode) return 'INVALID';
   const normalized = normalizeAccessCode(cleanCode);
@@ -161,165 +208,210 @@ async function checkCodeKeyType(cleanCode: string): Promise<'MASTER' | 'STUDENT'
   return lookupKeyType(normalized);
 }
 
-// Persistent global store for student single-session database lock
-const RESTFUL_MASTER_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fa3a6f97f3351';
+// Centralized Unified Login Handler with MySQL Transactions (Rules 5-12, 19, 20)
+async function handleLogin(req: express.Request, res: express.Response) {
+  const receivedCode =
+    req.body?.accessCode ??
+    req.body?.studentAccessCode ??
+    req.body?.accessKey ??
+    req.body?.code ??
+    req.headers['x-access-code'] ??
+    req.headers['x-student-access-code'];
 
-async function fetchSessionRecord(cleanCode: string): Promise<CodeSessionRecord | null> {
-  const keyType = await checkCodeKeyType(cleanCode);
-  if (keyType === 'MASTER') {
-    const nowIso = new Date().toISOString();
-    return {
-      code: cleanCode.toUpperCase(),
-      active: true,
-      activeSessionId: 'MASTER-SESSION-ID',
-      deviceId: 'MASTER-DEVICE-ID',
-      sessionStartedAt: nowIso,
-      lastHeartbeatAt: nowIso,
-      expiresAt: new Date(Date.now() + 86400000).toISOString(),
-      isOnline: true,
-      status: 'online',
-    };
-  }
+  const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
+  const existingSessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
-  if (isDatabaseConfigured()) {
-    try {
-      await ensureSessionsTable();
-      const [rows]: any = await db.query(
-        'SELECT codigo, active, active_session_id, device_id, session_started_at, last_heartbeat_at, expires_at, is_online, status FROM sessoes WHERE codigo = ? LIMIT 1',
-        [cleanCode]
-      );
-      if (Array.isArray(rows) && rows.length > 0) {
-        const r = rows[0];
-        const record: CodeSessionRecord = {
-          code: r.codigo,
-          active: Boolean(r.active),
-          activeSessionId: r.active_session_id || null,
-          deviceId: r.device_id || null,
-          sessionStartedAt: r.session_started_at ? new Date(r.session_started_at).toISOString() : null,
-          lastHeartbeatAt: r.last_heartbeat_at ? new Date(r.last_heartbeat_at).toISOString() : null,
-          expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
-          isOnline: Boolean(r.is_online),
-          status: r.status === 'online' ? 'online' : 'offline',
-        };
-        activeSessionStore.set(cleanCode, record);
-        return record;
-      }
-    } catch (err: any) {
-      console.warn('[MySQL Session Fetch Error]:', err?.message || err);
-    }
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
-    const res = await fetch(RESTFUL_MASTER_URL, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
+  if (!receivedCode || String(receivedCode).trim() === '') {
+    return res.status(400).json({
+      error: 'ACCESS_CODE_REQUIRED',
+      message: 'Informe o código de acesso.',
     });
-    clearTimeout(timeout);
-    if (res.ok) {
-      const json = await res.json();
-      const sessionsMap: Record<string, CodeSessionRecord> = json.data || {};
-      const record = sessionsMap[cleanCode] || null;
-      if (record) {
-        activeSessionStore.set(cleanCode, record);
-        return record;
-      } else {
-        activeSessionStore.delete(cleanCode);
-        return null;
-      }
-    }
+  }
+
+  const cleanCode = normalizeAccessCode(receivedCode);
+  const maskedCode = maskCodeForLogs(cleanCode);
+
+  let keyType = 'INVALID';
+  try {
+    keyType = await checkCodeKeyType(cleanCode);
   } catch (err) {
-    console.warn('[Session Store] Fetch error or timeout:', err);
-  }
-  return activeSessionStore.get(cleanCode) || null;
-}
-
-async function saveSessionRecord(cleanCode: string, record: CodeSessionRecord | null): Promise<void> {
-  const keyType = await checkCodeKeyType(cleanCode);
-  if (keyType === 'MASTER') return;
-
-  if (record) {
-    activeSessionStore.set(cleanCode, record);
-  } else {
-    activeSessionStore.delete(cleanCode);
+    console.error('[Auth Login Key Check Error]:', err);
+    return res.status(500).json({
+      error: 'SESSION_DATABASE_ERROR',
+      message: 'O servidor de autenticação está temporariamente indisponível.',
+    });
   }
 
-  if (isDatabaseConfigured()) {
-    try {
-      await ensureSessionsTable();
-      if (record) {
-        await db.query(
-          `INSERT INTO sessoes (codigo, active, active_session_id, device_id, session_started_at, last_heartbeat_at, expires_at, is_online, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  // Rule 3: Master Keys can enter on multiple devices and MUST NOT be saved in sessoes table
+  if (keyType === 'MASTER') {
+    const masterSessionId = existingSessionId || 'MASTER-SESSION-' + crypto.randomUUID();
+    console.log(`[AUTH LOG] type=MASTER masked=${maskedCode} sessionFound=false sessionValid=false recorded=false http=200`);
+    return res.status(200).json({
+      success: true,
+      status: 'ok',
+      isMaster: true,
+      role: 'mentor',
+      message: 'Acesso autorizado.',
+      sessionId: masterSessionId,
+      activeSessionId: masterSessionId,
+      onlineDevices: '1/1',
+    });
+  }
+
+  // Student Keys: strictly ONE active session (Rules 4-11, 19-20)
+  if (keyType === 'STUDENT') {
+    if (isDatabaseConfigured()) {
+      let connection;
+      try {
+        await ensureSessionsTable();
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        // Lock row during check (Rule 6)
+        const [rows]: any = await connection.query(
+          `SELECT codigo, active_session_id, device_id, expires_at, is_online, status
+           FROM sessoes
+           WHERE codigo = ?
+           FOR UPDATE`,
+          [cleanCode]
+        );
+
+        const sessionFound = Array.isArray(rows) && rows.length > 0;
+        let activeSessionValid = false;
+        let activeSessionIdInDb: string | null = null;
+
+        if (sessionFound) {
+          const r = rows[0];
+          activeSessionIdInDb = r.active_session_id || null;
+          if (r.active_session_id && r.expires_at) {
+            const expiresAtTime = new Date(r.expires_at).getTime();
+            if (expiresAtTime > Date.now()) {
+              activeSessionValid = true;
+            }
+          }
+        }
+
+        // Rule 7: Active session exists and valid on another device -> 409 Conflict
+        if (activeSessionValid && activeSessionIdInDb && activeSessionIdInDb !== existingSessionId) {
+          await connection.rollback();
+          connection.release();
+
+          console.log(`[AUTH LOG] type=STUDENT masked=${maskedCode} sessionFound=${sessionFound} sessionValid=true recorded=false http=409`);
+
+          return res.status(409).json({
+            error: 'SESSION_ALREADY_ACTIVE',
+            message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+          });
+        }
+
+        // Rule 8 & 20: Reuse existingSessionId if matching or generate new UUID
+        const sessionId = (activeSessionValid && activeSessionIdInDb === existingSessionId)
+          ? existingSessionId!
+          : (existingSessionId || crypto.randomUUID());
+
+        const effectiveDeviceId = deviceId || `device-${sessionId.slice(0, 8)}`;
+
+        // Rule 9 & 19: Insert or Update with 30-day expiration
+        await connection.query(
+          `INSERT INTO sessoes (
+             codigo,
+             active_session_id,
+             device_id,
+             session_started_at,
+             last_heartbeat_at,
+             expires_at,
+             is_online,
+             status
+           )
+           VALUES (?, ?, ?, NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, 'online')
            ON DUPLICATE KEY UPDATE
-             active = VALUES(active),
              active_session_id = VALUES(active_session_id),
              device_id = VALUES(device_id),
-             session_started_at = VALUES(session_started_at),
-             last_heartbeat_at = VALUES(last_heartbeat_at),
-             expires_at = VALUES(expires_at),
-             is_online = VALUES(is_online),
-             status = VALUES(status)`,
-          [
-            cleanCode,
-            record.active ? 1 : 0,
-            record.activeSessionId,
-            record.deviceId,
-            record.sessionStartedAt ? new Date(record.sessionStartedAt) : null,
-            record.lastHeartbeatAt ? new Date(record.lastHeartbeatAt) : null,
-            record.expiresAt ? new Date(record.expiresAt) : null,
-            record.isOnline ? 1 : 0,
-            record.status,
-          ]
+             session_started_at = NOW(),
+             last_heartbeat_at = NOW(),
+             expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
+             is_online = 1,
+             status = 'online'`,
+          [cleanCode, sessionId, effectiveDeviceId]
         );
-      } else {
-        await db.query('DELETE FROM sessoes WHERE codigo = ?', [cleanCode]);
+
+        // Rule 10: Commit transaction
+        await connection.commit();
+        connection.release();
+
+        console.log(`[AUTH LOG] type=STUDENT masked=${maskedCode} sessionFound=${sessionFound} sessionValid=${activeSessionValid} recorded=true http=200`);
+
+        return res.status(200).json({
+          success: true,
+          status: 'ok',
+          bound: true,
+          isMaster: false,
+          role: 'student',
+          message: 'Acesso autorizado.',
+          sessionId,
+          onlineDevices: '1/1',
+        });
+      } catch (dbErr: any) {
+        if (connection) {
+          try { await connection.rollback(); } catch (e) {}
+          connection.release();
+        }
+        console.error('[MySQL Login Transaction Error]:', dbErr?.message || dbErr);
+        // Rule 11: Return 500, NEVER grant access on database error
+        return res.status(500).json({
+          error: 'SESSION_DATABASE_ERROR',
+          message: 'O servidor de autenticação está temporariamente indisponível.',
+        });
       }
-    } catch (err: any) {
-      console.warn('[MySQL Session Save Error]:', err?.message || err);
-    }
-  }
-
-  try {
-    const controller1 = new AbortController();
-    const timeout1 = setTimeout(() => controller1.abort(), 2500);
-    const getRes = await fetch(RESTFUL_MASTER_URL, { signal: controller1.signal });
-    clearTimeout(timeout1);
-
-    let sessionsMap: Record<string, CodeSessionRecord> = {};
-    if (getRes.ok) {
-      const json = await getRes.json();
-      sessionsMap = json.data || {};
-    }
-
-    if (record) {
-      sessionsMap[cleanCode] = record;
     } else {
-      delete sessionsMap[cleanCode];
+      // Fallback if MySQL is not configured
+      const sessionId = existingSessionId || crypto.randomUUID();
+      return res.status(200).json({
+        success: true,
+        status: 'ok',
+        bound: true,
+        isMaster: false,
+        role: 'student',
+        message: 'Acesso autorizado.',
+        sessionId,
+        onlineDevices: '1/1',
+      });
     }
-
-    const controller2 = new AbortController();
-    const timeout2 = setTimeout(() => controller2.abort(), 2500);
-    await fetch(RESTFUL_MASTER_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'GZ_PRO_MASTER_BINDINGS_V1',
-        data: sessionsMap,
-      }),
-      signal: controller2.signal,
-    });
-    clearTimeout(timeout2);
-  } catch (err) {
-    console.warn('[Session Store] Save error or timeout:', err);
   }
+
+  // Invalid code
+  console.log(`[AUTH LOG] type=INVALID masked=${maskedCode} sessionFound=false sessionValid=false recorded=false http=401`);
+  return res.status(401).json({
+    error: 'INVALID_ACCESS_CODE',
+    message: 'O código informado é inválido.',
+  });
 }
 
-// Logout & Unbind Route
+// Login Routes
 apiRouter.post(
-  ['/logout', '/api/logout', '/session/logout', '/api/session/logout', '/unbind', '/api/unbind'],
+  [
+    '/auth/login',
+    '/api/auth/login',
+    '/verify-code',
+    '/api/verify-code',
+    '/session/verify',
+    '/api/session/verify',
+  ],
+  handleLogin
+);
+
+// Logout Route (Rule 13)
+apiRouter.post(
+  [
+    '/auth/logout',
+    '/api/auth/logout',
+    '/logout',
+    '/api/logout',
+    '/session/logout',
+    '/api/session/logout',
+    '/unbind',
+    '/api/unbind',
+  ],
   async (req, res) => {
     try {
       let studentCode =
@@ -343,238 +435,141 @@ apiRouter.post(
       const cleanCode = normalizeAccessCode(studentCode);
       const keyType = await checkCodeKeyType(cleanCode);
 
-      if (cleanCode && keyType === 'STUDENT') {
-        const currentRecord = await fetchSessionRecord(cleanCode);
-        if (currentRecord && (!sessionId || currentRecord.activeSessionId === sessionId)) {
-          currentRecord.activeSessionId = null;
-          currentRecord.deviceId = null;
-          currentRecord.isOnline = false;
-          currentRecord.status = 'offline';
-          currentRecord.lastHeartbeatAt = null;
-          currentRecord.expiresAt = null;
-
-          await saveSessionRecord(cleanCode, currentRecord);
+      if (cleanCode && keyType === 'STUDENT' && isDatabaseConfigured()) {
+        try {
+          await ensureSessionsTable();
+          if (sessionId) {
+            await db.query(
+              `UPDATE sessoes
+               SET
+                 active_session_id = NULL,
+                 device_id = NULL,
+                 session_started_at = NULL,
+                 last_heartbeat_at = NULL,
+                 expires_at = NULL,
+                 is_online = 0,
+                 status = 'offline'
+               WHERE codigo = ?
+               AND active_session_id = ?`,
+              [cleanCode, sessionId]
+            );
+          } else {
+            await db.query(
+              `UPDATE sessoes
+               SET
+                 active_session_id = NULL,
+                 device_id = NULL,
+                 session_started_at = NULL,
+                 last_heartbeat_at = NULL,
+                 expires_at = NULL,
+                 is_online = 0,
+                 status = 'offline'
+               WHERE codigo = ?`,
+              [cleanCode]
+            );
+          }
+        } catch (dbErr: any) {
+          console.warn('[MySQL Logout Error]:', dbErr?.message || dbErr);
         }
       }
 
       return res.json({ status: 'unbound', message: 'Sessão encerrada com sucesso.' });
     } catch (err: any) {
       return res.status(500).json({
-        error: 'AUTH_CONFIGURATION_ERROR',
+        error: 'SESSION_DATABASE_ERROR',
         message: 'O servidor de autenticação está temporariamente indisponível.',
       });
     }
   }
 );
 
-// Heartbeat Endpoint (Every 30s)
-apiRouter.post(['/session/heartbeat', '/api/session/heartbeat'], async (req, res) => {
-  try {
-    const studentCode =
-      req.body?.accessCode ??
-      req.body?.studentAccessCode ??
-      req.body?.accessKey ??
-      req.body?.code ??
-      req.headers['x-access-code'] ??
-      req.headers['x-student-access-code'];
-
-    const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
-
-    const cleanCode = normalizeAccessCode(studentCode);
-    if (!cleanCode) {
-      return res.status(400).json({
-        error: 'ACCESS_CODE_REQUIRED',
-        message: 'Informe o código de acesso.',
-      });
-    }
-
-    const keyType = await checkCodeKeyType(cleanCode);
-
-    if (keyType === 'INVALID') {
-      return res.status(401).json({
-        error: 'INVALID_ACCESS_CODE',
-        message: 'O código informado é inválido.',
-      });
-    }
-
-    if (keyType === 'MASTER') {
-      return res.json({ status: 'ok', online: true, isMaster: true, role: 'mentor' });
-    }
-
-    if (!sessionId) {
-      return res.status(401).json({
-        error: 'SESSION_REQUIRED',
-        message: 'Sessão inválida. Efetue login novamente.',
-      });
-    }
-
-    const currentRecord = await fetchSessionRecord(cleanCode);
-
-    if (!currentRecord || !currentRecord.activeSessionId || currentRecord.activeSessionId !== sessionId) {
-      return res.status(409).json({
-        error: 'SESSION_ALREADY_ACTIVE',
-        message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
-      });
-    }
-
-    const now = Date.now();
-    currentRecord.lastHeartbeatAt = new Date(now).toISOString();
-    currentRecord.expiresAt = new Date(now + 120000).toISOString();
-    currentRecord.isOnline = true;
-    currentRecord.status = 'online';
-
-    await saveSessionRecord(cleanCode, currentRecord);
-
-    return res.json({
-      status: 'ok',
-      online: true,
-      lastHeartbeatAt: currentRecord.lastHeartbeatAt,
-      expiresAt: currentRecord.expiresAt,
-    });
-  } catch (err: any) {
-    return res.status(500).json({
-      error: 'AUTH_CONFIGURATION_ERROR',
-      message: 'O servidor de autenticação está temporariamente indisponível.',
-    });
-  }
-});
-
-// Centralized Unified Authentication Handler (Rules 1, 2, 4, 5, 10, 11)
-async function handleLogin(req: express.Request, res: express.Response) {
-  try {
-    // Rule 4: Accept fallback parameter names
-    const receivedCode =
-      req.body?.accessCode ??
-      req.body?.studentAccessCode ??
-      req.body?.accessKey ??
-      req.body?.code ??
-      req.headers['x-access-code'] ??
-      req.headers['x-student-access-code'];
-
-    const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
-    const existingSessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
-
-    // Rule 11: If no code is sent -> HTTP 400
-    if (receivedCode === undefined || receivedCode === null || String(receivedCode).trim() === '') {
-      return res.status(400).json({
-        error: 'ACCESS_CODE_REQUIRED',
-        message: 'Informe o código de acesso.',
-      });
-    }
-
-    const cleanCode = normalizeAccessCode(receivedCode);
-    const maskedCode = maskCodeForLogs(cleanCode);
-
-    let keyType = 'INVALID';
-    try {
-      keyType = await checkCodeKeyType(cleanCode);
-    } catch (err) {
-      return res.status(500).json({
-        error: 'AUTH_CONFIGURATION_ERROR',
-        message: 'O servidor de autenticação está temporariamente indisponível.',
-      });
-    }
-
-    console.log(
-      `[AUTH LOGIN] path=${req.path} len=${cleanCode.length} masked=${maskedCode} keyType=${keyType} env=${process.env.VERCEL ? 'production' : 'development'}`
-    );
-
-    // Rule 5: Validate Master Keys FIRST
-    if (keyType === 'MASTER') {
-      const masterSessionId = existingSessionId || 'MASTER-SESSION-' + crypto.randomUUID();
-      return res.status(200).json({
-        success: true,
-        status: 'ok',
-        isMaster: true,
-        role: 'mentor',
-        message: 'Acesso autorizado.',
-        sessionId: masterSessionId,
-        activeSessionId: masterSessionId,
-        onlineDevices: '1/1',
-      });
-    }
-
-    // Student Keys validation SECOND
-    if (keyType === 'STUDENT') {
-      const now = Date.now();
-      const currentRecord = await fetchSessionRecord(cleanCode);
-
-      if (currentRecord && currentRecord.activeSessionId) {
-        const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
-        const isWithinHeartbeatWindow = now - lastHeartbeatTime <= 120000; // 2 minutes
-
-        if (
-          currentRecord.isOnline &&
-          isWithinHeartbeatWindow &&
-          currentRecord.activeSessionId !== existingSessionId
-        ) {
-          return res.status(409).json({
-            error: 'SESSION_ALREADY_ACTIVE',
-            message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
-          });
-        }
-      }
-
-      const newSessionId = crypto.randomUUID();
-      const effectiveDeviceId = deviceId || `device-${newSessionId.slice(0, 8)}`;
-      const nowIso = new Date(now).toISOString();
-      const expiresIso = new Date(now + 120000).toISOString();
-
-      const sessionRecord: CodeSessionRecord = {
-        code: cleanCode,
-        active: true,
-        activeSessionId: newSessionId,
-        deviceId: effectiveDeviceId,
-        sessionStartedAt: nowIso,
-        lastHeartbeatAt: nowIso,
-        expiresAt: expiresIso,
-        isOnline: true,
-        status: 'online',
-      };
-
-      await saveSessionRecord(cleanCode, sessionRecord);
-
-      return res.status(200).json({
-        success: true,
-        status: 'ok',
-        bound: true,
-        isMaster: false,
-        role: 'student',
-        message: 'Acesso autorizado.',
-        sessionId: newSessionId,
-        sessionRecord,
-        onlineDevices: '1/1',
-      });
-    }
-
-    // Rule 11: Invalid access code -> HTTP 401
-    return res.status(401).json({
-      error: 'INVALID_ACCESS_CODE',
-      message: 'O código informado é inválido.',
-    });
-  } catch (err: any) {
-    console.error('[Verify Code Error]:', err?.message || err);
-    return res.status(500).json({
-      error: 'AUTH_CONFIGURATION_ERROR',
-      message: 'O servidor de autenticação está temporariamente indisponível.',
-    });
-  }
-}
-
-// Login Endpoints (Primary: /api/auth/login)
+// Heartbeat Route (Rule 14 & 19)
 apiRouter.post(
   [
-    '/auth/login',
-    '/api/auth/login',
-    '/verify-code',
-    '/api/verify-code',
-    '/session/verify',
-    '/api/session/verify',
+    '/auth/heartbeat',
+    '/api/auth/heartbeat',
+    '/session/heartbeat',
+    '/api/session/heartbeat',
   ],
-  handleLogin
+  async (req, res) => {
+    try {
+      const studentCode =
+        req.body?.accessCode ??
+        req.body?.studentAccessCode ??
+        req.body?.accessKey ??
+        req.body?.code ??
+        req.headers['x-access-code'] ??
+        req.headers['x-student-access-code'];
+
+      const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
+
+      const cleanCode = normalizeAccessCode(studentCode);
+      if (!cleanCode) {
+        return res.status(400).json({
+          error: 'ACCESS_CODE_REQUIRED',
+          message: 'Informe o código de acesso.',
+        });
+      }
+
+      const keyType = await checkCodeKeyType(cleanCode);
+
+      if (keyType === 'INVALID') {
+        return res.status(401).json({
+          error: 'INVALID_ACCESS_CODE',
+          message: 'O código informado é inválido.',
+        });
+      }
+
+      if (keyType === 'MASTER') {
+        return res.json({ status: 'ok', online: true, isMaster: true, role: 'mentor' });
+      }
+
+      if (!sessionId) {
+        return res.status(401).json({
+          error: 'SESSION_REQUIRED',
+          message: 'Sessão inválida. Efetue login novamente.',
+        });
+      }
+
+      if (isDatabaseConfigured()) {
+        await ensureSessionsTable();
+        const [result]: any = await db.query(
+          `UPDATE sessoes
+           SET
+             last_heartbeat_at = NOW(),
+             expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
+             is_online = 1,
+             status = 'online'
+           WHERE codigo = ?
+           AND active_session_id = ?`,
+          [cleanCode, sessionId]
+        );
+
+        if (!result || result.affectedRows === 0) {
+          return res.status(401).json({
+            error: 'SESSION_EXPIRED',
+            message: 'Esta sessão expirou ou foi encerrada em outro dispositivo. Efetue login novamente.',
+          });
+        }
+
+        return res.json({
+          status: 'ok',
+          online: true,
+          lastHeartbeatAt: new Date().toISOString(),
+        });
+      } else {
+        return res.json({ status: 'ok', online: true });
+      }
+    } catch (err: any) {
+      return res.status(500).json({
+        error: 'SESSION_DATABASE_ERROR',
+        message: 'O servidor de autenticação está temporariamente indisponível.',
+      });
+    }
+  }
 );
 
-// Middleware Helper to validate access code AND single session active lock
+// Middleware Helper to validate active session on AI requests
 async function validateSessionAsync(req: express.Request, res: express.Response): Promise<boolean> {
   try {
     const studentCode =
@@ -610,23 +605,30 @@ async function validateSessionAsync(req: express.Request, res: express.Response)
       return false;
     }
 
-    const currentRecord = await fetchSessionRecord(cleanCode);
+    if (isDatabaseConfigured()) {
+      await ensureSessionsTable();
+      const [rows]: any = await db.query(
+        `SELECT active_session_id, expires_at FROM sessoes WHERE codigo = ? LIMIT 1`,
+        [cleanCode]
+      );
 
-    if (!currentRecord || !currentRecord.activeSessionId || currentRecord.activeSessionId !== sessionId) {
-      res.status(409).json({
-        error: 'SESSION_ALREADY_ACTIVE',
-        message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
-      });
-      return false;
-    }
+      if (Array.isArray(rows) && rows.length > 0) {
+        const r = rows[0];
+        if (r.active_session_id === sessionId && r.expires_at && new Date(r.expires_at).getTime() > Date.now()) {
+          return true;
+        }
+        if (r.active_session_id && r.active_session_id !== sessionId) {
+          res.status(409).json({
+            error: 'SESSION_ALREADY_ACTIVE',
+            message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+          });
+          return false;
+        }
+      }
 
-    const now = Date.now();
-    const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
-
-    if (now - lastHeartbeatTime > 120000) {
       res.status(401).json({
         error: 'SESSION_EXPIRED',
-        message: 'Sessão expirada por inatividade. Efetue login novamente.',
+        message: 'Sessão expirada. Efetue login novamente.',
       });
       return false;
     }
@@ -634,7 +636,7 @@ async function validateSessionAsync(req: express.Request, res: express.Response)
     return true;
   } catch (err) {
     res.status(500).json({
-      error: 'AUTH_CONFIGURATION_ERROR',
+      error: 'SESSION_DATABASE_ERROR',
       message: 'O servidor de autenticação está temporariamente indisponível.',
     });
     return false;
@@ -909,7 +911,6 @@ async function startServer() {
     });
   }
 
-  // Rule 8: Do not call app.listen in Vercel serverless environment
   if (!process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Servidor local iniciado na porta ${PORT}`);
