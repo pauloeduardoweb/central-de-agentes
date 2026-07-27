@@ -46,10 +46,14 @@ const KV_STORE_URL = 'https://keyvalue.xyz/gz_pro_v2_bindings_secure';
 
 async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
     const res = await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (res.ok) {
       const text = await res.text();
       if (text && text.trim().length > 0 && text.startsWith('{')) {
@@ -65,7 +69,7 @@ async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null
       return null;
     }
   } catch (err) {
-    console.warn('[KV Store] Fetch error:', err);
+    console.warn('[KV Store] Fetch error or timeout:', err);
   }
   return activeCodeBindings.get(cleanCode) || null;
 }
@@ -78,19 +82,24 @@ async function saveRemoteBinding(cleanCode: string, binding: CodeBinding | null)
   }
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
     if (binding) {
       await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(binding),
+        signal: controller.signal,
       });
     } else {
       await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
         method: 'DELETE',
+        signal: controller.signal,
       });
     }
+    clearTimeout(timeout);
   } catch (err) {
-    console.warn('[KV Store] Save error:', err);
+    console.warn('[KV Store] Save error or timeout:', err);
   }
 }
 
