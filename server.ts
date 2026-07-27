@@ -42,31 +42,29 @@ apiRouter.get('/health', (_req, res) => {
 });
 
 // Persistent global store for student device lock
-const KV_STORE_URL = 'https://keyvalue.xyz/gz_pro_v2_bindings_secure';
+const RESTFUL_MASTER_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fa3a6f97f3351';
 
 async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
-    const res = await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(RESTFUL_MASTER_URL, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       signal: controller.signal,
     });
     clearTimeout(timeout);
     if (res.ok) {
-      const text = await res.text();
-      if (text && text.trim().length > 0 && text.startsWith('{')) {
-        const parsed = JSON.parse(text);
-        if (parsed && parsed.deviceId) {
-          activeCodeBindings.set(cleanCode, parsed);
-          return parsed;
-        }
+      const json = await res.json();
+      const bindingsMap = json.data || {};
+      const binding = bindingsMap[cleanCode] || null;
+      if (binding) {
+        activeCodeBindings.set(cleanCode, binding);
+        return binding;
+      } else {
+        activeCodeBindings.delete(cleanCode);
+        return null;
       }
-    }
-    if (res.status === 404) {
-      activeCodeBindings.delete(cleanCode);
-      return null;
     }
   } catch (err) {
     console.warn('[KV Store] Fetch error or timeout:', err);
@@ -82,22 +80,37 @@ async function saveRemoteBinding(cleanCode: string, binding: CodeBinding | null)
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
-    if (binding) {
-      await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(binding),
-        signal: controller.signal,
-      });
-    } else {
-      await fetch(`${KV_STORE_URL}/${encodeURIComponent(cleanCode)}`, {
-        method: 'DELETE',
-        signal: controller.signal,
-      });
+    // Read existing map
+    const controller1 = new AbortController();
+    const timeout1 = setTimeout(() => controller1.abort(), 2000);
+    const getRes = await fetch(RESTFUL_MASTER_URL, { signal: controller1.signal });
+    clearTimeout(timeout1);
+
+    let bindingsMap: Record<string, CodeBinding> = {};
+    if (getRes.ok) {
+      const json = await getRes.json();
+      bindingsMap = json.data || {};
     }
-    clearTimeout(timeout);
+
+    if (binding) {
+      bindingsMap[cleanCode] = binding;
+    } else {
+      delete bindingsMap[cleanCode];
+    }
+
+    // Save updated map
+    const controller2 = new AbortController();
+    const timeout2 = setTimeout(() => controller2.abort(), 2000);
+    await fetch(RESTFUL_MASTER_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'GZ_PRO_MASTER_BINDINGS_V1',
+        data: bindingsMap,
+      }),
+      signal: controller2.signal,
+    });
+    clearTimeout(timeout2);
   } catch (err) {
     console.warn('[KV Store] Save error or timeout:', err);
   }
