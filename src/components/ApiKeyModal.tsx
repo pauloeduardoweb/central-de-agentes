@@ -51,18 +51,26 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        // Handle non-JSON or 404 HTML responses from server
+      }
 
       if (!res.ok || data.error) {
-        setError(data.error || 'Não foi possível verificar o acesso para este dispositivo.');
+        if (res.status === 404) {
+          setError('O servidor ainda não foi atualizado na Vercel. Faça o Redeploy na Vercel para aplicar a trava de segurança.');
+        } else {
+          setError(data.error || 'Acesso negado ou dispositivo não verificado.');
+        }
         setLoading(false);
         return;
       }
 
       onSave('STUDENT_AUTHORIZED', cleanCode);
-    } catch (err) {
-      // In case of offline/network glitch, proceed with client validation
-      onSave('STUDENT_AUTHORIZED', cleanCode);
+    } catch (err: any) {
+      setError('Erro ao se comunicar com o servidor. Verifique sua conexão e certifique-se de ter feito o Redeploy na Vercel.');
     } finally {
       setLoading(false);
     }

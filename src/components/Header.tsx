@@ -60,6 +60,19 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* API Key & Student Access Management Action */}
         <div className="flex items-center space-x-2">
+          {hasApiKey && (
+            <div 
+              className="flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm"
+              title="Sua licença está ativada e reconhecida exclusivamente para este dispositivo (1 Dispositivo Ativo)"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
+              <span>Online 1/1</span>
+            </div>
+          )}
+
           <button
             onClick={onOpenApiKeyModal}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 border transition-all shadow-sm ${
