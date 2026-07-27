@@ -38,15 +38,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
 
     try {
       const deviceId = getDeviceId();
-      const res = await fetch('/api/verify-code', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-client-device-id': deviceId,
-          'x-student-access-code': cleanCode,
         },
         body: JSON.stringify({
-          studentAccessCode: cleanCode,
+          accessCode: cleanCode,
           deviceId,
         }),
       });
@@ -55,16 +54,10 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       try {
         data = await res.json();
       } catch (e) {
-        // Response was non-JSON (e.g. timeout or HTML page)
+        // Response was non-JSON
       }
 
       if (!res.ok) {
-        if ((res.status === 409 || res.status === 403 || res.status === 401) && (data.message || data.error)) {
-          setError(data.message || data.error);
-          setLoading(false);
-          return;
-        }
-
         setError(data.message || data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) é inválido.`);
         setLoading(false);
         return;
