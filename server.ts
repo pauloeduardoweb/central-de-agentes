@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import { isValidStudentCode } from './src/data/studentCodes';
@@ -21,17 +22,20 @@ function getGeminiClient(customApiKey?: string) {
   return new GoogleGenAI({ apiKey });
 }
 
-// Memory registry for device-code bindings
-interface CodeBinding {
-  deviceId: string;
-  registeredAt: number;
-  lastActiveAt: number;
-  ip?: string;
+// Session Record Interface according to specification
+export interface CodeSessionRecord {
+  code: string;
+  active: boolean;
+  activeSessionId: string | null;
+  deviceId: string | null;
+  sessionStartedAt: string | null;
+  lastHeartbeatAt: string | null;
+  expiresAt: string | null;
+  isOnline: boolean;
+  status: 'online' | 'offline';
 }
 
-type DeviceBinding = CodeBinding;
-
-const activeCodeBindings = new Map<string, DeviceBinding>();
+const activeSessionStore = new Map<string, CodeSessionRecord>();
 const MASTER_CODES_LIST = [
   'mentor-bigode',
   'bigode-mentor',
@@ -59,16 +63,28 @@ apiRouter.get(['/health', '/api/health'], (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Persistent global store for student device lock
+// Persistent global store for student single-session database lock
 const RESTFUL_MASTER_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fa3a6f97f3351';
 
-async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null> {
-  // Master mentor codes are exempt from remote binding lookups
-  if (isMasterMentorCode(cleanCode)) return null;
+async function fetchSessionRecord(cleanCode: string): Promise<CodeSessionRecord | null> {
+  if (isMasterMentorCode(cleanCode)) {
+    const nowIso = new Date().toISOString();
+    return {
+      code: cleanCode.toUpperCase(),
+      active: true,
+      activeSessionId: 'MASTER-SESSION-ID',
+      deviceId: 'MASTER-DEVICE-ID',
+      sessionStartedAt: nowIso,
+      lastHeartbeatAt: nowIso,
+      expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      isOnline: true,
+      status: 'online',
+    };
+  }
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
+    const timeout = setTimeout(() => controller.abort(), 2500);
     const res = await fetch(RESTFUL_MASTER_URL, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
@@ -77,88 +93,151 @@ async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null
     clearTimeout(timeout);
     if (res.ok) {
       const json = await res.json();
-      const bindingsMap = json.data || {};
-      const binding = bindingsMap[cleanCode] || null;
-      if (binding) {
-        activeCodeBindings.set(cleanCode, binding);
-        return binding;
+      const sessionsMap: Record<string, CodeSessionRecord> = json.data || {};
+      const record = sessionsMap[cleanCode] || null;
+      if (record) {
+        activeSessionStore.set(cleanCode, record);
+        return record;
       } else {
-        activeCodeBindings.delete(cleanCode);
+        activeSessionStore.delete(cleanCode);
         return null;
       }
     }
   } catch (err) {
-    console.warn('[KV Store] Fetch error or timeout:', err);
+    console.warn('[Session Store] Fetch error or timeout:', err);
   }
-  return activeCodeBindings.get(cleanCode) || null;
+  return activeSessionStore.get(cleanCode) || null;
 }
 
-async function saveRemoteBinding(cleanCode: string, binding: CodeBinding | null): Promise<void> {
+async function saveSessionRecord(cleanCode: string, record: CodeSessionRecord | null): Promise<void> {
   if (isMasterMentorCode(cleanCode)) return;
 
-  if (binding) {
-    activeCodeBindings.set(cleanCode, binding);
+  if (record) {
+    activeSessionStore.set(cleanCode, record);
   } else {
-    activeCodeBindings.delete(cleanCode);
+    activeSessionStore.delete(cleanCode);
   }
 
   try {
-    // Read existing map
     const controller1 = new AbortController();
-    const timeout1 = setTimeout(() => controller1.abort(), 2000);
+    const timeout1 = setTimeout(() => controller1.abort(), 2500);
     const getRes = await fetch(RESTFUL_MASTER_URL, { signal: controller1.signal });
     clearTimeout(timeout1);
 
-    let bindingsMap: Record<string, CodeBinding> = {};
+    let sessionsMap: Record<string, CodeSessionRecord> = {};
     if (getRes.ok) {
       const json = await getRes.json();
-      bindingsMap = json.data || {};
+      sessionsMap = json.data || {};
     }
 
-    if (binding) {
-      bindingsMap[cleanCode] = binding;
+    if (record) {
+      sessionsMap[cleanCode] = record;
     } else {
-      delete bindingsMap[cleanCode];
+      delete sessionsMap[cleanCode];
     }
 
-    // Save updated map
     const controller2 = new AbortController();
-    const timeout2 = setTimeout(() => controller2.abort(), 2000);
+    const timeout2 = setTimeout(() => controller2.abort(), 2500);
     await fetch(RESTFUL_MASTER_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'GZ_PRO_MASTER_BINDINGS_V1',
-        data: bindingsMap,
+        data: sessionsMap,
       }),
       signal: controller2.signal,
     });
     clearTimeout(timeout2);
   } catch (err) {
-    console.warn('[KV Store] Save error or timeout:', err);
+    console.warn('[Session Store] Save error or timeout:', err);
   }
 }
 
-// Endpoint to unbind device when student disconnects
-apiRouter.post(['/unbind', '/api/unbind'], async (req, res) => {
-  const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
-  const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
+// Logout & Unbind Route
+apiRouter.post(
+  ['/logout', '/api/logout', '/session/logout', '/api/session/logout', '/unbind', '/api/unbind'],
+  async (req, res) => {
+    let studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+    let sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
-  if (studentCode && deviceId) {
-    const cleanCode = studentCode.trim().toLowerCase();
-    const binding = await fetchRemoteBinding(cleanCode);
-    if (binding && binding.deviceId === deviceId) {
-      await saveRemoteBinding(cleanCode, null);
+    if (req.body && typeof req.body === 'string') {
+      try {
+        const parsed = JSON.parse(req.body);
+        studentCode = studentCode || parsed.studentAccessCode;
+        sessionId = sessionId || parsed.sessionId;
+      } catch (e) {}
     }
+
+    if (studentCode) {
+      const cleanCode = studentCode.trim().toLowerCase();
+      if (!isMasterMentorCode(cleanCode)) {
+        const currentRecord = await fetchSessionRecord(cleanCode);
+        if (currentRecord && (!sessionId || currentRecord.activeSessionId === sessionId)) {
+          currentRecord.activeSessionId = null;
+          currentRecord.deviceId = null;
+          currentRecord.isOnline = false;
+          currentRecord.status = 'offline';
+          currentRecord.lastHeartbeatAt = null;
+          currentRecord.expiresAt = null;
+
+          await saveSessionRecord(cleanCode, currentRecord);
+        }
+      }
+    }
+
+    return res.json({ status: 'unbound', message: 'Sessão encerrada com sucesso.' });
   }
-  res.json({ status: 'unbound' });
+);
+
+// Heartbeat Endpoint (Every 30s)
+apiRouter.post(['/session/heartbeat', '/api/session/heartbeat'], async (req, res) => {
+  const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+  const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
+
+  if (!studentCode) {
+    return res.status(400).json({ error: 'Código de acesso ausente.' });
+  }
+
+  const cleanCode = studentCode.trim().toLowerCase();
+
+  if (isMasterMentorCode(cleanCode)) {
+    return res.json({ status: 'ok', online: true, isMaster: true });
+  }
+
+  if (!sessionId) {
+    return res.status(401).json({ error: 'Sessão inválida ou não informada.' });
+  }
+
+  const currentRecord = await fetchSessionRecord(cleanCode);
+
+  if (!currentRecord || !currentRecord.activeSessionId || currentRecord.activeSessionId !== sessionId) {
+    return res.status(401).json({
+      error: 'Sessão inválida ou substituída em outro dispositivo. Acesso revogado.',
+      status: 'offline',
+    });
+  }
+
+  const now = Date.now();
+  currentRecord.lastHeartbeatAt = new Date(now).toISOString();
+  currentRecord.expiresAt = new Date(now + 120000).toISOString();
+  currentRecord.isOnline = true;
+  currentRecord.status = 'online';
+
+  await saveSessionRecord(cleanCode, currentRecord);
+
+  return res.json({
+    status: 'ok',
+    online: true,
+    lastHeartbeatAt: currentRecord.lastHeartbeatAt,
+    expiresAt: currentRecord.expiresAt,
+  });
 });
 
-// Endpoint to verify student code and register 1-device lock
-apiRouter.post(['/verify-code', '/api/verify-code', '/'], async (req, res) => {
+// Endpoint to verify student code and register single session lock
+apiRouter.post(['/verify-code', '/api/verify-code', '/session/verify', '/api/session/verify', '/'], async (req, res) => {
   const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
   const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
-  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
+  const existingSessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
   if (!isValidStudentCode(studentCode)) {
     return res.status(403).json({
@@ -168,58 +247,74 @@ apiRouter.post(['/verify-code', '/api/verify-code', '/'], async (req, res) => {
 
   const cleanCode = studentCode.trim().toLowerCase();
 
-  // Master Mentor codes are exempt from strict 1-device binding lock
+  // Master Mentor codes are exempt from strict 1-session lock
   if (isMasterMentorCode(cleanCode)) {
-    return res.json({ status: 'ok', isMaster: true, onlineDevices: '1/1' });
-  }
-
-  if (!deviceId) {
-    return res.status(400).json({ error: 'Identificador de dispositivo ausente.' });
+    const masterSessionId = existingSessionId || 'MASTER-SESSION-' + crypto.randomUUID();
+    return res.json({
+      status: 'ok',
+      isMaster: true,
+      sessionId: masterSessionId,
+      activeSessionId: masterSessionId,
+      onlineDevices: '1/1',
+    });
   }
 
   const now = Date.now();
-  const existingBinding = await fetchRemoteBinding(cleanCode);
+  const currentRecord = await fetchSessionRecord(cleanCode);
 
-  if (!existingBinding) {
-    const newBinding: CodeBinding = {
-      deviceId,
-      registeredAt: now,
-      lastActiveAt: now,
-      ip: String(clientIp),
-    };
-    await saveRemoteBinding(cleanCode, newBinding);
-    return res.json({ status: 'ok', bound: true, onlineDevices: '1/1' });
+  // Check if session is currently active on another device/session
+  if (currentRecord && currentRecord.activeSessionId) {
+    const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
+    const isWithinHeartbeatWindow = now - lastHeartbeatTime <= 120000; // 2 minutes (120 seconds)
+
+    // Check if another device/session has an active heartbeat & isOnline
+    if (
+      currentRecord.isOnline &&
+      isWithinHeartbeatWindow &&
+      currentRecord.activeSessionId !== existingSessionId
+    ) {
+      // Rule 4: HTTP 409 Conflict with exact message
+      return res.status(409).json({
+        error: 'Esta chave já está sendo utilizada em outro dispositivo. Para entrar aqui, primeiro encerre a sessão anterior.',
+        activeSessionId: currentRecord.activeSessionId,
+        lastHeartbeatAt: currentRecord.lastHeartbeatAt,
+      });
+    }
   }
 
-  if (existingBinding.deviceId === deviceId) {
-    existingBinding.lastActiveAt = now;
-    await saveRemoteBinding(cleanCode, existingBinding);
-    return res.json({ status: 'ok', bound: true, onlineDevices: '1/1' });
-  }
+  // Create new active session with crypto.randomUUID() as required by Rule 1
+  const newSessionId = crypto.randomUUID();
+  const effectiveDeviceId = deviceId || `device-${newSessionId.slice(0, 8)}`;
+  const nowIso = new Date(now).toISOString();
+  const expiresIso = new Date(now + 120000).toISOString();
 
-  // Active on another device
-  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
-  if (now - (existingBinding.lastActiveAt || 0) > TWELVE_HOURS) {
-    const newBinding: CodeBinding = {
-      deviceId,
-      registeredAt: now,
-      lastActiveAt: now,
-      ip: String(clientIp),
-    };
-    await saveRemoteBinding(cleanCode, newBinding);
-    return res.json({ status: 'ok', bound: true, onlineDevices: '1/1' });
-  }
+  const sessionRecord: CodeSessionRecord = {
+    code: studentCode.trim().toUpperCase(),
+    active: true,
+    activeSessionId: newSessionId,
+    deviceId: effectiveDeviceId,
+    sessionStartedAt: nowIso,
+    lastHeartbeatAt: nowIso,
+    expiresAt: expiresIso,
+    isOnline: true,
+    status: 'online',
+  };
 
-  return res.status(403).json({
-    error: `Acesso Negado: O código (${studentCode.trim().toUpperCase()}) já está em uso em outro dispositivo (Computador/Celular). Limite: 1/1 Dispositivo ativado. Você deve clicar em 'Sair' no seu outro aparelho primeiro para liberar o acesso aqui.`,
+  await saveSessionRecord(cleanCode, sessionRecord);
+
+  return res.json({
+    status: 'ok',
+    bound: true,
+    sessionId: newSessionId,
+    sessionRecord,
+    onlineDevices: '1/1',
   });
 });
 
-// Helper to validate student access code AND single-device binding lock
-async function validateStudentAccessAsync(req: express.Request, res: express.Response): Promise<boolean> {
+// Middleware Helper to validate student access code AND single session active lock
+async function validateSessionAsync(req: express.Request, res: express.Response): Promise<boolean> {
   const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
-  const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
-  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
+  const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
   if (!isValidStudentCode(studentCode)) {
     res.status(403).json({
@@ -230,52 +325,37 @@ async function validateStudentAccessAsync(req: express.Request, res: express.Res
 
   const cleanCode = studentCode.trim().toLowerCase();
 
-  // Master Mentor codes are exempt from strict 1-device binding lock
+  // Master Mentor codes bypass strict session lock
   if (isMasterMentorCode(cleanCode)) {
     return true;
   }
 
-  const now = Date.now();
-  const existingBinding = await fetchRemoteBinding(cleanCode);
-
-  if (!existingBinding) {
-    if (deviceId) {
-      const newBinding: CodeBinding = {
-        deviceId,
-        registeredAt: now,
-        lastActiveAt: now,
-        ip: String(clientIp),
-      };
-      await saveRemoteBinding(cleanCode, newBinding);
-    }
-    return true;
-  }
-
-  // Check if a different device is trying to use the same student code
-  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
-  if (deviceId && existingBinding.deviceId !== deviceId) {
-    // If inactive for > 12 hours, allow re-binding
-    if (now - (existingBinding.lastActiveAt || 0) > TWELVE_HOURS) {
-      const newBinding: CodeBinding = {
-        deviceId,
-        registeredAt: now,
-        lastActiveAt: now,
-        ip: String(clientIp),
-      };
-      await saveRemoteBinding(cleanCode, newBinding);
-      return true;
-    }
-
-    res.status(403).json({
-      error: `Acesso Negado: O código (${studentCode.trim().toUpperCase()}) já está em uso em outro dispositivo. Limite: 1/1 Dispositivo ativado. Você deve clicar em 'Sair' no seu outro aparelho primeiro para liberar o acesso aqui.`,
+  if (!sessionId) {
+    res.status(401).json({
+      error: 'Acesso Não Autorizado: Sessão (sessionId) não identificada. Efetue login novamente.',
     });
     return false;
   }
 
-  if (deviceId) {
-    existingBinding.lastActiveAt = now;
-    await saveRemoteBinding(cleanCode, existingBinding);
+  const currentRecord = await fetchSessionRecord(cleanCode);
+
+  if (!currentRecord || !currentRecord.activeSessionId || currentRecord.activeSessionId !== sessionId) {
+    res.status(401).json({
+      error: 'Esta chave já está sendo utilizada em outro dispositivo. Sua sessão foi encerrada.',
+    });
+    return false;
   }
+
+  const now = Date.now();
+  const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
+
+  if (now - lastHeartbeatTime > 120000) {
+    res.status(401).json({
+      error: 'Sessão Expirada por inatividade (> 2 minutos sem envio de heartbeat). Efetue login novamente.',
+    });
+    return false;
+  }
+
   return true;
 }
 
@@ -325,7 +405,7 @@ function handleGeminiError(err: any, res: express.Response) {
 // Chat endpoint for agent execution
 apiRouter.post('/chat', async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  if (!(await validateStudentAccessAsync(req, res))) return;
+  if (!(await validateSessionAsync(req, res))) return;
 
   try {
     const { systemInstruction, messages, temperature = 0.7, customApiKey } = req.body;
@@ -385,7 +465,7 @@ apiRouter.post('/chat', async (req, res) => {
 
 // AI Agent Generator endpoint
 apiRouter.post('/generate-agent', async (req, res) => {
-  if (!(await validateStudentAccessAsync(req, res))) return;
+  if (!(await validateSessionAsync(req, res))) return;
 
   try {
     const { prompt, customApiKey } = req.body;
@@ -475,7 +555,7 @@ Retorne obrigatoriamente um objeto JSON estruturado com os seguintes campos:
 
 // Multi-Agent Collaboration Endpoint
 apiRouter.post('/multi-agent', async (req, res) => {
-  if (!(await validateStudentAccessAsync(req, res))) return;
+  if (!(await validateSessionAsync(req, res))) return;
 
   try {
     const { taskPrompt, agents, customApiKey } = req.body;
