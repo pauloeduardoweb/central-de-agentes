@@ -100,7 +100,7 @@ export default function App() {
     }
   }, []);
 
-  // Heartbeat loop every 30 seconds
+  // Heartbeat loop every 5 minutes (300,000 ms) - Rule 19
   useEffect(() => {
     if (!studentCode || !sessionId) return;
 
@@ -142,31 +142,11 @@ export default function App() {
       }
     };
 
-    const interval = setInterval(sendHeartbeat, 30000); // 30s
+    // Initial heartbeat after mount
+    sendHeartbeat();
+
+    const interval = setInterval(sendHeartbeat, 300000); // 5 minutes
     return () => clearInterval(interval);
-  }, [studentCode, sessionId]);
-
-  // Page unload beacon (sendBeacon)
-  useEffect(() => {
-    const handleUnload = () => {
-      if (studentCode && sessionId) {
-        const payload = JSON.stringify({
-          studentAccessCode: studentCode,
-          sessionId: sessionId,
-          deviceId: getDeviceId(),
-        });
-        const blob = new Blob([payload], { type: 'application/json' });
-        navigator.sendBeacon('/api/logout', blob);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleUnload);
-    window.addEventListener('pagehide', handleUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-      window.removeEventListener('pagehide', handleUnload);
-    };
   }, [studentCode, sessionId]);
 
   const handleSaveApiKey = (key: string, accessCode: string, newSessionId?: string) => {
