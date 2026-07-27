@@ -86,7 +86,7 @@ export default function App() {
             setStudentCode('');
             setSessionId('');
             setShowApiKeyModal(true);
-            if (data.error) triggerToast(data.error);
+            if (data.message || data.error) triggerToast(data.message || data.error);
           } else if (res.ok && data.sessionId) {
             localStorage.setItem('user_session_id', data.sessionId);
             setSessionId(data.sessionId);
@@ -136,7 +136,7 @@ export default function App() {
           setStudentCode('');
           setSessionId('');
           setShowApiKeyModal(true);
-          triggerToast(data.error || 'Esta chave já está sendo utilizada em outro dispositivo. Sua sessão foi encerrada.');
+          triggerToast(data.message || data.error || 'Esta chave já está sendo utilizada em outro dispositivo. Sua sessão foi encerrada.');
         }
       } catch (err) {
         console.warn('[Heartbeat] Network check error:', err);
