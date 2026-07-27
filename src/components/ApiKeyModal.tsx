@@ -135,7 +135,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </label>
             <input
               type="text"
-              placeholder="Digite seu código ex: GZ-5KRT-SRGB"
+              placeholder="Digite seu código ex: GZ-XXXX-XXXX"
               value={accessCode}
               onChange={(e) => {
                 setAccessCode(e.target.value);
