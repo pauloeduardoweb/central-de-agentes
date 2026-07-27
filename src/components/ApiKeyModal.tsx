@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Check, AlertCircle, X, Lock, Key } from 'lucide-react';
+import { ShieldCheck, Check, AlertCircle, X, Lock, Key, Loader2 } from 'lucide-react';
 import { isValidStudentCode } from '../data/studentCodes';
+import { getDeviceId } from '../utils/deviceId';
 
 interface ApiKeyModalProps {
   onClose: () => void;
@@ -11,13 +12,14 @@ interface ApiKeyModalProps {
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMandatoryOnboarding = false }) => {
   const [accessCode, setAccessCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const storedCode = localStorage.getItem('user_student_access_code') || '';
     setAccessCode(storedCode);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = accessCode.trim();
 
@@ -31,8 +33,39 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       return;
     }
 
-    // Save with student code (we pass 'STUDENT_AUTHORIZED' as dummy apiKey or empty string for backwards compatibility)
-    onSave('STUDENT_AUTHORIZED', cleanCode);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const deviceId = getDeviceId();
+      const res = await fetch('/api/verify-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-device-id': deviceId,
+          'x-student-access-code': cleanCode,
+        },
+        body: JSON.stringify({
+          studentAccessCode: cleanCode,
+          deviceId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setError(data.error || 'Não foi possível verificar o acesso para este dispositivo.');
+        setLoading(false);
+        return;
+      }
+
+      onSave('STUDENT_AUTHORIZED', cleanCode);
+    } catch (err) {
+      // In case of offline/network glitch, proceed with client validation
+      onSave('STUDENT_AUTHORIZED', cleanCode);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -116,10 +149,20 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             )}
             <button
               type="submit"
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center space-x-2"
+              disabled={loading}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Check className="w-4 h-4" />
-              <span>Validar e Entrar</span>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Verificando Dispositivo...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Validar e Entrar</span>
+                </>
+              )}
             </button>
           </div>
         </form>
