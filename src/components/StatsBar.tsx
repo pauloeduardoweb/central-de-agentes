@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Heart, Sparkles, MessageSquare, MessageCircle, Globe, ExternalLink, Award } from 'lucide-react';
+import { Bot, Heart, Sparkles, MessageSquare, MessageCircle, Globe, ExternalLink, Award, DollarSign } from 'lucide-react';
 import { Agent } from '../types';
 
 const ChatGPTIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -16,6 +16,7 @@ interface StatsBarProps {
   agents: Agent[];
   activeCategory?: string;
   onOpenOfficialAgent?: () => void;
+  onOpenAfiliados?: () => void;
   onOpenSiteModal?: () => void;
   onOpenCertificados?: () => void;
 }
@@ -23,6 +24,7 @@ interface StatsBarProps {
 export const StatsBar: React.FC<StatsBarProps> = ({
   agents,
   onOpenOfficialAgent,
+  onOpenAfiliados,
   onOpenSiteModal,
   onOpenCertificados,
 }) => {
@@ -137,9 +139,9 @@ export const StatsBar: React.FC<StatsBarProps> = ({
         </div>
       </div>
 
-      {/* 5. Conversar com Assistente Oficial */}
+      {/* 5. Programa de Afiliados */}
       <button
-        onClick={onOpenOfficialAgent}
+        onClick={onOpenAfiliados}
         className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-emerald-400 border border-emerald-500/50 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95"
       >
         <div 
@@ -151,17 +153,11 @@ export const StatsBar: React.FC<StatsBarProps> = ({
           }}
         />
         <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 text-slate-950 border border-emerald-300 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30">
-          <img 
-            src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
-            alt="" 
-            className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
-            referrerPolicy="no-referrer"
-          />
-          <Bot className="w-5 h-5 text-slate-950 relative z-10" />
+          <DollarSign className="w-5 h-5 text-slate-950 relative z-10" />
         </div>
         <div className="overflow-hidden relative z-10">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 truncate">Agente IA</p>
-          <p className="text-xs font-black text-white truncate">Assistente Oficial</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 truncate">Programa de</p>
+          <p className="text-xs font-black text-white truncate">AFILIADOS</p>
         </div>
       </button>
 

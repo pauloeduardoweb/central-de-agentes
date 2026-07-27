@@ -844,18 +844,6 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setShowOverlay(false);
-              onSelectChat(agent);
-            }}
-            className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center space-x-2 border border-slate-700 transition-all active:scale-95"
-          >
-            <Play className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400" />
-            <span>Chat no App</span>
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
               onToggleFavorite(agent.id);
             }}
             className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 border transition-all active:scale-95 ${
