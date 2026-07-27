@@ -16,6 +16,7 @@ import { TechGridBackground } from './components/TechGridBackground';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
 import { unbindCurrentDevice } from './utils/deviceId';
+import { isValidStudentCode } from './data/studentCodes';
 import { Check } from 'lucide-react';
 
 export default function App() {
@@ -43,7 +44,12 @@ export default function App() {
     setAgents(loaded);
 
     const savedKey = localStorage.getItem('user_gemini_api_key') || '';
+    const savedCode = localStorage.getItem('user_student_access_code') || '';
     setUserApiKey(savedKey);
+
+    if (!savedKey || !savedCode || !isValidStudentCode(savedCode)) {
+      setShowApiKeyModal(true);
+    }
   }, []);
 
   const handleSaveApiKey = (key: string, accessCode: string) => {
