@@ -1,9 +1,12 @@
 // Server-Only Authentication Keys Module
 // Contains exactly 4 Master Keys and 200 Student Access Codes for Geração Z Pro
 
-import { normalizeAccessCode } from '../src/data/studentCodes';
-
-export { normalizeAccessCode };
+export function normalizeAccessCode(value: unknown): string {
+  return String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\u200B-\u200D\uFEFF]/g, '');
+}
 
 export const MASTER_KEYS = new Set<string>([
   'MENTOR-BIGODE',
