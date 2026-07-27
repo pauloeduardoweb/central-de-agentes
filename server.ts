@@ -8,7 +8,13 @@ import {
   verifyLoadedKeysCount,
   normalizeAccessCode,
   maskCodeForLogs,
-} from './server/authKeys';
+} from './server/authKeys.js';
+import {
+  db,
+  isDatabaseConfigured,
+  testDatabaseConnection,
+  ensureSessionsTable,
+} from './server/database.js';
 
 dotenv.config();
 
@@ -55,15 +61,62 @@ apiRouter.get(['/health', '/api/health'], (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// MySQL Database status route
+apiRouter.get(['/database/status', '/api/database/status'], async (_req, res) => {
+  try {
+    const isConnected = await testDatabaseConnection();
+    if (isConnected) {
+      return res.json({
+        databaseConnected: true,
+        database: 'mysql',
+        host: 'hostinger',
+      });
+    } else {
+      return res.status(500).json({
+        databaseConnected: false,
+        error: 'DATABASE_CONNECTION_ERROR',
+      });
+    }
+  } catch (err: any) {
+    console.error('[Database Status Endpoint Error]:', err?.message || 'Error checking database status');
+    return res.status(500).json({
+      databaseConnected: false,
+      error: 'DATABASE_CONNECTION_ERROR',
+    });
+  }
+});
+
 // Diagnostic Endpoint (Rule 9)
-apiRouter.get(['/auth/status', '/api/auth/status'], (_req, res) => {
+apiRouter.get(['/auth/status', '/api/auth/status'], async (_req, res) => {
   try {
     const { masterCount, studentCount, totalCount } = verifyLoadedKeysCount();
+    let dbConnected = false;
+    let masterKeysCount = masterCount;
+    let studentKeysCount = studentCount;
+
+    if (isDatabaseConfigured()) {
+      try {
+        const [masterRows]: any = await db.query('SELECT COUNT(*) AS count FROM chaves_mestras');
+        const [studentRows]: any = await db.query('SELECT COUNT(*) AS count FROM codigos_acesso');
+
+        dbConnected = true;
+        if (Array.isArray(masterRows) && masterRows[0]) {
+          masterKeysCount = Number(masterRows[0].count);
+        }
+        if (Array.isArray(studentRows) && studentRows[0]) {
+          studentKeysCount = Number(studentRows[0].count);
+        }
+      } catch (err: any) {
+        console.warn('[Auth Status MySQL Error]:', err?.message || err);
+      }
+    }
+
     res.json({
       backendOnline: true,
-      masterKeysLoaded: masterCount,
-      studentKeysLoaded: studentCount,
-      totalKeysLoaded: totalCount,
+      databaseConnected: dbConnected,
+      masterKeysLoaded: masterKeysCount,
+      studentKeysLoaded: studentKeysCount,
+      totalKeysLoaded: masterKeysCount + studentKeysCount,
       environment: process.env.VERCEL ? 'production' : 'development',
     });
   } catch (err: any) {
@@ -75,11 +128,45 @@ apiRouter.get(['/auth/status', '/api/auth/status'], (_req, res) => {
   }
 });
 
+// Dynamic Code Key Type Lookup (MySQL first, fallback to in-memory authKeys)
+async function checkCodeKeyType(cleanCode: string): Promise<'MASTER' | 'STUDENT' | 'INVALID'> {
+  if (!cleanCode) return 'INVALID';
+  const normalized = normalizeAccessCode(cleanCode);
+
+  if (isDatabaseConfigured()) {
+    try {
+      // 1. Check chaves_mestras in Hostinger MySQL
+      const [masterRows]: any = await db.query(
+        'SELECT id FROM chaves_mestras WHERE UPPER(TRIM(codigo)) = ? AND ativo = 1 LIMIT 1',
+        [normalized]
+      );
+      if (Array.isArray(masterRows) && masterRows.length > 0) {
+        return 'MASTER';
+      }
+
+      // 2. Check codigos_acesso in Hostinger MySQL
+      const [studentRows]: any = await db.query(
+        'SELECT id, codigo, usado, usuario_id FROM codigos_acesso WHERE UPPER(TRIM(codigo)) = ? LIMIT 1',
+        [normalized]
+      );
+      if (Array.isArray(studentRows) && studentRows.length > 0) {
+        return 'STUDENT';
+      }
+    } catch (err: any) {
+      console.warn('[MySQL Lookup Error]:', err?.message || err?.code || 'Query failed');
+    }
+  }
+
+  // Fallback to in-memory authKeys list
+  return lookupKeyType(normalized);
+}
+
 // Persistent global store for student single-session database lock
 const RESTFUL_MASTER_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fa3a6f97f3351';
 
 async function fetchSessionRecord(cleanCode: string): Promise<CodeSessionRecord | null> {
-  if (lookupKeyType(cleanCode) === 'MASTER') {
+  const keyType = await checkCodeKeyType(cleanCode);
+  if (keyType === 'MASTER') {
     const nowIso = new Date().toISOString();
     return {
       code: cleanCode.toUpperCase(),
@@ -92,6 +179,34 @@ async function fetchSessionRecord(cleanCode: string): Promise<CodeSessionRecord 
       isOnline: true,
       status: 'online',
     };
+  }
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureSessionsTable();
+      const [rows]: any = await db.query(
+        'SELECT codigo, active, active_session_id, device_id, session_started_at, last_heartbeat_at, expires_at, is_online, status FROM sessoes WHERE codigo = ? LIMIT 1',
+        [cleanCode]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        const r = rows[0];
+        const record: CodeSessionRecord = {
+          code: r.codigo,
+          active: Boolean(r.active),
+          activeSessionId: r.active_session_id || null,
+          deviceId: r.device_id || null,
+          sessionStartedAt: r.session_started_at ? new Date(r.session_started_at).toISOString() : null,
+          lastHeartbeatAt: r.last_heartbeat_at ? new Date(r.last_heartbeat_at).toISOString() : null,
+          expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
+          isOnline: Boolean(r.is_online),
+          status: r.status === 'online' ? 'online' : 'offline',
+        };
+        activeSessionStore.set(cleanCode, record);
+        return record;
+      }
+    } catch (err: any) {
+      console.warn('[MySQL Session Fetch Error]:', err?.message || err);
+    }
   }
 
   try {
@@ -122,12 +237,49 @@ async function fetchSessionRecord(cleanCode: string): Promise<CodeSessionRecord 
 }
 
 async function saveSessionRecord(cleanCode: string, record: CodeSessionRecord | null): Promise<void> {
-  if (lookupKeyType(cleanCode) === 'MASTER') return;
+  const keyType = await checkCodeKeyType(cleanCode);
+  if (keyType === 'MASTER') return;
 
   if (record) {
     activeSessionStore.set(cleanCode, record);
   } else {
     activeSessionStore.delete(cleanCode);
+  }
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureSessionsTable();
+      if (record) {
+        await db.query(
+          `INSERT INTO sessoes (codigo, active, active_session_id, device_id, session_started_at, last_heartbeat_at, expires_at, is_online, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             active = VALUES(active),
+             active_session_id = VALUES(active_session_id),
+             device_id = VALUES(device_id),
+             session_started_at = VALUES(session_started_at),
+             last_heartbeat_at = VALUES(last_heartbeat_at),
+             expires_at = VALUES(expires_at),
+             is_online = VALUES(is_online),
+             status = VALUES(status)`,
+          [
+            cleanCode,
+            record.active ? 1 : 0,
+            record.activeSessionId,
+            record.deviceId,
+            record.sessionStartedAt ? new Date(record.sessionStartedAt) : null,
+            record.lastHeartbeatAt ? new Date(record.lastHeartbeatAt) : null,
+            record.expiresAt ? new Date(record.expiresAt) : null,
+            record.isOnline ? 1 : 0,
+            record.status,
+          ]
+        );
+      } else {
+        await db.query('DELETE FROM sessoes WHERE codigo = ?', [cleanCode]);
+      }
+    } catch (err: any) {
+      console.warn('[MySQL Session Save Error]:', err?.message || err);
+    }
   }
 
   try {
@@ -189,7 +341,9 @@ apiRouter.post(
       }
 
       const cleanCode = normalizeAccessCode(studentCode);
-      if (cleanCode && lookupKeyType(cleanCode) === 'STUDENT') {
+      const keyType = await checkCodeKeyType(cleanCode);
+
+      if (cleanCode && keyType === 'STUDENT') {
         const currentRecord = await fetchSessionRecord(cleanCode);
         if (currentRecord && (!sessionId || currentRecord.activeSessionId === sessionId)) {
           currentRecord.activeSessionId = null;
@@ -207,7 +361,7 @@ apiRouter.post(
     } catch (err: any) {
       return res.status(500).json({
         error: 'AUTH_CONFIGURATION_ERROR',
-        message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
+        message: 'O servidor de autenticação está temporariamente indisponível.',
       });
     }
   }
@@ -234,7 +388,7 @@ apiRouter.post(['/session/heartbeat', '/api/session/heartbeat'], async (req, res
       });
     }
 
-    const keyType = lookupKeyType(cleanCode);
+    const keyType = await checkCodeKeyType(cleanCode);
 
     if (keyType === 'INVALID') {
       return res.status(401).json({
@@ -280,7 +434,7 @@ apiRouter.post(['/session/heartbeat', '/api/session/heartbeat'], async (req, res
   } catch (err: any) {
     return res.status(500).json({
       error: 'AUTH_CONFIGURATION_ERROR',
-      message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
+      message: 'O servidor de autenticação está temporariamente indisponível.',
     });
   }
 });
@@ -313,16 +467,14 @@ async function handleLogin(req: express.Request, res: express.Response) {
 
     let keyType = 'INVALID';
     try {
-      keyType = lookupKeyType(cleanCode);
+      keyType = await checkCodeKeyType(cleanCode);
     } catch (err) {
-      // Rule 11: If lists are not loaded -> HTTP 500
       return res.status(500).json({
         error: 'AUTH_CONFIGURATION_ERROR',
-        message: 'O sistema de autenticação não foi carregado corretamente.',
+        message: 'O servidor de autenticação está temporariamente indisponível.',
       });
     }
 
-    // Rule 10: Secure logging
     console.log(
       `[AUTH LOGIN] path=${req.path} len=${cleanCode.length} masked=${maskedCode} keyType=${keyType} env=${process.env.VERCEL ? 'production' : 'development'}`
     );
@@ -404,7 +556,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
     console.error('[Verify Code Error]:', err?.message || err);
     return res.status(500).json({
       error: 'AUTH_CONFIGURATION_ERROR',
-      message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
+      message: 'O servidor de autenticação está temporariamente indisponível.',
     });
   }
 }
@@ -436,7 +588,7 @@ async function validateSessionAsync(req: express.Request, res: express.Response)
     const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
     const cleanCode = normalizeAccessCode(studentCode);
-    const keyType = lookupKeyType(cleanCode);
+    const keyType = await checkCodeKeyType(cleanCode);
 
     if (keyType === 'INVALID') {
       res.status(401).json({
@@ -483,7 +635,7 @@ async function validateSessionAsync(req: express.Request, res: express.Response)
   } catch (err) {
     res.status(500).json({
       error: 'AUTH_CONFIGURATION_ERROR',
-      message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
+      message: 'O servidor de autenticação está temporariamente indisponível.',
     });
     return false;
   }
