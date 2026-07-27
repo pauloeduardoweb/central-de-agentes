@@ -58,7 +58,40 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {/* API Key & Student Access Management Action */}
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={onOpenApiKeyModal}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-2 border transition-all shadow-sm ${
+              hasApiKey
+                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60 hover:border-emerald-400'
+                : 'bg-amber-500/10 border-amber-500/50 text-amber-400 hover:bg-amber-500/20 animate-pulse'
+            }`}
+            title="Clique para ver ou alterar seu código de acesso e chave da API"
+          >
+            <Key className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">
+              {hasApiKey ? 'Acesso Ativado' : 'Digitar Código & Chave API'}
+            </span>
+            {hasApiKey ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            )}
+          </button>
 
+          {hasApiKey && (
+            <button
+              onClick={onDisconnectApiKey}
+              className="px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 border border-rose-500/40 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 hover:border-rose-400 transition-all shadow-sm"
+              title="Desconectar e remover chave do navegador"
+            >
+              <LogOut className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden md:inline">Desconectar</span>
+              <span className="md:hidden">Sair</span>
+            </button>
+          )}
+        </div>
 
       </div>
     </header>
