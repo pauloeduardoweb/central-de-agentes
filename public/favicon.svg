@@ -1,1 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Dark Glow -->
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00f2ff" stop-opacity="0.25"/>
+      <stop offset="60%" stop-color="#03131c" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#03131c" stop-opacity="1"/>
+    </radialGradient>
 
+    <!-- Metallic Silver Gradient -->
+    <linearGradient id="silverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="25%" stop-color="#e2e8f0"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="75%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+
+    <!-- Cybernetic Blue Gradient -->
+    <linearGradient id="cyberBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#00d8f6"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+
+    <!-- Electric Neon Glow -->
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComponentTransfer in="blur" result="glow">
+        <feFuncA type="linear" slope="1.8"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="glow" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <linearGradient id="facetHighlight" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f2ff" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Base Canvas -->
+  <rect width="512" height="512" rx="128" fill="#03131c"/>
+  <rect width="512" height="512" rx="128" fill="url(#bgGlow)"/>
+
+  <!-- Outer Cybernetic Framing Ring/Border -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="url(#cyberBlue)" stroke-width="6" stroke-opacity="0.4"/>
+
+  <!-- Metallic Cybernetic Z Facets -->
+  <g filter="url(#neonGlow)">
+    <!-- Top Horizontal Bar -->
+    <polygon points="110,110 402,110 330,195 110,195" fill="url(#silverGrad)"/>
+    <polygon points="402,110 330,195 380,195 402,110" fill="url(#cyberBlue)"/>
+
+    <!-- Diagonal Beam Main -->
+    <polygon points="330,195 182,320 232,320 402,110" fill="url(#facetHighlight)"/>
+    <polygon points="330,195 182,320 110,402 182,402 330,270" fill="url(#cyberBlue)"/>
+
+    <!-- Bottom Horizontal Bar -->
+    <polygon points="110,402 402,402 402,317 182,317" fill="url(#silverGrad)"/>
+    <polygon points="110,402 182,317 132,317 110,402" fill="url(#cyberBlue)"/>
+
+    <!-- Sharp Electric Cuts / Accents -->
+    <!-- Top Cut -->
+    <path d="M 110 110 L 150 110 L 125 140 Z" fill="#ffffff" opacity="0.9"/>
+    <!-- Middle Tech Line -->
+    <line x1="220" y1="210" x2="350" y2="110" stroke="#00f2ff" stroke-width="5" stroke-linecap="round"/>
+    <line x1="160" y1="402" x2="290" y2="302" stroke="#00f2ff" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>
