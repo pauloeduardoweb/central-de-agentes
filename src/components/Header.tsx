@@ -1,5 +1,5 @@
-import React from 'react';
-import { ExternalLink, Key, CheckCircle2, AlertTriangle, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { ExternalLink, Key, CheckCircle2, AlertTriangle, LogOut, Lock, Unlock, Copy, Check } from 'lucide-react';
 
 interface HeaderProps {
   onOpenCreate?: () => void;
@@ -10,6 +10,7 @@ interface HeaderProps {
   onOpenApiKeyModal?: () => void;
   onDisconnectApiKey?: () => void;
   hasApiKey?: boolean;
+  studentCode?: string;
   agentCount: number;
 }
 
@@ -18,7 +19,37 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenApiKeyModal,
   onDisconnectApiKey,
   hasApiKey,
+  studentCode,
 }) => {
+  const [isKeyHidden, setIsKeyHidden] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const formatKeyDisplay = (code?: string) => {
+    if (!code) return 'NÃO DEFINIDA';
+    const upper = code.trim().toUpperCase();
+    if (!isKeyHidden) return upper;
+
+    if (upper.includes('-')) {
+      const parts = upper.split('-');
+      if (parts.length >= 3) {
+        return `${parts[0]}-••••-••••`;
+      }
+      return `${parts[0]}-••••`;
+    }
+    if (upper.length > 6) {
+      return `${upper.slice(0, 4)}••••${upper.slice(-2)}`;
+    }
+    return '••••••••';
+  };
+
+  const handleCopyKey = () => {
+    if (studentCode) {
+      navigator.clipboard.writeText(studentCode.trim().toUpperCase());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-30 border-b border-cyan-500/20 bg-[#020d14]/90 backdrop-blur-md px-4 lg:px-8 py-3.5 transition-colors">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
@@ -61,15 +92,54 @@ export const Header: React.FC<HeaderProps> = ({
         {/* API Key & Student Access Management Action */}
         <div className="flex items-center space-x-2">
           {hasApiKey && (
-            <div 
-              className="flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm"
-              title="Sua licença está ativada e reconhecida exclusivamente para este dispositivo (1 Dispositivo Ativo)"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-              </span>
-              <span>Online 1/1</span>
+            <div className="flex items-center space-x-1.5 sm:space-x-2">
+              {/* Online 1/1 Badge */}
+              <div 
+                className="flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-sm"
+                title="Sua licença está ativada e reconhecida exclusivamente para este dispositivo (1 Dispositivo Ativo)"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+                <span>Online 1/1</span>
+              </div>
+
+              {/* Active Key Display Badge with Lock Toggle */}
+              {studentCode && (
+                <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-cyan-500/30 text-cyan-200 text-xs font-mono font-bold shadow-sm">
+                  <span className="text-slate-400 font-sans font-medium text-[11px] hidden sm:inline">Chave:</span>
+                  <span className="tracking-wider text-emerald-400 select-all">
+                    {formatKeyDisplay(studentCode)}
+                  </span>
+
+                  {/* Lock / Unlock Toggle Button */}
+                  <button
+                    onClick={() => setIsKeyHidden(!isKeyHidden)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none"
+                    title={isKeyHidden ? "Clique para revelar a chave de acesso em uso" : "Clique para ocultar e proteger a chave de acesso"}
+                  >
+                    {isKeyHidden ? (
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    ) : (
+                      <Unlock className="w-3.5 h-3.5 text-emerald-400 font-bold animate-pulse" />
+                    )}
+                  </button>
+
+                  {/* Copy Button */}
+                  <button
+                    onClick={handleCopyKey}
+                    className="p-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors focus:outline-none hidden md:block"
+                    title="Copiar chave de acesso"
+                  >
+                    {copied ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -83,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Clique para ver ou alterar seu código de acesso de aluno"
           >
             <Key className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">
+            <span className="hidden lg:inline">
               {hasApiKey ? 'Acesso Liberado' : 'Digitar Código do Aluno'}
             </span>
             {hasApiKey ? (
