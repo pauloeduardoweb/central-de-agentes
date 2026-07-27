@@ -37,7 +37,7 @@ const MASTER_CODES_LIST = ['mentor-bigode', 'bigode-mentor', 'bigode7144', '7144
 const apiRouter = express.Router();
 
 // Health check endpoint
-apiRouter.get('/health', (_req, res) => {
+apiRouter.get(['/health', '/api/health'], (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -45,6 +45,9 @@ apiRouter.get('/health', (_req, res) => {
 const RESTFUL_MASTER_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fa3a6f97f3351';
 
 async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null> {
+  // Master mentor codes are exempt from remote binding lookups
+  if (MASTER_CODES_LIST.includes(cleanCode)) return null;
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
@@ -73,6 +76,8 @@ async function fetchRemoteBinding(cleanCode: string): Promise<CodeBinding | null
 }
 
 async function saveRemoteBinding(cleanCode: string, binding: CodeBinding | null): Promise<void> {
+  if (MASTER_CODES_LIST.includes(cleanCode)) return;
+
   if (binding) {
     activeCodeBindings.set(cleanCode, binding);
   } else {
@@ -117,7 +122,7 @@ async function saveRemoteBinding(cleanCode: string, binding: CodeBinding | null)
 }
 
 // Endpoint to unbind device when student disconnects
-apiRouter.post('/unbind', async (req, res) => {
+apiRouter.post(['/unbind', '/api/unbind'], async (req, res) => {
   const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
   const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
 
@@ -132,7 +137,7 @@ apiRouter.post('/unbind', async (req, res) => {
 });
 
 // Endpoint to verify student code and register 1-device lock
-apiRouter.post('/verify-code', async (req, res) => {
+apiRouter.post(['/verify-code', '/api/verify-code', '/'], async (req, res) => {
   const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
   const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
   const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
