@@ -55,6 +55,26 @@ apiRouter.get(['/health', '/api/health'], (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Diagnostic Endpoint (Rule 9)
+apiRouter.get(['/auth/status', '/api/auth/status'], (_req, res) => {
+  try {
+    const { masterCount, studentCount, totalCount } = verifyLoadedKeysCount();
+    res.json({
+      backendOnline: true,
+      masterKeysLoaded: masterCount,
+      studentKeysLoaded: studentCount,
+      totalKeysLoaded: totalCount,
+      environment: process.env.VERCEL ? 'production' : 'development',
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      backendOnline: false,
+      error: 'AUTH_CONFIGURATION_ERROR',
+      message: 'O sistema de autenticação não foi carregado corretamente.',
+    });
+  }
+});
+
 // Persistent global store for student single-session database lock
 const RESTFUL_MASTER_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fa3a6f97f3351';
 
@@ -150,13 +170,20 @@ apiRouter.post(
   ['/logout', '/api/logout', '/session/logout', '/api/session/logout', '/unbind', '/api/unbind'],
   async (req, res) => {
     try {
-      let studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+      let studentCode =
+        req.body?.accessCode ??
+        req.body?.studentAccessCode ??
+        req.body?.accessKey ??
+        req.body?.code ??
+        req.headers['x-access-code'] ??
+        req.headers['x-student-access-code'];
+
       let sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
       if (req.body && typeof req.body === 'string') {
         try {
           const parsed = JSON.parse(req.body);
-          studentCode = studentCode || parsed.studentAccessCode;
+          studentCode = studentCode || parsed.accessCode || parsed.studentAccessCode;
           sessionId = sessionId || parsed.sessionId;
         } catch (e) {}
       }
@@ -189,10 +216,24 @@ apiRouter.post(
 // Heartbeat Endpoint (Every 30s)
 apiRouter.post(['/session/heartbeat', '/api/session/heartbeat'], async (req, res) => {
   try {
-    const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+    const studentCode =
+      req.body?.accessCode ??
+      req.body?.studentAccessCode ??
+      req.body?.accessKey ??
+      req.body?.code ??
+      req.headers['x-access-code'] ??
+      req.headers['x-student-access-code'];
+
     const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
     const cleanCode = normalizeAccessCode(studentCode);
+    if (!cleanCode) {
+      return res.status(400).json({
+        error: 'ACCESS_CODE_REQUIRED',
+        message: 'Informe o código de acesso.',
+      });
+    }
+
     const keyType = lookupKeyType(cleanCode);
 
     if (keyType === 'INVALID') {
@@ -203,7 +244,7 @@ apiRouter.post(['/session/heartbeat', '/api/session/heartbeat'], async (req, res
     }
 
     if (keyType === 'MASTER') {
-      return res.json({ status: 'ok', online: true, isMaster: true });
+      return res.json({ status: 'ok', online: true, isMaster: true, role: 'mentor' });
     }
 
     if (!sessionId) {
@@ -244,81 +285,120 @@ apiRouter.post(['/session/heartbeat', '/api/session/heartbeat'], async (req, res
   }
 });
 
-// Endpoint to verify code and register single session lock
-apiRouter.post(['/verify-code', '/api/verify-code', '/session/verify', '/api/session/verify', '/'], async (req, res) => {
+// Centralized Unified Authentication Handler (Rules 1, 2, 4, 5, 10, 11)
+async function handleLogin(req: express.Request, res: express.Response) {
   try {
-    const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+    // Rule 4: Accept fallback parameter names
+    const receivedCode =
+      req.body?.accessCode ??
+      req.body?.studentAccessCode ??
+      req.body?.accessKey ??
+      req.body?.code ??
+      req.headers['x-access-code'] ??
+      req.headers['x-student-access-code'];
+
     const deviceId = (req.headers['x-client-device-id'] as string) || (req.body && req.body.deviceId);
     const existingSessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
-    const cleanCode = normalizeAccessCode(studentCode);
-    const keyType = lookupKeyType(cleanCode);
-
-    // Rule 9: Validation order
-    if (keyType === 'INVALID') {
-      return res.status(401).json({
-        error: 'INVALID_ACCESS_CODE',
-        message: 'O código informado é inválido.',
+    // Rule 11: If no code is sent -> HTTP 400
+    if (receivedCode === undefined || receivedCode === null || String(receivedCode).trim() === '') {
+      return res.status(400).json({
+        error: 'ACCESS_CODE_REQUIRED',
+        message: 'Informe o código de acesso.',
       });
     }
 
-    // Rule 10: Master keys allow multiple simultaneous sessions, no device lock
+    const cleanCode = normalizeAccessCode(receivedCode);
+    const maskedCode = maskCodeForLogs(cleanCode);
+
+    let keyType = 'INVALID';
+    try {
+      keyType = lookupKeyType(cleanCode);
+    } catch (err) {
+      // Rule 11: If lists are not loaded -> HTTP 500
+      return res.status(500).json({
+        error: 'AUTH_CONFIGURATION_ERROR',
+        message: 'O sistema de autenticação não foi carregado corretamente.',
+      });
+    }
+
+    // Rule 10: Secure logging
+    console.log(
+      `[AUTH LOGIN] path=${req.path} len=${cleanCode.length} masked=${maskedCode} keyType=${keyType} env=${process.env.VERCEL ? 'production' : 'development'}`
+    );
+
+    // Rule 5: Validate Master Keys FIRST
     if (keyType === 'MASTER') {
       const masterSessionId = existingSessionId || 'MASTER-SESSION-' + crypto.randomUUID();
-      return res.json({
+      return res.status(200).json({
+        success: true,
         status: 'ok',
         isMaster: true,
+        role: 'mentor',
+        message: 'Acesso autorizado.',
         sessionId: masterSessionId,
         activeSessionId: masterSessionId,
         onlineDevices: '1/1',
       });
     }
 
-    // Rule 11: Student keys require single active session
-    const now = Date.now();
-    const currentRecord = await fetchSessionRecord(cleanCode);
+    // Student Keys validation SECOND
+    if (keyType === 'STUDENT') {
+      const now = Date.now();
+      const currentRecord = await fetchSessionRecord(cleanCode);
 
-    if (currentRecord && currentRecord.activeSessionId) {
-      const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
-      const isWithinHeartbeatWindow = now - lastHeartbeatTime <= 120000; // 2 minutes
+      if (currentRecord && currentRecord.activeSessionId) {
+        const lastHeartbeatTime = currentRecord.lastHeartbeatAt ? new Date(currentRecord.lastHeartbeatAt).getTime() : 0;
+        const isWithinHeartbeatWindow = now - lastHeartbeatTime <= 120000; // 2 minutes
 
-      if (
-        currentRecord.isOnline &&
-        isWithinHeartbeatWindow &&
-        currentRecord.activeSessionId !== existingSessionId
-      ) {
-        return res.status(409).json({
-          error: 'SESSION_ALREADY_ACTIVE',
-          message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
-        });
+        if (
+          currentRecord.isOnline &&
+          isWithinHeartbeatWindow &&
+          currentRecord.activeSessionId !== existingSessionId
+        ) {
+          return res.status(409).json({
+            error: 'SESSION_ALREADY_ACTIVE',
+            message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+          });
+        }
       }
+
+      const newSessionId = crypto.randomUUID();
+      const effectiveDeviceId = deviceId || `device-${newSessionId.slice(0, 8)}`;
+      const nowIso = new Date(now).toISOString();
+      const expiresIso = new Date(now + 120000).toISOString();
+
+      const sessionRecord: CodeSessionRecord = {
+        code: cleanCode,
+        active: true,
+        activeSessionId: newSessionId,
+        deviceId: effectiveDeviceId,
+        sessionStartedAt: nowIso,
+        lastHeartbeatAt: nowIso,
+        expiresAt: expiresIso,
+        isOnline: true,
+        status: 'online',
+      };
+
+      await saveSessionRecord(cleanCode, sessionRecord);
+
+      return res.status(200).json({
+        success: true,
+        status: 'ok',
+        bound: true,
+        isMaster: false,
+        role: 'student',
+        message: 'Acesso autorizado.',
+        sessionId: newSessionId,
+        sessionRecord,
+        onlineDevices: '1/1',
+      });
     }
 
-    const newSessionId = crypto.randomUUID();
-    const effectiveDeviceId = deviceId || `device-${newSessionId.slice(0, 8)}`;
-    const nowIso = new Date(now).toISOString();
-    const expiresIso = new Date(now + 120000).toISOString();
-
-    const sessionRecord: CodeSessionRecord = {
-      code: cleanCode,
-      active: true,
-      activeSessionId: newSessionId,
-      deviceId: effectiveDeviceId,
-      sessionStartedAt: nowIso,
-      lastHeartbeatAt: nowIso,
-      expiresAt: expiresIso,
-      isOnline: true,
-      status: 'online',
-    };
-
-    await saveSessionRecord(cleanCode, sessionRecord);
-
-    return res.json({
-      status: 'ok',
-      bound: true,
-      sessionId: newSessionId,
-      sessionRecord,
-      onlineDevices: '1/1',
+    // Rule 11: Invalid access code -> HTTP 401
+    return res.status(401).json({
+      error: 'INVALID_ACCESS_CODE',
+      message: 'O código informado é inválido.',
     });
   } catch (err: any) {
     console.error('[Verify Code Error]:', err?.message || err);
@@ -327,12 +407,32 @@ apiRouter.post(['/verify-code', '/api/verify-code', '/session/verify', '/api/ses
       message: 'Não foi possível validar o acesso. Verifique a configuração do servidor.',
     });
   }
-});
+}
+
+// Login Endpoints (Primary: /api/auth/login)
+apiRouter.post(
+  [
+    '/auth/login',
+    '/api/auth/login',
+    '/verify-code',
+    '/api/verify-code',
+    '/session/verify',
+    '/api/session/verify',
+  ],
+  handleLogin
+);
 
 // Middleware Helper to validate access code AND single session active lock
 async function validateSessionAsync(req: express.Request, res: express.Response): Promise<boolean> {
   try {
-    const studentCode = (req.headers['x-student-access-code'] as string) || (req.body && req.body.studentAccessCode);
+    const studentCode =
+      req.body?.accessCode ??
+      req.body?.studentAccessCode ??
+      req.body?.accessKey ??
+      req.body?.code ??
+      req.headers['x-access-code'] ??
+      req.headers['x-student-access-code'];
+
     const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
 
     const cleanCode = normalizeAccessCode(studentCode);
@@ -657,9 +757,12 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
-  });
+  // Rule 8: Do not call app.listen in Vercel serverless environment
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Servidor local iniciado na porta ${PORT}`);
+    });
+  }
 }
 
 export default app;
