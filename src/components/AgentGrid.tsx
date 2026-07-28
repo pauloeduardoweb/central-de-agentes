@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Search, SlidersHorizontal, Heart, UserCheck, Sparkles, FolderOpen, Flame, Zap, ShoppingBag, ShieldAlert, Headphones, Layers, HelpCircle, TrendingUp, MessageCircle, Users, ExternalLink, Copy, Check, Cpu, Clock } from 'lucide-react';
+import { Search, SlidersHorizontal, Heart, UserCheck, Sparkles, FolderOpen, Flame, Zap, ShoppingBag, ShieldAlert, Headphones, Layers, HelpCircle, TrendingUp, MessageCircle, Users, ExternalLink, Copy, Check, Cpu, Clock, Trophy, Target, Award, Compass, Rocket } from 'lucide-react';
 import { Agent, CategoryType } from '../types';
 import { AgentCard } from './AgentCard';
 import { TikTokPosterCard } from './TikTokPosterCard';
+import { ChallengeAcademyPage } from './challenge/ChallengeAcademyPage';
 
 interface AgentGridProps {
   agents: Agent[];
@@ -79,6 +80,15 @@ const CATEGORY_MENU: CategoryMenuItem[] = [
     gradient: 'from-cyan-500 via-blue-600 to-indigo-600',
     activeBorder: 'border-cyan-400/80 shadow-cyan-500/20',
     textGlow: 'text-cyan-400',
+  },
+  {
+    id: 'Academia de Desafios',
+    label: 'ACADEMIA DE DESAFIOS',
+    tag: 'Treinamentos & Missões',
+    icon: Trophy,
+    gradient: 'from-amber-500 via-orange-600 to-red-600',
+    activeBorder: 'border-amber-400/80 shadow-amber-500/20',
+    textGlow: 'text-amber-400',
   },
 ];
 
@@ -177,6 +187,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
       'Suporte': 0,
       'Grupo de Network': 2,
       'Flow Ultra': 1,
+      'Academia de Desafios': 0,
       'Todas': agents.length,
     };
     agents.forEach((a) => {
@@ -206,7 +217,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   return (
     <div className="space-y-6">
       
-      {/* MAIN TOP NAVIGATION MENUS (TIKTOK 2K | TIKTOK SHOP | RECURSO ANTI-VIOLAÇÃO | SUPORTE | GRUPO DE NETWORK | FLOW ULTRA) */}
+      {/* MAIN TOP NAVIGATION MENUS (TIKTOK 2K | TIKTOK SHOP | RECURSO ANTI-VIOLAÇÃO | SUPORTE | GRUPO DE NETWORK | FLOW ULTRA | ACADEMIA DE DESAFIOS) */}
       <div className="bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/50 p-3 rounded-2xl shadow-2xl shadow-cyan-950/60 backdrop-blur-md relative overflow-hidden">
         {/* Tech Grid Image Overlay for main container */}
         <div 
@@ -217,7 +228,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             backgroundPosition: 'center',
           }}
         />
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 relative z-10">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 relative z-10">
           {CATEGORY_MENU.map((item) => {
             const IconComponent = item.icon;
             const isSelected = selectedCategory === item.id;
@@ -268,7 +279,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
                       ? 'bg-cyan-950/90 text-cyan-200 border-cyan-400/70 shadow-xs'
                       : 'bg-[#030e1a]/90 text-cyan-300 border-cyan-500/30'
                   }`}>
-                    {item.id === 'Grupo de Network' ? '2 Grupos VIP' : item.id === 'Suporte' ? '1 Contato' : item.id === 'Flow Ultra' ? '3 Grupos VIP' : `${count} ${count === 1 ? 'Agente' : 'Agentes'}`}
+                    {item.id === 'Grupo de Network' ? '2 Grupos VIP' : item.id === 'Suporte' ? '1 Contato' : item.id === 'Flow Ultra' ? '3 Grupos VIP' : item.id === 'Academia de Desafios' ? (count > 0 ? `${count} ${count === 1 ? 'Agente' : 'Agentes'}` : '3 Desafios') : `${count} ${count === 1 ? 'Agente' : 'Agentes'}`}
                   </span>
                 </div>
 
@@ -895,8 +906,12 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
         </div>
       )}
 
-      {/* Controls: Search, Filters & Sort (Hide when on Grupo de Network, Suporte or Flow Ultra) */}
-      {selectedCategory !== 'Grupo de Network' && selectedCategory !== 'Suporte' && selectedCategory !== 'Flow Ultra' && (
+      {selectedCategory === 'Academia de Desafios' && (
+        <ChallengeAcademyPage onBackToMainTab={() => setSelectedCategory('Tiktok 2K')} />
+      )}
+
+      {/* Controls: Search, Filters & Sort (Hide when on Grupo de Network, Suporte, Flow Ultra or Academia de Desafios) */}
+      {selectedCategory !== 'Grupo de Network' && selectedCategory !== 'Suporte' && selectedCategory !== 'Flow Ultra' && selectedCategory !== 'Academia de Desafios' && (
         <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 backdrop-blur-md relative overflow-hidden">
           <div 
             className="absolute inset-0 opacity-15 pointer-events-none"

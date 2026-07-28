@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Key, CheckCircle2, AlertTriangle, LogOut, Lock, Unlock, Copy, Check } from 'lucide-react';
+import { ExternalLink, Key, CheckCircle2, AlertTriangle, LogOut, Lock, Unlock, Copy, Check, Crown, Bot } from 'lucide-react';
 
 interface HeaderProps {
   onOpenCreate?: () => void;
@@ -12,6 +12,9 @@ interface HeaderProps {
   hasApiKey?: boolean;
   studentCode?: string;
   agentCount: number;
+  isMaster?: boolean;
+  activeView?: 'hub' | 'mentor';
+  onSelectView?: (view: 'hub' | 'mentor') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,6 +23,9 @@ export const Header: React.FC<HeaderProps> = ({
   onDisconnectApiKey,
   hasApiKey,
   studentCode,
+  isMaster = false,
+  activeView = 'hub',
+  onSelectView,
 }) => {
   const [isKeyHidden, setIsKeyHidden] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -88,6 +94,34 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Master Navigation Tab (Exclusively for Mentor Role) */}
+        {isMaster && onSelectView && (
+          <div className="hidden md:flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-cyan-500/30">
+            <button
+              onClick={() => onSelectView('hub')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
+                activeView === 'hub'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Bot className="w-3.5 h-3.5" />
+              <span>Agentes GPT</span>
+            </button>
+            <button
+              onClick={() => onSelectView('mentor')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
+                activeView === 'mentor'
+                  ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md shadow-cyan-500/20'
+                  : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
+              }`}
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>Painel do Mentor</span>
+            </button>
+          </div>
+        )}
 
         {/* API Key & Student Access Management Action */}
         <div className="flex items-center space-x-2">
