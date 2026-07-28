@@ -987,8 +987,8 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
         </div>
       )}
 
-      {/* Grid of Agents (Hidden on Grupo de Network, Suporte, and Flow Ultra unless agents exist) */}
-      {selectedCategory !== 'Grupo de Network' && selectedCategory !== 'Suporte' && (selectedCategory !== 'Flow Ultra' || filteredAgents.length > 0) && (
+      {/* Grid of Agents (Hidden on Grupo de Network, Suporte, Academia de Desafios, and Flow Ultra unless agents exist) */}
+      {selectedCategory !== 'Grupo de Network' && selectedCategory !== 'Suporte' && selectedCategory !== 'Academia de Desafios' && (selectedCategory !== 'Flow Ultra' || filteredAgents.length > 0) && (
         filteredAgents.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredAgents.map((agent) => (
