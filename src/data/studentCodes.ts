@@ -13,3 +13,8 @@ export function isValidStudentCode(value: unknown): boolean {
   const norm = normalizeAccessCode(value);
   return norm.length >= 3;
 }
+
+export function isMasterKey(value: unknown): boolean {
+  const norm = normalizeAccessCode(value);
+  return ['MENTOR-BIGODE', 'BIGODE-MENTOR', 'BIGODE7144', '7144BIGODE'].includes(norm);
+}
