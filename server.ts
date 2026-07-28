@@ -14,7 +14,22 @@ import {
   isDatabaseConfigured,
   testDatabaseConnection,
   ensureSessionsTable,
+  ensureProductsTable,
+  ensureProgressTable,
+  ensureProfilesTable,
 } from './server/database.js';
+import {
+  getGlobalRankingHandler,
+  getUserRankingStatsHandler,
+  syncPlayerProgressHandler,
+} from './server/rankingService.js';
+import {
+  getStudentProfileHandler,
+  checkUsernameHandler,
+  createStudentProfileHandler,
+  updateUsernameHandler,
+  getMentorStudentsHandler,
+} from './server/studentProfileService.js';
 
 dotenv.config();
 
@@ -881,6 +896,327 @@ ${historyContext ? `HISTÓRICO DE RESPOSTAS DOS OUTROS AGENTES:\n${historyContex
   } catch (err: any) {
     console.error('Error in /api/multi-agent:', err);
     return handleGeminiError(err, res);
+  }
+});
+
+// ==================================================
+// PRODUCTS & MENTOR ADMIN BACKEND ROUTES
+// ==================================================
+
+// Fallback in-memory product store for development when DB is not configured
+let memoryProducts = [
+  { id: 1, nome: 'Bolsa Feminina Elegante', categoria: 'Moda e Acessórios', pasta: 'bolsa-feminina-elegante', imagem_principal: 'https://midia.geracaozpro.com/produtos/bolsa-feminina-elegante/1.jpg', ativo: 1, nivel: 'Facil', xp: 25, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() },
+  { id: 2, nome: 'Escova Secadora Multifuncional', categoria: 'Beleza e Cuidados', pasta: 'escova-secadora-multifuncional', imagem_principal: 'https://midia.geracaozpro.com/produtos/escova-secadora-multifuncional/1.jpg', ativo: 1, nivel: 'Facil', xp: 25, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() },
+  { id: 3, nome: 'Mini Processador Elétrico', categoria: 'Casa e Cozinha', pasta: 'mini-processador-eletrico', imagem_principal: 'https://midia.geracaozpro.com/produtos/mini-processador-eletrico/1.jpg', ativo: 1, nivel: 'Facil', xp: 25, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() },
+  { id: 4, nome: 'Smartwatch Ultra Series', categoria: 'Eletrônicos e Gadgets', pasta: 'smartwatch-ultra-series', imagem_principal: 'https://midia.geracaozpro.com/produtos/smartwatch-ultra-series/1.jpg', ativo: 1, nivel: 'Facil', xp: 25, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() },
+  { id: 5, nome: 'Luminária Sunset LED', categoria: 'Decoração e Casa', pasta: 'luminaria-sunset-led', imagem_principal: 'https://midia.geracaozpro.com/produtos/luminaria-sunset-led/1.jpg', ativo: 1, nivel: 'Facil', xp: 25, criado_em: new Date().toISOString(), atualizado_em: new Date().toISOString() },
+];
+
+// Helper Middleware to protect Mentor Admin Routes (Rule 8 & Security)
+async function requireMentorAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    const code =
+      req.headers['x-access-code'] ||
+      req.headers['x-student-access-code'] ||
+      req.headers['x-master-key'] ||
+      req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
+      req.body?.accessCode ||
+      req.body?.accessKey ||
+      req.query?.accessCode;
+
+    const cleanCode = normalizeAccessCode(code);
+    if (!cleanCode) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Acesso não autorizado. Chave de acesso não informada.',
+      });
+    }
+
+    const keyType = await checkCodeKeyType(cleanCode);
+
+    if (keyType === 'MASTER') {
+      return next();
+    }
+
+    if (keyType === 'STUDENT') {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas mentores possuem permissão para acessar esta funcionalidade.',
+      });
+    }
+
+    return res.status(401).json({
+      error: 'UNAUTHORIZED',
+      message: 'Chave de acesso inválida.',
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Erro interno ao validar credenciais do mentor.',
+    });
+  }
+}
+
+// RANKING & STUDENT PROGRESS ROUTES
+apiRouter.get(['/ranking', '/api/ranking'], getGlobalRankingHandler);
+apiRouter.get(['/ranking/me', '/api/ranking/me', '/player/stats', '/api/player/stats'], getUserRankingStatsHandler);
+apiRouter.post(['/player/progress', '/api/player/progress', '/ranking/round', '/api/ranking/round'], syncPlayerProgressHandler);
+
+// STUDENT PROFILE ROUTES
+apiRouter.get(['/student/profile', '/api/student/profile'], getStudentProfileHandler);
+apiRouter.get(['/student/profile/check-username', '/api/student/profile/check-username'], checkUsernameHandler);
+apiRouter.post(['/student/profile', '/api/student/profile'], createStudentProfileHandler);
+apiRouter.patch(['/student/profile/username', '/api/student/profile/username'], updateUsernameHandler);
+
+// MENTOR STUDENT MANAGEMENT ROUTE
+apiRouter.get(['/mentor/students', '/api/mentor/students'], getMentorStudentsHandler);
+
+// PUBLIC ROUTE FOR ACADEMIA DE DESAFIOS: GET /api/products
+apiRouter.get(['/products', '/api/products'], async (_req, res) => {
+  try {
+    if (isDatabaseConfigured()) {
+      await ensureProductsTable();
+      const [rows]: any = await db.query(
+        `SELECT id, nome, categoria, imagem_principal AS imagem, nivel, xp
+         FROM produtos
+         WHERE ativo = 1
+         ORDER BY id DESC`
+      );
+
+      if (Array.isArray(rows)) {
+        const formatted = rows.map((r: any) => ({
+          id: r.id,
+          nome: r.nome,
+          categoria: r.categoria,
+          imagem: r.imagem_principal || r.imagem,
+          nivel: r.nivel || 'Facil',
+          xp: Number(r.xp) || 25,
+        }));
+        return res.json(formatted);
+      }
+    }
+
+    // In-memory fallback if DB not configured
+    const activeMemory = memoryProducts
+      .filter((p) => Number(p.ativo) === 1)
+      .map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        categoria: p.categoria,
+        imagem: p.imagem_principal,
+        nivel: p.nivel,
+        xp: p.xp,
+      }));
+
+    return res.json(activeMemory);
+  } catch (err: any) {
+    console.error('[Get Active Products Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'DATABASE_ERROR',
+      message: 'Não foi possível carregar a Biblioteca de Produtos.',
+    });
+  }
+});
+
+// ADMIN ROUTES (PROTECTED BY requireMentorAuth)
+
+// 1. GET /api/admin/products
+apiRouter.get(['/admin/products', '/api/admin/products'], requireMentorAuth, async (_req, res) => {
+  try {
+    if (isDatabaseConfigured()) {
+      await ensureProductsTable();
+      const [rows]: any = await db.query(
+        `SELECT id, nome, categoria, pasta, imagem_principal, ativo, nivel, xp, criado_em, atualizado_em
+         FROM produtos
+         ORDER BY id DESC`
+      );
+      if (Array.isArray(rows)) {
+        return res.json(rows);
+      }
+    }
+
+    return res.json(memoryProducts);
+  } catch (err: any) {
+    console.error('[Admin GET Products Error]:', err?.message || err);
+    return res.status(500).json({ error: 'DATABASE_ERROR', message: 'Erro ao listar produtos para administração.' });
+  }
+});
+
+// 2. POST /api/admin/products
+apiRouter.post(['/admin/products', '/api/admin/products'], requireMentorAuth, async (req, res) => {
+  try {
+    const { nome, categoria, pasta, imagem_principal, imagem, ativo = 1, nivel = 'Facil', xp = 25 } = req.body;
+
+    const imgUrl = imagem_principal || imagem;
+    if (!nome || !categoria || !pasta || !imgUrl) {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'Preencha todos os campos obrigatórios: Nome, Categoria, Pasta e URL da Imagem.',
+      });
+    }
+
+    const cleanFolder = String(pasta).trim().toLowerCase().replace(/\s+/g, '-');
+    const isAtivo = ativo === true || ativo === 1 || ativo === '1' ? 1 : 0;
+    const cleanXp = Number(xp) || 25;
+    const cleanNivel = ['Facil', 'Medio', 'Dificil'].includes(nivel) ? nivel : 'Facil';
+
+    if (isDatabaseConfigured()) {
+      await ensureProductsTable();
+      const [result]: any = await db.query(
+        `INSERT INTO produtos (nome, categoria, pasta, imagem_principal, ativo, nivel, xp)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [String(nome).trim(), String(categoria).trim(), cleanFolder, String(imgUrl).trim(), isAtivo, cleanNivel, cleanXp]
+      );
+
+      const insertedId = result.insertId;
+      return res.status(201).json({
+        id: insertedId,
+        nome: String(nome).trim(),
+        categoria: String(categoria).trim(),
+        pasta: cleanFolder,
+        imagem_principal: String(imgUrl).trim(),
+        ativo: isAtivo,
+        nivel: cleanNivel,
+        xp: cleanXp,
+      });
+    }
+
+    // In-memory fallback
+    const newId = memoryProducts.length > 0 ? Math.max(...memoryProducts.map((p) => p.id)) + 1 : 1;
+    const newProd = {
+      id: newId,
+      nome: String(nome).trim(),
+      categoria: String(categoria).trim(),
+      pasta: cleanFolder,
+      imagem_principal: String(imgUrl).trim(),
+      ativo: isAtivo,
+      nivel: cleanNivel,
+      xp: cleanXp,
+      criado_em: new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
+    };
+    memoryProducts.unshift(newProd);
+    return res.status(201).json(newProd);
+  } catch (err: any) {
+    console.error('[Admin POST Product Error]:', err?.message || err);
+    if (err?.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'DUPLICATE_PASTA', message: 'Já existe um produto cadastrado com esta pasta.' });
+    }
+    return res.status(500).json({ error: 'DATABASE_ERROR', message: 'Erro ao cadastrar produto.' });
+  }
+});
+
+// 3. PUT /api/admin/products/:id
+apiRouter.put(['/admin/products/:id', '/api/admin/products/:id'], requireMentorAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'INVALID_ID', message: 'ID do produto inválido.' });
+
+    const { nome, categoria, pasta, imagem_principal, imagem, ativo, nivel = 'Facil', xp = 25 } = req.body;
+    const imgUrl = imagem_principal || imagem;
+
+    if (!nome || !categoria || !pasta || !imgUrl) {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'Preencha todos os campos obrigatórios: Nome, Categoria, Pasta e URL da Imagem.',
+      });
+    }
+
+    const cleanFolder = String(pasta).trim().toLowerCase().replace(/\s+/g, '-');
+    const isAtivo = ativo === true || ativo === 1 || ativo === '1' ? 1 : 0;
+    const cleanXp = Number(xp) || 25;
+    const cleanNivel = ['Facil', 'Medio', 'Dificil'].includes(nivel) ? nivel : 'Facil';
+
+    if (isDatabaseConfigured()) {
+      await ensureProductsTable();
+      await db.query(
+        `UPDATE produtos
+         SET nome = ?, categoria = ?, pasta = ?, imagem_principal = ?, ativo = ?, nivel = ?, xp = ?
+         WHERE id = ?`,
+        [String(nome).trim(), String(categoria).trim(), cleanFolder, String(imgUrl).trim(), isAtivo, cleanNivel, cleanXp, id]
+      );
+
+      return res.json({
+        id,
+        nome: String(nome).trim(),
+        categoria: String(categoria).trim(),
+        pasta: cleanFolder,
+        imagem_principal: String(imgUrl).trim(),
+        ativo: isAtivo,
+        nivel: cleanNivel,
+        xp: cleanXp,
+      });
+    }
+
+    // In-memory update
+    const idx = memoryProducts.findIndex((p) => p.id === id);
+    if (idx !== -1) {
+      memoryProducts[idx] = {
+        ...memoryProducts[idx],
+        nome: String(nome).trim(),
+        categoria: String(categoria).trim(),
+        pasta: cleanFolder,
+        imagem_principal: String(imgUrl).trim(),
+        ativo: isAtivo,
+        nivel: cleanNivel,
+        xp: cleanXp,
+        atualizado_em: new Date().toISOString(),
+      };
+      return res.json(memoryProducts[idx]);
+    }
+
+    return res.status(404).json({ error: 'NOT_FOUND', message: 'Produto não encontrado.' });
+  } catch (err: any) {
+    console.error('[Admin PUT Product Error]:', err?.message || err);
+    return res.status(500).json({ error: 'DATABASE_ERROR', message: 'Erro ao atualizar produto.' });
+  }
+});
+
+// 4. PATCH /api/admin/products/:id/status
+apiRouter.patch(['/admin/products/:id/status', '/api/admin/products/:id/status'], requireMentorAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'INVALID_ID', message: 'ID do produto inválido.' });
+
+    const { ativo } = req.body;
+    const isAtivo = ativo === true || ativo === 1 || ativo === '1' ? 1 : 0;
+
+    if (isDatabaseConfigured()) {
+      await ensureProductsTable();
+      await db.query(`UPDATE produtos SET ativo = ? WHERE id = ?`, [isAtivo, id]);
+      return res.json({ id, ativo: isAtivo, message: 'Status do produto atualizado.' });
+    }
+
+    const item = memoryProducts.find((p) => p.id === id);
+    if (item) {
+      item.ativo = isAtivo;
+      return res.json({ id, ativo: isAtivo, message: 'Status do produto atualizado.' });
+    }
+
+    return res.status(404).json({ error: 'NOT_FOUND', message: 'Produto não encontrado.' });
+  } catch (err: any) {
+    console.error('[Admin PATCH Product Status Error]:', err?.message || err);
+    return res.status(500).json({ error: 'DATABASE_ERROR', message: 'Erro ao alterar status do produto.' });
+  }
+});
+
+// 5. DELETE /api/admin/products/:id
+apiRouter.delete(['/admin/products/:id', '/api/admin/products/:id'], requireMentorAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'INVALID_ID', message: 'ID do produto inválido.' });
+
+    if (isDatabaseConfigured()) {
+      await ensureProductsTable();
+      await db.query(`DELETE FROM produtos WHERE id = ?`, [id]);
+      return res.json({ id, success: true, message: 'Produto excluído com sucesso.' });
+    }
+
+    memoryProducts = memoryProducts.filter((p) => p.id !== id);
+    return res.json({ id, success: true, message: 'Produto excluído com sucesso.' });
+  } catch (err: any) {
+    console.error('[Admin DELETE Product Error]:', err?.message || err);
+    return res.status(500).json({ error: 'DATABASE_ERROR', message: 'Erro ao excluir produto.' });
   }
 });
 

@@ -1,4 +1,4 @@
-import { normalizeAccessCode } from './server/authKeys';
+import { normalizeAccessCode } from './server/authKeys.js';
 
 async function runTests() {
   console.log('=== INICIANDO BATERIA DE TESTES AUTOMÁTICOS DE AUTENTICAÇÃO UNIFICADA ===\n');
