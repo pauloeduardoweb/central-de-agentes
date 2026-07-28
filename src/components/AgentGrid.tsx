@@ -1009,15 +1009,9 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             <h3 className="text-sm font-bold text-white mb-1">
               Nenhum agente encontrado nesta categoria
             </h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
               Não encontramos nenhum agente que corresponda à sua busca ou filtros selecionados para {selectedCategory}.
             </p>
-            <button
-              onClick={onOpenCreate}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-            >
-              Criar Novo Agente Nesta Categoria
-            </button>
           </div>
         )
       )}

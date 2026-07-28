@@ -59,7 +59,6 @@ export const StatsBar: React.FC<StatsBarProps> = ({
           <p className="text-[11px] font-bold text-cyan-300/90 truncate">Total de Agentes</p>
           <div className="flex items-baseline space-x-1.5">
             <span className="text-lg font-black text-white">{totalAgents}</span>
-            <span className="text-[11px] font-semibold text-cyan-200/70">({customAgents} criados)</span>
           </div>
         </div>
       </div>
