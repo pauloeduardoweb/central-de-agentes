@@ -73,6 +73,32 @@ export const AcademiaEmBreveCard: React.FC<AcademiaEmBreveCardProps> = ({ onBack
           </div>
         )}
 
+        {/* Rodapé Institucional */}
+        <div className="relative pt-6 sm:pt-8 mt-8 border-t border-slate-800/80 space-y-3 text-center text-[11px] sm:text-xs text-slate-400 font-medium">
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-slate-300 font-semibold">
+            <span>Mentoria Geração Z Pro</span>
+            <span className="text-slate-600">•</span>
+            <span>Versão 1.0.0</span>
+            <span className="text-slate-600">•</span>
+            <span className="inline-flex items-center space-x-1.5 text-emerald-400 font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Status: Online</span>
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-slate-400">
+            <span className="hover:text-cyan-300 transition-colors cursor-pointer">Política de Privacidade</span>
+            <span className="text-slate-600">•</span>
+            <span className="hover:text-cyan-300 transition-colors cursor-pointer">Termos de Uso</span>
+            <span className="text-slate-600">•</span>
+            <span className="hover:text-cyan-300 transition-colors cursor-pointer">Suporte</span>
+          </div>
+
+          <p className="text-slate-500 text-[11px] pt-1">
+            © 2026 Geração Z Pro. Todos os direitos reservados.
+          </p>
+        </div>
+
       </div>
 
     </div>
