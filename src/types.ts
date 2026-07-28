@@ -1,4 +1,4 @@
-export type CategoryType = 'Tiktok 2K' | 'Tiktok Shop' | 'Recurso Anti-Violação' | 'Suporte' | 'Grupo de Network' | 'Flow Ultra' | 'Todas';
+export type CategoryType = 'Tiktok 2K' | 'Tiktok Shop' | 'Recurso Anti-Violação' | 'Suporte' | 'Grupo de Network' | 'Flow Ultra' | 'Academia de Desafios' | 'Todas';
 
 export interface AgentCapabilities {
   codeInterpreter: boolean;
@@ -56,4 +56,17 @@ export interface TeamGroup {
   description: string;
   agentIds: string[];
   createdAt: string;
+}
+
+export interface Product {
+  id: number;
+  nome: string;
+  categoria: string;
+  pasta: string;
+  imagem_principal: string;
+  ativo: boolean | number;
+  nivel: 'Facil' | 'Medio' | 'Dificil';
+  xp: number;
+  criado_em?: string;
+  atualizado_em?: string;
 }

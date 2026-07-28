@@ -12,11 +12,12 @@ import { ChatGPTImportModal } from './components/ChatGPTImportModal';
 import { MultiAgentModal } from './components/MultiAgentModal';
 import { ExportModal } from './components/ExportModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
+import { MentorPanel } from './components/mentor/MentorPanel';
 import { TechGridBackground } from './components/TechGridBackground';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
 import { getDeviceId, unbindCurrentDevice } from './utils/deviceId';
-import { isValidStudentCode } from './data/studentCodes';
+import { isValidStudentCode, isMasterKey } from './data/studentCodes';
 import { Check } from 'lucide-react';
 
 export default function App() {
@@ -30,6 +31,9 @@ export default function App() {
     return localStorage.getItem('user_session_id') || '';
   });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [activeView, setActiveView] = useState<'hub' | 'mentor'>('hub');
+
+  const isMaster = isMasterKey(studentCode);
 
   // Modal controls
   const [selectedChatAgent, setSelectedChatAgent] = useState<Agent | null>(null);
@@ -333,41 +337,53 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         hasApiKey={Boolean(userApiKey)}
         studentCode={studentCode}
         agentCount={agents.filter((a) => a.category !== 'Suporte').length}
+        isMaster={isMaster}
+        activeView={activeView}
+        onSelectView={(view) => setActiveView(view)}
       />
 
       {/* Container */}
       <main className={`max-w-7xl mx-auto px-4 lg:px-8 pt-6 transition-all duration-300 ${!userApiKey ? 'filter blur-lg opacity-20 pointer-events-none select-none' : ''}`}>
         
-        {/* Banner Oficial Geração Z Pro */}
-        <GeracaoZProBanner />
+        {isMaster && activeView === 'mentor' ? (
+          <MentorPanel
+            studentCode={studentCode}
+            onBackToHub={() => setActiveView('hub')}
+          />
+        ) : (
+          <>
+            {/* Banner Oficial Geração Z Pro */}
+            <GeracaoZProBanner />
 
-        {/* Metric Stats Banner - 8 Card Unified Menu */}
-        <StatsBar
-          agents={agents}
-          activeCategory={activeCategory}
-          onOpenOfficialAgent={handleOpenOfficialAgent}
-          onOpenAfiliados={() => setShowAfiliadosModal(true)}
-          onOpenSiteModal={() => setShowGeracaoZProModal(true)}
-          onOpenCertificados={() => setShowCertificadosModal(true)}
-        />
+            {/* Metric Stats Banner - 8 Card Unified Menu */}
+            <StatsBar
+              agents={agents}
+              activeCategory={activeCategory}
+              onOpenOfficialAgent={handleOpenOfficialAgent}
+              onOpenAfiliados={() => setShowAfiliadosModal(true)}
+              onOpenSiteModal={() => setShowGeracaoZProModal(true)}
+              onOpenCertificados={() => setShowCertificadosModal(true)}
+            />
 
-        {/* Grid and Search */}
-        <AgentGrid
-          agents={agents}
-          onSelectChat={(agent) => setSelectedChatAgent(agent)}
-          onToggleFavorite={handleToggleFavorite}
-          onEdit={(agent) => {
-            setEditingAgent(agent);
-            setShowCreateModal(true);
-          }}
-          onDuplicate={handleDuplicateAgent}
-          onDelete={handleDeleteAgent}
-          onCopyPrompt={handleCopyPrompt}
-          onOpenCreate={() => {
-            setEditingAgent(null);
-            setShowCreateModal(true);
-          }}
-        />
+            {/* Grid and Search */}
+            <AgentGrid
+              agents={agents}
+              onSelectChat={(agent) => setSelectedChatAgent(agent)}
+              onToggleFavorite={handleToggleFavorite}
+              onEdit={(agent) => {
+                setEditingAgent(agent);
+                setShowCreateModal(true);
+              }}
+              onDuplicate={handleDuplicateAgent}
+              onDelete={handleDeleteAgent}
+              onCopyPrompt={handleCopyPrompt}
+              onOpenCreate={() => {
+                setEditingAgent(null);
+                setShowCreateModal(true);
+              }}
+            />
+          </>
+        )}
 
       </main>
 
