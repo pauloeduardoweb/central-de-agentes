@@ -81,6 +81,7 @@ export const PinnedAgentsSection: React.FC<PinnedAgentsSectionProps> = ({
             <TikTokPosterCard
               agent={agent}
               isPinned={true}
+              hidePinAndFavorite={true}
               onSelectChat={onSelectChat}
               onToggleFavorite={onToggleFavorite}
               onCopyPrompt={onCopyPrompt}
