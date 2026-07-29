@@ -1,0 +1,283 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- Background Radial Glow -->
+    <radialGradient id="bgRadial" cx="50%" cy="45%" r="70%">
+      <stop offset="0%" stop-color="#092552" stop-opacity="0.95" />
+      <stop offset="40%" stop-color="#030f26" stop-opacity="0.98" />
+      <stop offset="100%" stop-color="#01040d" stop-opacity="1" />
+    </radialGradient>
+
+    <!-- Metallic Chrome Blue Text Gradient -->
+    <linearGradient id="chromeBlueText" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="20%" stop-color="#bae6fd" />
+      <stop offset="45%" stop-color="#38bdf8" />
+      <stop offset="75%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#172554" />
+    </linearGradient>
+
+    <!-- Golden Armor Metallic Gradient -->
+    <linearGradient id="goldArmorBright" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef9c3" />
+      <stop offset="25%" stop-color="#fde047" />
+      <stop offset="50%" stop-color="#eab308" />
+      <stop offset="75%" stop-color="#ca8a04" />
+      <stop offset="100%" stop-color="#854d0e" />
+    </linearGradient>
+
+    <linearGradient id="goldArmorDark" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="40%" stop-color="#ca8a04" />
+      <stop offset="85%" stop-color="#713f12" />
+      <stop offset="100%" stop-color="#3f2305" />
+    </linearGradient>
+
+    <radialGradient id="goldHighlight" cx="30%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="40%" stop-color="#fef08a" />
+      <stop offset="80%" stop-color="#eab308" />
+      <stop offset="100%" stop-color="#a16207" />
+    </radialGradient>
+
+    <!-- Horizon Beam Flare Gradient -->
+    <linearGradient id="horizonFlare" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0" />
+      <stop offset="20%" stop-color="#38bdf8" stop-opacity="0.4" />
+      <stop offset="50%" stop-color="#60a5fa" stop-opacity="1" />
+      <stop offset="80%" stop-color="#38bdf8" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Perspective Grid Floor Mask -->
+    <linearGradient id="gridFade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0" />
+      <stop offset="20%" stop-color="#ffffff" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Neon Glow Filter -->
+    <filter id="neonGlowIntense" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="blur1" />
+      <feGaussianBlur stdDeviation="15" result="blur2" />
+      <feGaussianBlur stdDeviation="30" result="blur3" />
+      <feMerge>
+        <feMergeNode in="blur3" />
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="lightningGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="characterShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-10" dy="10" stdDeviation="15" flood-color="#01040d" flood-opacity="0.8" />
+    </filter>
+  </defs>
+
+  <!-- Deep Space Background Canvas -->
+  <rect width="1920" height="1080" fill="url(#bgRadial)" />
+
+  <!-- Perspective Neon Grid Floor -->
+  <g mask="url(#gridFade)">
+    <!-- Horizon Base Line -->
+    <line x1="0" y1="720" x2="1920" y2="720" stroke="#38bdf8" stroke-width="2" />
+
+    <!-- Horizontal Grid Lines -->
+    <line x1="0" y1="735" x2="1920" y2="735" stroke="#2563eb" stroke-width="1" />
+    <line x1="0" y1="755" x2="1920" y2="755" stroke="#2563eb" stroke-width="1.2" />
+    <line x1="0" y1="780" x2="1920" y2="780" stroke="#1d4ed8" stroke-width="1.5" />
+    <line x1="0" y1="815" x2="1920" y2="815" stroke="#1d4ed8" stroke-width="1.8" />
+    <line x1="0" y1="860" x2="1920" y2="860" stroke="#1e40af" stroke-width="2" />
+    <line x1="0" y1="920" x2="1920" y2="920" stroke="#1e40af" stroke-width="2.5" />
+    <line x1="0" y1="995" x2="1920" y2="995" stroke="#1d4ed8" stroke-width="3" />
+    <line x1="0" y1="1080" x2="1920" y2="1080" stroke="#2563eb" stroke-width="3.5" />
+
+    <!-- Perspective Ray Lines Converging to Horizon Center (960, 710) -->
+    <line x1="960" y1="710" x2="-400" y2="1080" stroke="#2563eb" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="-200" y2="1080" stroke="#2563eb" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="0" y2="1080" stroke="#2563eb" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="200" y2="1080" stroke="#3b82f6" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="400" y2="1080" stroke="#3b82f6" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="600" y2="1080" stroke="#3b82f6" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="780" y2="1080" stroke="#60a5fa" stroke-width="2" />
+    <line x1="960" y1="710" x2="960" y2="1080" stroke="#60a5fa" stroke-width="2.5" />
+    <line x1="960" y1="710" x2="1140" y2="1080" stroke="#60a5fa" stroke-width="2" />
+    <line x1="960" y1="710" x2="1320" y2="1080" stroke="#3b82f6" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="1520" y2="1080" stroke="#3b82f6" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="1720" y2="1080" stroke="#2563eb" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="1920" y2="1080" stroke="#2563eb" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="2120" y2="1080" stroke="#2563eb" stroke-width="1.5" />
+    <line x1="960" y1="710" x2="2320" y2="1080" stroke="#2563eb" stroke-width="1.5" />
+
+    <!-- Glowing Nodes on Grid Intersections -->
+    <circle cx="960" cy="860" r="4" fill="#38bdf8" />
+    <circle cx="780" cy="860" r="3.5" fill="#38bdf8" />
+    <circle cx="1140" cy="860" r="3.5" fill="#38bdf8" />
+    <circle cx="600" cy="920" r="4" fill="#60a5fa" />
+    <circle cx="960" cy="920" r="5" fill="#38bdf8" />
+    <circle cx="1320" cy="920" r="4" fill="#60a5fa" />
+    <circle cx="400" cy="995" r="4" fill="#38bdf8" />
+    <circle cx="960" cy="995" r="5" fill="#38bdf8" />
+    <circle cx="1520" cy="995" r="4" fill="#38bdf8" />
+  </g>
+
+  <!-- Glowing Horizon Laser Line & Center Flare Spotlight -->
+  <rect x="0" y="718" width="1920" height="5" fill="url(#horizonFlare)" filter="url(#lightningGlow)" />
+  <ellipse cx="960" cy="720" rx="280" ry="12" fill="#38bdf8" opacity="0.9" filter="url(#neonGlowIntense)" />
+  <ellipse cx="960" cy="720" rx="120" ry="5" fill="#ffffff" opacity="0.95" />
+
+  <!-- High-Tech Circuit Board Traces - Left Side -->
+  <g stroke="#38bdf8" stroke-width="2.5" fill="none" filter="url(#lightningGlow)" opacity="0.85">
+    <path d="M 0 320 H 180 L 260 400 H 420 L 480 340 H 560" />
+    <path d="M 0 380 H 140 L 220 460 H 360" />
+    <path d="M 0 440 H 220 L 300 520 H 460 L 520 460" />
+    <path d="M 0 500 H 120 L 180 560 H 320" />
+    <path d="M 0 560 H 260 L 320 620 H 440" />
+
+    <!-- Circuit Node Dots -->
+    <circle cx="420" cy="400" r="4.5" fill="#38bdf8" />
+    <circle cx="560" cy="340" r="4.5" fill="#ffffff" />
+    <circle cx="360" cy="460" r="4.5" fill="#38bdf8" />
+    <circle cx="520" cy="460" r="4.5" fill="#60a5fa" />
+    <circle cx="320" cy="560" r="4.5" fill="#38bdf8" />
+    <circle cx="440" cy="620" r="4.5" fill="#38bdf8" />
+  </g>
+
+  <!-- High-Tech Circuit Board Traces - Right Side -->
+  <g stroke="#38bdf8" stroke-width="2.5" fill="none" filter="url(#lightningGlow)" opacity="0.85">
+    <path d="M 1920 320 H 1740 L 1660 400 H 1500 L 1440 340 H 1360" />
+    <path d="M 1920 380 H 1780 L 1700 460 H 1560" />
+    <path d="M 1920 440 H 1700 L 1620 520 H 1460 L 1400 460" />
+    <path d="M 1920 500 H 1800 L 1740 560 H 1600" />
+    <path d="M 1920 560 H 1660 L 1600 620 H 1480" />
+
+    <!-- Circuit Node Dots -->
+    <circle cx="1500" cy="400" r="4.5" fill="#38bdf8" />
+    <circle cx="1360" cy="340" r="4.5" fill="#ffffff" />
+    <circle cx="1560" cy="460" r="4.5" fill="#38bdf8" />
+    <circle cx="1400" cy="460" r="4.5" fill="#60a5fa" />
+    <circle cx="1600" cy="560" r="4.5" fill="#38bdf8" />
+    <circle cx="1480" cy="620" r="4.5" fill="#38bdf8" />
+  </g>
+
+  <!-- Electric Lightning Bolts - Top Left Corner -->
+  <g stroke="#60a5fa" stroke-width="3" fill="none" filter="url(#lightningGlow)" opacity="0.9">
+    <path d="M 0 0 L 140 100 L 90 160 L 260 250 L 180 320 L 420 440 L 350 500 L 520 600" />
+    <path d="M 80 0 L 220 90 L 180 150 L 360 240 L 290 310 L 480 410" stroke-width="2" />
+    <path d="M 240 0 L 340 80 L 300 130 L 460 220" stroke-width="1.5" stroke="#bae6fd" />
+    <path d="M 260 250 L 380 280 L 450 360" stroke-width="1.5" />
+    <path d="M 180 320 L 240 390 L 210 450 L 310 520" stroke-width="1.5" />
+  </g>
+
+  <!-- Electric Lightning Bolts - Top Right Corner -->
+  <g stroke="#60a5fa" stroke-width="3" fill="none" filter="url(#lightningGlow)" opacity="0.9">
+    <path d="M 1920 0 L 1780 100 L 1830 160 L 1660 250 L 1740 320 L 1500 440 L 1570 500 L 1400 600" />
+    <path d="M 1840 0 L 1700 90 L 1740 150 L 1560 240 L 1630 310 L 1440 410" stroke-width="2" />
+    <path d="M 1680 0 L 1580 80 L 1620 130 L 1460 220" stroke-width="1.5" stroke="#bae6fd" />
+    <path d="M 1660 250 L 1540 280 L 1470 360" stroke-width="1.5" />
+    <path d="M 1740 320 L 1680 390 L 1710 450 L 1610 520" stroke-width="1.5" />
+  </g>
+
+  <!-- Top Center 3D Metallic Title "MENTOR BIGODE" -->
+  <g filter="url(#neonGlowIntense)">
+    <!-- Title Outer Ambient Shadow Glow -->
+    <text x="960" y="188" text-anchor="middle" fill="#0284c7" font-size="132" font-weight="900" font-family="system-ui, -apple-system, sans-serif" letter-spacing="6">
+      MENTOR BIGODE
+    </text>
+
+    <!-- Title Chrome Metallic Front Layer -->
+    <text x="960" y="180" text-anchor="middle" fill="url(#chromeBlueText)" stroke="#38bdf8" stroke-width="3.5" font-size="132" font-weight="900" font-family="system-ui, -apple-system, sans-serif" letter-spacing="6">
+      MENTOR BIGODE
+    </text>
+  </g>
+
+  <!-- Laser Underline Ray under "MENTOR BIGODE" -->
+  <rect x="360" y="215" width="1200" height="5" fill="url(#horizonFlare)" filter="url(#lightningGlow)" />
+  <ellipse cx="960" cy="217" rx="300" ry="6" fill="#38bdf8" opacity="0.9" />
+
+  <!-- Character "Mentor Bigode" in Golden Plate Armor (Bottom Right Corner) -->
+  <g transform="translate(1380, 420)" filter="url(#characterShadow)">
+    <!-- Dark Knight Cape Draped Behind -->
+    <path d="M 120 220 Q 80 400 40 660 L 480 660 Q 440 400 380 220 Z" fill="#090d16" stroke="#172554" stroke-width="3" />
+
+    <!-- Left Golden Pauldron (Shoulder) -->
+    <path d="M 80 210 C 60 140 140 100 210 130 C 230 180 180 260 80 210 Z" fill="url(#goldArmorBright)" stroke="#713f12" stroke-width="3" />
+    <path d="M 100 200 C 90 150 150 120 190 145" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.8" />
+    <!-- Filigree Detail on Pauldron -->
+    <path d="M 120 170 Q 150 140 180 170 Q 150 200 120 170" fill="none" stroke="#854d0e" stroke-width="2.5" />
+
+    <!-- Right Golden Pauldron (Shoulder) -->
+    <path d="M 330 210 C 350 140 270 100 200 130 C 180 180 230 260 330 210 Z" fill="url(#goldArmorBright)" stroke="#713f12" stroke-width="3" />
+    <path d="M 310 200 C 320 150 260 120 220 145" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.8" />
+    <path d="M 290 170 Q 260 140 230 170 Q 260 200 290 170" fill="none" stroke="#854d0e" stroke-width="2.5" />
+
+    <!-- Golden Neck Collar / Gorget -->
+    <path d="M 160 190 Q 205 220 250 190 L 260 160 Q 205 180 150 160 Z" fill="url(#goldHighlight)" stroke="#713f12" stroke-width="2.5" />
+
+    <!-- Main Golden Chestplate / Cuirass -->
+    <path d="M 130 220 C 120 340 150 480 205 520 C 260 480 290 340 280 220 Z" fill="url(#goldArmorDark)" stroke="#854d0e" stroke-width="4" />
+    
+    <!-- Chestplate Specular Reflections -->
+    <path d="M 150 240 C 145 320 160 400 180 440" fill="none" stroke="#fef08a" stroke-width="4" opacity="0.9" />
+    <path d="M 160 250 C 155 310 168 380 185 410" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.95" />
+
+    <!-- Iconic Golden "Z" Emblem on Breastplate Center -->
+    <g transform="translate(205, 330) scale(1.4)">
+      <path d="M -25 -25 L 25 -25 L -10 5 L 25 5 L 25 20 L -25 20 L 10 -10 L -25 -10 Z" fill="url(#goldHighlight)" stroke="#713f12" stroke-width="2" filter="url(#lightningGlow)" />
+    </g>
+
+    <!-- Golden Belt & Tassets -->
+    <path d="M 140 480 L 270 480 L 285 540 L 125 540 Z" fill="url(#goldArmorBright)" stroke="#713f12" stroke-width="3" />
+    <rect x="185" y="475" width="40" height="35" rx="6" fill="url(#goldHighlight)" stroke="#713f12" stroke-width="2.5" />
+
+    <!-- Golden Vambraces & Arm Armor (Left Arm) -->
+    <path d="M 80 220 L 120 380 L 85 460 L 50 300 Z" fill="url(#goldArmorDark)" stroke="#713f12" stroke-width="3" />
+    <path d="M 95 240 L 125 380" stroke="#fef08a" stroke-width="3" fill="none" />
+
+    <!-- Golden Vambraces & Arm Armor (Right Arm) -->
+    <path d="M 330 220 L 290 380 L 325 460 L 360 300 Z" fill="url(#goldArmorDark)" stroke="#713f12" stroke-width="3" />
+    <path d="M 315 240 L 285 380" stroke="#fef08a" stroke-width="3" fill="none" />
+
+    <!-- Character Head & Face ("Mentor Bigode") -->
+    <!-- Neck -->
+    <path d="M 180 140 L 230 140 L 225 180 L 185 180 Z" fill="#d97706" />
+
+    <!-- Head Oval -->
+    <ellipse cx="205" cy="110" rx="42" ry="52" fill="#f59e0b" />
+    <ellipse cx="205" cy="112" rx="39" ry="48" fill="#fbbf24" />
+
+    <!-- Short Dark Hair -->
+    <path d="M 162 100 C 160 60 210 50 248 90 C 250 70 230 55 205 55 C 175 55 160 75 162 100 Z" fill="#1e1b18" />
+
+    <!-- Friendly Eyes -->
+    <ellipse cx="188" cy="102" rx="5" ry="4" fill="#0f172a" />
+    <ellipse cx="222" cy="102" rx="5" ry="4" fill="#0f172a" />
+    <circle cx="189" cy="101" r="1.5" fill="#ffffff" />
+    <circle cx="223" cy="101" r="1.5" fill="#ffffff" />
+
+    <!-- Eyebrows -->
+    <path d="M 180 94 Q 188 90 196 95" stroke="#1e1b18" stroke-width="2.5" fill="none" stroke-linecap="round" />
+    <path d="M 214 95 Q 222 90 230 94" stroke="#1e1b18" stroke-width="2.5" fill="none" stroke-linecap="round" />
+
+    <!-- Nose -->
+    <path d="M 205 102 L 201 114 L 209 114" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Iconic "Mentor Bigode" Mustache -->
+    <path d="M 175 125 C 185 116 200 118 205 122 C 210 118 225 116 235 125 C 242 131 228 135 205 127 C 182 135 168 131 175 125 Z" fill="#111827" stroke="#000000" stroke-width="1.5" />
+
+    <!-- Warm Friendly Smile -->
+    <path d="M 188 132 Q 205 142 222 132" stroke="#9a3412" stroke-width="2.5" fill="none" stroke-linecap="round" />
+    <path d="M 192 133 Q 205 140 218 133" fill="#ffffff" />
+
+    <!-- Ears -->
+    <ellipse cx="162" cy="112" rx="6" ry="10" fill="#f59e0b" />
+    <ellipse cx="248" cy="112" rx="6" ry="10" fill="#f59e0b" />
+  </g>
+</svg>
