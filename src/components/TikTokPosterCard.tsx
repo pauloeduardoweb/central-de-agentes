@@ -19,6 +19,7 @@ interface TikTokPosterCardProps {
   onToggleFavorite: (id: string) => void;
   onCopyPrompt: (agent: Agent) => void;
   onTogglePin?: (id: string) => void;
+  hidePinAndFavorite?: boolean;
 }
 
 export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
@@ -28,6 +29,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
   onToggleFavorite,
   onCopyPrompt,
   onTogglePin,
+  hidePinAndFavorite = false,
 }) => {
   const [showVideoModal, setShowVideoModal] = React.useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = React.useState(0);
@@ -50,6 +52,34 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
   }, [agent.category]);
 
   const showExampleButton = isTikTokModule || videoList.length > 0;
+
+  const renderTopButtons = () => {
+    if (hidePinAndFavorite) return null;
+    return (
+      <div className="relative z-10 flex justify-end items-center pointer-events-auto">
+        <div className="flex items-center space-x-0.5 sm:space-x-1.5">
+          {onTogglePin && (
+            <PinAgentButton
+              agentId={agent.id}
+              isPinned={isPinned}
+              onTogglePin={onTogglePin}
+            />
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(agent.id);
+            }}
+            className="p-1 sm:p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[24px] sm:min-w-[40px] min-h-[24px] sm:min-h-[40px] flex items-center justify-center"
+            aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+            title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+          >
+            <Heart className={`w-3 h-3 sm:w-4 sm:h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const getVimeoEmbedUrl = (url?: string) => {
     if (!url) return null;
@@ -177,28 +207,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
           />
 
           {/* Top Buttons (Pin and Favorite) */}
-          <div className="relative z-10 flex justify-end items-center pointer-events-auto">
-            <div className="flex items-center space-x-0.5 sm:space-x-1.5">
-              {onTogglePin && (
-                <PinAgentButton
-                  agentId={agent.id}
-                  isPinned={isPinned}
-                  onTogglePin={onTogglePin}
-                />
-              )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1 sm:p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[24px] sm:min-w-[40px] min-h-[24px] sm:min-h-[40px] flex items-center justify-center"
-                aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-              >
-                <Heart className={`w-3 h-3 sm:w-4 sm:h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
-            </div>
-          </div>
+          {renderTopButtons()}
 
           {/* Bottom Footer Line */}
           <div className="relative z-10 pt-1 border-t border-white/10 flex items-center justify-end pointer-events-auto">
@@ -230,28 +239,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <div className="absolute top-24 left-1/2 -translate-x-1/2 w-56 h-56 sm:w-64 sm:h-64 rounded-full border border-cyan-500/30 pointer-events-none" />
 
             {/* Top Buttons (Pin and Favorite) */}
-            <div className="relative z-10 flex justify-end items-center">
-              <div className="flex items-center space-x-1.5">
-                {onTogglePin && (
-                  <PinAgentButton
-                    agentId={agent.id}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(agent.id);
-                  }}
-                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                >
-                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-                </button>
-              </div>
-            </div>
+            {renderTopButtons()}
 
             {/* Center: Waffle Cone & Animal */}
             <div className="relative z-10 mt-6 mb-2 flex flex-col items-center">
@@ -309,28 +297,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <AtmosphericEffects />
 
             {/* Top Buttons (Pin and Favorite) */}
-            <div className="relative z-10 flex justify-end items-center">
-              <div className="flex items-center space-x-1.5">
-                {onTogglePin && (
-                  <PinAgentButton
-                    agentId={agent.id}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(agent.id);
-                  }}
-                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                >
-                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-                </button>
-              </div>
-            </div>
+            {renderTopButtons()}
 
             {/* Center: Dramatic Fruit Conflict Element */}
             <div className="relative z-10 my-auto flex flex-col items-center">
@@ -388,28 +355,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full border-2 border-cyan-400/80 shadow-[0_0_50px_rgba(34,211,238,0.9)] pointer-events-none animate-pulse" />
 
             {/* Top Buttons (Pin and Favorite) */}
-            <div className="relative z-10 flex justify-end items-center">
-              <div className="flex items-center space-x-1.5">
-                {onTogglePin && (
-                  <PinAgentButton
-                    agentId={agent.id}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(agent.id);
-                  }}
-                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                >
-                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-                </button>
-              </div>
-            </div>
+            {renderTopButtons()}
 
             {/* Bottom Title & Subtitle */}
             <div className="relative z-10 mt-auto mb-2 flex flex-col items-center px-1">
@@ -451,28 +397,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full border border-cyan-400/60 shadow-[0_0_50px_rgba(34,211,238,0.8)] pointer-events-none" />
 
             {/* Top Buttons (Pin and Favorite) */}
-            <div className="relative z-10 flex justify-end items-center">
-              <div className="flex items-center space-x-1.5">
-                {onTogglePin && (
-                  <PinAgentButton
-                    agentId={agent.id}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(agent.id);
-                  }}
-                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                >
-                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-                </button>
-              </div>
-            </div>
+            {renderTopButtons()}
 
             {/* Bottom Title & Subtitle */}
             <div className="relative z-10 mt-auto mb-2 flex flex-col items-center px-1">
@@ -503,28 +428,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <AtmosphericEffects />
 
             {/* Top Buttons (Pin and Favorite) */}
-            <div className="relative z-10 flex justify-end items-center">
-              <div className="flex items-center space-x-1.5">
-                {onTogglePin && (
-                  <PinAgentButton
-                    agentId={agent.id}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(agent.id);
-                  }}
-                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                >
-                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-                </button>
-              </div>
-            </div>
+            {renderTopButtons()}
 
             {/* Center: Baby & Soccer Ball Fusion Element */}
             <div className="relative z-10 my-auto flex flex-col items-center">
@@ -588,28 +492,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border border-cyan-400/70 shadow-[0_0_40px_rgba(34,211,238,0.8)] pointer-events-none animate-pulse" />
 
             {/* Top Buttons (Pin and Favorite) */}
-            <div className="relative z-10 flex justify-end items-center">
-              <div className="flex items-center space-x-1.5">
-                {onTogglePin && (
-                  <PinAgentButton
-                    agentId={agent.id}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(agent.id);
-                  }}
-                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                >
-                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-                </button>
-              </div>
-            </div>
+            {renderTopButtons()}
 
             {/* Bottom Title & Subtitle */}
             <div className="relative z-10 mt-auto mb-2 flex flex-col items-center px-1">
@@ -656,28 +539,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <div className="absolute top-1/4 left-1/4 w-1.5 h-1.5 bg-sky-200 rounded-full shadow-[0_0_10px_rgba(56,189,248,1)] pointer-events-none" />
 
             {/* Top Buttons (Pin and Favorite) */}
-            <div className="relative z-10 flex justify-end items-center">
-              <div className="flex items-center space-x-1.5">
-                {onTogglePin && (
-                  <PinAgentButton
-                    agentId={agent.id}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(agent.id);
-                  }}
-                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                >
-                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-                </button>
-              </div>
-            </div>
+            {renderTopButtons()}
 
             {/* Central Figure: Representation of Jesus in White Tunic, Brown Mantle, Open Palms & Serene Expression */}
             <div className="relative z-10 my-auto flex flex-col items-center">
@@ -770,28 +632,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             )}
 
             {/* Top Buttons (Pin and Favorite) */}
-            <div className="relative z-10 flex justify-end items-center">
-              <div className="flex items-center space-x-1.5">
-                {onTogglePin && (
-                  <PinAgentButton
-                    agentId={agent.id}
-                    isPinned={isPinned}
-                    onTogglePin={onTogglePin}
-                  />
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleFavorite(agent.id);
-                  }}
-                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
-                >
-                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-                </button>
-              </div>
-            </div>
+            {renderTopButtons()}
 
             {/* Center Avatar / Portrait Frame */}
             {!hideCardOverlays && (
