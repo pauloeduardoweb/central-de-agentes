@@ -108,8 +108,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         @media screen and (max-width: 768px) {
           .login-bg-responsive {
             background-image: url('/assets/login/login-mobile.png'), url('https://i.postimg.cc/xjSzC84j/Remove-login-panel-keep-character-202607291547.jpg');
-            background-size: cover;
-            background-position: center -60px;
+            background-size: 100% calc(100% + 78px);
+            background-position: center -78px;
             background-repeat: no-repeat;
             background-color: #020617;
             background-attachment: scroll;
@@ -119,7 +119,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
           }
           .login-panel-mobile {
             margin-top: auto !important;
-            margin-bottom: 8px !important;
+            margin-bottom: 48px !important;
           }
         }
         @media screen and (min-width: 769px) {
@@ -137,10 +137,10 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       {/* Minimal overlay (5%) without blur */}
       <div className="absolute inset-0 bg-black/5 pointer-events-none z-0" />
 
-      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[88%] sm:w-full max-w-[330px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300 login-panel-mobile">
+      <div className="bg-[#030b18] border-2 border-blue-500/50 rounded-2xl w-[82%] sm:w-full max-w-[268px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300 login-panel-mobile max-h-[85vh] overflow-y-auto">
         
         {/* High Tech Cover Banner */}
-        <div className="relative w-full aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
+        <div className="relative w-full aspect-[16/4.5] sm:aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
           <svg className="w-full h-full object-cover" viewBox="0 0 1200 450" fill="none">
             <defs>
               <radialGradient id="modalBgGlow" cx="50%" cy="50%" r="70%">
@@ -148,10 +148,10 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
                 <stop offset="50%" stopColor="#030c1e" stopOpacity="0.95" />
                 <stop offset="100%" stopColor="#01040a" stopOpacity="1" />
               </radialGradient>
-              <linearGradient id="modalTextMetallic" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#e0f2fe" />
-                <stop offset="35%" stopColor="#38bdf8" />
-                <stop offset="70%" stopColor="#1d4ed8" />
+              <linearGradient id="modalNaturalText" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#7dd3fc" />
+                <stop offset="45%" stopColor="#38bdf8" />
+                <stop offset="85%" stopColor="#1d4ed8" />
                 <stop offset="100%" stopColor="#1e3a8a" />
               </linearGradient>
               <linearGradient id="modalBeamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -180,9 +180,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </g>
             <rect x="0" y="340" width="1200" height="4" fill="url(#modalBeamGradient)" filter="url(#modalGlow)" />
             
-            {/* Banner Title */}
-            <g filter="url(#modalGlow)">
-              <text x="600" y="250" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="82" fontWeight="900" fontFamily="sans-serif" letterSpacing="3">
+            {/* Banner Title - Impactful Natural Blue Display Style */}
+            <g>
+              {/* Soft Dark Drop Shadow */}
+              <text x="603" y="270" textAnchor="middle" fill="#010612" stroke="#010612" strokeWidth="12" fontSize="135" fontWeight="900" fontFamily="'Impact', 'Arial Black', 'Montserrat', sans-serif" letterSpacing="5">
+                GERAÇÃO Z PRO
+              </text>
+              {/* Main Crisp Natural Metallic Blue Text */}
+              <text x="600" y="265" textAnchor="middle" fill="url(#modalNaturalText)" stroke="#1d4ed8" strokeWidth="2.5" fontSize="135" fontWeight="900" fontFamily="'Impact', 'Arial Black', 'Montserrat', sans-serif" letterSpacing="5">
                 GERAÇÃO Z PRO
               </text>
             </g>
@@ -191,23 +196,23 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
           </svg>
         </div>
 
-        <div className="p-4 sm:p-6 pt-1 sm:pt-1 space-y-3 sm:space-y-4">
+        <div className="p-3.5 sm:p-6 pt-1 sm:pt-1 space-y-2.5 sm:space-y-4">
           {!isMandatoryOnboarding && (
             <button
               onClick={onClose}
-              className="absolute top-3 right-3 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors z-20"
+              className="absolute top-2.5 right-2.5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors z-20"
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
 
           {/* Header Icon */}
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20 shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20 shrink-0">
               <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-lg font-bold text-white flex items-center space-x-2">
+              <h2 className="text-xs sm:text-lg font-bold text-white flex items-center space-x-1.5">
                 <span>Área do Aluno — Mentoria</span>
               </h2>
               <p className="text-[10px] sm:text-xs text-slate-400">
@@ -218,7 +223,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
           </div>
 
         {/* Notice Banner */}
-        <div className="bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-3 sm:p-3.5 text-[11px] sm:text-xs text-cyan-200/90 leading-relaxed space-y-1">
+        <div className="bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-2.5 sm:p-3.5 text-[10.5px] sm:text-xs text-cyan-200/90 leading-relaxed space-y-1">
           <div className="flex items-center space-x-1.5 font-bold text-cyan-400">
             <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             <span>Área Restrita aos Alunos da Mentoria</span>
@@ -230,14 +235,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-4">
           <div>
-            <label className="block text-[11px] sm:text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+            <label className="block text-[10.5px] sm:text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
               <span className="flex items-center space-x-1.5">
                 <Key className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Código de Acesso do Aluno:</span>
               </span>
-              <span className="text-[10px] text-cyan-400 font-normal">Fornecido na mentoria</span>
+              <span className="text-[9.5px] text-cyan-400 font-normal">Fornecido na mentoria</span>
             </label>
             <input
               type="text"
@@ -248,7 +253,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
                 setError(null);
               }}
               autoFocus
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#020d14] border border-amber-500/40 text-xs font-mono text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-[#020d14] border border-amber-500/40 text-xs font-mono text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
@@ -259,12 +264,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </p>
           )}
 
-          <div className="flex items-center justify-end space-x-2 pt-1 sm:pt-2">
+          <div className="flex items-center justify-end space-x-2 pt-0.5 sm:pt-2 pb-0.5">
             {!isMandatoryOnboarding && (
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               >
                 Cancelar
               </button>
@@ -272,7 +277,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-5 py-2.5 sm:px-6 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
