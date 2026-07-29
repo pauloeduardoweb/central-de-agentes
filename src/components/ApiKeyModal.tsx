@@ -103,7 +103,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         }
         @media (max-width: 639px) {
           .login-bg-responsive {
-            background-image: url('https://i.postimg.cc/300YdHdZ/CAPA.png'), url('/login-bg-hd.png');
+            background-image: url('https://i.postimg.cc/DnDYSZ00/CAPA.png'), url('https://i.postimg.cc/300YdHdZ/CAPA.png');
             background-size: cover, cover;
             background-position: center top, center top;
           }
@@ -120,7 +120,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       {/* Soft overlay (10%) to preserve text contrast without darkening the Ultra HD image */}
       <div className="absolute inset-0 bg-black/10 pointer-events-none z-0" />
 
-      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[90%] sm:w-full max-w-[340px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300">
+      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[88%] sm:w-full max-w-[330px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300">
         
         {/* High Tech Cover Banner */}
         <div className="relative w-full aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
@@ -163,12 +163,18 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </g>
             <rect x="0" y="340" width="1200" height="4" fill="url(#modalBeamGradient)" filter="url(#modalGlow)" />
             
-            {/* Desktop Banner Titles */}
+            {/* Banner Titles */}
             <g filter="url(#modalGlow)">
-              <text x="600" y="180" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="82" fontWeight="900" fontFamily="sans-serif" letterSpacing="3">
+              {/* Desktop version (MENTOR BIGODE + GERAÇÃO Z PRO) */}
+              <text x="600" y="180" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="82" fontWeight="900" fontFamily="sans-serif" letterSpacing="3" className="hidden sm:block">
                 MENTOR BIGODE
               </text>
-              <text x="600" y="285" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2" fontSize="68" fontWeight="900" fontFamily="sans-serif" letterSpacing="3">
+              <text x="600" y="285" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2" fontSize="68" fontWeight="900" fontFamily="sans-serif" letterSpacing="3" className="hidden sm:block">
+                GERAÇÃO Z PRO
+              </text>
+
+              {/* Mobile version (Only GERAÇÃO Z PRO inside panel) */}
+              <text x="600" y="240" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="82" fontWeight="900" fontFamily="sans-serif" letterSpacing="3" className="block sm:hidden">
                 GERAÇÃO Z PRO
               </text>
             </g>
