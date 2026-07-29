@@ -1,4 +1,4 @@
-import { Agent, ChatMessage, ChatSession, TeamGroup } from '../types';
+import { Agent, ChatMessage, ChatSession, TeamGroup, AgentStepState } from '../types';
 import { DEFAULT_AGENTS } from '../data/defaultAgents';
 
 const AGENTS_STORAGE_KEY = 'gpt_central_agents_v15';
@@ -99,13 +99,30 @@ export function getStoredChatSession(agentId: string): ChatMessage[] {
   }
 }
 
-export function saveChatSession(agentId: string, messages: ChatMessage[]): void {
+export function getStoredChatSessionFull(agentId: string): { messages: ChatMessage[]; localState?: AgentStepState } {
+  try {
+    const raw = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
+    if (!raw) return { messages: [] };
+    const sessions: Record<string, ChatSession> = JSON.parse(raw);
+    const session = sessions[agentId];
+    return {
+      messages: session?.messages || [],
+      localState: session?.localState,
+    };
+  } catch (err) {
+    console.error('Error reading full chat session:', err);
+    return { messages: [] };
+  }
+}
+
+export function saveChatSession(agentId: string, messages: ChatMessage[], localState?: AgentStepState): void {
   try {
     const raw = localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);
     const sessions: Record<string, ChatSession> = raw ? JSON.parse(raw) : {};
     sessions[agentId] = {
       agentId,
       messages,
+      localState,
       updatedAt: new Date().toISOString(),
     };
     localStorage.setItem(CHAT_SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
