@@ -94,33 +94,50 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-end sm:justify-center p-3 sm:p-6 pt-2 sm:pt-28 pb-3 sm:pb-8 animate-in fade-in duration-200 overflow-hidden select-none login-bg-responsive"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-end sm:justify-center p-3 sm:p-6 pt-2 sm:pt-28 pb-2 sm:pb-8 animate-in fade-in duration-200 overflow-hidden select-none login-bg-responsive"
     >
       <style>{`
         .login-bg-responsive {
+          min-height: 100vh;
           background-repeat: no-repeat;
-          background-color: #020612;
+          background-color: #020617;
+          filter: none !important;
+          backdrop-filter: none !important;
+          image-rendering: auto;
         }
-        @media (max-width: 639px) {
+        @media screen and (max-width: 768px) {
           .login-bg-responsive {
-            background-image: url('https://i.postimg.cc/300YdHdZ/CAPA.png');
+            background-image: url('/assets/login/login-mobile.png'), url('https://i.postimg.cc/xjSzC84j/Remove-login-panel-keep-character-202607291547.jpg');
             background-size: cover;
-            background-position: center top;
+            background-position: center -60px;
+            background-repeat: no-repeat;
+            background-color: #020617;
+            background-attachment: scroll;
+            filter: none !important;
+            backdrop-filter: none !important;
+            image-rendering: auto;
+          }
+          .login-panel-mobile {
+            margin-top: auto !important;
+            margin-bottom: 8px !important;
           }
         }
-        @media (min-width: 640px) {
+        @media screen and (min-width: 769px) {
           .login-bg-responsive {
-            background-image: url('https://i.postimg.cc/300YdHdZ/CAPA.png');
+            background-image: url('/assets/login/login-desktop.png'), url('https://i.postimg.cc/jSHh9RzY/CAPA.png');
             background-size: cover;
             background-position: center center;
+            background-repeat: no-repeat;
+            filter: none !important;
+            backdrop-filter: none !important;
           }
         }
       `}</style>
 
-      {/* Soft overlay (10%) to preserve text contrast without darkening the Ultra HD image */}
-      <div className="absolute inset-0 bg-black/10 pointer-events-none z-0" />
+      {/* Minimal overlay (5%) without blur */}
+      <div className="absolute inset-0 bg-black/5 pointer-events-none z-0" />
 
-      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[88%] sm:w-full max-w-[330px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300">
+      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[88%] sm:w-full max-w-[330px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300 login-panel-mobile">
         
         {/* High Tech Cover Banner */}
         <div className="relative w-full aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
