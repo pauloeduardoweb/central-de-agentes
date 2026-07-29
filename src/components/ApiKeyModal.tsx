@@ -94,7 +94,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-end sm:justify-center p-3 sm:p-6 pt-16 sm:pt-28 pb-4 sm:pb-8 animate-in fade-in duration-200 overflow-hidden select-none login-bg-responsive"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-3 sm:p-6 pt-10 sm:pt-28 pb-6 sm:pb-8 animate-in fade-in duration-200 overflow-hidden select-none login-bg-responsive"
     >
       <style>{`
         .login-bg-responsive {
@@ -105,7 +105,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         @media (max-width: 639px) {
           .login-bg-responsive {
             background-size: cover, cover;
-            background-position: 85% 10%, 85% 10%;
+            background-position: 82% 32%, 82% 32%;
           }
         }
         @media (min-width: 640px) {
