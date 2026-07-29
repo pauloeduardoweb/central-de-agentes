@@ -28,9 +28,6 @@ export const AgentPrimaryAction: React.FC<AgentPrimaryActionProps> = ({ agent, o
             <span className="px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 text-[10px] font-extrabold uppercase">
               CHAT LOCAL
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold uppercase">
-              SEM API
-            </span>
           </div>
 
           <div>

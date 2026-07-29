@@ -29,11 +29,6 @@ export const AgentStatusBlock: React.FC<AgentStatusBlockProps> = ({ agent }) => 
           <Zap className="w-3.5 h-3.5 text-cyan-400" />
           <span>Chat Local disponível</span>
         </div>
-
-        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-indigo-300">
-          <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Sem necessidade de API</span>
-        </div>
       </div>
     </div>
   );
