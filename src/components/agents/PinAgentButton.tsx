@@ -34,7 +34,7 @@ export const PinAgentButton: React.FC<PinAgentButtonProps> = ({
       aria-label={isPinned ? 'Desafixar agente' : 'Fixar agente'}
       aria-pressed={isPinned}
       title={isPinned ? 'Agente fixado' : 'Fixar agente'}
-      className={`relative inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-full backdrop-blur-md transition-all duration-300 active:scale-90 focus:outline-none focus:ring-2 focus:ring-orange-400/60 select-none ${
+      className={`relative inline-flex items-center justify-center min-w-[28px] sm:min-w-[40px] min-h-[28px] sm:min-h-[40px] rounded-full backdrop-blur-md transition-all duration-300 active:scale-90 focus:outline-none focus:ring-2 focus:ring-orange-400/60 select-none ${
         isPinned
           ? 'bg-black/80 text-orange-400 border border-orange-500/80 shadow-[0_0_15px_rgba(249,115,22,0.6)] ring-1 ring-orange-500/50'
           : 'bg-black/60 text-slate-300 hover:text-white border border-white/20 hover:bg-black/80 hover:border-white/40'

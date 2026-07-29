@@ -74,8 +74,8 @@ export const PinnedAgentsSection: React.FC<PinnedAgentsSectionProps> = ({
         </div>
       </div>
 
-      {/* Grid of Pinned Agents (Max 5) - Sleek 5-column grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5 max-w-7xl mx-auto">
+      {/* Grid of Pinned Agents (Max 5) - 5-column grid on mobile and desktop */}
+      <div className="grid grid-cols-5 gap-1 sm:gap-3.5 max-w-7xl mx-auto">
         {pinnedAgents.map((agent) => (
           <div key={`pinned-${agent.id}`} className="w-full">
             <TikTokPosterCard
