@@ -1,4 +1,4 @@
-export type CategoryType = 'Tiktok 2K' | 'Tiktok Shop' | 'Recurso Anti-Violação' | 'Suporte' | 'Grupo de Network' | 'Flow Ultra' | 'Academia de Desafios' | 'Todas';
+export type CategoryType = 'Tiktok 2K' | 'Tiktok Shop' | 'Recurso Anti-Violação' | 'Suporte' | 'Grupo de Network' | 'Flow Ultra' | 'Academia de Desafios' | 'Prompts de Movimentos' | 'Todas';
 
 export interface AgentCapabilities {
   codeInterpreter: boolean;
