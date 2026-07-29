@@ -94,18 +94,40 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-end sm:justify-center p-3 sm:p-6 pt-28 sm:pt-36 pb-6 sm:pb-10 animate-in fade-in duration-200 overflow-hidden select-none"
-      style={{
-        backgroundImage: "url('/login-bg-hd.png'), url('https://i.postimg.cc/DnDYSZ00/CAPA.png')",
-        backgroundSize: 'cover',
-        backgroundPosition: '80% center',
-        backgroundRepeat: 'no-repeat',
-      }}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-end sm:justify-center p-3 sm:p-6 pt-16 sm:pt-28 pb-4 sm:pb-8 animate-in fade-in duration-200 overflow-hidden select-none login-bg-responsive"
     >
-      {/* Soft overlay (12%) to preserve text contrast without darkening the Ultra HD image */}
+      <style>{`
+        .login-bg-responsive {
+          background-image: url('/login-bg-hd.png'), url('https://i.postimg.cc/DnDYSZ00/CAPA.png');
+          background-repeat: no-repeat;
+          background-color: #020612;
+        }
+        @media (max-width: 639px) {
+          .login-bg-responsive {
+            background-size: 100% auto, 100% auto;
+            background-position: center top, center top;
+          }
+        }
+        @media (min-width: 640px) {
+          .login-bg-responsive {
+            background-size: cover, cover;
+            background-position: center center, center center;
+          }
+        }
+      `}</style>
+
+      {/* Soft overlay (10%) to preserve text contrast without darkening the Ultra HD image */}
       <div className="absolute inset-0 bg-black/10 pointer-events-none z-0" />
 
-      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[92%] max-w-[360px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-2 sm:translate-y-12 transition-all duration-300">
+      {/* Mobile Title Glow Banner for MENTOR BIGODE */}
+      <div className="sm:hidden text-center mb-2 z-10 animate-in fade-in slide-in-from-top-4 duration-300">
+        <h1 className="text-xl sm:text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-cyan-200 drop-shadow-[0_0_15px_rgba(56,189,248,0.8)] uppercase">
+          MENTOR BIGODE
+        </h1>
+        <div className="h-0.5 w-28 mx-auto bg-gradient-to-r from-transparent via-cyan-400 to-transparent mt-1 opacity-80" />
+      </div>
+
+      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[92%] max-w-[360px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300">
         
         {/* Mentor Bigode High Tech Cover Banner */}
         <div className="relative w-full aspect-[16/5] sm:aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
