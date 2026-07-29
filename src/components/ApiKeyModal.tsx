@@ -18,6 +18,13 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
   useEffect(() => {
     const storedCode = localStorage.getItem('user_student_access_code') || '';
     setAccessCode(storedCode);
+
+    // Lock page scrollbar while modal is active
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,21 +94,21 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-hidden"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-end sm:justify-center p-3 sm:p-6 pt-28 sm:pt-36 pb-6 sm:pb-10 animate-in fade-in duration-200 overflow-hidden select-none"
       style={{
         backgroundImage: "url('/login-bg-hd.png'), url('https://i.postimg.cc/DnDYSZ00/CAPA.png')",
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundPosition: '80% center',
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Soft overlay (15%) to preserve text contrast without darkening the Ultra HD image */}
-      <div className="absolute inset-0 bg-black/15 pointer-events-none z-0" />
+      {/* Soft overlay (12%) to preserve text contrast without darkening the Ultra HD image */}
+      <div className="absolute inset-0 bg-black/10 pointer-events-none z-0" />
 
-      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl max-w-md w-full overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.35)] relative z-10 space-y-4 text-slate-100">
+      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[92%] max-w-[360px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-2 sm:translate-y-12 transition-all duration-300">
         
         {/* Mentor Bigode High Tech Cover Banner */}
-        <div className="relative w-full aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
+        <div className="relative w-full aspect-[16/5] sm:aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
           <svg className="w-full h-full object-cover" viewBox="0 0 1200 450" fill="none">
             <defs>
               <radialGradient id="modalBgGlow" cx="50%" cy="50%" r="70%">
@@ -149,7 +156,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
           </svg>
         </div>
 
-        <div className="p-6 pt-1 space-y-4">
+        <div className="p-4 sm:p-6 pt-1 space-y-3 sm:space-y-4">
           {!isMandatoryOnboarding && (
             <button
               onClick={onClose}
@@ -161,21 +168,21 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
 
           {/* Header Icon */}
           <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20 shrink-0">
-              <Lock className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20 shrink-0">
+              <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-white flex items-center space-x-2">
+              <h2 className="text-sm sm:text-lg font-bold text-white flex items-center space-x-2">
                 <span>Área do Aluno — Mentoria</span>
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] sm:text-xs text-slate-400">
                 Digite seu Código para Acessar a Plataforma
               </p>
             </div>
           </div>
 
         {/* Notice Banner */}
-        <div className="bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-3.5 text-xs text-cyan-200/90 leading-relaxed space-y-1.5">
+        <div className="bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-3 sm:p-3.5 text-[11px] sm:text-xs text-cyan-200/90 leading-relaxed space-y-1">
           <div className="flex items-center space-x-1.5 font-bold text-cyan-400">
             <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>Área Restrita aos Alunos da Mentoria</span>
@@ -186,9 +193,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+            <label className="block text-[11px] sm:text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
               <span className="flex items-center space-x-1.5">
                 <Key className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Código de Acesso do Aluno:</span>
@@ -215,7 +222,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </p>
           )}
 
-          <div className="flex items-center justify-end space-x-2 pt-2">
+          <div className="flex items-center justify-end space-x-2 pt-1 sm:pt-2">
             {!isMandatoryOnboarding && (
               <button
                 type="button"
