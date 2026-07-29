@@ -36,6 +36,22 @@ export interface Agent {
   createdAt?: string;
 }
 
+export interface AgentStepState {
+  currentStep: number;
+  answers: {
+    productName?: string;
+    objective?: string;
+    toneStyle?: string;
+    extraDetails?: string;
+    [key: string]: any;
+  };
+  attachedImage?: string | null;
+  attachedImageName?: string | null;
+  finalPrompt?: string | null;
+  isCompleted?: boolean;
+  flowSession?: any;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -47,6 +63,7 @@ export interface ChatMessage {
 export interface ChatSession {
   agentId: string;
   messages: ChatMessage[];
+  localState?: AgentStepState;
   updatedAt: string;
 }
 
