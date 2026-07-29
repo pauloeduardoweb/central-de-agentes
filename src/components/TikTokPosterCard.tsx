@@ -1,6 +1,7 @@
 import React from 'react';
-import { MessageSquare, Sparkles, Heart, Copy, Zap, Flame, Play, ExternalLink, MessageCircle, X } from 'lucide-react';
+import { MessageSquare, Sparkles, Heart, Copy, Zap, Flame, Play, ExternalLink, MessageCircle, X, Pin } from 'lucide-react';
 import { Agent } from '../types';
+import { PinAgentButton } from './agents/PinAgentButton';
 
 function getSafeImageUrl(url?: string): string {
   if (!url) return '';
@@ -12,16 +13,20 @@ function getSafeImageUrl(url?: string): string {
 
 interface TikTokPosterCardProps {
   agent: Agent;
+  isPinned?: boolean;
   onSelectChat: (agent: Agent) => void;
   onToggleFavorite: (id: string) => void;
   onCopyPrompt: (agent: Agent) => void;
+  onTogglePin?: (id: string) => void;
 }
 
 export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
   agent,
+  isPinned = false,
   onSelectChat,
   onToggleFavorite,
   onCopyPrompt,
+  onTogglePin,
 }) => {
   const [showVideoModal, setShowVideoModal] = React.useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = React.useState(0);
@@ -175,15 +180,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${theme.badgeBg} backdrop-blur-md shadow-lg`}>
               {theme.badgeLabel}
             </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleFavorite(agent.id);
-              }}
-              className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-            >
-              <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-            </button>
+            <div className="flex items-center space-x-1.5">
+              {onTogglePin && (
+                <PinAgentButton
+                  agentId={agent.id}
+                  isPinned={isPinned}
+                  onTogglePin={onTogglePin}
+                />
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(agent.id);
+                }}
+                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+              >
+                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+              </button>
+            </div>
           </div>
 
           {/* Bottom Footer Line */}
@@ -220,15 +236,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
                 ⚡ TikTok 2K Viral
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-              >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {onTogglePin && (
+                  <PinAgentButton
+                    agentId={agent.id}
+                    isPinned={isPinned}
+                    onTogglePin={onTogglePin}
+                  />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(agent.id);
+                  }}
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                >
+                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Center: Waffle Cone & Animal */}
@@ -291,15 +318,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
                 🎭 Novela Frutas
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-              >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {onTogglePin && (
+                  <PinAgentButton
+                    agentId={agent.id}
+                    isPinned={isPinned}
+                    onTogglePin={onTogglePin}
+                  />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(agent.id);
+                  }}
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                >
+                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Center: Dramatic Fruit Conflict Element */}
@@ -362,15 +400,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
                 🤠 Roça & Sertanejo
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-              >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {onTogglePin && (
+                  <PinAgentButton
+                    agentId={agent.id}
+                    isPinned={isPinned}
+                    onTogglePin={onTogglePin}
+                  />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(agent.id);
+                  }}
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                >
+                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Bottom Title & Subtitle */}
@@ -417,15 +466,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
                 👩‍🌾 Mulher Agro
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-              >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {onTogglePin && (
+                  <PinAgentButton
+                    agentId={agent.id}
+                    isPinned={isPinned}
+                    onTogglePin={onTogglePin}
+                  />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(agent.id);
+                  }}
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                >
+                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Bottom Title & Subtitle */}
@@ -461,15 +521,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
                 👶⚽ Bebês & Futebol
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-              >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {onTogglePin && (
+                  <PinAgentButton
+                    agentId={agent.id}
+                    isPinned={isPinned}
+                    onTogglePin={onTogglePin}
+                  />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(agent.id);
+                  }}
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                >
+                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Center: Baby & Soccer Ball Fusion Element */}
@@ -538,15 +609,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
                 🔮 Tarot & Mistério
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-              >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {onTogglePin && (
+                  <PinAgentButton
+                    agentId={agent.id}
+                    isPinned={isPinned}
+                    onTogglePin={onTogglePin}
+                  />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(agent.id);
+                  }}
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                >
+                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Bottom Title & Subtitle */}
@@ -598,15 +680,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
                 ✨ Mensagens de Fé
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-              >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {onTogglePin && (
+                  <PinAgentButton
+                    agentId={agent.id}
+                    isPinned={isPinned}
+                    onTogglePin={onTogglePin}
+                  />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(agent.id);
+                  }}
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                >
+                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Central Figure: Representation of Jesus in White Tunic, Brown Mantle, Open Palms & Serene Expression */}
@@ -704,15 +797,26 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${theme.badgeBg} backdrop-blur-md shadow-lg`}>
                 {theme.badgeLabel}
               </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite(agent.id);
-                }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20"
-              >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
-              </button>
+              <div className="flex items-center space-x-1.5">
+                {onTogglePin && (
+                  <PinAgentButton
+                    agentId={agent.id}
+                    isPinned={isPinned}
+                    onTogglePin={onTogglePin}
+                  />
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(agent.id);
+                  }}
+                  className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                  aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                  title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
+                >
+                  <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Center Avatar / Portrait Frame */}
@@ -802,6 +906,19 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             </button>
           )}
 
+          {/* Abrir no App (Chat Local Inteligente) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowOverlay(false);
+              onSelectChat(agent);
+            }}
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/30 active:scale-95 transition-all border border-emerald-300/60"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-100 animate-pulse" />
+            <span>⚡ Abrir no App (Chat Local)</span>
+          </button>
+
           {agent.chatGptUrl && (
             <button
               onClick={(e) => {
@@ -838,6 +955,23 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             >
               <ExternalLink className="w-4 h-4" />
               <span>Abrir no Gemini ↗</span>
+            </button>
+          )}
+
+          {onTogglePin && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin(agent.id);
+              }}
+              className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 border transition-all active:scale-95 ${
+                isPinned
+                  ? 'bg-orange-500/25 hover:bg-orange-500/40 text-orange-200 border-orange-500/60 shadow-lg shadow-orange-500/20'
+                  : 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 hover:text-white border-slate-700/80 hover:border-slate-500'
+              }`}
+            >
+              <Pin className={`w-4 h-4 ${isPinned ? 'fill-orange-400 text-orange-400 rotate-45' : 'text-orange-400'}`} />
+              <span>{isPinned ? 'Desafixar Agente' : 'Fixar Agente no Topo'}</span>
             </button>
           )}
 

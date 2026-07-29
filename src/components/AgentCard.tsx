@@ -2,25 +2,30 @@ import React, { useState } from 'react';
 import { Heart, MessageSquare, MoreVertical, Edit2, Copy, Trash2, Code2, Globe, Image, FileJson, Sparkles, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
 import { AgentIcon, getColorTheme } from './AgentIcon';
+import { PinAgentButton } from './agents/PinAgentButton';
 
 interface AgentCardProps {
   agent: Agent;
+  isPinned?: boolean;
   onSelectChat: (agent: Agent) => void;
   onToggleFavorite: (id: string) => void;
   onEdit: (agent: Agent) => void;
   onDuplicate: (agent: Agent) => void;
   onDelete: (id: string) => void;
   onCopyPrompt: (agent: Agent) => void;
+  onTogglePin?: (id: string) => void;
 }
 
 export const AgentCard: React.FC<AgentCardProps> = ({
   agent,
+  isPinned = false,
   onSelectChat,
   onToggleFavorite,
   onEdit,
   onDuplicate,
   onDelete,
   onCopyPrompt,
+  onTogglePin,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const theme = getColorTheme(agent.colorTheme);
@@ -73,6 +78,14 @@ export const AgentCard: React.FC<AgentCardProps> = ({
           </div>
 
           <div className="flex items-center space-x-1 shrink-0">
+            {onTogglePin && (
+              <PinAgentButton
+                agentId={agent.id}
+                isPinned={isPinned}
+                onTogglePin={onTogglePin}
+                size="sm"
+              />
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -181,12 +194,20 @@ export const AgentCard: React.FC<AgentCardProps> = ({
         </div>
 
         <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => onSelectChat(agent)}
+            className="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 via-teal-600 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/20 transition-all active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-100 animate-pulse" />
+            <span>Abrir no App</span>
+          </button>
+
           {agent.chatGptUrl && (
             <a
               href={agent.chatGptUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center space-x-1.5 shadow-xs transition-all"
+              className="py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center space-x-1 border border-slate-700 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span>ChatGPT ↗</span>
@@ -198,14 +219,12 @@ export const AgentCard: React.FC<AgentCardProps> = ({
               href={agent.geminiUrl || 'https://gemini.google.com/gem/1ytmjN-QrbLkcPzV03sfl--JL6tBF0mvL?usp=sharing'}
               target="_blank"
               rel="noopener noreferrer"
-              className="py-2.5 px-3 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center space-x-1.5 shadow-xs transition-all"
+              className="py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center space-x-1 border border-slate-700 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span>Gemini ↗</span>
             </a>
           )}
-
-
         </div>
       </div>
     </div>

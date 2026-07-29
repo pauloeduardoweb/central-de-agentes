@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Search, SlidersHorizontal, Heart, UserCheck, Sparkles, FolderOpen, Flame, Zap, ShoppingBag, ShieldAlert, Headphones, Layers, HelpCircle, TrendingUp, MessageCircle, Users, ExternalLink, Copy, Check, Cpu, Clock, Trophy, Target, Award, Compass, Rocket } from 'lucide-react';
+import { Search, SlidersHorizontal, Heart, UserCheck, Sparkles, FolderOpen, Flame, Zap, ShoppingBag, ShieldAlert, Headphones, Layers, HelpCircle, TrendingUp, MessageCircle, Users, ExternalLink, Copy, Check, Cpu, Clock, Trophy, Target, Award, Compass, Rocket, X, Pin } from 'lucide-react';
 import { Agent, CategoryType } from '../types';
 import { AgentCard } from './AgentCard';
 import { TikTokPosterCard } from './TikTokPosterCard';
 import { ChallengeAcademyPage } from './challenge/ChallengeAcademyPage';
+import { usePinnedAgents } from '../hooks/usePinnedAgents';
+import { PinnedAgentsSection } from './agents/PinnedAgentsSection';
 
 interface AgentGridProps {
   agents: Agent[];
@@ -108,6 +110,8 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   const [onlyCustom, setOnlyCustom] = useState(false);
   const [sortBy, setSortBy] = useState<'popular' | 'name' | 'recent'>('popular');
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+
+  const { pinnedAgentIds, isPinned, togglePinned, pinnedLimitMessage, clearLimitMessage } = usePinnedAgents();
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -216,6 +220,35 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
 
   return (
     <div className="space-y-6">
+
+      {/* Pinned limit notification message */}
+      {pinnedLimitMessage && (
+        <div className="p-4 rounded-2xl bg-orange-950/95 border border-orange-500/80 text-orange-200 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center space-x-3">
+            <span className="p-2 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/40">
+              <Pin className="w-4 h-4 fill-orange-400 rotate-45" />
+            </span>
+            <span className="leading-snug">{pinnedLimitMessage}</span>
+          </div>
+          <button
+            onClick={clearLimitMessage}
+            className="p-1.5 rounded-xl hover:bg-orange-900/80 text-orange-300 hover:text-white transition-colors shrink-0"
+            title="Fechar aviso"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Pinned Agents Section */}
+      <PinnedAgentsSection
+        pinnedAgentIds={pinnedAgentIds}
+        allAgents={agents}
+        onSelectChat={onSelectChat}
+        onToggleFavorite={onToggleFavorite}
+        onCopyPrompt={onCopyPrompt}
+        onTogglePin={togglePinned}
+      />
       
       {/* MAIN TOP NAVIGATION MENUS (TIKTOK 2K | TIKTOK SHOP | RECURSO ANTI-VIOLAÇÃO | SUPORTE | GRUPO DE NETWORK | FLOW ULTRA | ACADEMIA DE DESAFIOS) */}
       <div className="bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/50 p-3 rounded-2xl shadow-2xl shadow-cyan-950/60 backdrop-blur-md relative overflow-hidden">
@@ -995,9 +1028,11 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
               <TikTokPosterCard
                 key={agent.id}
                 agent={agent}
+                isPinned={isPinned(agent.id)}
                 onSelectChat={onSelectChat}
                 onToggleFavorite={onToggleFavorite}
                 onCopyPrompt={onCopyPrompt}
+                onTogglePin={togglePinned}
               />
             ))}
           </div>
