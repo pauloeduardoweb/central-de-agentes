@@ -4,6 +4,7 @@ import { Agent, CategoryType } from '../types';
 import { AgentCard } from './AgentCard';
 import { TikTokPosterCard } from './TikTokPosterCard';
 import { ChallengeAcademyPage } from './challenge/ChallengeAcademyPage';
+import { PromptsMovimentosEmBreveCard } from './prompts/PromptsMovimentosEmBreveCard';
 import { usePinnedAgents } from '../hooks/usePinnedAgents';
 import { PinnedAgentsSection } from './agents/PinnedAgentsSection';
 
@@ -91,6 +92,15 @@ const CATEGORY_MENU: CategoryMenuItem[] = [
     gradient: 'from-amber-500 via-orange-600 to-red-600',
     activeBorder: 'border-amber-400/80 shadow-amber-500/20',
     textGlow: 'text-amber-400',
+  },
+  {
+    id: 'Prompts de Movimentos',
+    label: 'PROMPTS DE MOVIMENTOS',
+    tag: 'Prompts & Estruturas',
+    icon: Layers,
+    gradient: 'from-purple-500 via-indigo-600 to-blue-600',
+    activeBorder: 'border-purple-400/80 shadow-purple-500/20',
+    textGlow: 'text-purple-400',
   },
 ];
 
@@ -192,6 +202,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
       'Grupo de Network': 2,
       'Flow Ultra': 1,
       'Academia de Desafios': 0,
+      'Prompts de Movimentos': 0,
       'Todas': agents.length,
     };
     agents.forEach((a) => {
@@ -261,7 +272,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             backgroundPosition: 'center',
           }}
         />
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 relative z-10">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3 relative z-10">
           {CATEGORY_MENU.map((item) => {
             const IconComponent = item.icon;
             const isSelected = selectedCategory === item.id;
@@ -312,7 +323,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
                       ? 'bg-cyan-950/90 text-cyan-200 border-cyan-400/70 shadow-xs'
                       : 'bg-[#030e1a]/90 text-cyan-300 border-cyan-500/30'
                   }`}>
-                    {item.id === 'Grupo de Network' ? '2 Grupos VIP' : item.id === 'Suporte' ? '1 Contato' : item.id === 'Flow Ultra' ? '3 Grupos VIP' : item.id === 'Academia de Desafios' ? (count > 0 ? `${count} ${count === 1 ? 'Agente' : 'Agentes'}` : '3 Desafios') : `${count} ${count === 1 ? 'Agente' : 'Agentes'}`}
+                    {item.id === 'Grupo de Network' ? '2 Grupos VIP' : item.id === 'Suporte' ? '1 Contato' : item.id === 'Flow Ultra' ? '3 Grupos VIP' : item.id === 'Academia de Desafios' ? (count > 0 ? `${count} ${count === 1 ? 'Agente' : 'Agentes'}` : '3 Desafios') : item.id === 'Prompts de Movimentos' ? 'Em breve' : `${count} ${count === 1 ? 'Agente' : 'Agentes'}`}
                   </span>
                 </div>
 
@@ -943,8 +954,12 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
         <ChallengeAcademyPage onBackToMainTab={() => setSelectedCategory('Tiktok 2K')} />
       )}
 
-      {/* Controls: Search, Filters & Sort (Hide when on Grupo de Network, Suporte, Flow Ultra or Academia de Desafios) */}
-      {selectedCategory !== 'Grupo de Network' && selectedCategory !== 'Suporte' && selectedCategory !== 'Flow Ultra' && selectedCategory !== 'Academia de Desafios' && (
+      {selectedCategory === 'Prompts de Movimentos' && (
+        <PromptsMovimentosEmBreveCard onBackToMainTab={() => setSelectedCategory('Tiktok 2K')} />
+      )}
+
+      {/* Controls: Search, Filters & Sort (Hide when on Grupo de Network, Suporte, Flow Ultra, Academia de Desafios or Prompts de Movimentos) */}
+      {selectedCategory !== 'Grupo de Network' && selectedCategory !== 'Suporte' && selectedCategory !== 'Flow Ultra' && selectedCategory !== 'Academia de Desafios' && selectedCategory !== 'Prompts de Movimentos' && (
         <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 backdrop-blur-md relative overflow-hidden">
           <div 
             className="absolute inset-0 opacity-15 pointer-events-none"
@@ -1020,8 +1035,8 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
         </div>
       )}
 
-      {/* Grid of Agents (Hidden on Grupo de Network, Suporte, Academia de Desafios, and Flow Ultra unless agents exist) */}
-      {selectedCategory !== 'Grupo de Network' && selectedCategory !== 'Suporte' && selectedCategory !== 'Academia de Desafios' && (selectedCategory !== 'Flow Ultra' || filteredAgents.length > 0) && (
+      {/* Grid of Agents (Hidden on Grupo de Network, Suporte, Academia de Desafios, Prompts de Movimentos, and Flow Ultra unless agents exist) */}
+      {selectedCategory !== 'Grupo de Network' && selectedCategory !== 'Suporte' && selectedCategory !== 'Academia de Desafios' && selectedCategory !== 'Prompts de Movimentos' && (selectedCategory !== 'Flow Ultra' || filteredAgents.length > 0) && (
         filteredAgents.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredAgents.map((agent) => (

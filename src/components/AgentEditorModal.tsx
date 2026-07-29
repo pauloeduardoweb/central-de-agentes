@@ -10,7 +10,7 @@ interface AgentEditorModalProps {
   onClose: () => void;
 }
 
-const CATEGORIES: CategoryType[] = ['Tiktok 2K', 'Tiktok Shop', 'Recurso Anti-Violação', 'Suporte', 'Grupo de Network', 'Flow Ultra', 'Academia de Desafios'];
+const CATEGORIES: CategoryType[] = ['Tiktok 2K', 'Tiktok Shop', 'Recurso Anti-Violação', 'Suporte', 'Grupo de Network', 'Flow Ultra', 'Academia de Desafios', 'Prompts de Movimentos'];
 
 const ICONS_LIST = [
   'Bot', 'Code2', 'PenTool', 'Languages', 'Briefcase', 'Sparkles',

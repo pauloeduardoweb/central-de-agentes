@@ -64,14 +64,14 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
     switch (agent.category) {
       case 'Tiktok Shop':
         return {
-          borderColor: 'border-emerald-400/80',
-          glowShadow: 'shadow-[0_0_50px_rgba(16,185,129,0.8)]',
-          badgeBg: 'bg-emerald-950/80 text-emerald-200 border border-emerald-400/60',
+          borderColor: 'border-cyan-400/80',
+          glowShadow: 'shadow-[0_0_50px_rgba(34,211,238,0.8)]',
+          badgeBg: 'bg-cyan-950/80 text-cyan-200 border border-cyan-400/60',
           badgeLabel: '🛒 TikTok Shop',
-          titleGradient: 'from-white via-emerald-100 to-teal-300',
-          footerColor: 'text-emerald-300',
-          hoverBorder: 'hover:border-emerald-500/60 hover:shadow-emerald-500/20',
-          btnGradient: 'from-emerald-500 via-teal-600 to-green-600 hover:from-emerald-400 hover:to-green-500 shadow-emerald-500/40 border border-emerald-300/60',
+          titleGradient: 'from-white via-cyan-100 to-sky-300',
+          footerColor: 'text-cyan-300',
+          hoverBorder: 'hover:border-cyan-500/60 hover:shadow-cyan-500/20',
+          btnGradient: 'from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 shadow-cyan-500/40 border border-cyan-300/60',
         };
       case 'Recurso Anti-Violação':
         return {
@@ -176,11 +176,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             referrerPolicy="no-referrer"
           />
 
-          {/* Top Badge */}
-          <div className="relative z-10 flex justify-between items-center pointer-events-auto">
-            <span className={`px-1 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[7px] sm:text-[10px] font-black uppercase tracking-wider ${theme.badgeBg} backdrop-blur-md shadow-lg truncate max-w-[45%] sm:max-w-none`}>
-              {theme.badgeLabel}
-            </span>
+          {/* Top Buttons (Pin and Favorite) */}
+          <div className="relative z-10 flex justify-end items-center pointer-events-auto">
             <div className="flex items-center space-x-0.5 sm:space-x-1.5">
               {onTogglePin && (
                 <PinAgentButton
@@ -232,11 +229,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <div className="absolute top-24 left-1/2 -translate-x-1/2 w-48 h-48 sm:w-56 sm:h-56 rounded-full border-2 border-cyan-400/90 shadow-[0_0_50px_rgba(34,211,238,0.95)] pointer-events-none animate-pulse" />
             <div className="absolute top-24 left-1/2 -translate-x-1/2 w-56 h-56 sm:w-64 sm:h-64 rounded-full border border-cyan-500/30 pointer-events-none" />
 
-            {/* Top Badge */}
-            <div className="relative z-10 flex justify-between items-center">
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
-                ⚡ TikTok 2K Viral
-              </span>
+            {/* Top Buttons (Pin and Favorite) */}
+            <div className="relative z-10 flex justify-end items-center">
               <div className="flex items-center space-x-1.5">
                 {onTogglePin && (
                   <PinAgentButton
@@ -314,11 +308,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
           <div className="relative w-full h-full bg-slate-950 flex flex-col justify-between p-4 sm:p-5 overflow-hidden text-center select-none">
             <AtmosphericEffects />
 
-            {/* Top Badge */}
-            <div className="relative z-10 flex justify-between items-center">
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
-                🎭 Novela Frutas
-              </span>
+            {/* Top Buttons (Pin and Favorite) */}
+            <div className="relative z-10 flex justify-end items-center">
               <div className="flex items-center space-x-1.5">
                 {onTogglePin && (
                   <PinAgentButton
@@ -396,11 +387,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             {/* Glowing Blue Holographic Ring */}
             <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full border-2 border-cyan-400/80 shadow-[0_0_50px_rgba(34,211,238,0.9)] pointer-events-none animate-pulse" />
 
-            {/* Top Badge */}
-            <div className="relative z-10 flex justify-between items-center">
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
-                🤠 Roça & Sertanejo
-              </span>
+            {/* Top Buttons (Pin and Favorite) */}
+            <div className="relative z-10 flex justify-end items-center">
               <div className="flex items-center space-x-1.5">
                 {onTogglePin && (
                   <PinAgentButton
@@ -438,8 +426,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
 
             {/* Bottom Footer Line */}
             <div className="relative z-10 pt-2 border-t border-cyan-500/30 flex items-center justify-end">
-              <span className="text-[10px] font-black text-emerald-400 flex items-center space-x-1">
-                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[10px] font-black text-cyan-400 flex items-center space-x-1">
+                <Zap className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Viral Agro</span>
               </span>
             </div>
@@ -462,11 +450,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             {/* Glowing Blue Circuit Halo */}
             <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full border border-cyan-400/60 shadow-[0_0_50px_rgba(34,211,238,0.8)] pointer-events-none" />
 
-            {/* Top Badge */}
-            <div className="relative z-10 flex justify-between items-center">
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
-                👩‍🌾 Mulher Agro
-              </span>
+            {/* Top Buttons (Pin and Favorite) */}
+            <div className="relative z-10 flex justify-end items-center">
               <div className="flex items-center space-x-1.5">
                 {onTogglePin && (
                   <PinAgentButton
@@ -517,11 +502,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
           <div className="relative w-full h-full bg-slate-950 flex flex-col justify-between p-4 sm:p-5 overflow-hidden text-center select-none">
             <AtmosphericEffects />
 
-            {/* Top Badge */}
-            <div className="relative z-10 flex justify-between items-center">
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
-                👶⚽ Bebês & Futebol
-              </span>
+            {/* Top Buttons (Pin and Favorite) */}
+            <div className="relative z-10 flex justify-end items-center">
               <div className="flex items-center space-x-1.5">
                 {onTogglePin && (
                   <PinAgentButton
@@ -605,11 +587,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             {/* Glowing Blue Astrological Zodiac Ring */}
             <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border border-cyan-400/70 shadow-[0_0_40px_rgba(34,211,238,0.8)] pointer-events-none animate-pulse" />
 
-            {/* Top Badge */}
-            <div className="relative z-10 flex justify-between items-center">
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
-                🔮 Tarot & Mistério
-              </span>
+            {/* Top Buttons (Pin and Favorite) */}
+            <div className="relative z-10 flex justify-end items-center">
               <div className="flex items-center space-x-1.5">
                 {onTogglePin && (
                   <PinAgentButton
@@ -676,11 +655,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             <div className="absolute bottom-28 right-1/4 w-2 h-2 bg-white rounded-full blur-xs shadow-[0_0_12px_rgba(255,255,255,1)] animate-pulse pointer-events-none" />
             <div className="absolute top-1/4 left-1/4 w-1.5 h-1.5 bg-sky-200 rounded-full shadow-[0_0_10px_rgba(56,189,248,1)] pointer-events-none" />
 
-            {/* Top Badge */}
-            <div className="relative z-10 flex justify-between items-center">
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-950/80 text-cyan-200 border border-cyan-400/60 backdrop-blur-md shadow-[0_0_12px_rgba(34,211,238,0.4)]">
-                ✨ Mensagens de Fé
-              </span>
+            {/* Top Buttons (Pin and Favorite) */}
+            <div className="relative z-10 flex justify-end items-center">
               <div className="flex items-center space-x-1.5">
                 {onTogglePin && (
                   <PinAgentButton
@@ -793,11 +769,8 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
               <div className={`absolute top-20 left-1/2 -translate-x-1/2 w-44 h-44 sm:w-52 sm:h-52 rounded-full border-2 ${theme.borderColor} ${theme.glowShadow} pointer-events-none animate-pulse`} />
             )}
 
-            {/* Top Badge */}
-            <div className="relative z-10 flex justify-between items-center">
-              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${theme.badgeBg} backdrop-blur-md shadow-lg`}>
-                {theme.badgeLabel}
-              </span>
+            {/* Top Buttons (Pin and Favorite) */}
+            <div className="relative z-10 flex justify-end items-center">
               <div className="flex items-center space-x-1.5">
                 {onTogglePin && (
                   <PinAgentButton
