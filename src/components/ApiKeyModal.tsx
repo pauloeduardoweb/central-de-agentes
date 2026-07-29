@@ -103,16 +103,16 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         }
         @media (max-width: 639px) {
           .login-bg-responsive {
-            background-image: url('https://i.postimg.cc/DnDYSZ00/CAPA.png'), url('https://i.postimg.cc/300YdHdZ/CAPA.png');
-            background-size: cover, cover;
-            background-position: center top, center top;
+            background-image: url('https://i.postimg.cc/300YdHdZ/CAPA.png');
+            background-size: cover;
+            background-position: center top;
           }
         }
         @media (min-width: 640px) {
           .login-bg-responsive {
-            background-image: url('/login-bg-hd.png'), url('https://i.postimg.cc/DnDYSZ00/CAPA.png');
-            background-size: cover, cover;
-            background-position: center center, center center;
+            background-image: url('https://i.postimg.cc/300YdHdZ/CAPA.png');
+            background-size: cover;
+            background-position: center center;
           }
         }
       `}</style>
@@ -163,18 +163,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </g>
             <rect x="0" y="340" width="1200" height="4" fill="url(#modalBeamGradient)" filter="url(#modalGlow)" />
             
-            {/* Banner Titles */}
+            {/* Banner Title */}
             <g filter="url(#modalGlow)">
-              {/* Desktop version (MENTOR BIGODE + GERAÇÃO Z PRO) */}
-              <text x="600" y="180" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="82" fontWeight="900" fontFamily="sans-serif" letterSpacing="3" className="hidden sm:block">
-                MENTOR BIGODE
-              </text>
-              <text x="600" y="285" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2" fontSize="68" fontWeight="900" fontFamily="sans-serif" letterSpacing="3" className="hidden sm:block">
-                GERAÇÃO Z PRO
-              </text>
-
-              {/* Mobile version (Only GERAÇÃO Z PRO inside panel) */}
-              <text x="600" y="240" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="82" fontWeight="900" fontFamily="sans-serif" letterSpacing="3" className="block sm:hidden">
+              <text x="600" y="250" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="82" fontWeight="900" fontFamily="sans-serif" letterSpacing="3">
                 GERAÇÃO Z PRO
               </text>
             </g>
