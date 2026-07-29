@@ -22,9 +22,9 @@ export const PinAgentButton: React.FC<PinAgentButtonProps> = ({
   };
 
   const iconSizes = {
-    sm: 'w-3.5 h-3.5',
-    md: 'w-4 h-4',
-    lg: 'w-5 h-5',
+    sm: 'w-3 h-3',
+    md: 'w-3 h-3 sm:w-4 sm:h-4',
+    lg: 'w-4 h-4 sm:w-5 sm:h-5',
   };
 
   return (
@@ -34,7 +34,7 @@ export const PinAgentButton: React.FC<PinAgentButtonProps> = ({
       aria-label={isPinned ? 'Desafixar agente' : 'Fixar agente'}
       aria-pressed={isPinned}
       title={isPinned ? 'Agente fixado' : 'Fixar agente'}
-      className={`relative inline-flex items-center justify-center min-w-[28px] sm:min-w-[40px] min-h-[28px] sm:min-h-[40px] rounded-full backdrop-blur-md transition-all duration-300 active:scale-90 focus:outline-none focus:ring-2 focus:ring-orange-400/60 select-none ${
+      className={`relative inline-flex items-center justify-center p-1 sm:p-1.5 min-w-[24px] sm:min-w-[40px] min-h-[24px] sm:min-h-[40px] rounded-full backdrop-blur-md transition-all duration-300 active:scale-90 focus:outline-none focus:ring-2 focus:ring-orange-400/60 select-none ${
         isPinned
           ? 'bg-black/80 text-orange-400 border border-orange-500/80 shadow-[0_0_15px_rgba(249,115,22,0.6)] ring-1 ring-orange-500/50'
           : 'bg-black/60 text-slate-300 hover:text-white border border-white/20 hover:bg-black/80 hover:border-white/40'
@@ -42,7 +42,7 @@ export const PinAgentButton: React.FC<PinAgentButtonProps> = ({
     >
       <Pin
         className={`${iconSizes[size]} transition-transform duration-200 ${
-          isPinned ? 'fill-orange-400 text-orange-400 rotate-45 scale-110' : 'text-slate-300 hover:text-white'
+          isPinned ? 'fill-orange-400 text-orange-400 rotate-45' : 'text-slate-300 hover:text-white'
         }`}
       />
     </button>

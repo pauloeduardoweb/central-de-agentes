@@ -66,7 +66,7 @@ export const PinnedAgentsSection: React.FC<PinnedAgentsSectionProps> = ({
           </div>
         </div>
 
-        <div className="relative z-10 shrink-0 flex items-center space-x-2">
+        <div className="hidden sm:flex relative z-10 shrink-0 items-center space-x-2">
           <span className="text-[10px] sm:text-[11px] font-bold text-orange-400/90 bg-orange-950/60 border border-orange-500/30 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl flex items-center space-x-1.5">
             <Sparkles className="w-3.5 h-3.5 text-orange-400" />
             <span>Acesso Rápido</span>

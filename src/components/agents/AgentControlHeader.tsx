@@ -29,7 +29,7 @@ export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, o
                 <AgentIcon name={agent.iconName || 'Bot'} className="w-6 h-6" />
               </div>
             )}
-            <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-950 shadow-sm" />
+            {/* Avatar image / fallback icon */}
           </div>
 
           <div className="space-y-1">
