@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageSquare, Sparkles, Heart, Copy, Zap, Flame, Play, ExternalLink, MessageCircle, X, Pin } from 'lucide-react';
 import { Agent } from '../types';
 import { PinAgentButton } from './agents/PinAgentButton';
+import { AgentControlCenter } from './agents/AgentControlCenter';
 
 function getSafeImageUrl(url?: string): string {
   if (!url) return '';
@@ -878,128 +879,37 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
       >
         {renderPosterGraphic()}
 
-        {/* Options Overlay (Appears ONLY when clicking the agent poster image) */}
-        <div 
-          className={`absolute inset-0 bg-slate-950/92 backdrop-blur-xs transition-all duration-200 flex flex-col items-center justify-center p-4 text-center space-y-2.5 z-20 ${
-            showOverlay 
-              ? 'opacity-100 pointer-events-auto scale-100' 
-              : 'opacity-0 pointer-events-none scale-95'
-          }`}
-          onClick={(e) => {
-            // Close overlay if background tapped
-            if (e.target === e.currentTarget) {
-              setShowOverlay(false);
-            }
+        {/* Central de Controle do Agente - Premium SaaS Control Center Modal */}
+        <AgentControlCenter
+          agent={agent}
+          isOpen={showOverlay}
+          isFavorite={Boolean(agent.isFavorite)}
+          isPinned={isPinned}
+          onOpenLocal={(selectedAgent) => {
+            setShowOverlay(false);
+            onSelectChat(selectedAgent);
           }}
-        >
-          {showExampleButton && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentVideoIndex(0);
-                setShowVideoModal(true);
-                setShowOverlay(false);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-lg shadow-orange-500/20 active:scale-95 transition-all border border-amber-300/60"
-            >
-              <span>▶️ Assistir Exemplo</span>
-            </button>
-          )}
-
-          {/* Abrir no App (Chat Local Inteligente) */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowOverlay(false);
-              onSelectChat(agent);
-            }}
-            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-600 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/30 active:scale-95 transition-all border border-emerald-300/60"
-          >
-            <Sparkles className="w-4 h-4 text-emerald-100 animate-pulse" />
-            <span>⚡ Abrir no App (Chat Local)</span>
-          </button>
-
-          {agent.chatGptUrl && (
-            <button
-              onClick={(e) => {
-                setShowOverlay(false);
-                handleOpenChatGPT(e);
-              }}
-              className={`w-full py-2.5 px-4 rounded-xl bg-gradient-to-r ${
-                agent.chatGptUrl.includes('wa.me')
-                  ? 'from-emerald-500 via-teal-600 to-green-600 hover:from-emerald-400 hover:to-green-500 shadow-emerald-500/40 border border-emerald-300/60'
-                  : theme.btnGradient
-              } text-white font-black text-xs flex items-center justify-center space-x-2 shadow-lg active:scale-95 transition-all`}
-            >
-              {agent.chatGptUrl.includes('wa.me') ? (
-                <>
-                  <MessageCircle className="w-4 h-4 text-white fill-white/20" />
-                  <span>WhatsApp (21) 96993-1420</span>
-                </>
-              ) : (
-                <>
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Abrir no ChatGPT ↗</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {targetGeminiUrl && (
-            <button
-              onClick={(e) => {
-                setShowOverlay(false);
-                handleOpenGemini(e);
-              }}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-lg active:scale-95 transition-all border border-blue-400/30"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>Abrir no Gemini ↗</span>
-            </button>
-          )}
-
-          {onTogglePin && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onTogglePin(agent.id);
-              }}
-              className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 border transition-all active:scale-95 ${
-                isPinned
-                  ? 'bg-orange-500/25 hover:bg-orange-500/40 text-orange-200 border-orange-500/60 shadow-lg shadow-orange-500/20'
-                  : 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 hover:text-white border-slate-700/80 hover:border-slate-500'
-              }`}
-            >
-              <Pin className={`w-4 h-4 ${isPinned ? 'fill-orange-400 text-orange-400 rotate-45' : 'text-orange-400'}`} />
-              <span>{isPinned ? 'Desafixar Agente' : 'Fixar Agente no Topo'}</span>
-            </button>
-          )}
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(agent.id);
-            }}
-            className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 border transition-all active:scale-95 ${
-              agent.isFavorite
-                ? 'bg-rose-500/25 hover:bg-rose-500/40 text-rose-200 border-rose-500/60 shadow-lg shadow-rose-500/20'
-                : 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 hover:text-white border-slate-700/80 hover:border-slate-500'
-            }`}
-          >
-            <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-red-400'}`} />
-            <span>{agent.isFavorite ? 'Remover dos Favoritos' : 'Favoritar Agente'}</span>
-          </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowOverlay(false);
-            }}
-            className="w-full py-1.5 px-3 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white font-semibold text-[11px] flex items-center justify-center space-x-1 border border-slate-800 transition-all mt-1"
-          >
-            <span>✕ Fechar</span>
-          </button>
-        </div>
+          onOpenChatGPT={(e) => {
+            setShowOverlay(false);
+            handleOpenChatGPT(e);
+          }}
+          onOpenGemini={(e) => {
+            setShowOverlay(false);
+            handleOpenGemini(e);
+          }}
+          onWatchExample={
+            showExampleButton
+              ? () => {
+                  setCurrentVideoIndex(0);
+                  setShowVideoModal(true);
+                  setShowOverlay(false);
+                }
+              : undefined
+          }
+          onToggleFavorite={onToggleFavorite}
+          onTogglePinned={onTogglePin}
+          onClose={() => setShowOverlay(false)}
+        />
       </div>
 
       {/* Embedded Video Modal directly on screen */}

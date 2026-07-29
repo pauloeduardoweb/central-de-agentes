@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Check, AlertCircle, X, Lock, Key, Loader2 } from 'lucide-react';
 import { isValidStudentCode } from '../data/studentCodes';
 import { getDeviceId } from '../utils/deviceId';
+import { getSafeImageUrl } from '../utils/imageUrl';
 
 interface ApiKeyModalProps {
   onClose: () => void;
@@ -85,32 +86,93 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
   };
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 ${isMandatoryOnboarding ? 'bg-slate-950/98 backdrop-blur-2xl' : 'bg-black/85 backdrop-blur-md'}`}>
-      <div className="bg-[#041a27] border border-cyan-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl relative space-y-5 text-slate-100">
-        
-        {!isMandatoryOnboarding && (
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-hidden"
+      style={{
+        backgroundImage: "url('/login-bg-hd.png'), url('https://i.postimg.cc/DnDYSZ00/CAPA.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      {/* Soft overlay (15%) to preserve text contrast without darkening the Ultra HD image */}
+      <div className="absolute inset-0 bg-black/15 pointer-events-none z-0" />
 
-        {/* Header Icon */}
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-500 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20 shrink-0">
-            <Lock className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-base sm:text-lg font-bold text-white flex items-center space-x-2">
-              <span>Acesso Exclusivo — Aluno Geração Z Pro</span>
-            </h2>
-            <p className="text-xs text-slate-400">
-              Autenticação de Alunos da Mentoria
-            </p>
-          </div>
+      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl max-w-md w-full overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.35)] relative z-10 space-y-4 text-slate-100">
+        
+        {/* Mentor Bigode High Tech Cover Banner */}
+        <div className="relative w-full aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
+          <svg className="w-full h-full object-cover" viewBox="0 0 1200 450" fill="none">
+            <defs>
+              <radialGradient id="modalBgGlow" cx="50%" cy="50%" r="70%">
+                <stop offset="0%" stopColor="#082046" stopOpacity="0.9" />
+                <stop offset="50%" stopColor="#030c1e" stopOpacity="0.95" />
+                <stop offset="100%" stopColor="#01040a" stopOpacity="1" />
+              </radialGradient>
+              <linearGradient id="modalTextMetallic" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#e0f2fe" />
+                <stop offset="35%" stopColor="#38bdf8" />
+                <stop offset="70%" stopColor="#1d4ed8" />
+                <stop offset="100%" stopColor="#1e3a8a" />
+              </linearGradient>
+              <linearGradient id="modalBeamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0" />
+                <stop offset="50%" stopColor="#60a5fa" stopOpacity="1" />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+              </linearGradient>
+              <filter id="modalGlow">
+                <feGaussianBlur stdDeviation="8" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <rect width="1200" height="450" fill="url(#modalBgGlow)" />
+            <g stroke="#60a5fa" strokeWidth="2.5" fill="none" opacity="0.85">
+              <path d="M 0 0 L 60 50 L 40 80 L 120 120 L 90 150 L 180 200" />
+              <path d="M 1200 0 L 1140 50 L 1160 80 L 1080 120 L 1110 150 L 1020 200" />
+            </g>
+            <g stroke="#3b82f6" strokeWidth="2" fill="none" opacity="0.8">
+              <path d="M 0 200 H 120 L 180 260 H 260" />
+              <path d="M 1200 200 H 1080 L 1020 260 H 940" />
+              <circle cx="260" cy="260" r="4" fill="#60a5fa" />
+              <circle cx="940" cy="260" r="4" fill="#60a5fa" />
+            </g>
+            <rect x="0" y="340" width="1200" height="4" fill="url(#modalBeamGradient)" filter="url(#modalGlow)" />
+            <g filter="url(#modalGlow)">
+              <text x="600" y="190" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="84" fontWeight="900" fontFamily="sans-serif" letterSpacing="3">
+                GERAÇÃO Z PRO
+              </text>
+            </g>
+            <rect x="250" y="215" width="700" height="3" fill="url(#modalBeamGradient)" />
+          </svg>
         </div>
+
+        <div className="p-6 pt-1 space-y-4">
+          {!isMandatoryOnboarding && (
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors z-20"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Header Icon */}
+          <div className="flex items-center space-x-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20 shrink-0">
+              <Lock className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center space-x-2">
+                <span>Área do Aluno — Mentoria</span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Digite seu Código para Acessar a Plataforma
+              </p>
+            </div>
+          </div>
 
         {/* Notice Banner */}
         <div className="bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-3.5 text-xs text-cyan-200/90 leading-relaxed space-y-1.5">
@@ -183,6 +245,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
           </div>
         </form>
 
+        </div>
       </div>
     </div>
   );
