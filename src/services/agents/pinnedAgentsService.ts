@@ -4,7 +4,7 @@ export interface PinnedAgent {
 }
 
 const STORAGE_KEY = 'generation_z_pro_pinned_agents';
-export const MAX_PINNED_AGENTS = 4;
+export const MAX_PINNED_AGENTS = 5;
 
 export class PinnedAgentsService {
   /**
@@ -57,7 +57,7 @@ export class PinnedAgentsService {
     if (current.length >= MAX_PINNED_AGENTS) {
       return {
         success: false,
-        message: 'Você já fixou o limite máximo de 4 agentes. Desafixe um agente para fixar outro.',
+        message: 'Você já fixou o limite máximo de 5 agentes. Desafixe um agente para fixar outro.',
       };
     }
 
