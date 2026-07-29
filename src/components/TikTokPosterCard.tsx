@@ -159,7 +159,7 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
       const safeCoverUrl = getSafeImageUrl(agent.coverImage);
 
       return (
-        <div className="relative w-full h-full bg-slate-950 flex flex-col justify-between p-2.5 sm:p-3.5 overflow-hidden text-center select-none rounded-2xl">
+        <div className="relative w-full h-full bg-slate-950 flex flex-col justify-between p-1 sm:p-3.5 overflow-hidden text-center select-none rounded-2xl">
           {/* Single Full-bleed Cover Image */}
           <img
             src={safeCoverUrl}
@@ -178,10 +178,10 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
 
           {/* Top Badge */}
           <div className="relative z-10 flex justify-between items-center pointer-events-auto">
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${theme.badgeBg} backdrop-blur-md shadow-lg`}>
+            <span className={`px-1 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[7px] sm:text-[10px] font-black uppercase tracking-wider ${theme.badgeBg} backdrop-blur-md shadow-lg truncate max-w-[45%] sm:max-w-none`}>
               {theme.badgeLabel}
             </span>
-            <div className="flex items-center space-x-1.5">
+            <div className="flex items-center space-x-0.5 sm:space-x-1.5">
               {onTogglePin && (
                 <PinAgentButton
                   agentId={agent.id}
@@ -194,19 +194,19 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
                   e.stopPropagation();
                   onToggleFavorite(agent.id);
                 }}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                className="p-1 sm:p-1.5 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md transition-transform active:scale-90 border border-white/20 min-w-[24px] sm:min-w-[40px] min-h-[24px] sm:min-h-[40px] flex items-center justify-center"
                 aria-label={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
                 title={agent.isFavorite ? 'Remover dos favoritos' : 'Favoritar agente'}
               >
-                <Heart className={`w-4 h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
+                <Heart className={`w-3 h-3 sm:w-4 sm:h-4 ${agent.isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-400'}`} />
               </button>
             </div>
           </div>
 
           {/* Bottom Footer Line */}
-          <div className="relative z-10 pt-1.5 border-t border-white/10 flex items-center justify-end pointer-events-auto">
-            <span className={`text-[10px] font-extrabold ${theme.footerColor} flex items-center space-x-1 drop-shadow-md`}>
-              <Flame className="w-3.5 h-3.5 text-amber-400" />
+          <div className="relative z-10 pt-1 border-t border-white/10 flex items-center justify-end pointer-events-auto">
+            <span className={`text-[8px] sm:text-[10px] font-extrabold ${theme.footerColor} flex items-center space-x-0.5 sm:space-x-1 drop-shadow-md`}>
+              <Flame className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-amber-400" />
               <span>{agent.usageCount || 100}+ Usos</span>
             </span>
           </div>
