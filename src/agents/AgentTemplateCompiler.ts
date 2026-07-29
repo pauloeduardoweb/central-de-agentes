@@ -131,3 +131,6 @@ ROTEIRO VIRAL DE 30 SEGUNDOS
     };
   }
 }
+
+export default AgentTemplateCompiler;
+
