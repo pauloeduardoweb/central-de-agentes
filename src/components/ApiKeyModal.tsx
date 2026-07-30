@@ -108,7 +108,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         @media screen and (max-width: 768px) {
           .login-bg-responsive {
             background-image: url('/assets/login/login-mobile.png'), url('https://i.postimg.cc/xjSzC84j/Remove-login-panel-keep-character-202607291547.jpg');
-            background-size: 100% calc(100% + 78px);
+            background-size: cover;
             background-position: center -78px;
             background-repeat: no-repeat;
             background-color: #020617;
