@@ -166,7 +166,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             backdrop-filter: none !important;
           }
           .speech-bubble-desktop-tablet {
-            left: calc(50% + 55px) !important;
+            left: calc(50% + 125px) !important;
             top: calc(50% - 50px) !important;
             transform: none !important;
             max-width: 320px !important;
