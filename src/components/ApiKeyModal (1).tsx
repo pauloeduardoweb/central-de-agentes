@@ -94,36 +94,140 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-end sm:justify-center p-3 sm:p-6 pt-2 sm:pt-28 pb-3 sm:pb-8 animate-in fade-in duration-200 overflow-hidden select-none login-bg-responsive"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-end sm:justify-center p-3 sm:p-6 pt-2 sm:pt-28 pb-2 sm:pb-8 animate-in fade-in duration-200 overflow-hidden select-none login-bg-responsive"
     >
       <style>{`
         .login-bg-responsive {
+          min-height: 100vh;
           background-repeat: no-repeat;
-          background-color: #020612;
+          background-color: #020617;
+          filter: none !important;
+          backdrop-filter: none !important;
+          image-rendering: auto;
         }
-        @media (max-width: 639px) {
-          .login-bg-responsive {
-            background-image: url('https://i.postimg.cc/300YdHdZ/CAPA.png');
-            background-size: cover;
-            background-position: center top;
+        @keyframes speechBubbleGlow {
+          0%, 100% {
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3), inset 0 0 8px rgba(56, 189, 248, 0.1);
+            border-color: rgba(56, 189, 248, 0.45);
+          }
+          50% {
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.65), inset 0 0 15px rgba(56, 189, 248, 0.2);
+            border-color: rgba(56, 189, 248, 0.85);
           }
         }
-        @media (min-width: 640px) {
+        .speech-bubble-glow {
+          animation: speechBubbleGlow 4s ease-in-out infinite;
+        }
+        @media screen and (max-width: 767px) {
           .login-bg-responsive {
-            background-image: url('https://i.postimg.cc/300YdHdZ/CAPA.png');
+            background-image: url('/assets/login/login-mobile.png'), url('https://i.postimg.cc/xjSzC84j/Remove-login-panel-keep-character-202607291547.jpg');
+            background-size: cover;
+            background-position: center -78px;
+            background-repeat: no-repeat;
+            background-color: #020617;
+            background-attachment: scroll;
+            filter: none !important;
+            backdrop-filter: none !important;
+            image-rendering: auto;
+          }
+          .login-panel-mobile {
+            margin-top: auto !important;
+            margin-bottom: 48px !important;
+          }
+        }
+        @media screen and (min-width: 768px) and (max-width: 1199px) {
+          .login-bg-responsive {
+            background-image: url('/assets/login/login-desktop.png'), url('https://i.postimg.cc/xjSzC84j/Remove-login-panel-keep-character-202607291547.jpg');
+            background-size: 100% auto, cover;
+            background-position: center -165px, center -40px;
+            background-repeat: no-repeat;
+          }
+          .glass-card-responsive {
+            background-color: rgba(3, 13, 34, 0.5) !important;
+            border-color: rgba(6, 182, 212, 0.4) !important;
+            backdrop-filter: none !important;
+          }
+          .speech-bubble-desktop-tablet {
+            display: none !important;
+          }
+          .login-panel-desktop {
+            margin-right: auto !important;
+            margin-left: auto !important;
+            transform: translateY(130px) !important;
+          }
+        }
+        @media screen and (min-width: 1200px) {
+          .login-bg-responsive {
+            background-image: url('/assets/login/login-desktop.png'), url('https://i.postimg.cc/jSHh9RzY/CAPA.png');
             background-size: cover;
             background-position: center center;
+            background-repeat: no-repeat;
+            filter: none !important;
+            backdrop-filter: none !important;
+          }
+          .speech-bubble-desktop-tablet {
+            left: calc(50% + 55px) !important;
+            top: calc(50% - 50px) !important;
+            transform: none !important;
+            max-width: 320px !important;
+            width: 320px !important;
+          }
+          .speech-bubble-desktop-tablet p {
+            text-align: left !important;
+          }
+          .speech-bubble-desktop-tablet .arrow-outer,
+          .speech-bubble-desktop-tablet .arrow-inner {
+            display: block !important;
+            top: 48% !important;
+          }
+          .login-panel-desktop {
+            margin-right: auto !important;
+            margin-left: 13vw !important;
+            transform: translateY(20px) !important;
           }
         }
       `}</style>
 
-      {/* Soft overlay (10%) to preserve text contrast without darkening the Ultra HD image */}
-      <div className="absolute inset-0 bg-black/10 pointer-events-none z-0" />
+      {/* Minimal overlay (5%) without blur */}
+      <div className="absolute inset-0 bg-black/5 pointer-events-none z-0" />
 
-      <div className="bg-[#030b18]/95 border-2 border-blue-500/50 rounded-2xl w-[88%] sm:w-full max-w-[330px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300">
+      {/* Speech Bubble - Desktop / Tablet */}
+      <div className="hidden sm:flex absolute speech-bubble-desktop-tablet z-20 pointer-events-none animate-in fade-in zoom-in-95 duration-500">
+        <div className="relative bg-[#030d22]/90 backdrop-blur-md border border-cyan-400/60 rounded-2xl p-3.5 sm:p-4 shadow-[0_0_25px_rgba(6,182,212,0.35)] text-slate-100 speech-bubble-glow w-full">
+          {/* Arrow pointing right towards character's mouth */}
+          <div className="arrow-outer absolute -right-2.5 top-1/2 -translate-y-1/2 w-0 h-0 border-y-[8px] border-y-transparent border-l-[10px] border-l-cyan-400/70 filter drop-shadow-[2px_0_4px_rgba(6,182,212,0.5)]" />
+          <div className="arrow-inner absolute -right-[8px] top-1/2 -translate-y-1/2 w-0 h-0 border-y-[7px] border-y-transparent border-l-[9px] border-l-[#030d22]" />
+
+          <p className="text-xs sm:text-sm leading-snug font-medium text-cyan-100/90">
+            <span className="font-extrabold text-white text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-cyan-300 block mb-0.5">
+              🚀 Seu próximo nível começa agora.
+            </span>
+            Faça login e tenha acesso aos agentes <br />
+            que podem acelerar seus resultados.
+          </p>
+        </div>
+      </div>
+
+      {/* Speech Bubble - Mobile */}
+      <div className="block sm:hidden absolute top-[15%] left-3 z-20 w-[58%] max-w-[210px] pointer-events-none animate-in fade-in slide-in-from-left-2 duration-500">
+        <div className="relative bg-[#030d22]/90 backdrop-blur-md border border-cyan-400/60 rounded-2xl p-2.5 shadow-[0_0_20px_rgba(6,182,212,0.35)] text-slate-100 speech-bubble-glow">
+          {/* Arrow pointing right towards character's mouth */}
+          <div className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-0 h-0 border-y-[6px] border-y-transparent border-l-[8px] border-l-cyan-400/70 filter drop-shadow-[2px_0_4px_rgba(6,182,212,0.5)]" />
+          <div className="absolute -right-[7px] top-1/2 -translate-y-1/2 w-0 h-0 border-y-[5px] border-y-transparent border-l-[7px] border-l-[#030d22]" />
+
+          <p className="text-[10px] leading-snug font-medium text-cyan-100/90">
+            <span className="font-extrabold text-white text-[11px] text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-cyan-300 mr-1">
+              🚀 Seu próximo nível começa agora.
+            </span>
+            Faça login e tenha acesso aos agentes que podem acelerar seus resultados.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-[#030b18] border-2 border-blue-500/50 rounded-2xl w-[82%] sm:w-full max-w-[268px] sm:max-w-md overflow-hidden shadow-[0_0_50px_rgba(37,99,235,0.4)] relative z-10 text-slate-100 transform translate-y-0 sm:translate-y-8 transition-all duration-300 login-panel-mobile login-panel-desktop max-h-[85vh] overflow-y-auto">
         
         {/* High Tech Cover Banner */}
-        <div className="relative w-full aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
+        <div className="relative w-full aspect-[16/4.5] sm:aspect-[16/6] bg-[#020713] overflow-hidden border-b border-blue-500/40">
           <svg className="w-full h-full object-cover" viewBox="0 0 1200 450" fill="none">
             <defs>
               <radialGradient id="modalBgGlow" cx="50%" cy="50%" r="70%">
@@ -131,10 +235,10 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
                 <stop offset="50%" stopColor="#030c1e" stopOpacity="0.95" />
                 <stop offset="100%" stopColor="#01040a" stopOpacity="1" />
               </radialGradient>
-              <linearGradient id="modalTextMetallic" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#e0f2fe" />
-                <stop offset="35%" stopColor="#38bdf8" />
-                <stop offset="70%" stopColor="#1d4ed8" />
+              <linearGradient id="modalNaturalText" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#7dd3fc" />
+                <stop offset="45%" stopColor="#38bdf8" />
+                <stop offset="85%" stopColor="#1d4ed8" />
                 <stop offset="100%" stopColor="#1e3a8a" />
               </linearGradient>
               <linearGradient id="modalBeamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -163,9 +267,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </g>
             <rect x="0" y="340" width="1200" height="4" fill="url(#modalBeamGradient)" filter="url(#modalGlow)" />
             
-            {/* Banner Title */}
-            <g filter="url(#modalGlow)">
-              <text x="600" y="250" textAnchor="middle" fill="url(#modalTextMetallic)" stroke="#60a5fa" strokeWidth="2.5" fontSize="82" fontWeight="900" fontFamily="sans-serif" letterSpacing="3">
+            {/* Banner Title - Impactful Natural Blue Display Style */}
+            <g>
+              {/* Soft Dark Drop Shadow */}
+              <text x="603" y="270" textAnchor="middle" fill="#010612" stroke="#010612" strokeWidth="12" fontSize="135" fontWeight="900" fontFamily="'Impact', 'Arial Black', 'Montserrat', sans-serif" letterSpacing="5">
+                GERAÇÃO Z PRO
+              </text>
+              {/* Main Crisp Natural Metallic Blue Text */}
+              <text x="600" y="265" textAnchor="middle" fill="url(#modalNaturalText)" stroke="#1d4ed8" strokeWidth="2.5" fontSize="135" fontWeight="900" fontFamily="'Impact', 'Arial Black', 'Montserrat', sans-serif" letterSpacing="5">
                 GERAÇÃO Z PRO
               </text>
             </g>
@@ -174,23 +283,23 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
           </svg>
         </div>
 
-        <div className="p-4 sm:p-6 pt-1 sm:pt-1 space-y-3 sm:space-y-4">
+        <div className="p-3.5 sm:p-6 pt-1 sm:pt-1 space-y-2.5 sm:space-y-4">
           {!isMandatoryOnboarding && (
             <button
               onClick={onClose}
-              className="absolute top-3 right-3 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors z-20"
+              className="absolute top-2.5 right-2.5 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors z-20"
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
 
           {/* Header Icon */}
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20 shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20 shrink-0">
               <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-lg font-bold text-white flex items-center space-x-2">
+              <h2 className="text-xs sm:text-lg font-bold text-white flex items-center space-x-1.5">
                 <span>Área do Aluno — Mentoria</span>
               </h2>
               <p className="text-[10px] sm:text-xs text-slate-400">
@@ -201,7 +310,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
           </div>
 
         {/* Notice Banner */}
-        <div className="bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-3 sm:p-3.5 text-[11px] sm:text-xs text-cyan-200/90 leading-relaxed space-y-1">
+        <div className="bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-2.5 sm:p-3.5 text-[10.5px] sm:text-xs text-cyan-200/90 leading-relaxed space-y-1">
           <div className="flex items-center space-x-1.5 font-bold text-cyan-400">
             <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             <span>Área Restrita aos Alunos da Mentoria</span>
@@ -213,14 +322,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-4">
           <div>
-            <label className="block text-[11px] sm:text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+            <label className="block text-[10.5px] sm:text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
               <span className="flex items-center space-x-1.5">
                 <Key className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Código de Acesso do Aluno:</span>
               </span>
-              <span className="text-[10px] text-cyan-400 font-normal">Fornecido na mentoria</span>
+              <span className="text-[9.5px] text-cyan-400 font-normal">Fornecido na mentoria</span>
             </label>
             <input
               type="text"
@@ -231,7 +340,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
                 setError(null);
               }}
               autoFocus
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#020d14] border border-amber-500/40 text-xs font-mono text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-[#020d14] border border-amber-500/40 text-xs font-mono text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
@@ -242,12 +351,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             </p>
           )}
 
-          <div className="flex items-center justify-end space-x-2 pt-1 sm:pt-2">
+          <div className="flex items-center justify-end space-x-2 pt-0.5 sm:pt-2 pb-0.5">
             {!isMandatoryOnboarding && (
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               >
                 Cancelar
               </button>
@@ -255,7 +364,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-5 py-2.5 sm:px-6 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
