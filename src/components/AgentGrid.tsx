@@ -10,6 +10,7 @@ import { PinnedAgentsSection } from './agents/PinnedAgentsSection';
 
 interface AgentGridProps {
   agents: Agent[];
+  userIdentifier?: string;
   onSelectChat: (agent: Agent) => void;
   onToggleFavorite: (id: string) => void;
   onEdit: (agent: Agent) => void;
@@ -106,6 +107,7 @@ const CATEGORY_MENU: CategoryMenuItem[] = [
 
 export const AgentGrid: React.FC<AgentGridProps> = ({
   agents,
+  userIdentifier,
   onSelectChat,
   onToggleFavorite,
   onEdit,
@@ -121,7 +123,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   const [sortBy, setSortBy] = useState<'popular' | 'name' | 'recent'>('popular');
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  const { pinnedAgentIds, isPinned, togglePinned, pinnedLimitMessage, clearLimitMessage } = usePinnedAgents();
+  const { pinnedAgentIds, isPinned, togglePinned, pinnedLimitMessage, clearLimitMessage } = usePinnedAgents(userIdentifier);
 
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
