@@ -30,6 +30,23 @@ import {
   updateUsernameHandler,
   getMentorStudentsHandler,
 } from './server/studentProfileService.js';
+import {
+  presenceHeartbeatHandler,
+  presenceLogoutHandler,
+  getAdminMemberStatsHandler,
+  getAdminOnlineUsersHandler,
+  getAdminMemberCountHandler,
+  getKeyAccessStatus,
+  adminDisconnectSessionHandler,
+  adminSuspendKeyHandler,
+  adminReactivateKeyHandler,
+  adminBanKeyHandler,
+  adminGetAccessHistoryHandler,
+  checkCodeKeyType,
+  memorySessionsMap,
+  getClientIp,
+  parseUserAgent,
+} from './server/presenceService.js';
 
 dotenv.config();
 
@@ -190,39 +207,6 @@ apiRouter.get(
   }
 );
 
-// Helper function to check key type (MySQL first, fallback to authKeys)
-async function checkCodeKeyType(cleanCode: string): Promise<'MASTER' | 'STUDENT' | 'INVALID'> {
-  if (!cleanCode) return 'INVALID';
-  const normalized = normalizeAccessCode(cleanCode);
-
-  if (isDatabaseConfigured()) {
-    try {
-      // 1. Check chaves_mestras in Hostinger MySQL
-      const [masterRows]: any = await db.query(
-        'SELECT id FROM chaves_mestras WHERE UPPER(TRIM(codigo)) = ? AND ativo = 1 LIMIT 1',
-        [normalized]
-      );
-      if (Array.isArray(masterRows) && masterRows.length > 0) {
-        return 'MASTER';
-      }
-
-      // 2. Check codigos_acesso in Hostinger MySQL
-      const [studentRows]: any = await db.query(
-        'SELECT id, codigo, usado, usuario_id FROM codigos_acesso WHERE UPPER(TRIM(codigo)) = ? LIMIT 1',
-        [normalized]
-      );
-      if (Array.isArray(studentRows) && studentRows.length > 0) {
-        return 'STUDENT';
-      }
-    } catch (err: any) {
-      console.warn('[MySQL Lookup Error]:', err?.message || err?.code || 'Query failed');
-    }
-  }
-
-  // Fallback to in-memory authKeys list
-  return lookupKeyType(normalized);
-}
-
 // Centralized Unified Login Handler with MySQL Transactions (Rules 5-12, 19, 20)
 async function handleLogin(req: express.Request, res: express.Response) {
   const receivedCode =
@@ -253,7 +237,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
     console.error('[Auth Login Key Check Error]:', err);
     return res.status(500).json({
       error: 'SESSION_DATABASE_ERROR',
-      message: 'O servidor de autenticação está temporariamente indisponível.',
+      message: 'Não foi possível conectar ao servidor de autenticação. Tente novamente em alguns instantes.',
     });
   }
 
@@ -275,6 +259,27 @@ async function handleLogin(req: express.Request, res: express.Response) {
 
   // Student Keys: strictly ONE active session (Rules 4-11, 19-20)
   if (keyType === 'STUDENT') {
+    const keyStatusInfo = await getKeyAccessStatus(cleanCode);
+    if (keyStatusInfo.accessStatus === 'SUSPENDED') {
+      memorySessionsMap.delete(cleanCode);
+      return res.status(423).json({
+        error: 'KEY_SUSPENDED',
+        accessStatus: 'SUSPENDED',
+        title: 'Acesso temporariamente suspenso',
+        message: 'Sua chave de acesso está temporariamente suspensa pelo Mentor. Entre em contato com o suporte caso tenha dúvidas.',
+        reason: keyStatusInfo.reason || 'Suspensa pelo Mentor',
+      });
+    }
+    if (keyStatusInfo.accessStatus === 'BANNED') {
+      memorySessionsMap.delete(cleanCode);
+      return res.status(403).json({
+        error: 'KEY_BANNED',
+        title: 'Acesso permanentemente bloqueado',
+        message: 'Esta chave de acesso foi banida pelo Mentor e não pode mais ser utilizada. Caso acredite que isso ocorreu por engano, entre em contato com o suporte da Mentoria Geração Z Pro.',
+        reason: keyStatusInfo.reason || 'Banida pelo Mentor',
+      });
+    }
+
     if (isDatabaseConfigured()) {
       let connection;
       try {
@@ -354,6 +359,26 @@ async function handleLogin(req: express.Request, res: express.Response) {
         await connection.commit();
         connection.release();
 
+        // Sync session to memorySessionsMap for fast heartbeat fallback
+        const now = new Date();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const { deviceType, operatingSystem, browserName } = parseUserAgent(req.headers['user-agent'] || '');
+        memorySessionsMap.set(cleanCode, {
+          codigo: cleanCode,
+          sessionId,
+          deviceId: effectiveDeviceId,
+          currentPage: 'Agentes GPT',
+          ipAddress: getClientIp(req),
+          userAgent: (req.headers['user-agent'] as string) || '',
+          deviceType,
+          browserName,
+          operatingSystem,
+          startedAt: now,
+          lastHeartbeatAt: now,
+          status: 'online',
+          expiresAt,
+        });
+
         console.log(`[AUTH LOG] type=STUDENT masked=${maskedCode} sessionFound=${sessionFound} sessionValid=${activeSessionValid} recorded=true http=200`);
 
         return res.status(200).json({
@@ -375,12 +400,32 @@ async function handleLogin(req: express.Request, res: express.Response) {
         // Rule 11: Return 500, NEVER grant access on database error
         return res.status(500).json({
           error: 'SESSION_DATABASE_ERROR',
-          message: 'O servidor de autenticação está temporariamente indisponível.',
+          message: 'Não foi possível conectar ao servidor de autenticação. Tente novamente em alguns instantes.',
         });
       }
     } else {
       // Fallback if MySQL is not configured
       const sessionId = existingSessionId || crypto.randomUUID();
+      const effectiveDeviceId = deviceId || `device-${sessionId.slice(0, 8)}`;
+      const now = new Date();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const { deviceType, operatingSystem, browserName } = parseUserAgent(req.headers['user-agent'] || '');
+      memorySessionsMap.set(cleanCode, {
+        codigo: cleanCode,
+        sessionId,
+        deviceId: effectiveDeviceId,
+        currentPage: 'Agentes GPT',
+        ipAddress: getClientIp(req),
+        userAgent: (req.headers['user-agent'] as string) || '',
+        deviceType,
+        browserName,
+        operatingSystem,
+        startedAt: now,
+        lastHeartbeatAt: now,
+        status: 'online',
+        expiresAt,
+      });
+
       return res.status(200).json({
         success: true,
         status: 'ok',
@@ -398,7 +443,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
   console.log(`[AUTH LOG] type=INVALID masked=${maskedCode} sessionFound=false sessionValid=false recorded=false http=401`);
   return res.status(401).json({
     error: 'INVALID_ACCESS_CODE',
-    message: 'O código informado é inválido.',
+    message: 'Código de acesso inválido. Verifique o código informado e tente novamente.',
   });
 }
 
@@ -450,6 +495,10 @@ apiRouter.post(
       const cleanCode = normalizeAccessCode(studentCode);
       const keyType = await checkCodeKeyType(cleanCode);
 
+      if (cleanCode) {
+        memorySessionsMap.delete(cleanCode);
+      }
+
       if (cleanCode && keyType === 'STUDENT' && isDatabaseConfigured()) {
         try {
           await ensureSessionsTable();
@@ -498,90 +547,25 @@ apiRouter.post(
   }
 );
 
-// Heartbeat Route (Rule 14 & 19)
+// Heartbeat & Presence Routes
 apiRouter.post(
   [
+    '/presence/heartbeat',
+    '/api/presence/heartbeat',
     '/auth/heartbeat',
     '/api/auth/heartbeat',
     '/session/heartbeat',
     '/api/session/heartbeat',
   ],
-  async (req, res) => {
-    try {
-      const studentCode =
-        req.body?.accessCode ??
-        req.body?.studentAccessCode ??
-        req.body?.accessKey ??
-        req.body?.code ??
-        req.headers['x-access-code'] ??
-        req.headers['x-student-access-code'];
+  presenceHeartbeatHandler
+);
 
-      const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
-
-      const cleanCode = normalizeAccessCode(studentCode);
-      if (!cleanCode) {
-        return res.status(400).json({
-          error: 'ACCESS_CODE_REQUIRED',
-          message: 'Informe o código de acesso.',
-        });
-      }
-
-      const keyType = await checkCodeKeyType(cleanCode);
-
-      if (keyType === 'INVALID') {
-        return res.status(401).json({
-          error: 'INVALID_ACCESS_CODE',
-          message: 'O código informado é inválido.',
-        });
-      }
-
-      if (keyType === 'MASTER') {
-        return res.json({ status: 'ok', online: true, isMaster: true, role: 'mentor' });
-      }
-
-      if (!sessionId) {
-        return res.status(401).json({
-          error: 'SESSION_REQUIRED',
-          message: 'Sessão inválida. Efetue login novamente.',
-        });
-      }
-
-      if (isDatabaseConfigured()) {
-        await ensureSessionsTable();
-        const [result]: any = await db.query(
-          `UPDATE sessoes
-           SET
-             last_heartbeat_at = NOW(),
-             expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
-             is_online = 1,
-             status = 'online'
-           WHERE codigo = ?
-           AND active_session_id = ?`,
-          [cleanCode, sessionId]
-        );
-
-        if (!result || result.affectedRows === 0) {
-          return res.status(401).json({
-            error: 'SESSION_EXPIRED',
-            message: 'Esta sessão expirou ou foi encerrada em outro dispositivo. Efetue login novamente.',
-          });
-        }
-
-        return res.json({
-          status: 'ok',
-          online: true,
-          lastHeartbeatAt: new Date().toISOString(),
-        });
-      } else {
-        return res.json({ status: 'ok', online: true });
-      }
-    } catch (err: any) {
-      return res.status(500).json({
-        error: 'SESSION_DATABASE_ERROR',
-        message: 'O servidor de autenticação está temporariamente indisponível.',
-      });
-    }
-  }
+apiRouter.post(
+  [
+    '/presence/logout',
+    '/api/presence/logout',
+  ],
+  presenceLogoutHandler
 );
 
 // Middleware Helper to validate active session on AI requests
@@ -612,6 +596,26 @@ async function validateSessionAsync(req: express.Request, res: express.Response)
       return true;
     }
 
+    const keyInfo = await getKeyAccessStatus(cleanCode);
+    if (keyInfo.accessStatus === 'SUSPENDED') {
+      memorySessionsMap.delete(cleanCode);
+      res.status(423).json({
+        error: 'KEY_SUSPENDED',
+        accessStatus: 'SUSPENDED',
+        title: 'Acesso temporariamente suspenso',
+        message: 'Seu acesso está temporariamente suspenso. Entre em contato com o suporte.',
+      });
+      return false;
+    }
+    if (keyInfo.accessStatus === 'BANNED') {
+      memorySessionsMap.delete(cleanCode);
+      res.status(403).json({
+        error: 'KEY_BANNED',
+        message: 'Esta chave de acesso não está disponível. Entre em contato com o suporte.',
+      });
+      return false;
+    }
+
     if (!sessionId) {
       res.status(401).json({
         error: 'SESSION_REQUIRED',
@@ -621,34 +625,44 @@ async function validateSessionAsync(req: express.Request, res: express.Response)
     }
 
     if (isDatabaseConfigured()) {
-      await ensureSessionsTable();
-      const [rows]: any = await db.query(
-        `SELECT active_session_id, expires_at FROM sessoes WHERE codigo = ? LIMIT 1`,
-        [cleanCode]
-      );
+      try {
+        await ensureSessionsTable();
+        const [rows]: any = await db.query(
+          `SELECT active_session_id, expires_at FROM sessoes WHERE codigo = ? LIMIT 1`,
+          [cleanCode]
+        );
 
-      if (Array.isArray(rows) && rows.length > 0) {
-        const r = rows[0];
-        if (r.active_session_id === sessionId && r.expires_at && new Date(r.expires_at).getTime() > Date.now()) {
-          return true;
+        if (Array.isArray(rows) && rows.length > 0) {
+          const r = rows[0];
+          if (r.active_session_id === sessionId && r.expires_at && new Date(r.expires_at).getTime() > Date.now()) {
+            return true;
+          }
+          if (r.active_session_id && r.active_session_id !== sessionId) {
+            res.status(409).json({
+              error: 'SESSION_ALREADY_ACTIVE',
+              message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+            });
+            return false;
+          }
         }
-        if (r.active_session_id && r.active_session_id !== sessionId) {
-          res.status(409).json({
-            error: 'SESSION_ALREADY_ACTIVE',
-            message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
-          });
-          return false;
-        }
+      } catch (dbErr) {
+        console.warn('[validateSessionAsync DB Warning - fallback to memory]:', dbErr);
       }
-
-      res.status(401).json({
-        error: 'SESSION_EXPIRED',
-        message: 'Sessão expirada. Efetue login novamente.',
-      });
-      return false;
     }
 
-    return true;
+    // Fallback to memorySessionsMap
+    const memSession = memorySessionsMap.get(cleanCode);
+    if (memSession && memSession.sessionId === sessionId) {
+      if (!memSession.expiresAt || memSession.expiresAt.getTime() > Date.now()) {
+        return true;
+      }
+    }
+
+    res.status(401).json({
+      error: 'SESSION_EXPIRED',
+      message: 'Sessão expirada. Efetue login novamente.',
+    });
+    return false;
   } catch (err) {
     res.status(500).json({
       error: 'SESSION_DATABASE_ERROR',
@@ -969,7 +983,7 @@ apiRouter.post(['/student/profile', '/api/student/profile'], createStudentProfil
 apiRouter.patch(['/student/profile/username', '/api/student/profile/username'], updateUsernameHandler);
 
 // MENTOR STUDENT MANAGEMENT ROUTE
-apiRouter.get(['/mentor/students', '/api/mentor/students'], getMentorStudentsHandler);
+apiRouter.get(['/mentor/students', '/api/mentor/students'], requireMentorAuth, getMentorStudentsHandler);
 
 // PUBLIC ROUTE FOR ACADEMIA DE DESAFIOS: GET /api/products
 apiRouter.get(['/products', '/api/products'], async (_req, res) => {
@@ -1019,6 +1033,18 @@ apiRouter.get(['/products', '/api/products'], async (_req, res) => {
 });
 
 // ADMIN ROUTES (PROTECTED BY requireMentorAuth)
+
+// Presence & Member Monitoring Stats
+apiRouter.get(['/admin/member-stats', '/api/admin/member-stats'], requireMentorAuth, getAdminMemberStatsHandler);
+apiRouter.get(['/admin/online-users', '/api/admin/online-users'], requireMentorAuth, getAdminOnlineUsersHandler);
+apiRouter.get(['/admin/member-count', '/api/admin/member-count'], requireMentorAuth, getAdminMemberCountHandler);
+
+// Administrative Session & Access Key Actions (Master Session Only)
+apiRouter.post(['/admin/users/:id/disconnect', '/api/admin/users/:id/disconnect', '/admin/users/disconnect', '/api/admin/users/disconnect'], requireMentorAuth, adminDisconnectSessionHandler);
+apiRouter.post(['/admin/access-keys/:id/suspend', '/api/admin/access-keys/:id/suspend', '/admin/access-keys/suspend', '/api/admin/access-keys/suspend'], requireMentorAuth, adminSuspendKeyHandler);
+apiRouter.post(['/admin/access-keys/:id/reactivate', '/api/admin/access-keys/:id/reactivate', '/admin/access-keys/reactivate', '/api/admin/access-keys/reactivate'], requireMentorAuth, adminReactivateKeyHandler);
+apiRouter.post(['/admin/access-keys/:id/ban', '/api/admin/access-keys/:id/ban', '/admin/access-keys/ban', '/api/admin/access-keys/ban'], requireMentorAuth, adminBanKeyHandler);
+apiRouter.get(['/admin/access-keys/:id/history', '/api/admin/access-keys/:id/history', '/admin/access-keys/history', '/api/admin/access-keys/history'], requireMentorAuth, adminGetAccessHistoryHandler);
 
 // 1. GET /api/admin/products
 apiRouter.get(['/admin/products', '/api/admin/products'], requireMentorAuth, async (_req, res) => {
