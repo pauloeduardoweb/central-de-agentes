@@ -1,6 +1,6 @@
 import express from 'express';
 import { db, isDatabaseConfigured, ensureProfilesTable, ensureProgressTable } from './database.js';
-import { normalizeAccessCode, lookupKeyType } from './authKeys.js';
+import { normalizeAccessCode, lookupKeyType, STUDENT_KEYS, MASTER_KEYS } from './authKeys.js';
 import { maskStudentCode, calculateLevelFromXp } from './rankingService.js';
 
 export const RESERVED_USERNAMES = new Set([
@@ -614,7 +614,9 @@ export async function getMentorStudentsHandler(req: express.Request, res: expres
       });
     }
 
-    let students: any[] = [];
+    const search = String(req.query.search || req.query.searchTerm || req.query.q || '').trim().toLowerCase();
+
+    let studentsInternal: any[] = [];
 
     if (isDatabaseConfigured()) {
       await ensureProfilesTable();
@@ -636,7 +638,8 @@ export async function getMentorStudentsHandler(req: express.Request, res: expres
       const [rows]: any = await db.query(query);
 
       if (Array.isArray(rows)) {
-        students = rows.map((r: any) => ({
+        studentsInternal = rows.map((r: any) => ({
+          _fullCode: r.codigo,
           username: r.nome_usuario || 'Não criado',
           avatar: r.avatar || null,
           maskedCode: maskStudentCode(r.codigo),
@@ -648,22 +651,52 @@ export async function getMentorStudentsHandler(req: express.Request, res: expres
       }
     } else {
       // Memory fallback
-      const profiles = Array.from(memoryProfilesMap.values());
-      students = profiles.map((p) => ({
-        username: p.nome_usuario,
-        avatar: p.avatar || null,
-        maskedCode: maskStudentCode(p.codigo),
-        xp: 0,
-        nivel: 1,
-        desafiosJogados: 0,
-        profileCreated: true,
-      }));
+      const studentMap = new Map<string, any>();
+      for (const p of memoryProfilesMap.values()) {
+        studentMap.set(p.codigo, {
+          _fullCode: p.codigo,
+          username: p.nome_usuario,
+          avatar: p.avatar || null,
+          maskedCode: maskStudentCode(p.codigo),
+          xp: 0,
+          nivel: 1,
+          desafiosJogados: 0,
+          profileCreated: true,
+        });
+      }
+      for (const key of STUDENT_KEYS) {
+        if (MASTER_KEYS.has(key) || lookupKeyType(key) === 'MASTER') continue;
+        if (!studentMap.has(key)) {
+          studentMap.set(key, {
+            _fullCode: key,
+            username: 'Não criado',
+            avatar: null,
+            maskedCode: maskStudentCode(key),
+            xp: 0,
+            nivel: 1,
+            desafiosJogados: 0,
+            profileCreated: false,
+          });
+        }
+      }
+      studentsInternal = Array.from(studentMap.values());
     }
+
+    if (search) {
+      studentsInternal = studentsInternal.filter((s) => {
+        const codeMatch = s._fullCode && String(s._fullCode).toLowerCase().includes(search);
+        const maskedCodeMatch = s.maskedCode && String(s.maskedCode).toLowerCase().includes(search);
+        const usernameMatch = s.username && String(s.username).toLowerCase().includes(search);
+        return codeMatch || maskedCodeMatch || usernameMatch;
+      });
+    }
+
+    const sanitizedStudents = studentsInternal.map(({ _fullCode, codigo, ...safeStudent }) => safeStudent);
 
     return res.json({
       success: true,
-      totalStudents: students.length,
-      students,
+      totalStudents: sanitizedStudents.length,
+      students: sanitizedStudents,
     });
   } catch (err: any) {
     console.error('[Get Mentor Students Error]:', err?.message || err);
