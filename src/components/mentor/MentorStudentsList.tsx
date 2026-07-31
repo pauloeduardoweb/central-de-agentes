@@ -18,14 +18,17 @@ export const MentorStudentsList: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const loadStudents = async () => {
+  const loadStudents = async (searchOverride?: string) => {
     setIsLoading(true);
     setError('');
     try {
       const studentCode = localStorage.getItem('user_student_access_code') || '';
       const sessionId = localStorage.getItem('user_session_id') || '';
 
-      const res = await fetch('/api/mentor/students', {
+      const termToUse = searchOverride !== undefined ? searchOverride : searchTerm;
+      const searchParam = termToUse.trim() ? `?search=${encodeURIComponent(termToUse.trim())}` : '';
+
+      const res = await fetch(`/api/mentor/students${searchParam}`, {
         headers: {
           'x-access-code': studentCode,
           'x-student-access-code': studentCode,
@@ -51,15 +54,9 @@ export const MentorStudentsList: React.FC = () => {
 
   useEffect(() => {
     loadStudents();
-  }, []);
+  }, [searchTerm]);
 
-  const filteredStudents = students.filter((s) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      s.username.toLowerCase().includes(term) ||
-      s.maskedCode.toLowerCase().includes(term)
-    );
-  });
+  const filteredStudents = students;
 
   return (
     <div className="p-6 rounded-3xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] border border-cyan-500/40 shadow-2xl text-white space-y-6">

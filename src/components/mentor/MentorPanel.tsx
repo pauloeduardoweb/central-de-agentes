@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ProductLibrary } from './ProductLibrary';
 import { MentorStudentsList } from './MentorStudentsList';
+import { MentorOnlineMonitoring } from './MentorOnlineMonitoring';
 
 interface MentorPanelProps {
   studentCode: string;
@@ -63,12 +64,12 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
     },
     {
       id: 'sessions',
-      title: 'Sessões Ativas',
-      description: 'Monitoramento em tempo real de dispositivos e conexões simultâneas.',
+      title: 'Sessões Ativas & Membros',
+      description: 'Monitoramento em tempo real de alunos online, conexões, páginas e IP.',
       icon: Activity,
-      badge: 'Em breve',
-      badgeColor: 'bg-slate-800/80 text-slate-400 border-slate-700',
-      isAvailable: false,
+      badge: 'Ativo',
+      badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
+      isAvailable: true,
     },
     {
       id: 'stats',
@@ -190,6 +191,9 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
         )}
         {activeTab === 'students' && (
           <MentorStudentsList />
+        )}
+        {activeTab === 'sessions' && (
+          <MentorOnlineMonitoring studentCode={studentCode} />
         )}
       </div>
 
