@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { StatsBar } from './components/StatsBar';
 import { GeracaoZProBanner } from './components/GeracaoZProBanner';
@@ -17,7 +17,8 @@ import { TechGridBackground } from './components/TechGridBackground';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
 import { getDeviceId, unbindCurrentDevice } from './utils/deviceId';
-import { isValidStudentCode, isMasterKey } from './data/studentCodes';
+import { isValidStudentCode, isMasterKey, normalizeAccessCode } from './data/studentCodes';
+import { useFavorites } from './hooks/useFavorites';
 import { Check } from 'lucide-react';
 
 export default function App() {
@@ -34,6 +35,18 @@ export default function App() {
   const [activeView, setActiveView] = useState<'hub' | 'mentor'>('hub');
 
   const isMaster = isMasterKey(studentCode);
+  const userIdentifier = studentCode
+    ? (isMaster ? 'MASTER' : normalizeAccessCode(studentCode))
+    : '';
+
+  const { favoriteAgentIds, toggleFavorite: toggleUserFavorite } = useFavorites(userIdentifier);
+
+  const displayAgents = useMemo(() => {
+    return agents.map((agent) => ({
+      ...agent,
+      isFavorite: favoriteAgentIds.includes(agent.id),
+    }));
+  }, [agents, favoriteAgentIds]);
 
   // Modal controls
   const [selectedChatAgent, setSelectedChatAgent] = useState<Agent | null>(null);
@@ -80,8 +93,8 @@ export default function App() {
             data = await res.json();
           } catch (e) {}
 
-          if (!res.ok && (res.status === 409 || res.status === 403 || res.status === 401)) {
-            // Code is active on another device or session revoked
+          if (!res.ok && (res.status === 423 || res.status === 409 || res.status === 403 || res.status === 401)) {
+            // Code is active on another device or session revoked/suspended/banned
             localStorage.removeItem('user_student_access_code');
             localStorage.removeItem('user_session_id');
             localStorage.removeItem('user_gemini_api_key');
@@ -89,7 +102,16 @@ export default function App() {
             setStudentCode('');
             setSessionId('');
             setShowApiKeyModal(true);
-            if (data.message || data.error) triggerToast(data.message || data.error);
+
+            let toastMsg = data.message;
+            if (res.status === 423 || data.error === 'KEY_SUSPENDED' || data.accessStatus === 'SUSPENDED') {
+              toastMsg = 'Acesso temporariamente suspenso: Sua chave de acesso está temporariamente suspensa pelo Mentor.';
+            } else if (res.status === 403 || data.error === 'KEY_BANNED' || data.accessStatus === 'BANNED') {
+              toastMsg = 'Acesso permanentemente bloqueado: Esta chave de acesso foi banida pelo Mentor.';
+            } else if (res.status === 401) {
+              toastMsg = 'Código de acesso inválido. Verifique o código informado e tente novamente.';
+            }
+            if (toastMsg) triggerToast(toastMsg);
           } else if (res.ok && data.sessionId) {
             localStorage.setItem('user_session_id', data.sessionId);
             setSessionId(data.sessionId);
@@ -104,14 +126,16 @@ export default function App() {
     }
   }, []);
 
-  // Heartbeat loop every 5 minutes (300,000 ms) - Rule 19
+  // Heartbeat loop every 45 seconds - Presence & Active Session System
   useEffect(() => {
     if (!studentCode || !sessionId) return;
 
     const sendHeartbeat = async () => {
       try {
         const deviceId = getDeviceId();
-        const res = await fetch('/api/session/heartbeat', {
+        const pageTitle = activeView === 'mentor' ? 'Painel do Mentor' : (activeCategory || 'Agentes GPT');
+
+        const res = await fetch('/api/presence/heartbeat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -123,10 +147,12 @@ export default function App() {
             studentAccessCode: studentCode,
             sessionId: sessionId,
             deviceId,
+            currentPage: pageTitle,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
           }),
         });
 
-        if (!res.ok && (res.status === 401 || res.status === 409)) {
+        if (!res.ok && (res.status === 423 || res.status === 403 || res.status === 401 || res.status === 409)) {
           let data: any = {};
           try {
             data = await res.json();
@@ -139,7 +165,16 @@ export default function App() {
           setStudentCode('');
           setSessionId('');
           setShowApiKeyModal(true);
-          triggerToast(data.message || data.error || 'Esta chave já está sendo utilizada em outro dispositivo. Sua sessão foi encerrada.');
+
+          let msg = data.message || data.error;
+          if (res.status === 423 || data.error === 'KEY_SUSPENDED') {
+            msg = 'Acesso temporariamente suspenso pelo Mentor.';
+          } else if (res.status === 403 || data.error === 'KEY_BANNED') {
+            msg = 'Acesso permanentemente bloqueado pelo Mentor.';
+          } else if (!msg) {
+            msg = 'Sua sessão foi encerrada.';
+          }
+          triggerToast(msg);
         }
       } catch (err) {
         console.warn('[Heartbeat] Network check error:', err);
@@ -149,9 +184,9 @@ export default function App() {
     // Initial heartbeat after mount
     sendHeartbeat();
 
-    const interval = setInterval(sendHeartbeat, 300000); // 5 minutes
+    const interval = setInterval(sendHeartbeat, 45000); // 45 seconds heartbeat
     return () => clearInterval(interval);
-  }, [studentCode, sessionId]);
+  }, [studentCode, sessionId, activeView, activeCategory]);
 
   const handleSaveApiKey = (key: string, accessCode: string, newSessionId?: string) => {
     localStorage.setItem('user_gemini_api_key', key);
@@ -197,8 +232,11 @@ export default function App() {
   };
 
   const handleToggleFavorite = (id: string) => {
-    const updated = agents.map((a) => (a.id === id ? { ...a, isFavorite: !a.isFavorite } : a));
-    updateAgentsList(updated);
+    if (!userIdentifier) {
+      triggerToast('Usuário não autenticado.');
+      return;
+    }
+    toggleUserFavorite(id);
   };
 
   const handleIncrementUsage = (agentId: string) => {
@@ -357,7 +395,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
 
             {/* Metric Stats Banner - 8 Card Unified Menu */}
             <StatsBar
-              agents={agents}
+              agents={displayAgents}
               activeCategory={activeCategory}
               onOpenOfficialAgent={handleOpenOfficialAgent}
               onOpenAfiliados={() => setShowAfiliadosModal(true)}
@@ -367,7 +405,8 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
 
             {/* Grid and Search */}
             <AgentGrid
-              agents={agents}
+              agents={displayAgents}
+              userIdentifier={userIdentifier}
               onSelectChat={(agent) => setSelectedChatAgent(agent)}
               onToggleFavorite={handleToggleFavorite}
               onEdit={(agent) => {
