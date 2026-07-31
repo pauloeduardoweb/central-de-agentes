@@ -15,10 +15,14 @@ export const MAX_PINNED_AGENTS = 5;
  * - STUDENT -> generation_z_pro_pinned_agents_<NORMALIZED_CODE>
  * - Unauthenticated / empty -> null
  */
-export function getPinnedAgentsStorageKey(userIdentifier?: string): string | null {
-  if (!userIdentifier) return null;
+export function getPinnedAgentsStorageKey(userIdentifier?: string): string {
+  if (!userIdentifier || !String(userIdentifier).trim()) {
+    return `${PINNED_STORAGE_PREFIX}DEFAULT`;
+  }
   const normalized = normalizeAccessCode(userIdentifier);
-  if (!normalized) return null;
+  if (!normalized) {
+    return `${PINNED_STORAGE_PREFIX}DEFAULT`;
+  }
 
   if (normalized === 'MASTER' || isMasterKey(normalized)) {
     return `${PINNED_STORAGE_PREFIX}MASTER`;
@@ -33,7 +37,6 @@ export class PinnedAgentsService {
    */
   static getPinnedAgents(userIdentifier?: string): PinnedAgent[] {
     const key = getPinnedAgentsStorageKey(userIdentifier);
-    if (!key) return [];
 
     try {
       // Migration logic for MASTER account
@@ -64,10 +67,13 @@ export class PinnedAgentsService {
    */
   static savePinnedAgents(userIdentifier: string | undefined, pinned: PinnedAgent[]): void {
     const key = getPinnedAgentsStorageKey(userIdentifier);
-    if (!key) return;
 
     try {
       localStorage.setItem(key, JSON.stringify(pinned));
+      // Dispatch custom event to notify all components in the current tab
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('pinned_agents_updated', { detail: { userIdentifier, pinned } }));
+      }
     } catch (e) {
       console.error('[PinnedAgentsService] Error saving pinned agents:', e);
     }
@@ -85,10 +91,6 @@ export class PinnedAgentsService {
    * Pin an agent if limit not reached for a user
    */
   static pinAgent(userIdentifier: string | undefined, agentId: string): { success: boolean; message: string } {
-    if (!userIdentifier) {
-      return { success: false, message: 'Usuário não autenticado.' };
-    }
-
     const current = this.getPinnedAgents(userIdentifier);
 
     if (current.some((item) => item.agentId === agentId)) {
@@ -115,10 +117,6 @@ export class PinnedAgentsService {
    * Unpin an agent for a user
    */
   static unpinAgent(userIdentifier: string | undefined, agentId: string): { success: boolean; message: string } {
-    if (!userIdentifier) {
-      return { success: false, message: 'Usuário não autenticado.' };
-    }
-
     const current = this.getPinnedAgents(userIdentifier);
     const updated = current.filter((item) => item.agentId !== agentId);
     this.savePinnedAgents(userIdentifier, updated);
