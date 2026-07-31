@@ -1,42 +1,64 @@
 import { useState, useEffect, useCallback } from 'react';
-import { PinnedAgentsService, PinnedAgent, MAX_PINNED_AGENTS } from '../services/agents/pinnedAgentsService';
+import {
+  PinnedAgentsService,
+  PinnedAgent,
+  MAX_PINNED_AGENTS,
+  getPinnedAgentsStorageKey,
+} from '../services/agents/pinnedAgentsService';
 
-export function usePinnedAgents() {
+export function usePinnedAgents(userIdentifier?: string) {
   const [pinnedList, setPinnedList] = useState<PinnedAgent[]>([]);
   const [pinnedLimitMessage, setPinnedLimitMessage] = useState<string | null>(null);
 
   const refreshPinned = useCallback(() => {
-    setPinnedList(PinnedAgentsService.getPinnedAgents());
-  }, []);
+    if (!userIdentifier) {
+      setPinnedList([]);
+      return;
+    }
+    setPinnedList(PinnedAgentsService.getPinnedAgents(userIdentifier));
+  }, [userIdentifier]);
 
   const clearLimitMessage = useCallback(() => {
     setPinnedLimitMessage(null);
   }, []);
 
   useEffect(() => {
-    refreshPinned();
+    // When userIdentifier changes, immediately update visual state
+    if (!userIdentifier) {
+      setPinnedList([]);
+      setPinnedLimitMessage(null);
+    } else {
+      setPinnedLimitMessage(null);
+      setPinnedList(PinnedAgentsService.getPinnedAgents(userIdentifier));
+    }
+
+    const storageKey = getPinnedAgentsStorageKey(userIdentifier);
 
     // Listen for storage changes across tabs or custom events
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'generation_z_pro_pinned_agents') {
+      if (storageKey && e.key === storageKey) {
         refreshPinned();
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, [refreshPinned]);
+  }, [userIdentifier, refreshPinned]);
 
   const isPinned = useCallback(
     (agentId: string) => {
+      if (!userIdentifier) return false;
       return pinnedList.some((item) => item.agentId === agentId);
     },
-    [pinnedList]
+    [userIdentifier, pinnedList]
   );
 
   const pinAgent = useCallback(
     (agentId: string) => {
-      const result = PinnedAgentsService.pinAgent(agentId);
+      if (!userIdentifier) {
+        return { success: false, message: 'Usuário não autenticado.' };
+      }
+      const result = PinnedAgentsService.pinAgent(userIdentifier, agentId);
       if (result.success) {
         setPinnedLimitMessage(null);
         refreshPinned();
@@ -45,24 +67,30 @@ export function usePinnedAgents() {
       }
       return result;
     },
-    [refreshPinned]
+    [userIdentifier, refreshPinned]
   );
 
   const unpinAgent = useCallback(
     (agentId: string) => {
-      const result = PinnedAgentsService.unpinAgent(agentId);
+      if (!userIdentifier) {
+        return { success: false, message: 'Usuário não autenticado.' };
+      }
+      const result = PinnedAgentsService.unpinAgent(userIdentifier, agentId);
       if (result.success) {
         setPinnedLimitMessage(null);
         refreshPinned();
       }
       return result;
     },
-    [refreshPinned]
+    [userIdentifier, refreshPinned]
   );
 
   const togglePinned = useCallback(
     (agentId: string) => {
-      const result = PinnedAgentsService.togglePinned(agentId);
+      if (!userIdentifier) {
+        return { success: false, isPinned: false, message: 'Usuário não autenticado.' };
+      }
+      const result = PinnedAgentsService.togglePinned(userIdentifier, agentId);
       if (!result.success && result.message) {
         setPinnedLimitMessage(result.message);
       } else {
@@ -71,7 +99,7 @@ export function usePinnedAgents() {
       refreshPinned();
       return result;
     },
-    [refreshPinned]
+    [userIdentifier, refreshPinned]
   );
 
   const pinnedAgentIds = pinnedList.map((item) => item.agentId);
@@ -93,3 +121,4 @@ export function usePinnedAgents() {
     refreshPinned,
   };
 }
+
