@@ -12,7 +12,7 @@ interface ApiKeyModalProps {
 
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMandatoryOnboarding = false }) => {
   const [accessCode, setAccessCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<{ title?: string | null; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -32,17 +32,23 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
     const cleanCode = accessCode.trim();
 
     if (!cleanCode) {
-      setError('Por favor, digite o Código de Acesso do Aluno (fornecido na mentoria).');
+      setAuthError({
+        title: null,
+        message: 'Por favor, digite o Código de Acesso do Aluno (fornecido na mentoria).',
+      });
       return;
     }
 
     if (!isValidStudentCode(cleanCode)) {
-      setError('Código de Acesso do Aluno inválido. Verifique o código e tente novamente.');
+      setAuthError({
+        title: null,
+        message: 'Código de acesso inválido. Verifique o código informado e tente novamente.',
+      });
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setAuthError(null);
 
     try {
       const deviceId = getDeviceId();
@@ -61,20 +67,100 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       let data: any = {};
       try {
         data = await res.json();
-      } catch (e) {
-        // Response was non-JSON
+      } catch {
+        data = {};
+      }
+
+      const errorCode = String(
+        data?.error ??
+        data?.code ??
+        data?.errorCode ??
+        data?.accessStatus ??
+        ''
+      ).trim().toUpperCase();
+
+      // 1. KEY_SUSPENDED Check (HTTP 423 or KEY_SUSPENDED error code)
+      const isSuspended =
+        res.status === 423 ||
+        errorCode === 'KEY_SUSPENDED' ||
+        errorCode === 'SUSPENDED' ||
+        String(data?.accessStatus || '').toUpperCase() === 'SUSPENDED' ||
+        String(data?.error || '').toUpperCase().includes('SUSPEND') ||
+        String(data?.title || '').toLowerCase().includes('suspenso') ||
+        String(data?.message || '').toLowerCase().includes('suspens');
+
+      if (isSuspended) {
+        setAuthError({
+          title: data?.title || 'Acesso temporariamente suspenso',
+          message:
+            data?.message ||
+            'Sua chave de acesso está temporariamente suspensa pelo Mentor. Entre em contato com o suporte caso tenha dúvidas.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 2. KEY_BANNED Check (HTTP 403 or KEY_BANNED error code)
+      const isBanned =
+        res.status === 403 ||
+        errorCode === 'KEY_BANNED' ||
+        errorCode === 'BANNED' ||
+        String(data?.accessStatus || '').toUpperCase() === 'BANNED' ||
+        String(data?.title || '').toLowerCase().includes('banid') ||
+        String(data?.message || '').toLowerCase().includes('banid');
+
+      if (isBanned) {
+        setAuthError({
+          title: data?.title || 'Acesso permanentemente bloqueado',
+          message:
+            data?.message ||
+            'Esta chave de acesso foi banida pelo Mentor e não pode mais ser utilizada. Caso acredite que isso ocorreu por engano, entre em contato com o suporte da Mentoria Geração Z Pro.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 3. INVALID_ACCESS_CODE Check
+      if (errorCode === 'INVALID_ACCESS_CODE' || errorCode === 'INVALID_CODE' || res.status === 401) {
+        setAuthError({
+          title: null,
+          message:
+            data?.message ||
+            'Código de acesso inválido. Verifique o código informado e tente novamente.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 4. SESSION_ALREADY_ACTIVE Check
+      if (errorCode === 'SESSION_ALREADY_ACTIVE' || res.status === 409) {
+        setAuthError({
+          title: null,
+          message:
+            data?.message ||
+            'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (res.status >= 500 || errorCode === 'SESSION_DATABASE_ERROR') {
+        setAuthError({
+          title: null,
+          message:
+            'Não foi possível conectar ao servidor de autenticação. Tente novamente em alguns instantes.',
+        });
+        setLoading(false);
+        return;
       }
 
       if (!res.ok) {
-        if (res.status === 500) {
-          setError(data.message || data.error || 'O servidor de autenticação está temporariamente indisponível.');
-        } else if (res.status === 409) {
-          setError(data.message || data.error || 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.');
-        } else if (res.status === 401) {
-          setError(data.message || data.error || `Acesso negado: O código (${cleanCode.toUpperCase()}) é inválido.`);
-        } else {
-          setError(data.message || data.error || 'O servidor de autenticação está temporariamente indisponível.');
-        }
+        setAuthError({
+          title: data?.title || null,
+          message:
+            data?.message ||
+            'A autenticação foi recusada pelo servidor.',
+        });
         setLoading(false);
         return;
       }
@@ -82,11 +168,11 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
       const returnedSessionId = data.sessionId || '';
       onSave('STUDENT_AUTHORIZED', cleanCode, returnedSessionId);
     } catch (err: any) {
-      if (isValidStudentCode(cleanCode)) {
-        onSave('STUDENT_AUTHORIZED', cleanCode);
-      } else {
-        setError('Não foi possível verificar a licença. Verifique sua conexão com a internet e tente novamente.');
-      }
+      // Real fetch/network failure or client Exception
+      setAuthError({
+        title: null,
+        message: 'Não foi possível conectar ao servidor de autenticação. Tente novamente em alguns instantes.',
+      });
     } finally {
       setLoading(false);
     }
@@ -337,18 +423,34 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
               value={accessCode}
               onChange={(e) => {
                 setAccessCode(e.target.value);
-                setError(null);
+                setAuthError(null);
               }}
               autoFocus
               className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-[#020d14] border border-amber-500/40 text-xs font-mono text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
 
-          {error && (
-            <p className="text-xs text-rose-400 font-medium mt-1 flex items-center space-x-1">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>{error}</span>
-            </p>
+          {authError && (
+            <div
+              className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/60 text-rose-200 text-xs animate-in fade-in duration-200 shadow-lg shadow-rose-950/50 space-y-1"
+            >
+              {authError.title ? (
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2 font-bold text-rose-300 text-xs sm:text-sm">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{authError.title}</span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-rose-200/90 leading-relaxed pl-6">
+                    {authError.message}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start space-x-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span className="text-[11px] sm:text-xs text-rose-200 font-medium leading-relaxed">{authError.message}</span>
+                </div>
+              )}
+            </div>
           )}
 
           <div className="flex items-center justify-end space-x-2 pt-0.5 sm:pt-2 pb-0.5">
