@@ -193,6 +193,7 @@ export default function App() {
     const sendHeartbeat = async () => {
       try {
         const deviceId = getDeviceId();
+        console.log('[HEARTBEAT CURRENT PAGE]', currentPageLabel);
 
         const res = await fetch('/api/presence/heartbeat', {
           method: 'POST',
