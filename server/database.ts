@@ -250,5 +250,26 @@ export async function ensureProfilesTable(): Promise<void> {
   }
 }
 
+export async function ensureAgentInteractionsTable(): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS interacoes_agentes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        codigo VARCHAR(100),
+        agent_id VARCHAR(100),
+        agent_name VARCHAR(150),
+        category VARCHAR(100),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_agent_id (agent_id),
+        INDEX idx_category (category),
+        INDEX idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  } catch (err: any) {
+    console.warn('[MySQL ensureAgentInteractionsTable Error]:', err?.message || err);
+  }
+}
+
 
 

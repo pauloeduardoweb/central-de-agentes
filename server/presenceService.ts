@@ -1,7 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable } from './database.js';
+import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable, ensureAgentInteractionsTable, ensureProgressTable } from './database.js';
 import { normalizeAccessCode, lookupKeyType, STUDENT_KEYS, MASTER_KEYS } from './authKeys.js';
 import { maskStudentCode } from './rankingService.js';
 
@@ -704,171 +704,57 @@ export async function presenceLogoutHandler(req: express.Request, res: express.R
   }
 }
 
-/**
- * GET /api/admin/member-stats
- * Returns administrative totals for Painel do Mentor
- */
-export async function getAdminMemberStatsHandler(req: express.Request, res: express.Response) {
-  try {
-    const isMaster = await verifyMasterAccess(req);
-    if (!isMaster) {
-      return res.status(403).json({
-        error: 'FORBIDDEN',
-        message: 'Acesso negado. Apenas o Mentor possui permissão para consultar estatísticas administrativas.',
-      });
+export interface MemoryAgentInteraction {
+  codigo: string;
+  agentId: string;
+  agentName: string;
+  category: string;
+  createdAt: Date;
+}
+
+export const memoryAgentInteractions: MemoryAgentInteraction[] = [];
+
+export async function recordAgentInteraction(
+  studentCode: string | undefined,
+  agentId: string,
+  agentName: string,
+  category?: string
+) {
+  const norm = normalizeAccessCode(studentCode) || 'ANONYMOUS';
+  const cleanCategory = category || 'Geral';
+  const now = new Date();
+
+  memoryAgentInteractions.unshift({
+    codigo: norm,
+    agentId,
+    agentName,
+    category: cleanCategory,
+    createdAt: now,
+  });
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureAgentInteractionsTable();
+      await db.query(
+        `INSERT INTO interacoes_agentes (codigo, agent_id, agent_name, category, created_at)
+         VALUES (?, ?, ?, ?, NOW())`,
+        [norm, agentId, agentName, cleanCategory]
+      );
+    } catch (err) {
+      console.warn('[recordAgentInteraction DB Warning]:', err);
     }
-
-    checkPeakReset();
-
-    let onlineNow = 0;
-    let absentSessions = 0;
-    let accessesToday = 0;
-    let totalMembers = STUDENT_KEYS.size || 200;
-
-    if (isDatabaseConfigured()) {
-      await ensurePicoTable();
-      await ensureCodigosAcessoTable();
-      await ensureSessionsTable();
-
-      // Total members registered in codigos_acesso
-      try {
-        const [totalRows]: any = await db.query(`SELECT COUNT(*) AS count FROM codigos_acesso`);
-        if (Array.isArray(totalRows) && totalRows[0] && Number(totalRows[0].count) > 0) {
-          totalMembers = Number(totalRows[0].count);
-        }
-      } catch (e) {
-        console.warn('[Admin Member Stats] Error counting codigos_acesso:', e);
-      }
-
-      // 1. Online Now: last_heartbeat_at within last 90 seconds (1.5 min) and active status
-      const [onlineRows]: any = await db.query(
-        `SELECT COUNT(*) AS count
-         FROM sessoes
-         WHERE (access_status IS NULL OR access_status = 'ACTIVE')
-         AND last_heartbeat_at >= DATE_SUB(NOW(), INTERVAL 90 SECOND)`
-      );
-      if (Array.isArray(onlineRows) && onlineRows[0]) {
-        onlineNow = Number(onlineRows[0].count) || 0;
-      }
-
-      // 2. Absent: last_heartbeat_at between 90s and 1 HOUR (3600s)
-      const [absentRows]: any = await db.query(
-        `SELECT COUNT(*) AS count
-         FROM sessoes
-         WHERE (access_status IS NULL OR access_status = 'ACTIVE')
-         AND last_heartbeat_at < DATE_SUB(NOW(), INTERVAL 90 SECOND)
-         AND last_heartbeat_at >= DATE_SUB(NOW(), INTERVAL 3600 SECOND)`
-      );
-      if (Array.isArray(absentRows) && absentRows[0]) {
-        absentSessions = Number(absentRows[0].count) || 0;
-      }
-
-      // 3. Accesses Today: sessions started or active today (since 00:00)
-      const [todayRows]: any = await db.query(
-        `SELECT COUNT(*) AS count
-         FROM sessoes
-         WHERE session_started_at >= CURDATE()
-            OR login_at >= CURDATE()
-            OR last_heartbeat_at >= CURDATE()`
-      );
-      if (Array.isArray(todayRows) && todayRows[0]) {
-        accessesToday = Number(todayRows[0].count) || 0;
-      }
-
-      // 4. Pico Simultâneo (Persisted in MySQL table pico_simultaneo_diario)
-      let peakSimultaneous = onlineNow;
-      try {
-        const [picoRows]: any = await db.query(
-          `SELECT pico FROM pico_simultaneo_diario WHERE data_dia = CURDATE() LIMIT 1`
-        );
-        if (Array.isArray(picoRows) && picoRows.length > 0) {
-          const storedPeak = Number(picoRows[0].pico) || 0;
-          peakSimultaneous = Math.max(storedPeak, onlineNow);
-          if (onlineNow > storedPeak) {
-            await db.query(`UPDATE pico_simultaneo_diario SET pico = ? WHERE data_dia = CURDATE()`, [onlineNow]);
-          }
-        } else {
-          await db.query(
-            `INSERT INTO pico_simultaneo_diario (data_dia, pico) VALUES (CURDATE(), ?)
-             ON DUPLICATE KEY UPDATE pico = GREATEST(pico, VALUES(pico))`,
-            [onlineNow]
-          );
-          peakSimultaneous = onlineNow;
-        }
-      } catch (picoErr) {
-        console.warn('[Admin Member Stats] Pico DB error fallback to memory:', picoErr);
-        if (onlineNow > dailyPeakCount) dailyPeakCount = onlineNow;
-        peakSimultaneous = Math.max(dailyPeakCount, onlineNow);
-      }
-
-      return res.json({
-        success: true,
-        onlineNow,
-        totalMembers,
-        accessesToday: Math.max(accessesToday, onlineNow),
-        peakSimultaneous,
-        absentSessions,
-        updatedAt: new Date().toISOString(),
-      });
-    } else {
-      // Memory statistics calculations
-      const nowMs = Date.now();
-      for (const s of memorySessionsMap.values()) {
-        const memStatus = memoryKeyStatusMap.get(s.codigo)?.accessStatus || 'ACTIVE';
-        if (memStatus !== 'ACTIVE') continue;
-
-        const diffSec = (nowMs - s.lastHeartbeatAt.getTime()) / 1000;
-        if (diffSec <= 90) {
-          onlineNow++;
-        } else if (diffSec <= 3600) {
-          absentSessions++;
-        }
-        if (s.startedAt.toDateString() === new Date().toDateString()) {
-          accessesToday++;
-        }
-      }
-
-      if (onlineNow > dailyPeakCount) {
-        dailyPeakCount = onlineNow;
-      }
-
-      return res.json({
-        success: true,
-        onlineNow,
-        totalMembers,
-        accessesToday: Math.max(accessesToday, onlineNow),
-        peakSimultaneous: Math.max(dailyPeakCount, onlineNow),
-        absentSessions,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-  } catch (err: any) {
-    console.error('[Admin Member Stats Error]:', err?.message || err);
-    return res.status(500).json({
-      error: 'SERVER_ERROR',
-      message: 'Erro ao obter dados estatísticos dos membros.',
-    });
   }
 }
 
 /**
- * GET /api/admin/online-users
- * Returns online and student user sessions list for Mentor table
+ * Central Authority for Presence Calculation
  */
-export async function getAdminOnlineUsersHandler(req: express.Request, res: express.Response) {
-  try {
-    const isMaster = await verifyMasterAccess(req);
-    if (!isMaster) {
-      return res.status(403).json({
-        error: 'FORBIDDEN',
-        message: 'Acesso negado. Apenas o Mentor possui permissão para visualizar o monitoramento de usuários.',
-      });
-    }
+export async function getCentralPresenceData() {
+  const usersMapByCode = new Map<string, any>();
+  const nowMs = Date.now();
 
-    const search = String(req.query.search || req.query.searchTerm || req.query.q || '').trim().toLowerCase();
-    const usersMapByCode = new Map<string, any>();
-
-    if (isDatabaseConfigured()) {
+  if (isDatabaseConfigured()) {
+    try {
       await ensureCodigosAcessoTable();
       await ensureSessionsTable();
       await ensureProfilesTable();
@@ -912,40 +798,55 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
       const [rows]: any = await db.query(query);
 
       if (Array.isArray(rows)) {
-        const nowMs = Date.now();
-
         for (const r of rows) {
-          if (isMasterKey(r.codigo)) continue; // Never include master keys
+          if (!r.codigo || isMasterKey(r.codigo)) continue; // Master keys are NEVER counted as students
 
-          const lastHbMs = r.last_heartbeat_at ? new Date(r.last_heartbeat_at).getTime() : 0;
-          const secondsSinceHb = lastHbMs > 0 ? (nowMs - lastHbMs) / 1000 : 9999;
+          const normCode = normalizeAccessCode(r.codigo);
 
-          let calculatedPresence: 'Online' | 'Ausente' | 'Offline' = 'Offline';
-          const accStat = (r.access_status || 'ACTIVE').toUpperCase();
-
-          if (accStat === 'ACTIVE' && secondsSinceHb <= 90) {
-            calculatedPresence = 'Online';
-          } else if (accStat === 'ACTIVE' && secondsSinceHb <= 3600) {
-            calculatedPresence = 'Ausente';
-          } else {
-            calculatedPresence = 'Offline';
+          const memSession = memorySessionsMap.get(normCode);
+          let lastHbMs = r.last_heartbeat_at ? new Date(r.last_heartbeat_at).getTime() : 0;
+          if (memSession && memSession.lastHeartbeatAt) {
+            const memHbMs = memSession.lastHeartbeatAt.getTime();
+            if (memHbMs > lastHbMs) {
+              lastHbMs = memHbMs;
+            }
           }
 
-          const entryDate = r.login_at || r.session_started_at ? new Date(r.login_at || r.session_started_at) : null;
-          const { deviceType, operatingSystem, browserName } = parseUserAgent(r.user_agent);
+          const secondsSinceHb = lastHbMs > 0 ? (nowMs - lastHbMs) / 1000 : 999999;
+          const accStat = (r.access_status || 'ACTIVE').toUpperCase();
 
-          const devStr = r.device_type && r.browser_name
-            ? `${r.operating_system || operatingSystem} • ${r.browser_name || browserName}`
+          let calculatedPresence: 'Online' | 'Ausente' | 'Offline' = 'Offline';
+          if (accStat === 'ACTIVE') {
+            if (secondsSinceHb <= 90) {
+              calculatedPresence = 'Online';
+            } else if (secondsSinceHb <= 3600) {
+              calculatedPresence = 'Ausente';
+            } else {
+              calculatedPresence = 'Offline';
+            }
+          }
+
+          const entryDate = r.login_at || r.session_started_at
+            ? new Date(r.login_at || r.session_started_at)
+            : (memSession ? memSession.startedAt : null);
+
+          const { deviceType, operatingSystem, browserName } = parseUserAgent(r.user_agent || memSession?.userAgent);
+
+          const devStr = (r.device_type || memSession?.deviceType) && (r.browser_name || memSession?.browserName)
+            ? `${r.operating_system || memSession?.operatingSystem || operatingSystem} • ${r.browser_name || memSession?.browserName || browserName}`
             : `${operatingSystem} • ${browserName}`;
 
-          const isExpiresAtFuture = r.expires_at ? new Date(r.expires_at).getTime() > Date.now() : false;
-          const hasActiveSession = Boolean(r.active_session_id && isExpiresAtFuture);
+          const isExpiresAtFuture = r.expires_at
+            ? new Date(r.expires_at).getTime() > Date.now()
+            : (memSession?.expiresAt ? memSession.expiresAt.getTime() > Date.now() : false);
 
-          usersMapByCode.set(r.codigo, {
-            _fullCode: r.codigo,
-            username: r.nome_usuario || `Aluno ${maskStudentCode(r.codigo)}`,
+          const hasActiveSession = Boolean((r.active_session_id || memSession?.sessionId) && isExpiresAtFuture);
+
+          usersMapByCode.set(normCode, {
+            _fullCode: normCode,
+            username: r.nome_usuario || `Aluno ${maskStudentCode(normCode)}`,
             avatar: r.avatar || null,
-            maskedKey: maskKeyForAdmin(r.codigo),
+            maskedKey: maskKeyForAdmin(normCode),
             status: calculatedPresence,
             presenceStatus: calculatedPresence,
             hasActiveSession,
@@ -960,72 +861,186 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
             reactivatedBy: r.reactivated_by || null,
             lastAdminAction: r.last_admin_action || null,
             lastAdminActionAt: r.last_admin_action_at ? new Date(r.last_admin_action_at).toISOString() : null,
-            currentPage: r.current_page || 'Agentes GPT',
-            deviceType: r.device_type || deviceType,
-            operatingSystem: r.operating_system || operatingSystem,
-            browserName: r.browser_name || browserName,
+            currentPage: r.current_page || memSession?.currentPage || 'Agentes GPT',
+            deviceType: r.device_type || memSession?.deviceType || deviceType,
+            operatingSystem: r.operating_system || memSession?.operatingSystem || operatingSystem,
+            browserName: r.browser_name || memSession?.browserName || browserName,
             device: devStr,
-            maskedIp: maskIpAddress(r.ip_address),
+            maskedIp: maskIpAddress(r.ip_address || memSession?.ipAddress),
             loginAt: entryDate ? entryDate.toISOString() : new Date().toISOString(),
-            lastActivity: r.last_heartbeat_at ? new Date(r.last_heartbeat_at).toISOString() : new Date().toISOString(),
+            lastActivity: lastHbMs > 0 ? new Date(lastHbMs).toISOString() : new Date().toISOString(),
             connectedTime: formatConnectedTime(entryDate),
           });
         }
       }
+    } catch (err) {
+      console.warn('[getCentralPresenceData DB Warning]:', err);
     }
+  }
 
-    // Combine with memory sessions and default student keys
-    const nowMs = Date.now();
-    for (const key of STUDENT_KEYS) {
-      if (isMasterKey(key)) continue;
+  // Fallback / merge for STUDENT_KEYS
+  for (const rawKey of STUDENT_KEYS) {
+    const key = normalizeAccessCode(rawKey);
+    if (!key || isMasterKey(key)) continue;
 
-      if (!usersMapByCode.has(key)) {
-        const memSession = memorySessionsMap.get(key);
-        const memKeyInfo = memoryKeyStatusMap.get(key);
+    if (!usersMapByCode.has(key)) {
+      const memSession = memorySessionsMap.get(key);
+      const memKeyInfo = memoryKeyStatusMap.get(key);
 
-        let presence: 'Online' | 'Ausente' | 'Offline' = 'Offline';
-        if (memSession) {
-          const sec = (nowMs - memSession.lastHeartbeatAt.getTime()) / 1000;
-          if (sec <= 90) presence = 'Online';
-          else if (sec <= 3600) presence = 'Ausente';
-        }
-
-        const accStat = memKeyInfo?.accessStatus || 'ACTIVE';
-        const hasActiveSession = Boolean(memSession);
-
-        usersMapByCode.set(key, {
-          _fullCode: key,
-          username: `Aluno ${maskKeyForAdmin(key)}`,
-          avatar: null,
-          maskedKey: maskKeyForAdmin(key),
-          status: accStat === 'ACTIVE' ? presence : 'Offline',
-          presenceStatus: accStat === 'ACTIVE' ? presence : 'Offline',
-          hasActiveSession,
-          accessStatus: accStat,
-          suspensionReason: memKeyInfo?.suspensionReason || null,
-          suspendedAt: memKeyInfo?.suspendedAt || null,
-          suspendedBy: memKeyInfo?.suspendedBy || null,
-          bannedReason: memKeyInfo?.bannedReason || null,
-          bannedAt: memKeyInfo?.bannedAt || null,
-          bannedBy: memKeyInfo?.bannedBy || null,
-          reactivatedAt: memKeyInfo?.reactivatedAt || null,
-          reactivatedBy: memKeyInfo?.reactivatedBy || null,
-          lastAdminAction: memKeyInfo?.lastAdminAction || null,
-          lastAdminActionAt: memKeyInfo?.lastAdminActionAt || null,
-          currentPage: memSession?.currentPage || 'Agentes GPT',
-          deviceType: memSession?.deviceType || 'Desktop',
-          operatingSystem: memSession?.operatingSystem || 'Windows',
-          browserName: memSession?.browserName || 'Chrome',
-          device: memSession ? `${memSession.operatingSystem} • ${memSession.browserName}` : 'Desconhecido',
-          maskedIp: maskIpAddress(memSession?.ipAddress),
-          loginAt: memSession ? memSession.startedAt.toISOString() : new Date().toISOString(),
-          lastActivity: memSession ? memSession.lastHeartbeatAt.toISOString() : new Date().toISOString(),
-          connectedTime: formatConnectedTime(memSession ? memSession.startedAt : null),
-        });
+      let presence: 'Online' | 'Ausente' | 'Offline' = 'Offline';
+      if (memSession) {
+        const sec = (nowMs - memSession.lastHeartbeatAt.getTime()) / 1000;
+        if (sec <= 90) presence = 'Online';
+        else if (sec <= 3600) presence = 'Ausente';
       }
+
+      const accStat = memKeyInfo?.accessStatus || 'ACTIVE';
+      const hasActiveSession = Boolean(memSession);
+
+      usersMapByCode.set(key, {
+        _fullCode: key,
+        username: `Aluno ${maskKeyForAdmin(key)}`,
+        avatar: null,
+        maskedKey: maskKeyForAdmin(key),
+        status: accStat === 'ACTIVE' ? presence : 'Offline',
+        presenceStatus: accStat === 'ACTIVE' ? presence : 'Offline',
+        hasActiveSession,
+        accessStatus: accStat,
+        suspensionReason: memKeyInfo?.suspensionReason || null,
+        suspendedAt: memKeyInfo?.suspendedAt || null,
+        suspendedBy: memKeyInfo?.suspendedBy || null,
+        bannedReason: memKeyInfo?.bannedReason || null,
+        bannedAt: memKeyInfo?.bannedAt || null,
+        bannedBy: memKeyInfo?.bannedBy || null,
+        reactivatedAt: memKeyInfo?.reactivatedAt || null,
+        reactivatedBy: memKeyInfo?.reactivatedBy || null,
+        lastAdminAction: memKeyInfo?.lastAdminAction || null,
+        lastAdminActionAt: memKeyInfo?.lastAdminActionAt || null,
+        currentPage: memSession?.currentPage || 'Agentes GPT',
+        deviceType: memSession?.deviceType || 'Desktop',
+        operatingSystem: memSession?.operatingSystem || 'Windows',
+        browserName: memSession?.browserName || 'Chrome',
+        device: memSession ? `${memSession.operatingSystem} • ${memSession.browserName}` : 'Desconhecido',
+        maskedIp: maskIpAddress(memSession?.ipAddress),
+        loginAt: memSession ? memSession.startedAt.toISOString() : new Date().toISOString(),
+        lastActivity: memSession ? memSession.lastHeartbeatAt.toISOString() : new Date().toISOString(),
+        connectedTime: formatConnectedTime(memSession ? memSession.startedAt : null),
+      });
+    }
+  }
+
+  const allUsers = Array.from(usersMapByCode.values());
+
+  const onlineNow = allUsers.filter(u => u.status === 'Online').length;
+  const absentSessions = allUsers.filter(u => u.status === 'Ausente').length;
+  const offlineSessions = allUsers.filter(u => u.status === 'Offline').length;
+  const totalMembers = allUsers.length;
+
+  const todayStr = new Date().toDateString();
+  const accessesToday = allUsers.filter(u => {
+    if (u.status === 'Online' || u.status === 'Ausente') return true;
+    if (u.loginAt && new Date(u.loginAt).toDateString() === todayStr) return true;
+    return false;
+  }).length;
+
+  return {
+    users: allUsers,
+    stats: {
+      onlineNow,
+      absentSessions,
+      offlineSessions,
+      totalMembers,
+      accessesToday,
+      mentorOnline: true,
+    },
+  };
+}
+
+/**
+ * GET /api/admin/member-stats
+ * Returns administrative totals for Painel do Mentor
+ */
+export async function getAdminMemberStatsHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas o Mentor possui permissão para consultar estatísticas administrativas.',
+      });
     }
 
-    let usersList = Array.from(usersMapByCode.values());
+    checkPeakReset();
+
+    const central = await getCentralPresenceData();
+    const { onlineNow, absentSessions, totalMembers, accessesToday } = central.stats;
+
+    let peakSimultaneous = onlineNow;
+
+    if (isDatabaseConfigured()) {
+      try {
+        await ensurePicoTable();
+        const [picoRows]: any = await db.query(
+          `SELECT pico FROM pico_simultaneo_diario WHERE data_dia = CURDATE() LIMIT 1`
+        );
+        if (Array.isArray(picoRows) && picoRows.length > 0) {
+          const storedPeak = Number(picoRows[0].pico) || 0;
+          peakSimultaneous = Math.max(storedPeak, onlineNow);
+          if (onlineNow > storedPeak) {
+            await db.query(`UPDATE pico_simultaneo_diario SET pico = ? WHERE data_dia = CURDATE()`, [onlineNow]);
+          }
+        } else {
+          await db.query(
+            `INSERT INTO pico_simultaneo_diario (data_dia, pico) VALUES (CURDATE(), ?)
+             ON DUPLICATE KEY UPDATE pico = GREATEST(pico, VALUES(pico))`,
+            [onlineNow]
+          );
+          peakSimultaneous = onlineNow;
+        }
+      } catch (picoErr) {
+        if (onlineNow > dailyPeakCount) dailyPeakCount = onlineNow;
+        peakSimultaneous = Math.max(dailyPeakCount, onlineNow);
+      }
+    } else {
+      if (onlineNow > dailyPeakCount) dailyPeakCount = onlineNow;
+      peakSimultaneous = Math.max(dailyPeakCount, onlineNow);
+    }
+
+    return res.json({
+      success: true,
+      onlineNow,
+      totalMembers,
+      accessesToday,
+      peakSimultaneous,
+      absentSessions,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    console.error('[Admin Member Stats Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Erro ao obter dados estatísticos dos membros.',
+    });
+  }
+}
+
+/**
+ * GET /api/admin/online-users
+ * Returns online and student user sessions list for Mentor table
+ */
+export async function getAdminOnlineUsersHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas o Mentor possui permissão para visualizar o monitoramento de usuários.',
+      });
+    }
+
+    const search = String(req.query.search || req.query.searchTerm || req.query.q || '').trim().toLowerCase();
+    const central = await getCentralPresenceData();
+    let usersList = central.users;
 
     if (search) {
       usersList = usersList.filter((u) => {
@@ -1040,10 +1055,7 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
       });
     }
 
-    // Calculate active sessions count based strictly on valid active login sessions (active_session_id != null and expires_at > now)
     const activeSessionsCount = usersList.filter(u => u.hasActiveSession).length;
-
-    // Strip internal _fullCode and codigo fields to protect sensitive access keys
     const sanitizedUsers = usersList.map(({ _fullCode, codigo, ...safeUser }) => safeUser);
 
     return res.json({
@@ -1058,6 +1070,210 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
     return res.status(500).json({
       error: 'SERVER_ERROR',
       message: 'Erro ao obter lista de usuários online.',
+    });
+  }
+}
+
+/**
+ * GET /api/admin/stats
+ * Returns REAL calculated platform statistics (interactions, agents, challenges, devices)
+ */
+export async function getAdminStatsHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas o Mentor possui permissão para consultar estatísticas.',
+      });
+    }
+
+    let totalInteractions = 0;
+    let mostUsedAgent: string | null = null;
+    let challengeCompletionRate = '0%';
+    let peakHour: string | null = null;
+    let categories: Array<{ name: string; count: number; percentage: number; color: string }> = [];
+    let devices: Array<{ name: string; count: number; percentage: number }> = [];
+    let browsers: Array<{ name: string; count: number; percentage: number }> = [];
+
+    if (isDatabaseConfigured()) {
+      try {
+        await ensureAgentInteractionsTable();
+        await ensureProgressTable();
+        await ensureSessionsTable();
+
+        // 1. Total Interactions & Most Used Agent & Categories
+        const [intCountRows]: any = await db.query(`SELECT COUNT(*) AS count FROM interacoes_agentes`);
+        if (Array.isArray(intCountRows) && intCountRows[0]) {
+          totalInteractions = Number(intCountRows[0].count) || 0;
+        }
+
+        if (totalInteractions > 0) {
+          const [agentRows]: any = await db.query(
+            `SELECT agent_name, COUNT(*) AS count
+             FROM interacoes_agentes
+             GROUP BY agent_id, agent_name
+             ORDER BY count DESC
+             LIMIT 1`
+          );
+          if (Array.isArray(agentRows) && agentRows.length > 0 && agentRows[0].agent_name) {
+            mostUsedAgent = String(agentRows[0].agent_name);
+          }
+
+          const [catRows]: any = await db.query(
+            `SELECT category, COUNT(*) AS count
+             FROM interacoes_agentes
+             GROUP BY category
+             ORDER BY count DESC`
+          );
+
+          if (Array.isArray(catRows) && catRows.length > 0) {
+            const colors = ['cyan', 'amber', 'emerald', 'indigo', 'rose', 'fuchsia'];
+            categories = catRows.map((c: any, idx: number) => {
+              const count = Number(c.count) || 0;
+              const percentage = totalInteractions > 0 ? Math.round((count / totalInteractions) * 100) : 0;
+              return {
+                name: c.category || 'Outros',
+                count,
+                percentage,
+                color: colors[idx % colors.length],
+              };
+            });
+          }
+
+          const [peakRows]: any = await db.query(
+            `SELECT HOUR(created_at) AS hr, COUNT(*) AS count
+             FROM interacoes_agentes
+             GROUP BY hr
+             ORDER BY count DESC
+             LIMIT 1`
+          );
+          if (Array.isArray(peakRows) && peakRows.length > 0) {
+            const hr = Number(peakRows[0].hr);
+            const nextHr = (hr + 1) % 24;
+            const pad = (n: number) => String(n).padStart(2, '0');
+            peakHour = `${pad(hr)}:00h - ${pad(nextHr)}:00h`;
+          }
+        }
+
+        // 2. Challenge Completion Rate
+        const [progRows]: any = await db.query(
+          `SELECT SUM(desafios_jogados) AS played, SUM(desafios_corretos) AS correct FROM progresso_alunos`
+        );
+        if (Array.isArray(progRows) && progRows[0]) {
+          const played = Number(progRows[0].played) || 0;
+          const correct = Number(progRows[0].correct) || 0;
+          if (played > 0) {
+            const rate = Math.min(100, Math.round((correct / played) * 100 * 10) / 10);
+            challengeCompletionRate = `${rate}%`;
+          }
+        }
+
+        // 3. Devices & Browsers telemetry
+        const [devRows]: any = await db.query(
+          `SELECT device_type, COUNT(*) AS count FROM sessoes WHERE device_type IS NOT NULL AND TRIM(device_type) != '' GROUP BY device_type ORDER BY count DESC`
+        );
+        if (Array.isArray(devRows) && devRows.length > 0) {
+          const totalDevs = devRows.reduce((acc: number, r: any) => acc + (Number(r.count) || 0), 0);
+          if (totalDevs > 0) {
+            devices = devRows.map((r: any) => ({
+              name: r.device_type,
+              count: Number(r.count) || 0,
+              percentage: Math.round(((Number(r.count) || 0) / totalDevs) * 100),
+            }));
+          }
+        }
+
+        const [browRows]: any = await db.query(
+          `SELECT browser_name, COUNT(*) AS count FROM sessoes WHERE browser_name IS NOT NULL AND TRIM(browser_name) != '' GROUP BY browser_name ORDER BY count DESC`
+        );
+        if (Array.isArray(browRows) && browRows.length > 0) {
+          const totalBrows = browRows.reduce((acc: number, r: any) => acc + (Number(r.count) || 0), 0);
+          if (totalBrows > 0) {
+            browsers = browRows.map((r: any) => ({
+              name: r.browser_name,
+              count: Number(r.count) || 0,
+              percentage: Math.round(((Number(r.count) || 0) / totalBrows) * 100),
+            }));
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[getAdminStatsHandler DB Error]:', dbErr);
+      }
+    }
+
+    // Memory fallbacks if DB returned 0 or wasn't configured
+    if (totalInteractions === 0 && memoryAgentInteractions.length > 0) {
+      totalInteractions = memoryAgentInteractions.length;
+
+      const countsByAgent = new Map<string, { name: string; count: number }>();
+      const countsByCat = new Map<string, number>();
+      const countsByHour = new Map<number, number>();
+
+      for (const item of memoryAgentInteractions) {
+        const agEntry = countsByAgent.get(item.agentId) || { name: item.agentName, count: 0 };
+        agEntry.count++;
+        countsByAgent.set(item.agentId, agEntry);
+
+        countsByCat.set(item.category, (countsByCat.get(item.category) || 0) + 1);
+
+        const hr = item.createdAt.getHours();
+        countsByHour.set(hr, (countsByHour.get(hr) || 0) + 1);
+      }
+
+      let topAgent = '';
+      let topAgentCount = 0;
+      for (const v of countsByAgent.values()) {
+        if (v.count > topAgentCount) {
+          topAgentCount = v.count;
+          topAgent = v.name;
+        }
+      }
+      if (topAgent) mostUsedAgent = topAgent;
+
+      const colors = ['cyan', 'amber', 'emerald', 'indigo', 'rose', 'fuchsia'];
+      let idx = 0;
+      categories = [];
+      for (const [cat, cnt] of countsByCat.entries()) {
+        categories.push({
+          name: cat,
+          count: cnt,
+          percentage: Math.round((cnt / totalInteractions) * 100),
+          color: colors[idx % colors.length],
+        });
+        idx++;
+      }
+
+      let topHr = -1;
+      let topHrCount = 0;
+      for (const [h, cnt] of countsByHour.entries()) {
+        if (cnt > topHrCount) {
+          topHrCount = cnt;
+          topHr = h;
+        }
+      }
+      if (topHr >= 0) {
+        const pad = (n: number) => String(n).padStart(2, '0');
+        peakHour = `${pad(topHr)}:00h - ${pad((topHr + 1) % 24)}:00h`;
+      }
+    }
+
+    return res.json({
+      success: true,
+      totalInteractions,
+      mostUsedAgent: mostUsedAgent || null,
+      challengeCompletionRate,
+      peakHour,
+      categories,
+      devices,
+      browsers,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    console.error('[Admin Stats Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Erro ao obter estatísticas globais.',
     });
   }
 }
