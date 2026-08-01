@@ -1,7 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable, ensureAgentInteractionsTable, ensureProgressTable } from './database.js';
+import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable, ensureSessionHistoryTable, ensureAgentInteractionsTable, ensureProgressTable } from './database.js';
 import { normalizeAccessCode, lookupKeyType, STUDENT_KEYS, MASTER_KEYS } from './authKeys.js';
 import { maskStudentCode } from './rankingService.js';
 
@@ -140,6 +140,110 @@ export function formatConnectedTime(startDate: Date | null): string {
   if (hours < 24) return `${hours}h ${remMinutes}m`;
   const days = Math.floor(hours / 24);
   return `${days}d ${hours % 24}h`;
+}
+
+export function formatTempoOnline(seconds: number): string {
+  if (isNaN(seconds) || seconds <= 0) return '0 s';
+  if (seconds < 60) return `${Math.floor(seconds)} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  if (hours < 24) {
+    return remMinutes > 0 ? `${hours} h ${remMinutes} min` : `${hours} h`;
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  if (days === 1) {
+    return remHours > 0 ? `1 dia ${remHours} h` : `1 dia`;
+  }
+  return remHours > 0 ? `${days} dias ${remHours} h` : `${days} dias`;
+}
+
+export function formatLastActivity(lastHbMs: number): string {
+  if (!lastHbMs || lastHbMs <= 0) return 'Indefinido';
+  const diffSec = Math.max(0, Math.floor((Date.now() - lastHbMs) / 1000));
+  if (diffSec < 3) return 'Agora';
+  if (diffSec < 60) return `há ${diffSec} s`;
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return `há ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `há ${hrs} h`;
+  const days = Math.floor(hrs / 24);
+  return `há ${days} d`;
+}
+
+export interface HistoryEventItem {
+  id: number;
+  codigo: string;
+  maskedKey: string;
+  username?: string;
+  sessionId?: string | number | null;
+  eventType: 'LOGIN' | 'LOGOUT' | 'HEARTBEAT' | 'CATEGORY_CHANGE' | 'MENTOR_DISCONNECT' | 'SUSPEND' | 'BAN' | 'REACTIVATE';
+  page?: string | null;
+  device?: string | null;
+  ip?: string | null;
+  details?: string | null;
+  createdAt: string;
+}
+
+export const memoryActivityFeed: HistoryEventItem[] = [];
+let historyIdCounter = 1;
+
+export async function recordSessionHistoryEvent(params: {
+  codigo: string;
+  sessionId?: string | number | null;
+  eventType: 'LOGIN' | 'LOGOUT' | 'HEARTBEAT' | 'CATEGORY_CHANGE' | 'MENTOR_DISCONNECT' | 'SUSPEND' | 'BAN' | 'REACTIVATE';
+  page?: string | null;
+  device?: string | null;
+  ip?: string | null;
+  details?: string | null;
+}): Promise<void> {
+  const normCode = normalizeAccessCode(params.codigo);
+  if (!normCode && params.codigo !== 'TODAS_AS_SESSOES') return;
+
+  const targetCode = normCode || 'TODAS_AS_SESSOES';
+  const nowIso = new Date().toISOString();
+  const maskedKey = targetCode === 'TODAS_AS_SESSOES' ? 'TODAS AS SESSÕES' : maskKeyForAdmin(targetCode);
+
+  const eventItem: HistoryEventItem = {
+    id: historyIdCounter++,
+    codigo: targetCode,
+    maskedKey,
+    sessionId: params.sessionId || null,
+    eventType: params.eventType,
+    page: params.page || 'TikTok 2K',
+    device: params.device || null,
+    ip: maskIpAddress(params.ip),
+    details: params.details || null,
+    createdAt: nowIso,
+  };
+
+  memoryActivityFeed.unshift(eventItem);
+  if (memoryActivityFeed.length > 100) {
+    memoryActivityFeed.pop();
+  }
+
+  if (isDatabaseConfigured() && targetCode !== 'TODAS_AS_SESSOES') {
+    try {
+      await ensureSessionHistoryTable();
+      await db.query(
+        `INSERT INTO session_history (codigo, session_id, event_type, page, device, ip, details, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          targetCode,
+          params.sessionId ? String(params.sessionId) : null,
+          params.eventType,
+          params.page || null,
+          params.device || null,
+          params.ip || null,
+          params.details || null,
+        ]
+      );
+    } catch (err: any) {
+      console.warn('[recordSessionHistoryEvent Error]:', err?.message || err);
+    }
+  }
 }
 
 // Key Access Status Info Interface
@@ -601,6 +705,20 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
         }
 
         if (sessionValidated) {
+          const r = rows[0];
+          const newPage = (currentPage && String(currentPage).trim() !== '') ? String(currentPage).trim() : null;
+          if (newPage && r.current_page && newPage !== r.current_page) {
+            recordSessionHistoryEvent({
+              codigo: cleanCode,
+              sessionId: r.id || sessionId,
+              eventType: 'CATEGORY_CHANGE',
+              page: newPage,
+              device: `${operatingSystem} • ${browserName}`,
+              ip: clientIp,
+              details: `Navegou para ${newPage}`,
+            }).catch(() => {});
+          }
+
           await db.query(
             `UPDATE sessoes
              SET
@@ -740,6 +858,11 @@ export async function presenceLogoutHandler(req: express.Request, res: express.R
 
     if (cleanCode) {
       memorySessionsMap.delete(cleanCode);
+      recordSessionHistoryEvent({
+        codigo: cleanCode,
+        eventType: 'LOGOUT',
+        details: 'Aluno encerrou a sessão (logout)',
+      }).catch(() => {});
     }
 
     return res.json({ status: 'unbound', message: 'Sessão encerrada com sucesso.' });
@@ -923,6 +1046,29 @@ export async function getCentralPresenceData() {
             } catch (e) {}
           }
           const sessIdNum = r.session_id ? Number(r.session_id) : null;
+          const onlineSecs = entryDate ? Math.max(0, Math.floor((nowMs - entryDate.getTime()) / 1000)) : 0;
+          const tempoOnlineFormatted = formatTempoOnline(onlineSecs);
+          const lastActivityFormatted = formatLastActivity(lastHbMs);
+
+          const recentEvent = memoryActivityFeed.find(ev => ev.codigo === normCode);
+          let recentAction = 'Heartbeat';
+          if (recentEvent) {
+            if (recentEvent.eventType === 'LOGIN') recentAction = 'Novo Login';
+            else if (recentEvent.eventType === 'LOGOUT') recentAction = 'Saiu';
+            else if (recentEvent.eventType === 'MENTOR_DISCONNECT') recentAction = 'Encerrado pelo Mentor';
+            else if (recentEvent.eventType === 'SUSPEND') recentAction = 'Suspenso';
+            else if (recentEvent.eventType === 'BAN') recentAction = 'Banido';
+            else if (recentEvent.eventType === 'REACTIVATE') recentAction = 'Reativado';
+            else if (recentEvent.eventType === 'CATEGORY_CHANGE') recentAction = recentEvent.page || 'Mudou de categoria';
+            else recentAction = 'Heartbeat';
+          } else {
+            if (accStat === 'SUSPENDED') recentAction = 'Suspenso';
+            else if (accStat === 'BANNED') recentAction = 'Banido';
+            else if (r.disconnect_source === 'MENTOR_SINGLE' || r.disconnect_source === 'MENTOR_ALL') recentAction = 'Encerrado pelo Mentor';
+            else if (r.disconnect_source === 'STUDENT_LOGOUT') recentAction = 'Saiu';
+            else if (hasActiveSession) recentAction = 'Entrou';
+            else recentAction = 'Offline';
+          }
 
           usersMapByCode.set(normCode, {
             accessKeyId: keyIdNum || null,
@@ -955,6 +1101,11 @@ export async function getCentralPresenceData() {
             loginAt: entryDate ? entryDate.toISOString() : new Date().toISOString(),
             lastActivity: lastHbMs > 0 ? new Date(lastHbMs).toISOString() : new Date().toISOString(),
             connectedTime: formatConnectedTime(entryDate),
+            tempoOnlineSeconds: onlineSecs,
+            tempoOnlineFormatted,
+            lastActivityFormatted,
+            recentAction,
+            lastAction: recentAction,
             disconnectSource: (!hasActiveSession && r.disconnected_at && r.disconnect_source && ['MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT'].includes(r.disconnect_source)) ? r.disconnect_source : null,
             disconnectedAt: (!hasActiveSession && r.disconnected_at && r.disconnect_source && ['MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT'].includes(r.disconnect_source)) ? new Date(r.disconnected_at).toISOString() : null,
           });
@@ -1121,6 +1272,109 @@ export async function getCentralPresenceData() {
     return false;
   }).length;
 
+  // 1. Top Categories
+  const categoryCounts: Record<string, number> = {
+    'TikTok Shop': 0,
+    'Flow Ultra': 0,
+    'TikTok 2K': 0,
+    'Suporte': 0,
+    'Grupo Network': 0,
+    'Academia': 0,
+    'Prompts': 0,
+    'Dashboard': 0,
+  };
+  for (const u of allUsers) {
+    const page = u.currentPage || 'TikTok 2K';
+    categoryCounts[page] = (categoryCounts[page] || 0) + 1;
+  }
+  const topCategories = Object.entries(categoryCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // 2. Devices distribution
+  const deviceCounts: Record<string, number> = {
+    Windows: 0,
+    Android: 0,
+    iPhone: 0,
+    Mac: 0,
+    Linux: 0,
+    Outro: 0,
+  };
+  for (const u of allUsers) {
+    const os = (u.operatingSystem || '').toLowerCase();
+    const dev = (u.deviceType || '').toLowerCase();
+    if (os.includes('win')) deviceCounts.Windows++;
+    else if (os.includes('android') || dev.includes('mobile')) deviceCounts.Android++;
+    else if (os.includes('ios') || os.includes('iphone') || os.includes('ipad')) deviceCounts.iPhone++;
+    else if (os.includes('mac')) deviceCounts.Mac++;
+    else if (os.includes('linux')) deviceCounts.Linux++;
+    else deviceCounts.Outro++;
+  }
+  const totalDevs = Math.max(1, allUsers.length);
+  const devices = Object.entries(deviceCounts).map(([name, count]) => ({
+    name,
+    count,
+    percentage: Math.round((count / totalDevs) * 100),
+  }));
+
+  // 3. Browsers distribution
+  const browserCounts: Record<string, number> = {
+    Chrome: 0,
+    Edge: 0,
+    Safari: 0,
+    Firefox: 0,
+    Opera: 0,
+  };
+  for (const u of allUsers) {
+    const br = (u.browserName || '').toLowerCase();
+    if (br.includes('chrome')) browserCounts.Chrome++;
+    else if (br.includes('edge')) browserCounts.Edge++;
+    else if (br.includes('safari')) browserCounts.Safari++;
+    else if (br.includes('firefox')) browserCounts.Firefox++;
+    else if (br.includes('opera')) browserCounts.Opera++;
+    else browserCounts.Chrome++;
+  }
+  const browsers = Object.entries(browserCounts).map(([name, count]) => ({
+    name,
+    count,
+  }));
+
+  // 4. Logins today by hour
+  const hourlyLogins = Array.from({ length: 24 }, (_, i) => {
+    const hourLabel = `${String(i).padStart(2, '0')}h`;
+    return { hour: hourLabel, count: 0 };
+  });
+  for (const u of allUsers) {
+    if (u.loginAt) {
+      const loginDate = new Date(u.loginAt);
+      if (loginDate.toDateString() === todayStr) {
+        const hr = loginDate.getHours();
+        if (hourlyLogins[hr]) hourlyLogins[hr].count++;
+      }
+    }
+  }
+
+  // 5. Longest and Shortest Sessions
+  const onlineUsersList = activeUsers.filter(u => u.status === 'Online' || u.status === 'Ausente');
+  const sortedByTimeDesc = [...onlineUsersList].sort((a, b) => (b.tempoOnlineSeconds || 0) - (a.tempoOnlineSeconds || 0));
+  const sortedByTimeAsc = [...onlineUsersList].sort((a, b) => (a.tempoOnlineSeconds || 0) - (b.tempoOnlineSeconds || 0));
+
+  const longestSessions = sortedByTimeDesc.slice(0, 10).map(u => ({
+    name: u.username,
+    codigo: u.maskedKey,
+    tempoOnline: u.tempoOnlineFormatted,
+    tempoOnlineSeconds: u.tempoOnlineSeconds,
+    paginaAtual: u.currentPage,
+  }));
+
+  const shortestSessions = sortedByTimeAsc.slice(0, 10).map(u => ({
+    name: u.username,
+    codigo: u.maskedKey,
+    tempoOnline: u.tempoOnlineFormatted,
+    tempoOnlineSeconds: u.tempoOnlineSeconds,
+    paginaAtual: u.currentPage,
+  }));
+
   return {
     users: allUsers,
     stats: {
@@ -1131,6 +1385,13 @@ export async function getCentralPresenceData() {
       totalLicenses: totalLicensesCount,
       accessesToday,
       mentorOnline: true,
+      topCategories,
+      devices,
+      browsers,
+      loginsToday: hourlyLogins,
+      longestSessions,
+      shortestSessions,
+      activityFeed: memoryActivityFeed.slice(0, 30),
     },
   };
 }
@@ -1780,6 +2041,13 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
       // Record audit log safely without allowing audit errors to rollback disconnection
       try {
         await recordAdminAuditAction(targetRow.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
+        await recordSessionHistoryEvent({
+          codigo: targetRow.codigo,
+          sessionId: targetRow.id,
+          eventType: 'MENTOR_DISCONNECT',
+          ip: clientIp,
+          details: 'Login encerrado pelo Mentor',
+        });
       } catch (auditErr) {
         console.warn('[Audit Log Record Warning - Disconnect Succeeded]:', auditErr);
       }
@@ -1996,6 +2264,12 @@ export async function adminSuspendKeyHandler(req: express.Request, res: express.
 
     // Audit log
     await recordAdminAuditAction(keyInfo.codigo, 'SUSPEND', finalReason, clientIp);
+    await recordSessionHistoryEvent({
+      codigo: keyInfo.codigo,
+      eventType: 'SUSPEND',
+      ip: clientIp,
+      details: `Chave suspensa: ${finalReason}`,
+    });
 
     return res.json({
       success: true,
@@ -2077,6 +2351,12 @@ export async function adminReactivateKeyHandler(req: express.Request, res: expre
     saveKeyStatusStore();
 
     await recordAdminAuditAction(keyInfo.codigo, 'REACTIVATE', 'Reativação efetuada pelo Mentor', clientIp);
+    await recordSessionHistoryEvent({
+      codigo: keyInfo.codigo,
+      eventType: 'REACTIVATE',
+      ip: clientIp,
+      details: 'Chave reativada pelo Mentor',
+    });
 
     return res.json({
       success: true,
@@ -2172,6 +2452,12 @@ export async function adminBanKeyHandler(req: express.Request, res: express.Resp
     memorySessionsMap.delete(keyInfo.codigo);
 
     await recordAdminAuditAction(keyInfo.codigo, 'BAN', finalReason, clientIp);
+    await recordSessionHistoryEvent({
+      codigo: keyInfo.codigo,
+      eventType: 'BAN',
+      ip: clientIp,
+      details: `Chave banida: ${finalReason}`,
+    });
 
     return res.json({
       success: true,
@@ -2504,6 +2790,144 @@ export async function generateAccessKeysHandler(req: express.Request, res: expre
     return res.status(500).json({
       error: 'SERVER_ERROR',
       message: err?.message || 'Erro ao gerar novos códigos de acesso.',
+    });
+  }
+}
+
+/**
+ * GET /api/admin/student-history/:idOrCode
+ * Returns full timeline history of events for a student
+ */
+export async function adminGetStudentHistoryHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas o Mentor pode consultar o histórico de alunos.',
+      });
+    }
+
+    const rawTarget = String(req.params.idOrCode || req.query.codigo || req.query.id || '').trim();
+    let normCode = normalizeAccessCode(rawTarget);
+
+    if (!normCode && rawTarget) {
+      const keyInfo = await findAccessKeyById(rawTarget, req.query);
+      if (keyInfo.codigo) normCode = keyInfo.codigo;
+    }
+
+    let historyList: any[] = [];
+
+    if (isDatabaseConfigured()) {
+      await ensureSessionHistoryTable();
+      let sql = `SELECT id, codigo, session_id, event_type, page, device, ip, details, created_at FROM session_history`;
+      let paramsArr: any[] = [];
+
+      if (normCode) {
+        sql += ` WHERE codigo = ?`;
+        paramsArr.push(normCode);
+      }
+      sql += ` ORDER BY created_at DESC LIMIT 100`;
+
+      const [rows]: any = await db.query(sql, paramsArr);
+      if (Array.isArray(rows)) {
+        historyList = rows.map((r: any) => ({
+          id: r.id,
+          codigo: r.codigo,
+          maskedKey: maskKeyForAdmin(r.codigo),
+          sessionId: r.session_id,
+          eventType: r.event_type,
+          page: r.page,
+          device: r.device,
+          ip: maskIpAddress(r.ip),
+          details: r.details,
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        }));
+      }
+    } else {
+      historyList = memoryActivityFeed
+        .filter((ev) => !normCode || ev.codigo === normCode)
+        .map((ev) => ({
+          id: ev.id,
+          codigo: ev.codigo,
+          maskedKey: ev.maskedKey,
+          sessionId: ev.sessionId,
+          eventType: ev.eventType,
+          page: ev.page,
+          device: ev.device,
+          ip: maskIpAddress(ev.ip),
+          details: ev.details,
+          createdAt: ev.createdAt,
+        }));
+    }
+
+    return res.json({
+      success: true,
+      codigo: normCode || 'ALL',
+      maskedKey: normCode ? maskKeyForAdmin(normCode) : 'TODOS',
+      history: historyList,
+    });
+  } catch (err: any) {
+    console.error('[Admin Student History Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Não foi possível carregar o histórico do aluno.',
+    });
+  }
+}
+
+/**
+ * GET /api/admin/activity-feed
+ * Returns real-time activity feed events
+ */
+export async function adminGetActivityFeedHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado.',
+      });
+    }
+
+    let feed: any[] = [];
+
+    if (isDatabaseConfigured()) {
+      await ensureSessionHistoryTable();
+      const [rows]: any = await db.query(
+        `SELECT id, codigo, session_id, event_type, page, device, ip, details, created_at
+         FROM session_history
+         ORDER BY created_at DESC LIMIT 30`
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        feed = rows.map((r: any) => ({
+          id: r.id,
+          codigo: r.codigo,
+          maskedKey: maskKeyForAdmin(r.codigo),
+          sessionId: r.session_id,
+          eventType: r.event_type,
+          page: r.page,
+          device: r.device,
+          ip: maskIpAddress(r.ip),
+          details: r.details,
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        }));
+      }
+    }
+
+    if (feed.length === 0) {
+      feed = memoryActivityFeed.slice(0, 30);
+    }
+
+    return res.json({
+      success: true,
+      feed,
+    });
+  } catch (err: any) {
+    console.error('[Activity Feed Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Erro ao carregar feed de atividades.',
     });
   }
 }

@@ -129,9 +129,34 @@ export async function ensureSessionsTable(): Promise<void> {
     await deduplicateSessionsTable();
     await ensureCodigosAcessoTable();
     await ensureAdminAccessTable();
+    await ensureSessionHistoryTable();
     await cleanLegacyDisconnections();
   } catch (err: any) {
     console.warn('[MySQL ensureSessionsTable Error]:', err?.message || err);
+  }
+}
+
+export async function ensureSessionHistoryTable(): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS session_history (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        codigo VARCHAR(100) NOT NULL,
+        session_id INT DEFAULT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        page VARCHAR(255) DEFAULT NULL,
+        device VARCHAR(255) DEFAULT NULL,
+        ip VARCHAR(100) DEFAULT NULL,
+        details TEXT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_hist_codigo (codigo),
+        INDEX idx_hist_event (event_type),
+        INDEX idx_hist_created (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  } catch (err: any) {
+    console.warn('[MySQL ensureSessionHistoryTable Error]:', err?.message || err);
   }
 }
 
