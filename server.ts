@@ -51,6 +51,7 @@ import {
   memorySessionsMap,
   getClientIp,
   parseUserAgent,
+  PRESENCE_VERSION,
 } from './server/presenceService.js';
 
 dotenv.config();
@@ -135,6 +136,7 @@ apiRouter.get(['/auth/status', '/api/auth/status'], async (_req, res) => {
 
     res.json({
       backendOnline: true,
+      presenceVersion: PRESENCE_VERSION,
       databaseConnected: dbConnected,
       masterKeysLoaded: masterKeysCount,
       studentKeysLoaded: studentKeysCount,
