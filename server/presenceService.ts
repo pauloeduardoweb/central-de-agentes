@@ -672,7 +672,9 @@ export async function presenceLogoutHandler(req: express.Request, res: express.R
            device_id = NULL,
            is_online = 0,
            status = 'offline',
-           logout_at = NOW()
+           logout_at = NOW(),
+           disconnected_at = NOW(),
+           disconnect_source = 'STUDENT_LOGOUT'
          WHERE codigo = ?`,
         [cleanCode]
       );
@@ -768,6 +770,9 @@ export async function getCentralPresenceData() {
           s.operating_system,
           s.session_started_at,
           s.login_at,
+          s.logout_at,
+          s.disconnected_at,
+          s.disconnect_source,
           s.last_heartbeat_at,
           s.is_online,
           s.status,
@@ -892,6 +897,8 @@ export async function getCentralPresenceData() {
             loginAt: entryDate ? entryDate.toISOString() : new Date().toISOString(),
             lastActivity: lastHbMs > 0 ? new Date(lastHbMs).toISOString() : new Date().toISOString(),
             connectedTime: formatConnectedTime(entryDate),
+            disconnectSource: r.disconnect_source || (r.logout_at ? 'MENTOR_SINGLE' : null),
+            disconnectedAt: r.disconnected_at ? new Date(r.disconnected_at).toISOString() : (r.logout_at ? new Date(r.logout_at).toISOString() : null),
           });
         }
       }
@@ -1647,6 +1654,8 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
            is_online = 0,
            status = 'offline',
            logout_at = NOW(),
+           disconnected_at = NOW(),
+           disconnect_source = 'MENTOR_SINGLE',
            updated_at = NOW()
          WHERE codigo = ?
            AND active_session_id IS NOT NULL`,
@@ -1680,7 +1689,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
         success: true,
         disconnectedCount: 1,
         sessionRecordId: targetRow.id,
-        message: 'Sessão encerrada com sucesso.',
+        message: '1 sessão desconectada com sucesso.',
       });
     }
 
@@ -1693,7 +1702,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
         success: true,
         disconnectedCount: 1,
         sessionRecordId: sessionRecordId || 1,
-        message: 'Sessão encerrada com sucesso.',
+        message: '1 sessão desconectada com sucesso.',
       });
     }
 
@@ -1739,7 +1748,10 @@ export async function adminDisconnectAllSessionsHandler(req: express.Request, re
            device_id = NULL,
            is_online = 0,
            status = 'offline',
-           logout_at = NOW()
+           logout_at = NOW(),
+           disconnected_at = NOW(),
+           disconnect_source = 'MENTOR_ALL',
+           updated_at = NOW()
          WHERE active_session_id IS NOT NULL
            AND expires_at IS NOT NULL
            AND expires_at > NOW()`
@@ -1770,7 +1782,7 @@ export async function adminDisconnectAllSessionsHandler(req: express.Request, re
 
     const messageText = affectedCount === 0
       ? 'Nenhuma sessão ativa encontrada.'
-      : `${affectedCount} ${affectedCount === 1 ? 'sessão encerrada' : 'sessões encerradas'} com sucesso.`;
+      : `${affectedCount} ${affectedCount === 1 ? 'sessão desconectada' : 'sessões desconectadas'} com sucesso.`;
 
     return res.json({
       success: true,

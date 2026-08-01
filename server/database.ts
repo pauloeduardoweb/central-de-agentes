@@ -118,6 +118,8 @@ export async function ensureSessionsTable(): Promise<void> {
       `ALTER TABLE sessoes ADD COLUMN operating_system VARCHAR(50) DEFAULT 'Desconhecido'`,
       `ALTER TABLE sessoes ADD COLUMN login_at DATETIME DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN logout_at DATETIME DEFAULT NULL`,
+      `ALTER TABLE sessoes ADD COLUMN disconnect_source VARCHAR(50) DEFAULT NULL`,
+      `ALTER TABLE sessoes ADD COLUMN disconnected_at DATETIME DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
     ];
 
