@@ -11,6 +11,8 @@ import { PinnedAgentsSection } from './agents/PinnedAgentsSection';
 interface AgentGridProps {
   agents: Agent[];
   userIdentifier?: string;
+  activeCategory?: CategoryType | string;
+  onSelectCategory?: (category: CategoryType) => void;
   onSelectChat: (agent: Agent) => void;
   onToggleFavorite: (id: string) => void;
   onEdit: (agent: Agent) => void;
@@ -108,6 +110,8 @@ const CATEGORY_MENU: CategoryMenuItem[] = [
 export const AgentGrid: React.FC<AgentGridProps> = ({
   agents,
   userIdentifier,
+  activeCategory,
+  onSelectCategory,
   onSelectChat,
   onToggleFavorite,
   onEdit,
@@ -117,7 +121,22 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   onOpenCreate,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType>('Tiktok 2K');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType>(() => {
+    return (activeCategory as CategoryType) || 'Tiktok 2K';
+  });
+
+  React.useEffect(() => {
+    if (activeCategory && activeCategory !== selectedCategory) {
+      setSelectedCategory(activeCategory as CategoryType);
+    }
+  }, [activeCategory]);
+
+  const handleCategoryChange = (catId: CategoryType) => {
+    setSelectedCategory(catId);
+    if (onSelectCategory) {
+      onSelectCategory(catId);
+    }
+  };
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [onlyCustom, setOnlyCustom] = useState(false);
   const [sortBy, setSortBy] = useState<'popular' | 'name' | 'recent'>('popular');
@@ -283,7 +302,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             return (
               <button
                 key={item.id}
-                onClick={() => setSelectedCategory(item.id)}
+                onClick={() => handleCategoryChange(item.id)}
                 className={`relative flex flex-col items-start justify-between p-3.5 rounded-xl transition-all duration-300 text-left border overflow-hidden group ${
                   isSelected
                     ? `bg-gradient-to-br from-[#0d2a4a] via-[#091f38] to-[#051224] text-white ${item.activeBorder} shadow-xl shadow-cyan-500/30 ring-2 ring-cyan-400`
