@@ -97,6 +97,80 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   const [historyList, setHistoryList] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
 
+  // Disconnect All Modal States
+  const [showDisconnectAllModal, setShowDisconnectAllModal] = useState<boolean>(false);
+  const [disconnectAllLoading, setDisconnectAllLoading] = useState<boolean>(false);
+  const [disconnectAllError, setDisconnectAllError] = useState<string | null>(null);
+  const [disconnectAllSuccessMsg, setDisconnectAllSuccessMsg] = useState<string | null>(null);
+  const [backendActiveSessionsCount, setBackendActiveSessionsCount] = useState<number | null>(null);
+  const [noSessionsNotification, setNoSessionsNotification] = useState<string | null>(null);
+
+  const getActiveValidSessionsCount = () => {
+    if (typeof backendActiveSessionsCount === 'number') {
+      return backendActiveSessionsCount;
+    }
+    return users.filter((u: any) => Boolean(u.hasActiveSession)).length;
+  };
+
+  const handleOpenDisconnectAll = () => {
+    setNoSessionsNotification(null);
+    const activeCount = getActiveValidSessionsCount();
+
+    if (activeCount <= 0) {
+      setNoSessionsNotification('Nenhuma sessão ativa encontrada.');
+      setTimeout(() => {
+        setNoSessionsNotification((prev) => (prev === 'Nenhuma sessão ativa encontrada.' ? null : prev));
+      }, 4000);
+      return;
+    }
+
+    setDisconnectAllError(null);
+    setDisconnectAllSuccessMsg(null);
+    setShowDisconnectAllModal(true);
+  };
+
+  const executeDisconnectAll = async () => {
+    if (disconnectAllLoading) return;
+
+    setDisconnectAllLoading(true);
+    setDisconnectAllError(null);
+    setDisconnectAllSuccessMsg(null);
+
+    try {
+      const res = await fetch('/api/admin/users/disconnect-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': studentCode,
+          'x-student-access-code': studentCode,
+        },
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Não foi possível encerrar todas as sessões. Tente novamente.');
+      }
+
+      const count = data.disconnectedCount ?? data.count ?? 0;
+      const successText = count === 1
+        ? '✅ 1 sessão encerrada com sucesso.'
+        : `✅ ${count} sessões encerradas com sucesso.`;
+
+      setDisconnectAllSuccessMsg(successText);
+
+      setTimeout(() => {
+        setShowDisconnectAllModal(false);
+        setDisconnectAllSuccessMsg(null);
+        fetchData(true);
+      }, 1500);
+    } catch (err: any) {
+      setDisconnectAllError(err.message || 'Não foi possível encerrar todas as sessões. Tente novamente.');
+    } finally {
+      setDisconnectAllLoading(false);
+    }
+  };
+
   const fetchData = async (isManualRefresh = false, searchOverride?: string) => {
     if (isManualRefresh) setRefreshing(true);
     setErrorMsg(null);
@@ -132,6 +206,9 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         const usersData = await usersRes.json();
         if (Array.isArray(usersData.users)) {
           setUsers(usersData.users);
+        }
+        if (typeof usersData.activeSessionsCount === 'number') {
+          setBackendActiveSessionsCount(usersData.activeSessionsCount);
         }
       }
 
@@ -384,7 +461,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 self-end sm:self-auto">
+        <div className="flex items-center space-x-3 self-end sm:self-auto flex-wrap justify-end gap-y-2">
           {lastUpdatedTime && (
             <span className="text-[11px] font-mono text-slate-400">
               Última atualização: <strong className="text-cyan-300">{lastUpdatedTime}</strong>
@@ -394,14 +471,36 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
           <button
             onClick={() => fetchData(true)}
             disabled={refreshing}
-            className="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center space-x-2 transition-all disabled:opacity-50"
+            className="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center space-x-2 transition-all disabled:opacity-50 cursor-pointer"
             title="Atualizar dados de conexões agora"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-cyan-400' : ''}`} />
             <span>{refreshing ? 'Atualizando...' : 'ATUALIZAR AGORA'}</span>
           </button>
+
+          <button
+            onClick={handleOpenDisconnectAll}
+            disabled={disconnectAllLoading}
+            className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:border-rose-400/50 text-xs font-bold flex items-center space-x-2 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+            title="Encerrar todas as sessões ativas de alunos"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-400" />
+            <span>🔄 Desconectar Todas as Sessões</span>
+          </button>
         </div>
       </div>
+
+      {noSessionsNotification && (
+        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center justify-between space-x-2 animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>{noSessionsNotification}</span>
+          </div>
+          <button onClick={() => setNoSessionsNotification(null)} className="text-amber-400 hover:text-white cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-center space-x-2">
@@ -1232,6 +1331,95 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition-colors"
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 6: DESCONECTAR TODAS AS SESSÕES */}
+      {/* ========================================================= */}
+      {showDisconnectAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#020d14] border border-rose-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl shadow-rose-950/50 space-y-5 relative">
+            <button
+              onClick={() => {
+                if (!disconnectAllLoading) {
+                  setShowDisconnectAllModal(false);
+                  setDisconnectAllError(null);
+                  setDisconnectAllSuccessMsg(null);
+                }
+              }}
+              disabled={disconnectAllLoading}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3">
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Desconectar todas as sessões?</h3>
+                <p className="text-xs text-rose-300 font-semibold mt-0.5">Ação Administrativa de Alto Impacto</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-2">
+              <p className="text-sm font-bold text-rose-200">
+                ⚠️ Desconectar todas as sessões?
+              </p>
+              <p className="text-xs text-rose-100 font-bold">
+                {getActiveValidSessionsCount()} {getActiveValidSessionsCount() === 1 ? 'sessão será encerrada.' : 'sessões serão encerradas.'}
+              </p>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Todos os alunos conectados precisarão realizar login novamente.
+              </p>
+            </div>
+
+            {disconnectAllError && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>{disconnectAllError}</span>
+              </div>
+            )}
+
+            {disconnectAllSuccessMsg && (
+              <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{disconnectAllSuccessMsg}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                onClick={() => {
+                  if (!disconnectAllLoading) {
+                    setShowDisconnectAllModal(false);
+                    setDisconnectAllError(null);
+                    setDisconnectAllSuccessMsg(null);
+                  }
+                }}
+                disabled={disconnectAllLoading}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={executeDisconnectAll}
+                disabled={disconnectAllLoading}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs transition-all shadow-lg shadow-rose-600/30 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {disconnectAllLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Desconectando...</span>
+                  </>
+                ) : (
+                  <span>Desconectar Todas</span>
+                )}
               </button>
             </div>
           </div>
