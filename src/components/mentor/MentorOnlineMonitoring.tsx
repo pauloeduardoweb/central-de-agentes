@@ -146,10 +146,22 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         },
       });
 
-      const data = await res.json();
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = null;
+        }
+      }
 
       if (!res.ok) {
-        throw new Error(data.message || 'Não foi possível encerrar todas as sessões. Tente novamente.');
+        throw new Error(data?.message || 'Não foi possível encerrar todas as sessões. Tente novamente.');
+      }
+
+      if (!data) {
+        throw new Error('Não foi possível processar a resposta do servidor. Tente novamente.');
       }
 
       const count = data.disconnectedCount ?? data.count ?? 0;
@@ -295,9 +307,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = null;
+        }
+      }
+
       if (!res.ok) {
-        throw new Error(data.message || 'Erro ao desconectar sessão.');
+        throw new Error(data?.message || 'Erro ao desconectar sessão.');
       }
 
       setActionSuccessMsg('Sessão desconectada com sucesso!');
@@ -334,9 +355,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = null;
+        }
+      }
+
       if (!res.ok) {
-        throw new Error(data.message || 'Erro ao suspender chave.');
+        throw new Error(data?.message || 'Erro ao suspender chave.');
       }
 
       setActionSuccessMsg('Chave suspensa com sucesso!');
@@ -379,9 +409,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = null;
+        }
+      }
+
       if (!res.ok) {
-        throw new Error(data.message || 'Erro ao banir chave.');
+        throw new Error(data?.message || 'Erro ao banir chave.');
       }
 
       setActionSuccessMsg('Chave banida com sucesso!');
@@ -413,9 +452,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = null;
+        }
+      }
+
       if (!res.ok) {
-        throw new Error(data.message || 'Erro ao reativar chave.');
+        throw new Error(data?.message || 'Erro ao reativar chave.');
       }
 
       setActionSuccessMsg('Chave reativada com sucesso!');
