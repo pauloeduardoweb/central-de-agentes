@@ -35,7 +35,9 @@ import {
   presenceLogoutHandler,
   getAdminMemberStatsHandler,
   getAdminOnlineUsersHandler,
+  getAdminStatsHandler,
   getAdminMemberCountHandler,
+  recordAgentInteraction,
   getKeyAccessStatus,
   adminDisconnectSessionHandler,
   adminDisconnectAllSessionsHandler,
@@ -789,6 +791,21 @@ apiRouter.post('/chat', async (req, res) => {
     });
 
     const replyText = response.text || 'Desculpe, não consegui gerar uma resposta no momento.';
+
+    // Record interaction for real stats
+    const studentCode =
+      req.body?.accessCode ??
+      req.body?.studentAccessCode ??
+      req.body?.accessKey ??
+      req.body?.code ??
+      req.headers['x-access-code'] ??
+      req.headers['x-student-access-code'];
+    const agId = req.body?.agentId || req.body?.agent?.id || 'agente-gpt';
+    const agName = req.body?.agentName || req.body?.agent?.name || 'Agente GPT';
+    const agCategory = req.body?.category || req.body?.agent?.category || 'Geral';
+
+    recordAgentInteraction(String(studentCode || ''), String(agId), String(agName), String(agCategory));
+
     res.json({ reply: replyText });
   } catch (err: any) {
     console.error('Error in /api/chat:', err);
@@ -1060,6 +1077,7 @@ apiRouter.get(['/products', '/api/products'], async (_req, res) => {
 apiRouter.get(['/admin/member-stats', '/api/admin/member-stats'], requireMentorAuth, getAdminMemberStatsHandler);
 apiRouter.get(['/admin/online-users', '/api/admin/online-users'], requireMentorAuth, getAdminOnlineUsersHandler);
 apiRouter.get(['/admin/member-count', '/api/admin/member-count'], requireMentorAuth, getAdminMemberCountHandler);
+apiRouter.get(['/admin/stats', '/api/admin/stats'], requireMentorAuth, getAdminStatsHandler);
 
 // Administrative Session & Access Key Actions (Master Session Only)
 apiRouter.post(['/admin/users/disconnect-all', '/api/admin/users/disconnect-all', '/users/disconnect-all'], requireMentorAuth, adminDisconnectAllSessionsHandler);
