@@ -84,7 +84,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('');
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'todos' | 'online' | 'ausente' | 'offline' | 'suspensos' | 'banidos'>('todos');
+  const [statusFilter, setStatusFilter] = useState<'ativos' | 'todos' | 'online' | 'ausente' | 'offline' | 'suspensos' | 'banidos'>('ativos');
 
   // Administrative Modal States
   const [selectedUser, setSelectedUser] = useState<OnlineUser | null>(null);
@@ -297,7 +297,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   };
 
   const executeDisconnect = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || actionLoading) return;
     setActionLoading(true);
     setActionError(null);
 
@@ -332,11 +332,29 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         throw new Error(data?.message || 'Erro ao desconectar sessão.');
       }
 
-      setActionSuccessMsg('Sessão desconectada com sucesso!');
+      // Optimistically update local user line immediately
+      setUsers((prevUsers) =>
+        prevUsers.map((u) => {
+          if (
+            (selectedUser.sessionRecordId && u.sessionRecordId === selectedUser.sessionRecordId) ||
+            u.maskedKey === selectedUser.maskedKey
+          ) {
+            return {
+              ...u,
+              status: 'Offline',
+              presenceStatus: 'Offline',
+              hasActiveSession: false,
+            };
+          }
+          return u;
+        })
+      );
+
+      setActionSuccessMsg('Sessão encerrada com sucesso.');
       setTimeout(() => {
         closeModal();
         fetchData();
-      }, 1200);
+      }, 300);
     } catch (err: any) {
       setActionError(err.message || 'Erro ao comunicar com o servidor.');
     } finally {
@@ -345,7 +363,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   };
 
   const executeSuspend = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || actionLoading) return;
     setActionLoading(true);
     setActionError(null);
 
@@ -384,11 +402,26 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         throw new Error(data?.message || 'Erro ao suspender chave.');
       }
 
+      setUsers((prevUsers) =>
+        prevUsers.map((u) => {
+          if (u.maskedKey === selectedUser.maskedKey) {
+            return {
+              ...u,
+              accessStatus: 'SUSPENDED',
+              status: 'Offline',
+              presenceStatus: 'Offline',
+              hasActiveSession: false,
+            };
+          }
+          return u;
+        })
+      );
+
       setActionSuccessMsg('Chave suspensa com sucesso!');
       setTimeout(() => {
         closeModal();
         fetchData();
-      }, 1200);
+      }, 300);
     } catch (err: any) {
       setActionError(err.message || 'Erro ao comunicar com o servidor.');
     } finally {
@@ -397,7 +430,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   };
 
   const executeBan = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || actionLoading) return;
 
     const finalReason = actionReason === 'Outro motivo' && customReason.trim()
       ? customReason.trim()
@@ -442,11 +475,26 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         throw new Error(data?.message || 'Erro ao banir chave.');
       }
 
+      setUsers((prevUsers) =>
+        prevUsers.map((u) => {
+          if (u.maskedKey === selectedUser.maskedKey) {
+            return {
+              ...u,
+              accessStatus: 'BANNED',
+              status: 'Offline',
+              presenceStatus: 'Offline',
+              hasActiveSession: false,
+            };
+          }
+          return u;
+        })
+      );
+
       setActionSuccessMsg('Chave banida com sucesso!');
       setTimeout(() => {
         closeModal();
         fetchData();
-      }, 1200);
+      }, 300);
     } catch (err: any) {
       setActionError(err.message || 'Erro ao comunicar com o servidor.');
     } finally {
@@ -455,7 +503,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   };
 
   const executeReactivate = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || actionLoading) return;
     setActionLoading(true);
     setActionError(null);
 
@@ -489,11 +537,23 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         throw new Error(data?.message || 'Erro ao reativar chave.');
       }
 
+      setUsers((prevUsers) =>
+        prevUsers.map((u) => {
+          if (u.maskedKey === selectedUser.maskedKey) {
+            return {
+              ...u,
+              accessStatus: 'ACTIVE',
+            };
+          }
+          return u;
+        })
+      );
+
       setActionSuccessMsg('Chave reativada com sucesso!');
       setTimeout(() => {
         closeModal();
         fetchData();
-      }, 1200);
+      }, 300);
     } catch (err: any) {
       setActionError(err.message || 'Erro ao comunicar com o servidor.');
     } finally {
@@ -503,6 +563,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
 
   // Filter users list by status (search filtering is handled on backend)
   const filteredUsers = users.filter((u) => {
+    if (statusFilter === 'ativos') return u.status === 'Online' || u.status === 'Ausente';
     if (statusFilter === 'todos') return true;
     if (statusFilter === 'online') return u.status === 'Online';
     if (statusFilter === 'ausente') return u.status === 'Ausente';
@@ -702,12 +763,24 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
           </div>
 
           {/* Status Filter Buttons */}
-          <div className="flex items-center space-x-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center space-x-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 flex-wrap gap-y-1">
+            <button
+              onClick={() => setStatusFilter('ativos')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                statusFilter === 'ativos'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Ativos ({users.filter((u) => u.status === 'Online' || u.status === 'Ausente').length})</span>
+            </button>
+
             <button
               onClick={() => setStatusFilter('todos')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 statusFilter === 'todos'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                  ? 'bg-slate-800 text-cyan-300 border border-slate-700'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -1015,10 +1088,10 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               <button
                 onClick={executeDisconnect}
                 disabled={actionLoading}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center space-x-2 disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
               >
                 {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>DESCONECTAR AGORA</span>
+                <span>{actionLoading ? 'Processando...' : 'DESCONECTAR AGORA'}</span>
               </button>
             </div>
           </div>
@@ -1102,10 +1175,10 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               <button
                 onClick={executeSuspend}
                 disabled={actionLoading}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center space-x-2 disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
               >
                 {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>CONFIRMAR SUSPENSÃO</span>
+                <span>{actionLoading ? 'Processando...' : 'CONFIRMAR SUSPENSÃO'}</span>
               </button>
             </div>
           </div>
@@ -1253,10 +1326,10 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                   <button
                     onClick={executeBan}
                     disabled={actionLoading}
-                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition-all shadow-lg shadow-red-600/30 flex items-center space-x-2 disabled:opacity-50"
+                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition-all shadow-lg shadow-red-600/30 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
                   >
                     {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                    <span>Confirmar Banimento</span>
+                    <span>{actionLoading ? 'Processando...' : 'Confirmar Banimento'}</span>
                   </button>
                 </div>
               </>
@@ -1317,10 +1390,10 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               <button
                 onClick={executeReactivate}
                 disabled={actionLoading}
-                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center space-x-2 disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
               >
                 {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>CONFIRMAR REATIVAÇÃO</span>
+                <span>{actionLoading ? 'Processando...' : 'CONFIRMAR REATIVAÇÃO'}</span>
               </button>
             </div>
           </div>
