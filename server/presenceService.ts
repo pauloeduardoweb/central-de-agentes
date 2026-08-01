@@ -5,6 +5,8 @@ import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ens
 import { normalizeAccessCode, lookupKeyType, STUDENT_KEYS, MASTER_KEYS } from './authKeys.js';
 import { maskStudentCode } from './rankingService.js';
 
+export const PRESENCE_VERSION = '2026-08-01-final-disconnect-v1';
+
 export function isMasterKey(rawCode: unknown): boolean {
   const norm = normalizeAccessCode(rawCode);
   if (!norm) return false;
@@ -452,21 +454,29 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
     if (!cleanCode) {
       return res.status(400).json({
         error: 'ACCESS_CODE_REQUIRED',
+        presenceVersion: PRESENCE_VERSION,
         message: 'Informe o código de acesso.',
       });
     }
+
+    console.log('[HEARTBEAT RECEBIDO]', {
+      codigo: cleanCode,
+      sessionId,
+      currentPage,
+    });
 
     const keyType = await checkCodeKeyType(cleanCode);
     if (keyType === 'INVALID') {
       return res.status(401).json({
         error: 'INVALID_ACCESS_CODE',
+        presenceVersion: PRESENCE_VERSION,
         message: 'O código informado é inválido.',
       });
     }
 
     // Master keys are exempt from session table persistence (Rule 3)
     if (keyType === 'MASTER') {
-      return res.json({ status: 'ok', online: true, isMaster: true, role: 'mentor' });
+      return res.json({ status: 'ok', online: true, isMaster: true, role: 'mentor', presenceVersion: PRESENCE_VERSION });
     }
 
     // Check key status first (Suspended / Banned)
@@ -476,6 +486,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
       return res.status(423).json({
         error: 'KEY_SUSPENDED',
         accessStatus: 'SUSPENDED',
+        presenceVersion: PRESENCE_VERSION,
         title: 'Acesso temporariamente suspenso',
         message: 'Sua chave de acesso está temporariamente suspensa pelo Mentor. Entre em contato com o suporte caso tenha dúvidas.',
       });
@@ -484,6 +495,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
       memorySessionsMap.delete(cleanCode);
       return res.status(403).json({
         error: 'KEY_BANNED',
+        presenceVersion: PRESENCE_VERSION,
         title: 'Acesso permanentemente bloqueado',
         message: 'Esta chave de acesso foi banida pelo Mentor e não pode mais ser utilizada. Caso acredite que isso ocorreu por engano, entre em contato com o suporte da Mentoria Geração Z Pro.',
       });
@@ -492,6 +504,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
     if (!sessionId) {
       return res.status(401).json({
         error: 'SESSION_REQUIRED',
+        presenceVersion: PRESENCE_VERSION,
         message: 'Sessão inválida. Efetue login novamente.',
       });
     }
@@ -517,6 +530,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
             return res.status(423).json({
               error: 'KEY_SUSPENDED',
               accessStatus: 'SUSPENDED',
+              presenceVersion: PRESENCE_VERSION,
               title: 'Acesso temporariamente suspenso',
               message: 'Sua chave de acesso está temporariamente suspensa pelo Mentor. Entre em contato com o suporte caso tenha dúvidas.',
             });
@@ -525,6 +539,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
             memorySessionsMap.delete(cleanCode);
             return res.status(403).json({
               error: 'KEY_BANNED',
+              presenceVersion: PRESENCE_VERSION,
               title: 'Acesso permanentemente bloqueado',
               message: 'Esta chave de acesso foi banida pelo Mentor e não pode mais ser utilizada. Caso acredite que isso ocorreu por engano, entre em contato com o suporte da Mentoria Geração Z Pro.',
             });
@@ -533,6 +548,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
             memorySessionsMap.delete(cleanCode);
             return res.status(401).json({
               error: 'ADMIN_DISCONNECTED',
+              presenceVersion: PRESENCE_VERSION,
               message: 'Sua sessão foi encerrada pelo Mentor.',
             });
           }
@@ -540,6 +556,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
             memorySessionsMap.delete(cleanCode);
             return res.status(401).json({
               error: 'SESSION_EXPIRED',
+              presenceVersion: PRESENCE_VERSION,
               message: 'Esta chave de acesso foi conectada em outro dispositivo. Efetue login novamente.',
             });
           }
@@ -547,6 +564,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
             memorySessionsMap.delete(cleanCode);
             return res.status(401).json({
               error: 'SESSION_EXPIRED',
+              presenceVersion: PRESENCE_VERSION,
               message: 'Sessão de 30 dias expirada. Efetue login novamente.',
             });
           }
@@ -556,6 +574,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
           memorySessionsMap.delete(cleanCode);
           return res.status(401).json({
             error: 'ADMIN_DISCONNECTED',
+            presenceVersion: PRESENCE_VERSION,
             message: 'Sua sessão foi encerrada pelo Mentor.',
           });
         }
@@ -638,6 +657,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
     return res.json({
       status: 'ok',
       online: true,
+      presenceVersion: PRESENCE_VERSION,
       lastHeartbeatAt: now.toISOString(),
     });
   } catch (err: any) {
@@ -890,7 +910,7 @@ export async function getCentralPresenceData() {
             reactivatedBy: r.reactivated_by || null,
             lastAdminAction: r.last_admin_action || null,
             lastAdminActionAt: r.last_admin_action_at ? new Date(r.last_admin_action_at).toISOString() : null,
-            currentPage: r.current_page || memSession?.currentPage || 'Agentes GPT',
+            currentPage: r.current_page || memSession?.currentPage || 'TikTok 2K',
             deviceType: r.device_type || memSession?.deviceType || deviceType,
             operatingSystem: r.operating_system || memSession?.operatingSystem || operatingSystem,
             browserName: r.browser_name || memSession?.browserName || browserName,
@@ -1032,7 +1052,7 @@ export async function getCentralPresenceData() {
           reactivatedBy: memKeyInfo?.reactivatedBy || null,
           lastAdminAction: memKeyInfo?.lastAdminAction || null,
           lastAdminActionAt: memKeyInfo?.lastAdminActionAt || null,
-          currentPage: memSession.currentPage || 'Agentes GPT',
+          currentPage: memSession.currentPage || 'TikTok 2K',
           deviceType: memSession.deviceType || 'Desktop',
           operatingSystem: memSession.operatingSystem || 'Windows',
           browserName: memSession.browserName || 'Chrome',
@@ -1317,6 +1337,7 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
 
     return res.json({
       success: true,
+      presenceVersion: PRESENCE_VERSION,
       totalSessions: sanitizedUsers.length,
       activeSessionsCount,
       users: sanitizedUsers,
@@ -1687,10 +1708,30 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
 
       await recordAdminAuditAction(targetRow.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
 
+      const [checkRows]: any = await db.query(
+        `SELECT active_session_id FROM sessoes WHERE codigo = ? ORDER BY id DESC LIMIT 1`,
+        [targetRow.codigo]
+      );
+      const activeSessionIdAfter = (Array.isArray(checkRows) && checkRows.length > 0) ? checkRows[0].active_session_id : null;
+
+      if (activeSessionIdAfter !== null) {
+        return res.status(500).json({
+          success: false,
+          presenceVersion: PRESENCE_VERSION,
+          error: 'DISCONNECT_FAILED',
+          message: 'Falha ao validar o encerramento da sessão no banco de dados.',
+          activeSessionIdAfter,
+        });
+      }
+
       return res.json({
         success: true,
+        presenceVersion: PRESENCE_VERSION,
         disconnectedCount: 1,
+        affectedRows,
         sessionRecordId: targetRow.id,
+        activeSessionIdAfter: null,
+        disconnectSource: 'MENTOR_SINGLE',
         message: '1 sessão desconectada com sucesso.',
       });
     }
@@ -1702,14 +1743,19 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
       memorySessionsMap.delete(normCode);
       return res.json({
         success: true,
+        presenceVersion: PRESENCE_VERSION,
         disconnectedCount: 1,
+        affectedRows: 1,
         sessionRecordId: sessionRecordId || 1,
+        activeSessionIdAfter: null,
+        disconnectSource: 'MENTOR_SINGLE',
         message: '1 sessão desconectada com sucesso.',
       });
     }
 
     return res.status(404).json({
       success: false,
+      presenceVersion: PRESENCE_VERSION,
       error: 'SESSION_NOT_FOUND',
       message: 'Sessão não encontrada.',
     });
@@ -1717,6 +1763,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
     console.error('[Admin Disconnect Session Error]:', err?.message || err);
     return res.status(500).json({
       error: 'SERVER_ERROR',
+      presenceVersion: PRESENCE_VERSION,
       message: 'Não foi possível concluir a ação. Tente novamente.',
     });
   }
@@ -1788,7 +1835,11 @@ export async function adminDisconnectAllSessionsHandler(req: express.Request, re
 
     return res.json({
       success: true,
+      presenceVersion: PRESENCE_VERSION,
       disconnectedCount: affectedCount,
+      affectedRows: affectedCount,
+      activeSessionIdAfter: null,
+      disconnectSource: 'MENTOR_ALL',
       count: affectedCount,
       message: messageText,
     });
@@ -1796,6 +1847,7 @@ export async function adminDisconnectAllSessionsHandler(req: express.Request, re
     console.error('[Admin Disconnect All Sessions Error]:', err?.message || err);
     return res.status(500).json({
       error: 'SERVER_ERROR',
+      presenceVersion: PRESENCE_VERSION,
       message: 'Não foi possível encerrar todas as sessões. Tente novamente.',
     });
   }

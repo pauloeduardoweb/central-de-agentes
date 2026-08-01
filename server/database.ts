@@ -95,7 +95,7 @@ export async function ensureSessionsTable(): Promise<void> {
         expires_at DATETIME,
         is_online BOOLEAN DEFAULT FALSE,
         status VARCHAR(20) DEFAULT 'offline',
-        current_page VARCHAR(255) DEFAULT 'Agentes GPT',
+        current_page VARCHAR(255) DEFAULT 'TikTok 2K',
         ip_address VARCHAR(100) DEFAULT NULL,
         user_agent TEXT DEFAULT NULL,
         device_type VARCHAR(50) DEFAULT 'Desktop',
@@ -110,7 +110,7 @@ export async function ensureSessionsTable(): Promise<void> {
     // Ensure columns exist if table was created previously without them
     const alterQueries = [
       `ALTER TABLE sessoes ADD COLUMN id INT AUTO_INCREMENT UNIQUE KEY`,
-      `ALTER TABLE sessoes ADD COLUMN current_page VARCHAR(255) DEFAULT 'Agentes GPT'`,
+      `ALTER TABLE sessoes ADD COLUMN current_page VARCHAR(255) DEFAULT 'TikTok 2K'`,
       `ALTER TABLE sessoes ADD COLUMN ip_address VARCHAR(100) DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN user_agent TEXT DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN device_type VARCHAR(50) DEFAULT 'Desktop'`,
@@ -158,8 +158,12 @@ export async function cleanLegacyDisconnections(): Promise<void> {
             AND codigo NOT IN (
               SELECT ca.codigo
               FROM admin_access_actions a
-              JOIN codigos_acesso ca ON ca.id = a.target_access_key_id
+              JOIN codigos_acesso ca ON a.target_access_key_id = ca.id
               WHERE a.action_type IN ('DISCONNECT', 'DISCONNECT_ALL_SESSIONS')
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM admin_access_actions a2
+              WHERE a2.action_type = 'DISCONNECT_ALL_SESSIONS'
             )
           )
         )
