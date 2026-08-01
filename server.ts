@@ -56,6 +56,8 @@ import {
 
 dotenv.config();
 
+console.log('[SERVER BUILD VERSION]', PRESENCE_VERSION);
+
 // Startup validation of keys count
 const { masterCount, studentCount, totalCount } = verifyLoadedKeysCount();
 console.log(`Chaves mestras carregadas: ${masterCount}`);
@@ -150,6 +152,16 @@ apiRouter.get(['/auth/status', '/api/auth/status'], async (_req, res) => {
       message: 'O sistema de autenticação não foi carregado corretamente.',
     });
   }
+});
+
+// Production build version endpoint
+apiRouter.get(['/version', '/api/version'], (_req, res) => {
+  res.json({
+    success: true,
+    presenceVersion: PRESENCE_VERSION,
+    buildTimestamp: new Date().toISOString(),
+    commit: '2026-08-01-final-disconnect-v1',
+  });
 });
 
 // Diagnostic Endpoint for session status by code (Rule 17)
