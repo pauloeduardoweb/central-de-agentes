@@ -652,10 +652,10 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               {stats.absentSessions}
             </span>
             <span className="text-[11px] text-amber-400 ml-2 font-semibold">
-              ausente (90s - 5m)
+              ausentes
             </span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">Sem interação recente</p>
+          <p className="text-[10px] text-slate-400 mt-1">Sem interação entre 90s e 1h</p>
         </div>
 
       </div>

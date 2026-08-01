@@ -15,6 +15,9 @@ import {
 import { ProductLibrary } from './ProductLibrary';
 import { MentorStudentsList } from './MentorStudentsList';
 import { MentorOnlineMonitoring } from './MentorOnlineMonitoring';
+import { MentorChallenges } from './MentorChallenges';
+import { MentorAccessCodes } from './MentorAccessCodes';
+import { MentorStats } from './MentorStats';
 
 interface MentorPanelProps {
   studentCode: string;
@@ -39,9 +42,9 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
       title: 'Criar Desafios',
       description: 'Crie e edite desafios e ganchos virais para a Academia de Desafios.',
       icon: Trophy,
-      badge: 'Em breve',
-      badgeColor: 'bg-slate-800/80 text-slate-400 border-slate-700',
-      isAvailable: false,
+      badge: 'Ativo',
+      badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
+      isAvailable: true,
     },
     {
       id: 'students',
@@ -52,15 +55,14 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
       badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
       isAvailable: true,
     },
-
     {
       id: 'codes',
       title: 'Códigos de Acesso',
       description: 'Gerenciamento de chaves de alunos e liberação de novas licenças.',
       icon: Key,
-      badge: 'Em breve',
-      badgeColor: 'bg-slate-800/80 text-slate-400 border-slate-700',
-      isAvailable: false,
+      badge: 'Ativo',
+      badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
+      isAvailable: true,
     },
     {
       id: 'sessions',
@@ -76,9 +78,9 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
       title: 'Estatísticas',
       description: 'Métricas avançadas de uso de agentes, desafios concluídos e acessos.',
       icon: BarChart3,
-      badge: 'Em breve',
-      badgeColor: 'bg-slate-800/80 text-slate-400 border-slate-700',
-      isAvailable: false,
+      badge: 'Ativo',
+      badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
+      isAvailable: true,
     },
   ];
 
@@ -189,11 +191,20 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
         {activeTab === 'products' && (
           <ProductLibrary studentCode={studentCode} />
         )}
+        {activeTab === 'challenges' && (
+          <MentorChallenges studentCode={studentCode} />
+        )}
         {activeTab === 'students' && (
           <MentorStudentsList />
         )}
+        {activeTab === 'codes' && (
+          <MentorAccessCodes studentCode={studentCode} />
+        )}
         {activeTab === 'sessions' && (
           <MentorOnlineMonitoring studentCode={studentCode} />
+        )}
+        {activeTab === 'stats' && (
+          <MentorStats studentCode={studentCode} />
         )}
       </div>
 
