@@ -685,13 +685,13 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
         onlineNow = Number(onlineRows[0].count) || 0;
       }
 
-      // 2. Absent: last_heartbeat_at between 90s and 300s (5 min)
+      // 2. Absent: last_heartbeat_at between 90s and 1 HOUR (3600s)
       const [absentRows]: any = await db.query(
         `SELECT COUNT(*) AS count
          FROM sessoes
          WHERE (access_status IS NULL OR access_status = 'ACTIVE')
          AND last_heartbeat_at < DATE_SUB(NOW(), INTERVAL 90 SECOND)
-         AND last_heartbeat_at >= DATE_SUB(NOW(), INTERVAL 300 SECOND)`
+         AND last_heartbeat_at >= DATE_SUB(NOW(), INTERVAL 3600 SECOND)`
       );
       if (Array.isArray(absentRows) && absentRows[0]) {
         absentSessions = Number(absentRows[0].count) || 0;
@@ -718,7 +718,7 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
         const diffSec = (nowMs - s.lastHeartbeatAt.getTime()) / 1000;
         if (diffSec <= 90) {
           onlineNow++;
-        } else if (diffSec <= 300) {
+        } else if (diffSec <= 3600) {
           absentSessions++;
         }
         if (s.startedAt.toDateString() === new Date().toDateString()) {
@@ -824,7 +824,7 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
 
           if (accStat === 'ACTIVE' && secondsSinceHb <= 90) {
             calculatedPresence = 'Online';
-          } else if (accStat === 'ACTIVE' && secondsSinceHb <= 300) {
+          } else if (accStat === 'ACTIVE' && secondsSinceHb <= 3600) {
             calculatedPresence = 'Ausente';
           } else {
             calculatedPresence = 'Offline';
@@ -845,6 +845,7 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
             username: r.nome_usuario || `Aluno ${maskStudentCode(r.codigo)}`,
             avatar: r.avatar || null,
             maskedKey: maskKeyForAdmin(r.codigo),
+            status: calculatedPresence,
             presenceStatus: calculatedPresence,
             hasActiveSession,
             accessStatus: accStat as 'ACTIVE' | 'SUSPENDED' | 'BANNED',
@@ -885,7 +886,7 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
         if (memSession) {
           const sec = (nowMs - memSession.lastHeartbeatAt.getTime()) / 1000;
           if (sec <= 90) presence = 'Online';
-          else if (sec <= 300) presence = 'Ausente';
+          else if (sec <= 3600) presence = 'Ausente';
         }
 
         const accStat = memKeyInfo?.accessStatus || 'ACTIVE';
@@ -896,6 +897,7 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
           username: `Aluno ${maskKeyForAdmin(key)}`,
           avatar: null,
           maskedKey: maskKeyForAdmin(key),
+          status: accStat === 'ACTIVE' ? presence : 'Offline',
           presenceStatus: accStat === 'ACTIVE' ? presence : 'Offline',
           hasActiveSession,
           accessStatus: accStat,
