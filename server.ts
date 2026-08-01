@@ -47,6 +47,9 @@ import {
   adminGetAccessHistoryHandler,
   getAdminAccessKeysHandler,
   generateAccessKeysHandler,
+  adminGetStudentHistoryHandler,
+  adminGetActivityFeedHandler,
+  recordSessionHistoryEvent,
   checkCodeKeyType,
   memorySessionsMap,
   getClientIp,
@@ -446,6 +449,17 @@ async function handleLogin(req: express.Request, res: express.Response) {
           status: 'online',
           expiresAt,
         });
+
+        // Record history event
+        recordSessionHistoryEvent({
+          codigo: cleanCode,
+          sessionId,
+          eventType: 'LOGIN',
+          page: (req.body?.currentPage && String(req.body.currentPage).trim() !== '') ? String(req.body.currentPage).trim() : 'TikTok 2K',
+          device: `${operatingSystem} • ${browserName}`,
+          ip: clientIp,
+          details: 'Aluno efetuou login no sistema',
+        }).catch(() => {});
 
         console.log(`[AUTH LOG] type=STUDENT masked=${maskedCode} sessionFound=${sessionFound} sessionValid=${activeSessionValid} recorded=true http=200`);
 
@@ -1152,6 +1166,8 @@ apiRouter.post(['/admin/access-keys/:id/ban', '/api/admin/access-keys/:id/ban', 
 apiRouter.get(['/admin/access-keys/:id/history', '/api/admin/access-keys/:id/history', '/admin/access-keys/history', '/api/admin/access-keys/history'], requireMentorAuth, adminGetAccessHistoryHandler);
 apiRouter.get(['/admin/access-keys', '/api/admin/access-keys'], requireMentorAuth, getAdminAccessKeysHandler);
 apiRouter.post(['/admin/access-keys/generate', '/api/admin/access-keys/generate'], requireMentorAuth, generateAccessKeysHandler);
+apiRouter.get(['/admin/student-history/:idOrCode', '/api/admin/student-history/:idOrCode', '/admin/student-history', '/api/admin/student-history'], requireMentorAuth, adminGetStudentHistoryHandler);
+apiRouter.get(['/admin/activity-feed', '/api/admin/activity-feed'], requireMentorAuth, adminGetActivityFeedHandler);
 
 // 1. GET /api/admin/products
 apiRouter.get(['/admin/products', '/api/admin/products'], requireMentorAuth, async (_req, res) => {
