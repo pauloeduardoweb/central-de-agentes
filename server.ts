@@ -337,10 +337,24 @@ async function handleLogin(req: express.Request, res: express.Response) {
           });
         }
 
-        // Reuse activeSessionIdInDb if valid on same device, or existingSessionId, or new UUID
+        // If session is no longer active in DB, and client is attempting auto-verification of an old disconnected session ID -> 401 Disconnected
+        if (!activeSessionValid && existingSessionId && !req.body?.isNewLogin) {
+          await connection.rollback();
+          connection.release();
+          memorySessionsMap.delete(cleanCode);
+
+          console.log(`[AUTH LOG] type=STUDENT masked=${maskedCode} sessionFound=${sessionFound} sessionValid=false rejectedDisconnected=true http=401`);
+
+          return res.status(401).json({
+            error: 'ADMIN_DISCONNECTED',
+            message: 'Sua sessão foi encerrada pelo Mentor. Efetue login novamente.',
+          });
+        }
+
+        // Reuse activeSessionIdInDb if valid on same device, or generate fresh UUID for new login
         const sessionId = (activeSessionValid && activeSessionIdInDb)
           ? activeSessionIdInDb
-          : (existingSessionId || crypto.randomUUID());
+          : crypto.randomUUID();
 
         const effectiveDeviceId = deviceId || deviceIdInDb || `device-${sessionId.slice(0, 8)}`;
 
@@ -460,7 +474,15 @@ async function handleLogin(req: express.Request, res: express.Response) {
         });
       }
 
-      const sessionId = (isMemValid && memSession?.sessionId) ? memSession.sessionId : (existingSessionId || crypto.randomUUID());
+      if (!isMemValid && existingSessionId && !req.body?.isNewLogin) {
+        memorySessionsMap.delete(cleanCode);
+        return res.status(401).json({
+          error: 'ADMIN_DISCONNECTED',
+          message: 'Sua sessão foi encerrada pelo Mentor. Efetue login novamente.',
+        });
+      }
+
+      const sessionId = (isMemValid && memSession?.sessionId) ? memSession.sessionId : crypto.randomUUID();
       const effectiveDeviceId = deviceId || memSession?.deviceId || `device-${sessionId.slice(0, 8)}`;
       const now = new Date();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
