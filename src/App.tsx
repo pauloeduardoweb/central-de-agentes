@@ -115,9 +115,14 @@ export default function App() {
           );
 
           if (isSuspended || isBanned || isInvalidCode || isExplicitRevocation) {
-            localStorage.removeItem('user_student_access_code');
-            localStorage.removeItem('user_session_id');
-            localStorage.removeItem('user_gemini_api_key');
+            try {
+              localStorage.clear();
+              sessionStorage.clear();
+            } catch (e) {
+              localStorage.removeItem('user_student_access_code');
+              localStorage.removeItem('user_session_id');
+              localStorage.removeItem('user_gemini_api_key');
+            }
             setUserApiKey('');
             setStudentCode('');
             setSessionId('');
@@ -231,9 +236,14 @@ export default function App() {
           );
 
           if (isSuspended || isBanned || isExplicitRevocation) {
-            localStorage.removeItem('user_student_access_code');
-            localStorage.removeItem('user_session_id');
-            localStorage.removeItem('user_gemini_api_key');
+            try {
+              localStorage.clear();
+              sessionStorage.clear();
+            } catch (e) {
+              localStorage.removeItem('user_student_access_code');
+              localStorage.removeItem('user_session_id');
+              localStorage.removeItem('user_gemini_api_key');
+            }
             setUserApiKey('');
             setStudentCode('');
             setSessionId('');
