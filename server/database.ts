@@ -124,10 +124,49 @@ export async function ensureSessionsTable(): Promise<void> {
     for (const q of alterQueries) {
       await db.query(q).catch(() => {});
     }
+    await deduplicateSessionsTable();
     await ensureCodigosAcessoTable();
     await ensureAdminAccessTable();
   } catch (err: any) {
     console.warn('[MySQL ensureSessionsTable Error]:', err?.message || err);
+  }
+}
+
+export async function deduplicateSessionsTable(): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  try {
+    const [dupCodes]: any = await db.query(
+      `SELECT codigo, COUNT(*) as cnt FROM sessoes GROUP BY codigo HAVING cnt > 1`
+    );
+    if (Array.isArray(dupCodes) && dupCodes.length > 0) {
+      console.log(`[Deduplicate] Found ${dupCodes.length} duplicate session codes in database. Cleaning up...`);
+      for (const item of dupCodes) {
+        const code = item.codigo;
+        const [rows]: any = await db.query(
+          `SELECT id, active_session_id, expires_at, last_heartbeat_at
+           FROM sessoes
+           WHERE codigo = ?
+           ORDER BY
+             (CASE WHEN active_session_id IS NOT NULL AND expires_at > NOW() THEN 1 ELSE 0 END) DESC,
+             last_heartbeat_at DESC,
+             id DESC`,
+          [code]
+        );
+        if (Array.isArray(rows) && rows.length > 1) {
+          const canonicalId = rows[0].id;
+          const deleteIds = rows.slice(1).map((r: any) => r.id);
+          if (deleteIds.length > 0) {
+            await db.query(`DELETE FROM sessoes WHERE id IN (?)`, [deleteIds]);
+            console.log(`[Deduplicate] Code ${code}: kept canonical row ${canonicalId}, removed duplicate rows ${deleteIds.join(',')}`);
+          }
+        }
+      }
+    }
+
+    // Try adding unique key uk_sessoes_codigo if not already present
+    await db.query(`ALTER TABLE sessoes ADD UNIQUE KEY uk_sessoes_codigo (codigo)`).catch(() => {});
+  } catch (err: any) {
+    console.warn('[deduplicateSessionsTable Warning]:', err?.message || err);
   }
 }
 

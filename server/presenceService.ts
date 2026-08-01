@@ -506,7 +506,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
         await ensureSessionsTable();
 
         const [rows]: any = await db.query(
-          `SELECT active_session_id, expires_at, access_status FROM sessoes WHERE codigo = ?`,
+          `SELECT active_session_id, expires_at, access_status FROM sessoes WHERE codigo = ? ORDER BY (CASE WHEN active_session_id IS NOT NULL AND expires_at > NOW() THEN 1 ELSE 0 END) DESC, last_heartbeat_at DESC LIMIT 1`,
           [cleanCode]
         );
 
@@ -789,7 +789,10 @@ export async function getCentralPresenceData() {
         FROM sessoes s
         LEFT JOIN codigos_acesso ca ON s.codigo = ca.codigo
         LEFT JOIN perfis_alunos pf ON s.codigo = pf.codigo
-        ORDER BY s.last_heartbeat_at DESC
+        ORDER BY
+          (CASE WHEN s.active_session_id IS NOT NULL AND s.expires_at > NOW() THEN 1 ELSE 0 END) DESC,
+          s.last_heartbeat_at DESC,
+          s.id DESC
       `;
 
       const [rows]: any = await db.query(query);
@@ -799,6 +802,7 @@ export async function getCentralPresenceData() {
           if (!r.codigo || isMasterKey(r.codigo)) continue; // Master keys are NEVER counted as students
 
           const normCode = normalizeAccessCode(r.codigo);
+          if (!normCode || usersMapByCode.has(normCode)) continue; // Keep only canonical (first) row per code!
 
           const memSession = memorySessionsMap.get(normCode);
           let lastHbMs = r.last_heartbeat_at ? new Date(r.last_heartbeat_at).getTime() : 0;
@@ -829,9 +833,15 @@ export async function getCentralPresenceData() {
 
           const { deviceType, operatingSystem, browserName } = parseUserAgent(r.user_agent || memSession?.userAgent);
 
-          const devStr = (r.device_type || memSession?.deviceType) && (r.browser_name || memSession?.browserName)
-            ? `${r.operating_system || memSession?.operatingSystem || operatingSystem} • ${r.browser_name || memSession?.browserName || browserName}`
-            : `${operatingSystem} • ${browserName}`;
+          const finalOs = (r.operating_system && r.operating_system !== 'Desconhecido')
+            ? r.operating_system
+            : (memSession?.operatingSystem || operatingSystem);
+
+          const finalBrowser = (r.browser_name && r.browser_name !== 'Desconhecido')
+            ? r.browser_name
+            : (memSession?.browserName || browserName);
+
+          const devStr = `${finalOs} • ${finalBrowser}`;
 
           const isExpiresAtFuture = r.expires_at
             ? new Date(r.expires_at).getTime() > Date.now()
@@ -1604,11 +1614,20 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
       }
 
       if (!targetRow.active_session_id) {
-        return res.status(409).json({
-          success: false,
-          error: 'SESSION_NOT_ACTIVE',
-          message: 'Esta sessão já está encerrada.',
-        });
+        // Check if there is an active session row for the same codigo
+        const [activeRows]: any = await db.query(
+          `SELECT id, codigo, active_session_id, expires_at, logout_at FROM sessoes WHERE codigo = ? AND active_session_id IS NOT NULL ORDER BY last_heartbeat_at DESC LIMIT 1`,
+          [targetRow.codigo]
+        );
+        if (Array.isArray(activeRows) && activeRows.length > 0) {
+          targetRow = activeRows[0];
+        } else {
+          return res.status(409).json({
+            success: false,
+            error: 'SESSION_NOT_ACTIVE',
+            message: 'Esta sessão já está encerrada.',
+          });
+        }
       }
 
       if (isMasterKey(targetRow.codigo)) {
@@ -1629,9 +1648,9 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
            status = 'offline',
            logout_at = NOW(),
            updated_at = NOW()
-         WHERE id = ?
+         WHERE codigo = ?
            AND active_session_id IS NOT NULL`,
-        [targetRow.id]
+        [targetRow.codigo]
       );
 
       const affectedRows = updateRes && typeof updateRes.affectedRows === 'number' ? updateRes.affectedRows : 0;
