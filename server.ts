@@ -38,6 +38,7 @@ import {
   getAdminMemberCountHandler,
   getKeyAccessStatus,
   adminDisconnectSessionHandler,
+  adminDisconnectAllSessionsHandler,
   adminSuspendKeyHandler,
   adminReactivateKeyHandler,
   adminBanKeyHandler,
@@ -1061,6 +1062,7 @@ apiRouter.get(['/admin/online-users', '/api/admin/online-users'], requireMentorA
 apiRouter.get(['/admin/member-count', '/api/admin/member-count'], requireMentorAuth, getAdminMemberCountHandler);
 
 // Administrative Session & Access Key Actions (Master Session Only)
+apiRouter.post(['/admin/users/disconnect-all', '/api/admin/users/disconnect-all', '/users/disconnect-all'], requireMentorAuth, adminDisconnectAllSessionsHandler);
 apiRouter.post(['/admin/users/:id/disconnect', '/api/admin/users/:id/disconnect', '/admin/users/disconnect', '/api/admin/users/disconnect'], requireMentorAuth, adminDisconnectSessionHandler);
 apiRouter.post(['/admin/access-keys/:id/suspend', '/api/admin/access-keys/:id/suspend', '/admin/access-keys/suspend', '/api/admin/access-keys/suspend'], requireMentorAuth, adminSuspendKeyHandler);
 apiRouter.post(['/admin/access-keys/:id/reactivate', '/api/admin/access-keys/:id/reactivate', '/admin/access-keys/reactivate', '/api/admin/access-keys/reactivate'], requireMentorAuth, adminReactivateKeyHandler);
