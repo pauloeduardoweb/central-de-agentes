@@ -11,6 +11,21 @@ export function isMasterKey(rawCode: unknown): boolean {
   return MASTER_KEYS.has(norm) || lookupKeyType(norm) === 'MASTER';
 }
 
+export async function ensurePicoTable() {
+  if (!isDatabaseConfigured()) return;
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS pico_simultaneo_diario (
+        data_dia DATE PRIMARY KEY,
+        pico INT NOT NULL DEFAULT 0,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+  } catch (err) {
+    console.warn('[ensurePicoTable Warning]:', err);
+  }
+}
+
 export function resolveStudentCode(targetInput: unknown): string | null {
   const norm = normalizeAccessCode(targetInput);
   if (!norm) return null;
@@ -708,10 +723,22 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
     let onlineNow = 0;
     let absentSessions = 0;
     let accessesToday = 0;
-    const totalMembers = STUDENT_KEYS.size || 200;
+    let totalMembers = STUDENT_KEYS.size || 200;
 
     if (isDatabaseConfigured()) {
+      await ensurePicoTable();
+      await ensureCodigosAcessoTable();
       await ensureSessionsTable();
+
+      // Total members registered in codigos_acesso
+      try {
+        const [totalRows]: any = await db.query(`SELECT COUNT(*) AS count FROM codigos_acesso`);
+        if (Array.isArray(totalRows) && totalRows[0] && Number(totalRows[0].count) > 0) {
+          totalMembers = Number(totalRows[0].count);
+        }
+      } catch (e) {
+        console.warn('[Admin Member Stats] Error counting codigos_acesso:', e);
+      }
 
       // 1. Online Now: last_heartbeat_at within last 90 seconds (1.5 min) and active status
       const [onlineRows]: any = await db.query(
@@ -736,7 +763,7 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
         absentSessions = Number(absentRows[0].count) || 0;
       }
 
-      // 3. Accesses Today: sessions started or active today
+      // 3. Accesses Today: sessions started or active today (since 00:00)
       const [todayRows]: any = await db.query(
         `SELECT COUNT(*) AS count
          FROM sessoes
@@ -747,6 +774,42 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
       if (Array.isArray(todayRows) && todayRows[0]) {
         accessesToday = Number(todayRows[0].count) || 0;
       }
+
+      // 4. Pico Simultâneo (Persisted in MySQL table pico_simultaneo_diario)
+      let peakSimultaneous = onlineNow;
+      try {
+        const [picoRows]: any = await db.query(
+          `SELECT pico FROM pico_simultaneo_diario WHERE data_dia = CURDATE() LIMIT 1`
+        );
+        if (Array.isArray(picoRows) && picoRows.length > 0) {
+          const storedPeak = Number(picoRows[0].pico) || 0;
+          peakSimultaneous = Math.max(storedPeak, onlineNow);
+          if (onlineNow > storedPeak) {
+            await db.query(`UPDATE pico_simultaneo_diario SET pico = ? WHERE data_dia = CURDATE()`, [onlineNow]);
+          }
+        } else {
+          await db.query(
+            `INSERT INTO pico_simultaneo_diario (data_dia, pico) VALUES (CURDATE(), ?)
+             ON DUPLICATE KEY UPDATE pico = GREATEST(pico, VALUES(pico))`,
+            [onlineNow]
+          );
+          peakSimultaneous = onlineNow;
+        }
+      } catch (picoErr) {
+        console.warn('[Admin Member Stats] Pico DB error fallback to memory:', picoErr);
+        if (onlineNow > dailyPeakCount) dailyPeakCount = onlineNow;
+        peakSimultaneous = Math.max(dailyPeakCount, onlineNow);
+      }
+
+      return res.json({
+        success: true,
+        onlineNow,
+        totalMembers,
+        accessesToday: Math.max(accessesToday, onlineNow),
+        peakSimultaneous,
+        absentSessions,
+        updatedAt: new Date().toISOString(),
+      });
     } else {
       // Memory statistics calculations
       const nowMs = Date.now();
@@ -764,22 +827,21 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
           accessesToday++;
         }
       }
-    }
 
-    // Update peak count if current online is higher
-    if (onlineNow > dailyPeakCount) {
-      dailyPeakCount = onlineNow;
-    }
+      if (onlineNow > dailyPeakCount) {
+        dailyPeakCount = onlineNow;
+      }
 
-    return res.json({
-      success: true,
-      onlineNow,
-      totalMembers,
-      accessesToday: Math.max(accessesToday, onlineNow),
-      peakSimultaneous: Math.max(dailyPeakCount, onlineNow),
-      absentSessions,
-      updatedAt: new Date().toISOString(),
-    });
+      return res.json({
+        success: true,
+        onlineNow,
+        totalMembers,
+        accessesToday: Math.max(accessesToday, onlineNow),
+        peakSimultaneous: Math.max(dailyPeakCount, onlineNow),
+        absentSessions,
+        updatedAt: new Date().toISOString(),
+      });
+    }
   } catch (err: any) {
     console.error('[Admin Member Stats Error]:', err?.message || err);
     return res.status(500).json({
