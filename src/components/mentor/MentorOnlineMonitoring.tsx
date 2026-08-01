@@ -266,6 +266,8 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
           longestSessions: statsData.longestSessions || [],
           shortestSessions: statsData.shortestSessions || [],
           activityFeed: statsData.activityFeed || [],
+          healthCheck: statsData.healthCheck,
+          alerts: statsData.alerts || [],
         });
       }
 

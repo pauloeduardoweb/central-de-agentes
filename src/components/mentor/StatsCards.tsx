@@ -12,6 +12,8 @@ import {
   Smartphone,
   ChevronRight
 } from 'lucide-react';
+import { HealthCheckCard, HealthMetrics } from './HealthCheckCard';
+import { AlertsCentral, AlertItem } from './AlertsCentral';
 
 interface ActivityItem {
   id: number;
@@ -33,11 +35,20 @@ interface StatsCardsProps {
     longestSessions?: { name: string; codigo: string; tempoOnline: string; tempoOnlineSeconds: number; paginaAtual: string }[];
     shortestSessions?: { name: string; codigo: string; tempoOnline: string; tempoOnlineSeconds: number; paginaAtual: string }[];
     activityFeed?: ActivityItem[];
+    healthCheck?: HealthMetrics;
+    alerts?: AlertItem[];
   };
   onSelectStudent?: (codigo: string) => void;
+  onRefreshHealth?: () => void;
+  loadingHealth?: boolean;
 }
 
-export const StatsCards: React.FC<StatsCardsProps> = ({ stats, onSelectStudent }) => {
+export const StatsCards: React.FC<StatsCardsProps> = ({
+  stats,
+  onSelectStudent,
+  onRefreshHealth,
+  loadingHealth = false,
+}) => {
   const {
     topCategories = [],
     devices = [],
@@ -46,6 +57,8 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, onSelectStudent }
     longestSessions = [],
     shortestSessions = [],
     activityFeed = [],
+    healthCheck,
+    alerts = [],
   } = stats;
 
   const formatFeedTime = (isoString: string) => {
@@ -64,7 +77,20 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, onSelectStudent }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-      {/* 1. Atividade em Tempo Real */}
+      {/* 1. Health Check do Servidor */}
+      <HealthCheckCard
+        health={healthCheck}
+        onRefresh={onRefreshHealth}
+        loading={loadingHealth}
+      />
+
+      {/* 2. Central de Alertas */}
+      <AlertsCentral
+        alerts={alerts}
+        onSelectStudent={onSelectStudent}
+      />
+
+      {/* 3. Atividade em Tempo Real */}
       <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
         <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 mb-3">
           <div className="flex items-center space-x-2">
@@ -76,7 +102,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, onSelectStudent }
               <p className="text-[11px] text-zinc-400">Feed de ações recentes dos alunos</p>
             </div>
           </div>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold">
             Ao vivo
           </span>
         </div>
@@ -113,7 +139,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, onSelectStudent }
         </div>
       </div>
 
-      {/* 2. Top Categorias */}
+      {/* 4. Top Categorias */}
       <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
         <div className="flex items-center space-x-2 pb-3 border-b border-zinc-800/80 mb-3">
           <span className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
@@ -148,7 +174,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, onSelectStudent }
         </div>
       </div>
 
-      {/* 3. Dispositivos e Sistemas */}
+      {/* 5. Dispositivos e Sistemas */}
       <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
         <div className="flex items-center space-x-2 pb-3 border-b border-zinc-800/80 mb-3">
           <span className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
@@ -184,31 +210,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, onSelectStudent }
         </div>
       </div>
 
-      {/* 4. Navegadores */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
-        <div className="flex items-center space-x-2 pb-3 border-b border-zinc-800/80 mb-3">
-          <span className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-            <Globe className="w-4 h-4" />
-          </span>
-          <div>
-            <h3 className="text-sm font-bold text-white">Navegadores Utilizados</h3>
-            <p className="text-[11px] text-zinc-400">Browser dos alunos</p>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
-          {browsers.map((b, idx) => (
-            <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/60 text-xs">
-              <span className="text-zinc-300 font-medium">{b.name}</span>
-              <span className="font-mono text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                {b.count}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 5. Logins Hoje (Gráfico por Hora) */}
+      {/* 6. Logins Hoje (Gráfico por Hora) */}
       <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
         <div className="flex items-center space-x-2 pb-3 border-b border-zinc-800/80 mb-3">
           <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -240,45 +242,6 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, onSelectStudent }
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* 6. Sessões Mais Longas */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
-        <div className="flex items-center space-x-2 pb-3 border-b border-zinc-800/80 mb-3">
-          <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <Clock className="w-4 h-4" />
-          </span>
-          <div>
-            <h3 className="text-sm font-bold text-white">Sessões Mais Longas</h3>
-            <p className="text-[11px] text-zinc-400">Alunos com maior tempo contínuo</p>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-          {longestSessions.length === 0 ? (
-            <div className="text-center py-10 text-xs text-zinc-500">
-              Nenhum aluno online no momento.
-            </div>
-          ) : (
-            longestSessions.map((s, idx) => (
-              <div
-                key={idx}
-                onClick={() => onSelectStudent && onSelectStudent(s.codigo)}
-                className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/60 flex items-center justify-between text-xs hover:border-zinc-700 cursor-pointer transition-colors group"
-              >
-                <div>
-                  <span className="font-semibold text-zinc-200 group-hover:text-amber-300 transition-colors block">
-                    {s.name || s.codigo}
-                  </span>
-                  <span className="text-[10px] text-zinc-500">{s.paginaAtual}</span>
-                </div>
-                <span className="font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
-                  {s.tempoOnline}
-                </span>
-              </div>
-            ))
-          )}
         </div>
       </div>
     </div>
