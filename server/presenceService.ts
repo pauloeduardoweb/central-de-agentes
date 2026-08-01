@@ -519,7 +519,28 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
         await ensureSessionsTable();
 
         const [rows]: any = await db.query(
-          `SELECT active_session_id, expires_at, access_status FROM sessoes WHERE codigo = ? ORDER BY (CASE WHEN active_session_id IS NOT NULL AND expires_at > NOW() THEN 1 ELSE 0 END) DESC, last_heartbeat_at DESC LIMIT 1`,
+          `SELECT
+             s.id,
+             s.codigo,
+             s.active_session_id,
+             s.expires_at,
+             s.current_page,
+             s.disconnect_source,
+             s.disconnected_at,
+             ca.access_status
+           FROM sessoes s
+           INNER JOIN codigos_acesso ca
+             ON ca.codigo = s.codigo
+           WHERE s.codigo = ?
+           ORDER BY
+             CASE
+               WHEN s.active_session_id IS NOT NULL
+                AND s.expires_at > NOW()
+               THEN 1
+               ELSE 0
+             END DESC,
+             s.last_heartbeat_at DESC
+           LIMIT 1`,
           [cleanCode]
         );
 
@@ -544,7 +565,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
               message: 'Esta chave de acesso foi banida pelo Mentor e não pode mais ser utilizada. Caso acredite que isso ocorreu por engano, entre em contato com o suporte da Mentoria Geração Z Pro.',
             });
           }
-          if (!r.active_session_id) {
+          if (!r.active_session_id || r.disconnect_source === 'MENTOR_SINGLE' || r.disconnect_source === 'MENTOR_ALL') {
             memorySessionsMap.delete(cleanCode);
             return res.status(401).json({
               error: 'ADMIN_DISCONNECTED',
@@ -1701,9 +1722,9 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
            disconnected_at = NOW(),
            disconnect_source = 'MENTOR_SINGLE',
            updated_at = NOW()
-         WHERE codigo = ?
+         WHERE id = ?
            AND active_session_id IS NOT NULL`,
-        [targetRow.codigo]
+        [targetRow.id]
       );
 
       const affectedRows = updateRes && typeof updateRes.affectedRows === 'number' ? updateRes.affectedRows : 0;
@@ -1771,7 +1792,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
         sessionRecordId: targetRow.id,
         activeSessionIdAfter: null,
         disconnectSource: 'MENTOR_SINGLE',
-        message: '1 sessão desconectada com sucesso.',
+        message: '1 login encerrado com sucesso.',
       });
     }
 
@@ -1788,7 +1809,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
         sessionRecordId: sessionRecordId || 1,
         activeSessionIdAfter: null,
         disconnectSource: 'MENTOR_SINGLE',
-        message: '1 sessão desconectada com sucesso.',
+        message: '1 login encerrado com sucesso.',
       });
     }
 
@@ -1869,8 +1890,10 @@ export async function adminDisconnectAllSessionsHandler(req: express.Request, re
     }
 
     const messageText = affectedCount === 0
-      ? 'Nenhuma sessão ativa encontrada.'
-      : `${affectedCount} ${affectedCount === 1 ? 'sessão desconectada' : 'sessões desconectadas'} com sucesso.`;
+      ? 'Nenhum login ativo encontrado.'
+      : affectedCount === 1
+      ? '1 login encerrado com sucesso.'
+      : `${affectedCount} logins encerrados com sucesso.`;
 
     return res.json({
       success: true,
