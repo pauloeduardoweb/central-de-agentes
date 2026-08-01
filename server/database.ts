@@ -49,6 +49,7 @@ export async function ensureCodigosAcessoTable(): Promise<void> {
         reactivated_by VARCHAR(100) DEFAULT NULL,
         last_admin_action VARCHAR(50) DEFAULT NULL,
         last_admin_action_at DATETIME DEFAULT NULL,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_codigo (codigo),
         INDEX idx_access_status (access_status)
@@ -57,6 +58,7 @@ export async function ensureCodigosAcessoTable(): Promise<void> {
 
     // Ensure columns exist on codigos_acesso if created previously without them
     const alterQueries = [
+      `ALTER TABLE codigos_acesso ADD COLUMN criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
       `ALTER TABLE codigos_acesso ADD COLUMN access_status ENUM('ACTIVE', 'SUSPENDED', 'BANNED') NOT NULL DEFAULT 'ACTIVE'`,
       `ALTER TABLE codigos_acesso MODIFY COLUMN access_status ENUM('ACTIVE', 'SUSPENDED', 'BANNED') NOT NULL DEFAULT 'ACTIVE'`,
       `ALTER TABLE codigos_acesso ADD COLUMN suspension_reason VARCHAR(255) DEFAULT NULL`,

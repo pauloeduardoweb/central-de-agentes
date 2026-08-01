@@ -752,6 +752,7 @@ export async function recordAgentInteraction(
 export async function getCentralPresenceData() {
   const usersMapByCode = new Map<string, any>();
   const nowMs = Date.now();
+  let totalLicensesCount = 0;
 
   if (isDatabaseConfigured()) {
     try {
@@ -759,21 +760,16 @@ export async function getCentralPresenceData() {
       await ensureSessionsTable();
       await ensureProfilesTable();
 
+      // Total count of licenses registered in Hostinger MySQL
+      const [countRows]: any = await db.query(`SELECT COUNT(*) AS total FROM codigos_acesso`);
+      if (Array.isArray(countRows) && countRows.length > 0) {
+        totalLicensesCount = Number(countRows[0].total) || 0;
+      }
+
+      // ONLY QUERY USERS WHO HAVE RECORDED SESSIONS IN sessoes TABLE
       const query = `
         SELECT
-          ca.id AS key_id,
-          ca.codigo,
-          ca.access_status,
-          ca.suspension_reason,
-          ca.suspended_at,
-          ca.suspended_by,
-          ca.banned_reason,
-          ca.banned_at,
-          ca.banned_by,
-          ca.reactivated_at,
-          ca.reactivated_by,
-          ca.last_admin_action,
-          ca.last_admin_action_at,
+          s.codigo,
           s.active_session_id,
           s.expires_at,
           s.current_page,
@@ -787,11 +783,23 @@ export async function getCentralPresenceData() {
           s.last_heartbeat_at,
           s.is_online,
           s.status,
+          ca.id AS key_id,
+          ca.access_status,
+          ca.suspension_reason,
+          ca.suspended_at,
+          ca.suspended_by,
+          ca.banned_reason,
+          ca.banned_at,
+          ca.banned_by,
+          ca.reactivated_at,
+          ca.reactivated_by,
+          ca.last_admin_action,
+          ca.last_admin_action_at,
           pf.nome_usuario,
           pf.avatar
-        FROM codigos_acesso ca
-        LEFT JOIN sessoes s ON ca.codigo = s.codigo
-        LEFT JOIN perfis_alunos pf ON ca.codigo = pf.codigo
+        FROM sessoes s
+        LEFT JOIN codigos_acesso ca ON s.codigo = ca.codigo
+        LEFT JOIN perfis_alunos pf ON s.codigo = pf.codigo
         ORDER BY s.last_heartbeat_at DESC
       `;
 
@@ -878,55 +886,57 @@ export async function getCentralPresenceData() {
     }
   }
 
-  // Fallback / merge for STUDENT_KEYS
-  for (const rawKey of STUDENT_KEYS) {
-    const key = normalizeAccessCode(rawKey);
-    if (!key || isMasterKey(key)) continue;
+  // Fallback ONLY for keys present in memorySessionsMap (active or past memory sessions)
+  if (!isDatabaseConfigured() || memorySessionsMap.size > 0) {
+    for (const [rawKey, memSession] of memorySessionsMap.entries()) {
+      const key = normalizeAccessCode(rawKey);
+      if (!key || isMasterKey(key)) continue;
 
-    if (!usersMapByCode.has(key)) {
-      const memSession = memorySessionsMap.get(key);
-      const memKeyInfo = memoryKeyStatusMap.get(key);
+      if (!usersMapByCode.has(key)) {
+        const memKeyInfo = memoryKeyStatusMap.get(key);
 
-      let presence: 'Online' | 'Ausente' | 'Offline' = 'Offline';
-      if (memSession) {
+        let presence: 'Online' | 'Ausente' | 'Offline' = 'Offline';
         const sec = (nowMs - memSession.lastHeartbeatAt.getTime()) / 1000;
         if (sec <= 90) presence = 'Online';
         else if (sec <= 3600) presence = 'Ausente';
+
+        const accStat = memKeyInfo?.accessStatus || 'ACTIVE';
+
+        usersMapByCode.set(key, {
+          _fullCode: key,
+          username: `Aluno ${maskKeyForAdmin(key)}`,
+          avatar: null,
+          maskedKey: maskKeyForAdmin(key),
+          status: accStat === 'ACTIVE' ? presence : 'Offline',
+          presenceStatus: accStat === 'ACTIVE' ? presence : 'Offline',
+          hasActiveSession: true,
+          accessStatus: accStat,
+          suspensionReason: memKeyInfo?.suspensionReason || null,
+          suspendedAt: memKeyInfo?.suspendedAt || null,
+          suspendedBy: memKeyInfo?.suspendedBy || null,
+          bannedReason: memKeyInfo?.bannedReason || null,
+          bannedAt: memKeyInfo?.bannedAt || null,
+          bannedBy: memKeyInfo?.bannedBy || null,
+          reactivatedAt: memKeyInfo?.reactivatedAt || null,
+          reactivatedBy: memKeyInfo?.reactivatedBy || null,
+          lastAdminAction: memKeyInfo?.lastAdminAction || null,
+          lastAdminActionAt: memKeyInfo?.lastAdminActionAt || null,
+          currentPage: memSession.currentPage || 'Agentes GPT',
+          deviceType: memSession.deviceType || 'Desktop',
+          operatingSystem: memSession.operatingSystem || 'Windows',
+          browserName: memSession.browserName || 'Chrome',
+          device: `${memSession.operatingSystem} • ${memSession.browserName}`,
+          maskedIp: maskIpAddress(memSession.ipAddress),
+          loginAt: memSession.startedAt.toISOString(),
+          lastActivity: memSession.lastHeartbeatAt.toISOString(),
+          connectedTime: formatConnectedTime(memSession.startedAt),
+        });
       }
-
-      const accStat = memKeyInfo?.accessStatus || 'ACTIVE';
-      const hasActiveSession = Boolean(memSession);
-
-      usersMapByCode.set(key, {
-        _fullCode: key,
-        username: `Aluno ${maskKeyForAdmin(key)}`,
-        avatar: null,
-        maskedKey: maskKeyForAdmin(key),
-        status: accStat === 'ACTIVE' ? presence : 'Offline',
-        presenceStatus: accStat === 'ACTIVE' ? presence : 'Offline',
-        hasActiveSession,
-        accessStatus: accStat,
-        suspensionReason: memKeyInfo?.suspensionReason || null,
-        suspendedAt: memKeyInfo?.suspendedAt || null,
-        suspendedBy: memKeyInfo?.suspendedBy || null,
-        bannedReason: memKeyInfo?.bannedReason || null,
-        bannedAt: memKeyInfo?.bannedAt || null,
-        bannedBy: memKeyInfo?.bannedBy || null,
-        reactivatedAt: memKeyInfo?.reactivatedAt || null,
-        reactivatedBy: memKeyInfo?.reactivatedBy || null,
-        lastAdminAction: memKeyInfo?.lastAdminAction || null,
-        lastAdminActionAt: memKeyInfo?.lastAdminActionAt || null,
-        currentPage: memSession?.currentPage || 'Agentes GPT',
-        deviceType: memSession?.deviceType || 'Desktop',
-        operatingSystem: memSession?.operatingSystem || 'Windows',
-        browserName: memSession?.browserName || 'Chrome',
-        device: memSession ? `${memSession.operatingSystem} • ${memSession.browserName}` : 'Desconhecido',
-        maskedIp: maskIpAddress(memSession?.ipAddress),
-        loginAt: memSession ? memSession.startedAt.toISOString() : new Date().toISOString(),
-        lastActivity: memSession ? memSession.lastHeartbeatAt.toISOString() : new Date().toISOString(),
-        connectedTime: formatConnectedTime(memSession ? memSession.startedAt : null),
-      });
     }
+  }
+
+  if (totalLicensesCount === 0) {
+    totalLicensesCount = Math.max(STUDENT_KEYS.size, usersMapByCode.size);
   }
 
   const allUsers = Array.from(usersMapByCode.values());
@@ -950,6 +960,7 @@ export async function getCentralPresenceData() {
       absentSessions,
       offlineSessions,
       totalMembers,
+      totalLicenses: totalLicensesCount,
       accessesToday,
       mentorOnline: true,
     },
@@ -1842,6 +1853,236 @@ export async function adminGetAccessHistoryHandler(req: express.Request, res: ex
     return res.status(500).json({
       error: 'SERVER_ERROR',
       message: 'Erro ao obter histórico da chave.',
+    });
+  }
+}
+
+/**
+ * GET /api/admin/access-keys
+ * Returns list of all access keys from MySQL codigos_acesso along with license stats
+ */
+export async function getAdminAccessKeysHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas o Mentor pode acessar os códigos de acesso.',
+      });
+    }
+
+    const nowMs = Date.now();
+    let keysList: any[] = [];
+
+    if (isDatabaseConfigured()) {
+      await ensureCodigosAcessoTable();
+      await ensureSessionsTable();
+      await ensureProfilesTable();
+
+      const query = `
+        SELECT 
+          ca.id,
+          ca.codigo,
+          ca.usado,
+          ca.usuario_id,
+          ca.access_status,
+          COALESCE(ca.criado_em, ca.created_at) AS criado_em,
+          s.codigo AS session_codigo,
+          s.last_heartbeat_at,
+          s.is_online,
+          pf.nome_usuario
+        FROM codigos_acesso ca
+        LEFT JOIN sessoes s ON ca.codigo = s.codigo
+        LEFT JOIN perfis_alunos pf ON ca.codigo = pf.codigo
+        ORDER BY ca.id DESC
+      `;
+
+      const [rows]: any = await db.query(query);
+
+      if (Array.isArray(rows)) {
+        keysList = rows.map((r: any) => {
+          const norm = normalizeAccessCode(r.codigo);
+          const isUsed = Boolean(r.usado || r.usuario_id || r.session_codigo);
+          const hasSession = Boolean(r.session_codigo);
+          const isOnline = Boolean(
+            r.session_codigo &&
+            r.last_heartbeat_at &&
+            (nowMs - new Date(r.last_heartbeat_at).getTime()) <= 90000
+          );
+
+          return {
+            id: r.id,
+            codigo: r.codigo,
+            maskedKey: maskKeyForAdmin(norm),
+            accessStatus: (r.access_status || 'ACTIVE').toUpperCase(),
+            usado: isUsed,
+            hasSession,
+            isOnline,
+            createdAt: r.criado_em ? new Date(r.criado_em).toISOString() : new Date().toISOString(),
+            expiresAt: '30 dias',
+            username: r.nome_usuario || (isUsed ? `Aluno ${maskStudentCode(norm)}` : 'Não utilizado'),
+          };
+        });
+      }
+    } else {
+      // Memory keys fallback
+      for (const rawKey of STUDENT_KEYS) {
+        const norm = normalizeAccessCode(rawKey);
+        const memSession = memorySessionsMap.get(norm);
+        const memKeyInfo = memoryKeyStatusMap.get(norm);
+        const isUsed = Boolean(memSession);
+        const isOnline = Boolean(
+          memSession && (nowMs - memSession.lastHeartbeatAt.getTime()) <= 90000
+        );
+
+        keysList.push({
+          id: Math.abs(norm.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)),
+          codigo: norm,
+          maskedKey: maskKeyForAdmin(norm),
+          accessStatus: memKeyInfo?.accessStatus || 'ACTIVE',
+          usado: isUsed,
+          hasSession: Boolean(memSession),
+          isOnline,
+          createdAt: new Date().toISOString(),
+          expiresAt: '30 dias',
+          username: isUsed ? `Aluno ${maskStudentCode(norm)}` : 'Não utilizado',
+        });
+      }
+    }
+
+    const totalLicenses = keysList.length;
+    const activeKeys = keysList.filter((k) => k.accessStatus === 'ACTIVE').length;
+    const suspendedKeys = keysList.filter((k) => k.accessStatus === 'SUSPENDED').length;
+    const bannedKeys = keysList.filter((k) => k.accessStatus === 'BANNED').length;
+    const neverUsed = keysList.filter((k) => !k.usado).length;
+    const alreadyUsed = keysList.filter((k) => k.usado).length;
+
+    return res.json({
+      success: true,
+      keys: keysList,
+      stats: {
+        totalLicenses,
+        activeKeys,
+        suspendedKeys,
+        bannedKeys,
+        neverUsed,
+        alreadyUsed,
+      },
+    });
+  } catch (err: any) {
+    console.error('[Admin Access Keys Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Erro ao obter os códigos de acesso.',
+    });
+  }
+}
+
+/**
+ * POST /api/admin/access-keys/generate
+ * Generates new access keys and persists them directly into MySQL codigos_acesso
+ */
+export async function generateAccessKeysHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas o Mentor pode gerar novos códigos de acesso.',
+      });
+    }
+
+    const quantity = Math.max(1, Math.min(50, Number(req.body?.quantity || req.body?.count || 1)));
+    const customPrefix = String(req.body?.prefix || 'GZPRO').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') || 'GZPRO';
+
+    const createdKeys: any[] = [];
+
+    if (isDatabaseConfigured()) {
+      await ensureCodigosAcessoTable();
+
+      for (let i = 0; i < quantity; i++) {
+        let generatedCode = '';
+        let exists = true;
+        let attempts = 0;
+
+        while (exists && attempts < 20) {
+          attempts++;
+          const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+          const randomDigits = Math.floor(1000 + Math.random() * 9000);
+          generatedCode = `${customPrefix}-${randomSuffix}-${randomDigits}`;
+
+          const [existingRows]: any = await db.query(
+            `SELECT id FROM codigos_acesso WHERE codigo = ? LIMIT 1`,
+            [generatedCode]
+          );
+          exists = Array.isArray(existingRows) && existingRows.length > 0;
+        }
+
+        if (exists) {
+          throw new Error('Falha ao gerar código de acesso único.');
+        }
+
+        // PHYSICAL PERSISTENCE IN MYSQL codigos_acesso
+        const [insertRes]: any = await db.query(
+          `INSERT INTO codigos_acesso (
+             codigo,
+             usado,
+             usuario_id,
+             access_status,
+             criado_em
+           )
+           VALUES (?, 0, NULL, 'ACTIVE', NOW())`,
+          [generatedCode]
+        );
+
+        // Add to memory set so auth system immediately recognizes it
+        STUDENT_KEYS.add(generatedCode);
+
+        createdKeys.push({
+          id: insertRes?.insertId || Date.now() + i,
+          codigo: generatedCode,
+          maskedKey: maskKeyForAdmin(generatedCode),
+          accessStatus: 'ACTIVE',
+          usado: false,
+          createdAt: new Date().toISOString(),
+          expiresAt: '30 dias',
+          username: 'Não utilizado',
+          isOnline: false,
+        });
+      }
+    } else {
+      for (let i = 0; i < quantity; i++) {
+        const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const randomDigits = Math.floor(1000 + Math.random() * 9000);
+        const generatedCode = `${customPrefix}-${randomSuffix}-${randomDigits}`;
+
+        STUDENT_KEYS.add(generatedCode);
+
+        createdKeys.push({
+          id: Date.now() + i,
+          codigo: generatedCode,
+          maskedKey: maskKeyForAdmin(generatedCode),
+          accessStatus: 'ACTIVE',
+          usado: false,
+          createdAt: new Date().toISOString(),
+          expiresAt: '30 dias',
+          username: 'Não utilizado',
+          isOnline: false,
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      count: createdKeys.length,
+      keys: createdKeys,
+      message: `${createdKeys.length} novas licenças de acesso geradas e persistidas no banco de dados com sucesso.`,
+    });
+  } catch (err: any) {
+    console.error('[Generate Access Keys Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: err?.message || 'Erro ao gerar novos códigos de acesso.',
     });
   }
 }
