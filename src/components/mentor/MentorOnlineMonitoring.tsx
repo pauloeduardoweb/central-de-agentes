@@ -183,27 +183,11 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         : `✅ ${count} sessões desconectadas com sucesso.`;
 
       setDisconnectAllSuccessMsg(successText);
-
-      setUsers((prevUsers) =>
-        prevUsers.map((u) => {
-          if (u.hasActiveSession || u.status === 'Online' || u.status === 'Ausente') {
-            return {
-              ...u,
-              status: 'Offline',
-              presenceStatus: 'Offline',
-              hasActiveSession: false,
-              disconnectSource: 'MENTOR_ALL',
-              disconnectedAt: new Date().toISOString(),
-            };
-          }
-          return u;
-        })
-      );
+      await fetchData(true);
 
       setTimeout(() => {
         setShowDisconnectAllModal(false);
         setDisconnectAllSuccessMsg(null);
-        fetchData(true);
       }, 1500);
     } catch (err: any) {
       setDisconnectAllError(err.message || 'Não foi possível encerrar todas as sessões. Tente novamente.');
@@ -358,31 +342,12 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         throw new Error(data?.message || 'Erro ao desconectar sessão.');
       }
 
-      // Optimistically update local user line immediately
-      setUsers((prevUsers) =>
-        prevUsers.map((u) => {
-          if (
-            (selectedUser.sessionRecordId && u.sessionRecordId === selectedUser.sessionRecordId) ||
-            u.maskedKey === selectedUser.maskedKey
-          ) {
-            return {
-              ...u,
-              status: 'Offline',
-              presenceStatus: 'Offline',
-              hasActiveSession: false,
-              disconnectSource: 'MENTOR_SINGLE',
-              disconnectedAt: new Date().toISOString(),
-            };
-          }
-          return u;
-        })
-      );
-
+      // Re-fetch data directly from DB confirmed state
       setActionSuccessMsg('✅ 1 sessão desconectada com sucesso.');
+      await fetchData();
       setTimeout(() => {
         closeModal();
-        fetchData();
-      }, 300);
+      }, 500);
     } catch (err: any) {
       setActionError(err.message || 'Erro ao comunicar com o servidor.');
     } finally {
