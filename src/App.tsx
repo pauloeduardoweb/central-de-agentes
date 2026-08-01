@@ -88,13 +88,31 @@ export default function App() {
         body: JSON.stringify({ accessCode: savedCode, deviceId, sessionId: savedSessionId }),
       })
         .then(async (res) => {
+          // Ignore server errors or non-ok statuses that are not explicit revocations
+          if (res.status >= 500) {
+            console.warn('[Startup Verify] Server temporary response ignored:', res.status);
+            return;
+          }
+
           let data: any = {};
           try {
             data = await res.json();
-          } catch (e) {}
+          } catch {
+            // Non-JSON or proxy response -> keep stored session
+            return;
+          }
 
-          if (!res.ok && (res.status === 423 || res.status === 409 || res.status === 403 || res.status === 401)) {
-            // Code is active on another device or session revoked/suspended/banned
+          const errCode = String(data?.error || data?.code || data?.accessStatus || '').toUpperCase();
+
+          const isSuspended = res.status === 423 || errCode === 'KEY_SUSPENDED' || errCode === 'SUSPENDED';
+          const isBanned = res.status === 403 || errCode === 'KEY_BANNED' || errCode === 'BANNED';
+          const isInvalidCode = res.status === 401 && errCode === 'INVALID_ACCESS_CODE';
+          const isExplicitRevocation = res.status === 401 && (
+            errCode === 'ADMIN_DISCONNECTED' ||
+            errCode === 'SESSION_EXPIRED'
+          );
+
+          if (isSuspended || isBanned || isInvalidCode || isExplicitRevocation) {
             localStorage.removeItem('user_student_access_code');
             localStorage.removeItem('user_session_id');
             localStorage.removeItem('user_gemini_api_key');
@@ -104,11 +122,11 @@ export default function App() {
             setShowApiKeyModal(true);
 
             let toastMsg = data.message;
-            if (res.status === 423 || data.error === 'KEY_SUSPENDED' || data.accessStatus === 'SUSPENDED') {
-              toastMsg = 'Acesso temporariamente suspenso: Sua chave de acesso está temporariamente suspensa pelo Mentor.';
-            } else if (res.status === 403 || data.error === 'KEY_BANNED' || data.accessStatus === 'BANNED') {
-              toastMsg = 'Acesso permanentemente bloqueado: Esta chave de acesso foi banida pelo Mentor.';
-            } else if (res.status === 401) {
+            if (isSuspended) {
+              toastMsg = 'Acesso temporariamente suspenso pelo Mentor.';
+            } else if (isBanned) {
+              toastMsg = 'Acesso permanentemente bloqueado pelo Mentor.';
+            } else if (isInvalidCode) {
               toastMsg = 'Código de acesso inválido. Verifique o código informado e tente novamente.';
             }
             if (toastMsg) triggerToast(toastMsg);
@@ -117,7 +135,9 @@ export default function App() {
             setSessionId(data.sessionId);
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('[Startup Verify] Network error ignored (keeping session intact):', err);
+        });
     } else {
       setUserApiKey('');
       setStudentCode('');
@@ -152,24 +172,31 @@ export default function App() {
           }),
         });
 
+        // 500, 502, 503, 504 server errors -> KEEP SESSION INTACT
+        if (res.status >= 500) {
+          console.warn('[Heartbeat] Server error ignored:', res.status);
+          return;
+        }
+
         if (!res.ok) {
           let data: any = {};
           try {
             data = await res.json();
-          } catch (e) {}
+          } catch {
+            // Non-JSON or HTML gateway error -> KEEP SESSION INTACT
+            return;
+          }
 
           const errCode = String(data?.error || data?.code || data?.accessStatus || '').toUpperCase();
           const isSuspended = res.status === 423 || errCode === 'KEY_SUSPENDED' || errCode === 'SUSPENDED';
           const isBanned = res.status === 403 || errCode === 'KEY_BANNED' || errCode === 'BANNED';
-          const isInvalidSession = (res.status === 401 || res.status === 409) && (
-            errCode === 'SESSION_EXPIRED' ||
+          const isExplicitRevocation = res.status === 401 && (
             errCode === 'ADMIN_DISCONNECTED' ||
-            errCode === 'SESSION_ALREADY_ACTIVE' ||
-            errCode === 'SESSION_REQUIRED' ||
+            errCode === 'SESSION_EXPIRED' ||
             errCode === 'INVALID_ACCESS_CODE'
           );
 
-          if (isSuspended || isBanned || isInvalidSession) {
+          if (isSuspended || isBanned || isExplicitRevocation) {
             localStorage.removeItem('user_student_access_code');
             localStorage.removeItem('user_session_id');
             localStorage.removeItem('user_gemini_api_key');
@@ -188,19 +215,31 @@ export default function App() {
             }
             triggerToast(msg);
           } else {
-            console.warn('[Heartbeat] Temporary server response ignored:', res.status);
+            console.warn('[Heartbeat] Ignored non-fatal response status:', res.status, errCode);
           }
         }
       } catch (err) {
-        console.warn('[Heartbeat] Network check error:', err);
+        console.warn('[Heartbeat] Network error ignored (keeping session intact):', err);
       }
     };
 
     // Initial heartbeat after mount
     sendHeartbeat();
 
+    // Re-send heartbeat immediately when tab becomes visible after background pause
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        sendHeartbeat();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     const interval = setInterval(sendHeartbeat, 3000); // 3 seconds heartbeat
-    return () => clearInterval(interval);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, [studentCode, sessionId, activeView, activeCategory]);
 
   const handleSaveApiKey = (key: string, accessCode: string, newSessionId?: string) => {
