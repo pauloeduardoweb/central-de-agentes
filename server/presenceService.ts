@@ -445,7 +445,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
       req.headers['x-student-access-code'];
 
     const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
-    const currentPage = req.body?.currentPage || req.body?.page || 'Agentes GPT';
+    const currentPage = req.body?.currentPage ?? req.body?.page ?? '';
     const rawUa = req.headers['user-agent'] || req.body?.userAgent || '';
 
     const cleanCode = normalizeAccessCode(studentCode);
@@ -568,7 +568,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
                expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
                is_online = 1,
                status = 'online',
-               current_page = ?,
+               current_page = COALESCE(NULLIF(?, ''), current_page),
                ip_address = COALESCE(NULLIF(?, ''), ip_address),
                user_agent = COALESCE(NULLIF(?, ''), user_agent),
                device_type = CASE WHEN ? IS NOT NULL AND ? != '' AND ? != 'Desconhecido' THEN ? ELSE device_type END,
@@ -617,11 +617,13 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
     const now = new Date();
     const existing = memorySessionsMap.get(cleanCode);
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const finalPageToSave = (currentPage && String(currentPage).trim() !== '') ? String(currentPage).trim() : (existing?.currentPage || 'TikTok 2K');
+
     memorySessionsMap.set(cleanCode, {
       codigo: cleanCode,
       sessionId,
       deviceId: existing?.deviceId || `device-${sessionId.slice(0, 8)}`,
-      currentPage,
+      currentPage: finalPageToSave,
       ipAddress: clientIp,
       userAgent: rawUa,
       deviceType,
@@ -897,8 +899,8 @@ export async function getCentralPresenceData() {
             loginAt: entryDate ? entryDate.toISOString() : new Date().toISOString(),
             lastActivity: lastHbMs > 0 ? new Date(lastHbMs).toISOString() : new Date().toISOString(),
             connectedTime: formatConnectedTime(entryDate),
-            disconnectSource: r.disconnect_source || (r.logout_at ? 'MENTOR_SINGLE' : null),
-            disconnectedAt: r.disconnected_at ? new Date(r.disconnected_at).toISOString() : (r.logout_at ? new Date(r.logout_at).toISOString() : null),
+            disconnectSource: (!hasActiveSession && r.disconnected_at && r.disconnect_source && ['MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT'].includes(r.disconnect_source)) ? r.disconnect_source : null,
+            disconnectedAt: (!hasActiveSession && r.disconnected_at && r.disconnect_source && ['MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT'].includes(r.disconnect_source)) ? new Date(r.disconnected_at).toISOString() : null,
           });
         }
       }
