@@ -123,6 +123,15 @@ export default function App() {
               localStorage.removeItem('user_session_id');
               localStorage.removeItem('user_gemini_api_key');
             }
+            setSelectedChatAgent(null);
+            setEditingAgent(null);
+            setShowCreateModal(false);
+            setShowImportModal(false);
+            setShowMultiAgentModal(false);
+            setShowExportModal(false);
+            setShowGeracaoZProModal(false);
+            setShowCertificadosModal(false);
+            setShowAfiliadosModal(false);
             setUserApiKey('');
             setStudentCode('');
             setSessionId('');
@@ -254,6 +263,15 @@ export default function App() {
               localStorage.removeItem('user_session_id');
               localStorage.removeItem('user_gemini_api_key');
             }
+            setSelectedChatAgent(null);
+            setEditingAgent(null);
+            setShowCreateModal(false);
+            setShowImportModal(false);
+            setShowMultiAgentModal(false);
+            setShowExportModal(false);
+            setShowGeracaoZProModal(false);
+            setShowCertificadosModal(false);
+            setShowAfiliadosModal(false);
             setUserApiKey('');
             setStudentCode('');
             setSessionId('');
@@ -454,6 +472,30 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
       triggerToast('Agentes restaurados para o padrão.');
     }
   };
+
+  const isAuthenticated = Boolean(userApiKey && studentCode && sessionId);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#03131c] text-slate-100 font-sans antialiased flex items-center justify-center p-4 relative overflow-hidden">
+        <TechGridBackground />
+
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-5 right-5 z-50 flex items-center space-x-2 bg-slate-900 text-white dark:bg-emerald-600 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold animate-in slide-in-from-bottom duration-200">
+            <Check className="w-4 h-4 text-emerald-400 dark:text-white" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
+        <ApiKeyModal
+          isMandatoryOnboarding={true}
+          onSave={handleSaveApiKey}
+          onClose={() => {}}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#03131c] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white pb-20 relative overflow-x-hidden">
