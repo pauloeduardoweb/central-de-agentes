@@ -626,7 +626,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
             title="Encerrar todas as sessões ativas de alunos"
           >
             <LogOut className="w-3.5 h-3.5 text-rose-400" />
-            <span>🔄 Desconectar Todas as Sessões</span>
+            <span>🔄 Encerrar Todos os Logins</span>
           </button>
         </div>
       </div>
@@ -1150,7 +1150,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                 <LogOut className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-black text-white">Desconectar Sessão Ativa</h3>
+                <h3 className="text-base font-black text-white">Encerrar Login do Aluno</h3>
                 <p className="text-xs text-amber-300 font-mono font-bold mt-0.5">{selectedUser.maskedKey}</p>
               </div>
             </div>
@@ -1193,7 +1193,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                 className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
               >
                 {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>{actionLoading ? 'Processando...' : 'DESCONECTAR AGORA'}</span>
+                <span>{actionLoading ? 'Processando...' : 'ENCERRAR LOGIN AGORA'}</span>
               </button>
             </div>
           </div>
@@ -1608,17 +1608,17 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                 <AlertTriangle className="w-6 h-6 animate-pulse" />
               </div>
               <div>
-                <h3 className="text-base font-black text-white">Desconectar todas as sessões?</h3>
+                <h3 className="text-base font-black text-white">Encerrar todos os logins?</h3>
                 <p className="text-xs text-rose-300 font-semibold mt-0.5">Ação Administrativa de Alto Impacto</p>
               </div>
             </div>
 
             <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-2">
               <p className="text-sm font-bold text-rose-200">
-                ⚠️ Desconectar todas as sessões?
+                ⚠️ Encerrar todos os logins?
               </p>
               <p className="text-xs text-rose-100 font-bold">
-                {getActiveValidSessionsCount()} {getActiveValidSessionsCount() === 1 ? 'sessão será encerrada.' : 'sessões serão encerradas.'}
+                {getActiveValidSessionsCount()} {getActiveValidSessionsCount() === 1 ? 'login será encerrado.' : 'logins serão encerrados.'}
               </p>
               <p className="text-xs text-slate-300 leading-relaxed">
                 Todos os alunos conectados precisarão realizar login novamente.
@@ -1661,10 +1661,10 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                 {disconnectAllLoading ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Desconectando...</span>
+                    <span>Encerrando...</span>
                   </>
                 ) : (
-                  <span>Desconectar Todas</span>
+                  <span>Encerrar Todos</span>
                 )}
               </button>
             </div>
