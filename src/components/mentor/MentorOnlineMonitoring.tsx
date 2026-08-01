@@ -25,6 +25,9 @@ import {
 } from 'lucide-react';
 
 interface OnlineUser {
+  accessKeyId?: number;
+  sessionRecordId?: number;
+  id?: number;
   username: string;
   avatar: string | null;
   maskedKey: string;
@@ -255,7 +258,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     setActionSuccessMsg(null);
 
     if (modalType === 'history') {
-      fetchUserHistory(user.maskedKey);
+      fetchUserHistory(user);
     }
   };
 
@@ -267,14 +270,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     setActionSuccessMsg(null);
   };
 
-  const fetchUserHistory = async (maskedKey: string) => {
+  const fetchUserHistory = async (userParam?: OnlineUser) => {
+    const userToUse = userParam || selectedUser;
+    if (!userToUse) return;
+
     setHistoryLoading(true);
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'x-access-code': studentCode,
       };
-      const res = await fetch(`/api/admin/access-keys/${encodeURIComponent(maskedKey)}/history`, { headers });
+      const targetId = userToUse.accessKeyId || userToUse.id || encodeURIComponent(userToUse.maskedKey);
+      const res = await fetch(`/api/admin/access-keys/${targetId}/history`, { headers });
       if (res.ok) {
         const data = await res.json();
         setHistoryList(data.history || []);
@@ -294,14 +301,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     setActionLoading(true);
     setActionError(null);
 
+    const targetId = selectedUser.sessionRecordId || selectedUser.accessKeyId || selectedUser.id || encodeURIComponent(selectedUser.maskedKey);
+
     try {
-      const res = await fetch(`/api/admin/users/${encodeURIComponent(selectedUser.maskedKey)}/disconnect`, {
+      const res = await fetch(`/api/admin/users/${targetId}/disconnect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-access-code': studentCode,
         },
         body: JSON.stringify({
+          accessKeyId: selectedUser.accessKeyId,
+          sessionRecordId: selectedUser.sessionRecordId,
           targetCode: selectedUser.maskedKey,
           reason: 'Desconexão manual solicitada pelo Mentor',
         }),
@@ -317,7 +328,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         }
       }
 
-      if (!res.ok) {
+      if (!res.ok || (data && data.success === false)) {
         throw new Error(data?.message || 'Erro ao desconectar sessão.');
       }
 
@@ -342,14 +353,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
       ? customReason.trim()
       : actionReason;
 
+    const targetId = selectedUser.accessKeyId || selectedUser.id || encodeURIComponent(selectedUser.maskedKey);
+
     try {
-      const res = await fetch(`/api/admin/access-keys/${encodeURIComponent(selectedUser.maskedKey)}/suspend`, {
+      const res = await fetch(`/api/admin/access-keys/${targetId}/suspend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-access-code': studentCode,
         },
         body: JSON.stringify({
+          accessKeyId: selectedUser.accessKeyId,
+          sessionRecordId: selectedUser.sessionRecordId,
           targetCode: selectedUser.maskedKey,
           reason: finalReason,
         }),
@@ -365,7 +380,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         }
       }
 
-      if (!res.ok) {
+      if (!res.ok || (data && data.success === false)) {
         throw new Error(data?.message || 'Erro ao suspender chave.');
       }
 
@@ -396,14 +411,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     setActionLoading(true);
     setActionError(null);
 
+    const targetId = selectedUser.accessKeyId || selectedUser.id || encodeURIComponent(selectedUser.maskedKey);
+
     try {
-      const res = await fetch(`/api/admin/access-keys/${encodeURIComponent(selectedUser.maskedKey)}/ban`, {
+      const res = await fetch(`/api/admin/access-keys/${targetId}/ban`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-access-code': studentCode,
         },
         body: JSON.stringify({
+          accessKeyId: selectedUser.accessKeyId,
+          sessionRecordId: selectedUser.sessionRecordId,
           targetCode: selectedUser.maskedKey,
           reason: finalReason,
         }),
@@ -419,7 +438,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         }
       }
 
-      if (!res.ok) {
+      if (!res.ok || (data && data.success === false)) {
         throw new Error(data?.message || 'Erro ao banir chave.');
       }
 
@@ -440,14 +459,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     setActionLoading(true);
     setActionError(null);
 
+    const targetId = selectedUser.accessKeyId || selectedUser.id || encodeURIComponent(selectedUser.maskedKey);
+
     try {
-      const res = await fetch(`/api/admin/access-keys/${encodeURIComponent(selectedUser.maskedKey)}/reactivate`, {
+      const res = await fetch(`/api/admin/access-keys/${targetId}/reactivate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-access-code': studentCode,
         },
         body: JSON.stringify({
+          accessKeyId: selectedUser.accessKeyId,
+          sessionRecordId: selectedUser.sessionRecordId,
           targetCode: selectedUser.maskedKey,
         }),
       });
@@ -462,7 +485,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         }
       }
 
-      if (!res.ok) {
+      if (!res.ok || (data && data.success === false)) {
         throw new Error(data?.message || 'Erro ao reativar chave.');
       }
 
