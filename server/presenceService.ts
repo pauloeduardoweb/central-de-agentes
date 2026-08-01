@@ -885,6 +885,94 @@ export async function getCentralPresenceData() {
           });
         }
       }
+
+      // Also query suspended and banned keys from codigos_acesso so they appear in Suspensos/Banidos tabs
+      const [blockedRows]: any = await db.query(`
+        SELECT
+          ca.id AS key_id,
+          ca.codigo,
+          ca.access_status,
+          ca.suspension_reason,
+          ca.suspended_at,
+          ca.suspended_by,
+          ca.banned_reason,
+          ca.banned_at,
+          ca.banned_by,
+          ca.reactivated_at,
+          ca.reactivated_by,
+          ca.last_admin_action,
+          ca.last_admin_action_at,
+          s.id AS session_id,
+          s.current_page,
+          s.ip_address,
+          s.user_agent,
+          s.device_type,
+          s.browser_name,
+          s.operating_system,
+          s.last_heartbeat_at,
+          pf.nome_usuario,
+          pf.avatar
+        FROM codigos_acesso ca
+        LEFT JOIN sessoes s ON ca.codigo = s.codigo
+        LEFT JOIN perfis_alunos pf ON ca.codigo = pf.codigo
+        WHERE ca.access_status IN ('SUSPENDED', 'BANNED')
+      `);
+
+      if (Array.isArray(blockedRows)) {
+        for (const r of blockedRows) {
+          if (!r.codigo || isMasterKey(r.codigo)) continue;
+          const normCode = normalizeAccessCode(r.codigo);
+          if (usersMapByCode.has(normCode)) {
+            const existing = usersMapByCode.get(normCode);
+            existing.accessStatus = (r.access_status || 'ACTIVE').toUpperCase();
+            existing.suspensionReason = r.suspension_reason || existing.suspensionReason;
+            existing.suspendedAt = r.suspended_at ? new Date(r.suspended_at).toISOString() : existing.suspendedAt;
+            existing.suspendedBy = r.suspended_by || existing.suspendedBy;
+            existing.bannedReason = r.banned_reason || existing.bannedReason;
+            existing.bannedAt = r.banned_at ? new Date(r.banned_at).toISOString() : existing.bannedAt;
+            existing.bannedBy = r.banned_by || existing.bannedBy;
+          } else {
+            const accStat = (r.access_status || 'ACTIVE').toUpperCase();
+            const { deviceType, operatingSystem, browserName } = parseUserAgent(r.user_agent);
+            const devStr = r.device_type && r.browser_name
+              ? `${r.operating_system || operatingSystem} • ${r.browser_name || browserName}`
+              : `${operatingSystem} • ${browserName}`;
+
+            usersMapByCode.set(normCode, {
+              accessKeyId: r.key_id ? Number(r.key_id) : null,
+              sessionRecordId: r.session_id ? Number(r.session_id) : null,
+              id: r.key_id || r.session_id || null,
+              _fullCode: normCode,
+              username: r.nome_usuario || `Aluno ${maskStudentCode(normCode)}`,
+              avatar: r.avatar || null,
+              maskedKey: maskKeyForAdmin(normCode),
+              status: 'Offline',
+              presenceStatus: 'Offline',
+              hasActiveSession: false,
+              accessStatus: accStat as 'ACTIVE' | 'SUSPENDED' | 'BANNED',
+              suspensionReason: r.suspension_reason || null,
+              suspendedAt: r.suspended_at ? new Date(r.suspended_at).toISOString() : null,
+              suspendedBy: r.suspended_by || null,
+              bannedReason: r.banned_reason || null,
+              bannedAt: r.banned_at ? new Date(r.banned_at).toISOString() : null,
+              bannedBy: r.banned_by || null,
+              reactivatedAt: r.reactivated_at ? new Date(r.reactivated_at).toISOString() : null,
+              reactivatedBy: r.reactivated_by || null,
+              lastAdminAction: r.last_admin_action || null,
+              lastAdminActionAt: r.last_admin_action_at ? new Date(r.last_admin_action_at).toISOString() : null,
+              currentPage: r.current_page || 'Desconectado',
+              deviceType: r.device_type || deviceType,
+              operatingSystem: r.operating_system || operatingSystem,
+              browserName: r.browser_name || browserName,
+              device: devStr,
+              maskedIp: maskIpAddress(r.ip_address),
+              loginAt: new Date().toISOString(),
+              lastActivity: r.last_heartbeat_at ? new Date(r.last_heartbeat_at).toISOString() : new Date().toISOString(),
+              connectedTime: '-',
+            });
+          }
+        }
+      }
     } catch (err) {
       console.warn('[getCentralPresenceData DB Warning]:', err);
     }
@@ -944,14 +1032,15 @@ export async function getCentralPresenceData() {
   }
 
   const allUsers = Array.from(usersMapByCode.values());
+  const activeUsers = allUsers.filter(u => u.accessStatus === 'ACTIVE');
 
-  const onlineNow = allUsers.filter(u => u.status === 'Online').length;
-  const absentSessions = allUsers.filter(u => u.status === 'Ausente').length;
-  const offlineSessions = allUsers.filter(u => u.status === 'Offline').length;
-  const totalMembers = allUsers.length;
+  const onlineNow = activeUsers.filter(u => u.status === 'Online').length;
+  const absentSessions = activeUsers.filter(u => u.status === 'Ausente').length;
+  const offlineSessions = activeUsers.filter(u => u.status === 'Offline').length;
+  const totalMembers = activeUsers.length;
 
   const todayStr = new Date().toDateString();
-  const accessesToday = allUsers.filter(u => {
+  const accessesToday = activeUsers.filter(u => {
     if (u.status === 'Online' || u.status === 'Ausente') return true;
     if (u.loginAt && new Date(u.loginAt).toDateString() === todayStr) return true;
     return false;
@@ -1473,62 +1562,86 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
       });
     }
 
-    const sessInfo = await findSessionById(req.params.id, req.body);
-
-    if (!sessInfo.codigo) {
-      return res.status(404).json({
-        error: 'SESSION_NOT_FOUND',
-        message: 'Sessão de acesso não encontrada.',
-      });
-    }
-
-    if (isMasterKey(sessInfo.codigo)) {
-      return res.status(403).json({
-        error: 'MASTER_KEY_PROTECTED',
-        message: 'Ações administrativas sobre chaves mestras são estritamente proibidas.',
-      });
-    }
-
-    const clientIp = getClientIp(req);
-    let disconnectedCount = 0;
+    const rawIdParam = req.params.id || req.body?.sessionRecordId || req.body?.id;
+    const sessionRecordId = Number(rawIdParam);
 
     if (isDatabaseConfigured()) {
       await ensureSessionsTable();
       await ensureCodigosAcessoTable();
 
-      let updateRes: any = null;
-      if (sessInfo.sessionRecordId) {
-        [updateRes] = await db.query(
-          `UPDATE sessoes
-           SET
-             active_session_id = NULL,
-             device_id = NULL,
-             is_online = 0,
-             status = 'offline',
-             logout_at = NOW(),
-             updated_at = NOW()
-           WHERE id = ?
-             AND active_session_id IS NOT NULL`,
-          [sessInfo.sessionRecordId]
+      let targetRow: any = null;
+
+      if (!isNaN(sessionRecordId) && sessionRecordId > 0) {
+        const [rows]: any = await db.query(
+          `SELECT id, codigo, active_session_id, expires_at, logout_at FROM sessoes WHERE id = ? LIMIT 1`,
+          [sessionRecordId]
         );
-      } else {
-        [updateRes] = await db.query(
-          `UPDATE sessoes
-           SET
-             active_session_id = NULL,
-             device_id = NULL,
-             is_online = 0,
-             status = 'offline',
-             logout_at = NOW(),
-             updated_at = NOW()
-           WHERE codigo = ?
-             AND active_session_id IS NOT NULL`,
-          [sessInfo.codigo]
-        );
+        if (Array.isArray(rows) && rows.length > 0) {
+          targetRow = rows[0];
+        }
       }
 
-      if (updateRes && typeof updateRes.affectedRows === 'number') {
-        disconnectedCount = updateRes.affectedRows;
+      if (!targetRow) {
+        const rawCode = String(req.body?.targetCode || req.body?.codigo || req.params.id || '').trim();
+        if (rawCode && !rawCode.includes('*')) {
+          const normCode = normalizeAccessCode(rawCode);
+          const [rows]: any = await db.query(
+            `SELECT id, codigo, active_session_id, expires_at, logout_at FROM sessoes WHERE codigo = ? LIMIT 1`,
+            [normCode]
+          );
+          if (Array.isArray(rows) && rows.length > 0) {
+            targetRow = rows[0];
+          }
+        }
+      }
+
+      if (!targetRow) {
+        return res.status(404).json({
+          success: false,
+          error: 'SESSION_NOT_FOUND',
+          message: 'Sessão não encontrada.',
+        });
+      }
+
+      if (!targetRow.active_session_id) {
+        return res.status(409).json({
+          success: false,
+          error: 'SESSION_NOT_ACTIVE',
+          message: 'Esta sessão já está encerrada.',
+        });
+      }
+
+      if (isMasterKey(targetRow.codigo)) {
+        return res.status(403).json({
+          error: 'MASTER_KEY_PROTECTED',
+          message: 'Ações administrativas sobre chaves mestras são estritamente proibidas.',
+        });
+      }
+
+      const clientIp = getClientIp(req);
+
+      const [updateRes]: any = await db.query(
+        `UPDATE sessoes
+         SET
+           active_session_id = NULL,
+           device_id = NULL,
+           is_online = 0,
+           status = 'offline',
+           logout_at = NOW(),
+           updated_at = NOW()
+         WHERE id = ?
+           AND active_session_id IS NOT NULL`,
+        [targetRow.id]
+      );
+
+      const affectedRows = updateRes && typeof updateRes.affectedRows === 'number' ? updateRes.affectedRows : 0;
+
+      if (affectedRows !== 1) {
+        return res.status(409).json({
+          success: false,
+          error: 'SESSION_NOT_ACTIVE',
+          message: 'Esta sessão já está encerrada.',
+        });
       }
 
       await db.query(
@@ -1537,29 +1650,38 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
            last_admin_action = 'DISCONNECT',
            last_admin_action_at = NOW()
          WHERE codigo = ?`,
-        [sessInfo.codigo]
+        [targetRow.codigo]
       );
-    }
 
-    // Clear memory session
-    memorySessionsMap.delete(sessInfo.codigo);
+      memorySessionsMap.delete(targetRow.codigo);
 
-    // Audit action
-    await recordAdminAuditAction(sessInfo.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
+      await recordAdminAuditAction(targetRow.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
 
-    if (disconnectedCount === 0) {
-      return res.status(200).json({
-        success: false,
-        error: 'SESSION_NOT_ACTIVE',
-        message: 'Esta sessão já estava encerrada ou não possui sessão ativa.',
+      return res.json({
+        success: true,
+        disconnectedCount: 1,
+        sessionRecordId: targetRow.id,
+        message: 'Sessão encerrada com sucesso.',
       });
     }
 
-    return res.json({
-      success: true,
-      error: null,
-      disconnectedCount: 1,
-      message: 'Sessão encerrada com sucesso.',
+    // In-memory fallback if DB not configured
+    const rawCode = String(req.body?.targetCode || req.body?.codigo || req.params.id || '').trim();
+    const normCode = normalizeAccessCode(rawCode);
+    if (normCode && memorySessionsMap.has(normCode)) {
+      memorySessionsMap.delete(normCode);
+      return res.json({
+        success: true,
+        disconnectedCount: 1,
+        sessionRecordId: sessionRecordId || 1,
+        message: 'Sessão encerrada com sucesso.',
+      });
+    }
+
+    return res.status(404).json({
+      success: false,
+      error: 'SESSION_NOT_FOUND',
+      message: 'Sessão não encontrada.',
     });
   } catch (err: any) {
     console.error('[Admin Disconnect Session Error]:', err?.message || err);
@@ -2061,7 +2183,7 @@ export async function getAdminAccessKeysHandler(req: express.Request, res: expre
             hasSession,
             isOnline,
             createdAt: r.criado_em ? new Date(r.criado_em).toISOString() : new Date().toISOString(),
-            expiresAt: '30 dias',
+            expiresAt: 'Vitalício',
             username: r.nome_usuario || (isUsed ? `Aluno ${maskStudentCode(norm)}` : 'Não utilizado'),
           };
         });
@@ -2091,7 +2213,7 @@ export async function getAdminAccessKeysHandler(req: express.Request, res: expre
           hasSession: Boolean(memSession),
           isOnline,
           createdAt: new Date().toISOString(),
-          expiresAt: '30 dias',
+          expiresAt: 'Vitalício',
           username: isUsed ? `Aluno ${maskStudentCode(norm)}` : 'Não utilizado',
         });
       }
@@ -2197,7 +2319,7 @@ export async function generateAccessKeysHandler(req: express.Request, res: expre
           accessStatus: 'ACTIVE',
           usado: false,
           createdAt: new Date().toISOString(),
-          expiresAt: '30 dias',
+          expiresAt: 'Vitalício',
           username: 'Não utilizado',
           isOnline: false,
         });
@@ -2217,7 +2339,7 @@ export async function generateAccessKeysHandler(req: express.Request, res: expre
           accessStatus: 'ACTIVE',
           usado: false,
           createdAt: new Date().toISOString(),
-          expiresAt: '30 dias',
+          expiresAt: 'Vitalício',
           username: 'Não utilizado',
           isOnline: false,
         });
