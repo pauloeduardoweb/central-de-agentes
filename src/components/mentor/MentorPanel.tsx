@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   Package,
@@ -22,10 +22,17 @@ import { MentorStats } from './MentorStats';
 interface MentorPanelProps {
   studentCode: string;
   onBackToHub?: () => void;
+  onTabChange?: (tab: string) => void;
 }
 
-export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToHub }) => {
+export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToHub, onTabChange }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'challenges' | 'students' | 'codes' | 'sessions' | 'stats'>('products');
+
+  useEffect(() => {
+    if (onTabChange) {
+      onTabChange(activeTab);
+    }
+  }, [activeTab, onTabChange]);
 
   const mentorCards = [
     {

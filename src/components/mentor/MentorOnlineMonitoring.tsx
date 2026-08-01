@@ -44,6 +44,7 @@ interface OnlineUser {
   connectedTime: string;
   disconnectSource?: string;
   disconnectedAt?: string;
+  hasActiveSession?: boolean;
 }
 
 interface MemberStats {
@@ -588,18 +589,29 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     }
   };
 
+  // Helper predicate functions for strict mutual exclusion
+  const isUserActive = (u: OnlineUser) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED';
+  const isUserDesconectado = (u: OnlineUser) =>
+    isUserActive(u) &&
+    !u.hasActiveSession &&
+    Boolean(u.disconnectedAt) &&
+    Boolean(u.disconnectSource) &&
+    ['MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT'].includes(u.disconnectSource!);
+  const isUserOnline = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Online';
+  const isUserAusente = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Ausente';
+  const isUserOffline = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Offline';
+
   // Filter users list by status (search filtering is handled on backend)
   const filteredUsers = users.filter((u) => {
     const isSuspended = u.accessStatus === 'SUSPENDED';
     const isBanned = u.accessStatus === 'BANNED';
-    const isActive = !isSuspended && !isBanned;
 
-    if (statusFilter === 'ativos') return isActive && (u.status === 'Online' || u.status === 'Ausente');
-    if (statusFilter === 'todos') return isActive;
-    if (statusFilter === 'online') return isActive && u.status === 'Online';
-    if (statusFilter === 'ausente') return isActive && u.status === 'Ausente';
-    if (statusFilter === 'offline') return isActive && u.status === 'Offline';
-    if (statusFilter === 'desconectados') return isActive && (Boolean(u.disconnectSource) || Boolean(u.disconnectedAt) || (!u.hasActiveSession && u.status === 'Offline'));
+    if (statusFilter === 'ativos') return isUserOnline(u) || isUserAusente(u);
+    if (statusFilter === 'todos') return isUserActive(u) && (Boolean(u.hasActiveSession) || isUserDesconectado(u));
+    if (statusFilter === 'online') return isUserOnline(u);
+    if (statusFilter === 'ausente') return isUserAusente(u);
+    if (statusFilter === 'offline') return isUserOffline(u);
+    if (statusFilter === 'desconectados') return isUserDesconectado(u);
     if (statusFilter === 'suspensos') return isSuspended;
     if (statusFilter === 'banidos') return isBanned;
     return true;
@@ -805,7 +817,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               }`}
             >
               <Activity className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Ativos ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && (u.status === 'Online' || u.status === 'Ausente')).length})</span>
+              <span>Ativos ({users.filter((u) => isUserOnline(u) || isUserAusente(u)).length})</span>
             </button>
 
             <button
@@ -816,7 +828,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Todos ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED').length})
+              Todos ({users.filter((u) => isUserActive(u) && (Boolean(u.hasActiveSession) || isUserDesconectado(u))).length})
             </button>
 
             <button
@@ -828,7 +840,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>Online ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && u.status === 'Online').length})</span>
+              <span>Online ({users.filter(isUserOnline).length})</span>
             </button>
 
             <button
@@ -840,7 +852,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              <span>Ausente ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && u.status === 'Ausente').length})</span>
+              <span>Ausente ({users.filter(isUserAusente).length})</span>
             </button>
 
             <button
@@ -852,7 +864,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-              <span>Offline ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && u.status === 'Offline').length})</span>
+              <span>Offline ({users.filter(isUserOffline).length})</span>
             </button>
 
             <button
@@ -864,7 +876,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               }`}
             >
               <WifiOff className="w-3.5 h-3.5 text-rose-400" />
-              <span>Desconectados ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && (Boolean(u.disconnectSource) || Boolean(u.disconnectedAt) || (!u.hasActiveSession && u.status === 'Offline'))).length})</span>
+              <span>Desconectados ({users.filter(isUserDesconectado).length})</span>
             </button>
 
             <button
