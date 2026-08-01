@@ -60,31 +60,52 @@ export const MentorAccessCodes: React.FC<MentorAccessCodesProps> = ({ studentCod
     setTimeout(() => setToastMsg(null), 3000);
   };
 
+  const [licenseStats, setLicenseStats] = useState<{
+    totalLicenses: number;
+    activeKeys: number;
+    suspendedKeys: number;
+    bannedKeys: number;
+    neverUsed: number;
+    alreadyUsed: number;
+  }>({
+    totalLicenses: 0,
+    activeKeys: 0,
+    suspendedKeys: 0,
+    bannedKeys: 0,
+    neverUsed: 0,
+    alreadyUsed: 0,
+  });
+
   const loadKeys = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/online-users', {
+      const res = await fetch('/api/admin/access-keys', {
         headers: {
           'x-access-code': studentCode,
           'x-student-access-code': studentCode,
+          'x-master-key': studentCode,
         },
       });
 
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.users)) {
-          const mapped: AccessKeyItem[] = data.users.map((u: any, idx: number) => ({
-            id: idx + 1,
-            codigo: u.maskedKey,
-            maskedKey: u.maskedKey,
-            accessStatus: u.accessStatus || 'ACTIVE',
-            createdAt: u.loginAt || new Date().toISOString(),
+        if (Array.isArray(data.keys)) {
+          const mapped: AccessKeyItem[] = data.keys.map((k: any) => ({
+            id: k.id,
+            codigo: k.codigo,
+            maskedKey: k.maskedKey,
+            accessStatus: k.accessStatus || 'ACTIVE',
+            createdAt: k.createdAt || new Date().toISOString(),
             expiresAt: '30 dias',
-            activeSessionId: u.hasActiveSession ? 'active-sess' : null,
-            isOnline: u.status === 'Online',
-            username: u.username,
+            activeSessionId: k.hasSession ? 'active-sess' : null,
+            isOnline: Boolean(k.isOnline),
+            username: k.username,
+            usado: Boolean(k.usado),
           }));
           setKeysList(mapped);
+        }
+        if (data.stats) {
+          setLicenseStats(data.stats);
         }
       }
     } catch (err) {
@@ -100,34 +121,36 @@ export const MentorAccessCodes: React.FC<MentorAccessCodesProps> = ({ studentCod
 
   const handleGenerateKeys = async () => {
     setGenerating(true);
-    const created: string[] = [];
-    const count = Math.max(1, Math.min(20, generateQuantity));
+    try {
+      const res = await fetch('/api/admin/access-keys/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': studentCode,
+          'x-student-access-code': studentCode,
+          'x-master-key': studentCode,
+        },
+        body: JSON.stringify({
+          quantity: generateQuantity,
+          prefix: customPrefix,
+        }),
+      });
 
-    for (let i = 0; i < count; i++) {
-      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const randomDigits = Math.floor(1000 + Math.random() * 9000);
-      const generatedCode = `${customPrefix.toUpperCase()}-${randomSuffix}-${randomDigits}`;
-      created.push(generatedCode);
+      const data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.keys)) {
+        const createdCodes = data.keys.map((k: any) => k.codigo);
+        setNewlyGeneratedKeys(createdCodes);
+        triggerToast(`${createdCodes.length} novas licenças de acesso geradas e salvas no MySQL!`);
+        await loadKeys();
+      } else {
+        triggerToast(data.message || 'Erro ao gerar novas licenças.');
+      }
+    } catch (err) {
+      console.error('[Generate Keys Error]:', err);
+      triggerToast('Erro ao comunicar com o servidor.');
+    } finally {
+      setGenerating(false);
     }
-
-    setNewlyGeneratedKeys(created);
-
-    // Append to local key view
-    const newItems: AccessKeyItem[] = created.map((code, idx) => ({
-      id: keysList.length + idx + 1,
-      codigo: code,
-      maskedKey: `${code.slice(0, 5)}****${code.slice(-4)}`,
-      accessStatus: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      expiresAt: '30 dias',
-      activeSessionId: null,
-      isOnline: false,
-      username: 'Não vinculado',
-    }));
-
-    setKeysList((prev) => [...newItems, ...prev]);
-    setGenerating(false);
-    triggerToast(`Novas ${created.length} licenças de acesso geradas com sucesso!`);
   };
 
   const copyToClipboard = (text: string) => {
@@ -207,27 +230,39 @@ export const MentorAccessCodes: React.FC<MentorAccessCodesProps> = ({ studentCod
       </div>
 
       {/* Stats Summary Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800">
           <span className="text-[11px] font-bold text-slate-400">Total de Licenças</span>
-          <p className="text-xl font-black text-white mt-1">{keysList.length}</p>
+          <p className="text-xl font-black text-white mt-1">{licenseStats.totalLicenses || keysList.length}</p>
         </div>
         <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30">
-          <span className="text-[11px] font-bold text-emerald-400">Chaves Ativas</span>
+          <span className="text-[11px] font-bold text-emerald-400">Ativas</span>
           <p className="text-xl font-black text-emerald-300 mt-1">
-            {keysList.filter((k) => k.accessStatus === 'ACTIVE').length}
+            {licenseStats.activeKeys ?? keysList.filter((k) => k.accessStatus === 'ACTIVE').length}
           </p>
         </div>
         <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/30">
-          <span className="text-[11px] font-bold text-amber-400">Chaves Suspensas</span>
+          <span className="text-[11px] font-bold text-amber-400">Suspensas</span>
           <p className="text-xl font-black text-amber-300 mt-1">
-            {keysList.filter((k) => k.accessStatus === 'SUSPENDED').length}
+            {licenseStats.suspendedKeys ?? keysList.filter((k) => k.accessStatus === 'SUSPENDED').length}
           </p>
         </div>
         <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-500/30">
-          <span className="text-[11px] font-bold text-rose-400">Chaves Banidas</span>
+          <span className="text-[11px] font-bold text-rose-400">Banidas</span>
           <p className="text-xl font-black text-rose-300 mt-1">
-            {keysList.filter((k) => k.accessStatus === 'BANNED').length}
+            {licenseStats.bannedKeys ?? keysList.filter((k) => k.accessStatus === 'BANNED').length}
+          </p>
+        </div>
+        <div className="p-3.5 rounded-2xl bg-sky-950/40 border border-sky-500/30">
+          <span className="text-[11px] font-bold text-sky-400">Nunca Utilizadas</span>
+          <p className="text-xl font-black text-sky-300 mt-1">
+            {licenseStats.neverUsed ?? keysList.filter((k) => !k.usado).length}
+          </p>
+        </div>
+        <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30">
+          <span className="text-[11px] font-bold text-indigo-400">Já Utilizadas</span>
+          <p className="text-xl font-black text-indigo-300 mt-1">
+            {licenseStats.alreadyUsed ?? keysList.filter((k) => k.usado).length}
           </p>
         </div>
       </div>
