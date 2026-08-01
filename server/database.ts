@@ -109,6 +109,7 @@ export async function ensureSessionsTable(): Promise<void> {
 
     // Ensure columns exist if table was created previously without them
     const alterQueries = [
+      `ALTER TABLE sessoes ADD COLUMN id INT AUTO_INCREMENT UNIQUE KEY`,
       `ALTER TABLE sessoes ADD COLUMN current_page VARCHAR(255) DEFAULT 'Agentes GPT'`,
       `ALTER TABLE sessoes ADD COLUMN ip_address VARCHAR(100) DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN user_agent TEXT DEFAULT NULL`,

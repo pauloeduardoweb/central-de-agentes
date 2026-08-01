@@ -851,10 +851,22 @@ export async function getCentralPresenceData() {
 
           const hasActiveSession = Boolean((r.active_session_id || memSession?.sessionId) && isExpiresAtFuture);
 
+          let keyIdNum = r.key_id ? Number(r.key_id) : null;
+          if (!keyIdNum && isDatabaseConfigured()) {
+            try {
+              await db.query(`INSERT IGNORE INTO codigos_acesso (codigo) VALUES (?)`, [normCode]);
+              const [kRows]: any = await db.query(`SELECT id FROM codigos_acesso WHERE codigo = ? LIMIT 1`, [normCode]);
+              if (Array.isArray(kRows) && kRows.length > 0) {
+                keyIdNum = Number(kRows[0].id);
+              }
+            } catch (e) {}
+          }
+          const sessIdNum = r.session_id ? Number(r.session_id) : null;
+
           usersMapByCode.set(normCode, {
-            accessKeyId: r.key_id || null,
-            sessionRecordId: r.session_id || null,
-            id: r.key_id || r.session_id || null,
+            accessKeyId: keyIdNum || null,
+            sessionRecordId: sessIdNum || null,
+            id: keyIdNum || sessIdNum || null,
             _fullCode: normCode,
             username: r.nome_usuario || `Aluno ${maskStudentCode(normCode)}`,
             avatar: r.avatar || null,
@@ -972,109 +984,137 @@ export async function getCentralPresenceData() {
 }
 
 /**
- * Helper to resolve target access key or session record securely by numeric ID or unmasked code
+ * Helper to resolve a target session record securely by numeric sessionRecordId or unmasked code
  */
-async function findTargetAccessKey(
+async function findSessionById(
   rawParam: any,
-  bodyObj: any
+  bodyObj?: any
 ): Promise<{
-  accessKeyId: number | null;
-  codigo: string | null;
-  accessStatus: string | null;
   sessionRecordId: number | null;
+  codigo: string | null;
+  isOnline: boolean;
 }> {
-  const candidate = bodyObj?.accessKeyId || bodyObj?.sessionRecordId || bodyObj?.id || rawParam;
+  const candidate = bodyObj?.sessionRecordId || bodyObj?.id || rawParam;
 
   if (isDatabaseConfigured()) {
-    await ensureCodigosAcessoTable();
     await ensureSessionsTable();
 
     // 1. If candidate is a numeric ID
     const numId = Number(candidate);
     if (!isNaN(numId) && numId > 0 && String(candidate).trim() !== '') {
-      // First query codigos_acesso by id
-      const [keyRows]: any = await db.query(
-        `SELECT id, codigo, access_status FROM codigos_acesso WHERE id = ? LIMIT 1`,
+      const [rows]: any = await db.query(
+        `SELECT id, codigo, is_online FROM sessoes WHERE id = ? LIMIT 1`,
         [numId]
       );
-      if (Array.isArray(keyRows) && keyRows.length > 0) {
-        const kRow = keyRows[0];
-        const [sessRows]: any = await db.query(
-          `SELECT id FROM sessoes WHERE codigo = ? LIMIT 1`,
-          [kRow.codigo]
-        );
-        const sRow = Array.isArray(sessRows) && sessRows.length > 0 ? sessRows[0] : null;
+      if (Array.isArray(rows) && rows.length > 0) {
         return {
-          accessKeyId: kRow.id,
-          codigo: kRow.codigo,
-          accessStatus: kRow.access_status,
-          sessionRecordId: sRow?.id || null,
-        };
-      }
-
-      // If not found in codigos_acesso, query sessoes by id
-      const [sessRows]: any = await db.query(
-        `SELECT id, codigo FROM sessoes WHERE id = ? LIMIT 1`,
-        [numId]
-      );
-      if (Array.isArray(sessRows) && sessRows.length > 0) {
-        const sRow = sessRows[0];
-        const [keyRows2]: any = await db.query(
-          `SELECT id, access_status FROM codigos_acesso WHERE codigo = ? LIMIT 1`,
-          [sRow.codigo]
-        );
-        const kRow2 = Array.isArray(keyRows2) && keyRows2.length > 0 ? keyRows2[0] : null;
-        return {
-          accessKeyId: kRow2?.id || null,
-          codigo: sRow.codigo,
-          accessStatus: kRow2?.access_status || 'ACTIVE',
-          sessionRecordId: sRow.id,
+          sessionRecordId: rows[0].id,
+          codigo: rows[0].codigo,
+          isOnline: Boolean(rows[0].is_online),
         };
       }
     }
 
-    // 2. If candidate is unmasked string code (does not contain '*')
+    // 2. Fallback: if candidate is unmasked string code (no asterisks)
     const rawStr = String(bodyObj?.targetCode || bodyObj?.codigo || rawParam || '').trim();
     if (rawStr && !rawStr.includes('*')) {
       const norm = normalizeAccessCode(rawStr);
-      const [keyRows3]: any = await db.query(
-        `SELECT id, codigo, access_status FROM codigos_acesso WHERE codigo = ? LIMIT 1`,
+      const [rows]: any = await db.query(
+        `SELECT id, codigo, is_online FROM sessoes WHERE codigo = ? LIMIT 1`,
         [norm]
       );
-      if (Array.isArray(keyRows3) && keyRows3.length > 0) {
-        const kRow = keyRows3[0];
-        const [sessRows]: any = await db.query(
-          `SELECT id FROM sessoes WHERE codigo = ? LIMIT 1`,
-          [kRow.codigo]
-        );
-        const sRow = Array.isArray(sessRows) && sessRows.length > 0 ? sessRows[0] : null;
+      if (Array.isArray(rows) && rows.length > 0) {
         return {
-          accessKeyId: kRow.id,
-          codigo: kRow.codigo,
-          accessStatus: kRow.access_status,
-          sessionRecordId: sRow?.id || null,
+          sessionRecordId: rows[0].id,
+          codigo: rows[0].codigo,
+          isOnline: Boolean(rows[0].is_online),
         };
       }
     }
   }
 
-  // 3. Fallback memory check
+  // 3. Fallback memory check for unmasked code
   const rawStr = String(bodyObj?.targetCode || bodyObj?.codigo || rawParam || '').trim();
   if (rawStr && !rawStr.includes('*')) {
     const norm = normalizeAccessCode(rawStr);
     if (STUDENT_KEYS.has(norm)) {
       const memSession = memorySessionsMap.get(norm);
+      return {
+        sessionRecordId: memSession ? 1 : null,
+        codigo: norm,
+        isOnline: Boolean(memSession),
+      };
+    }
+  }
+
+  return { sessionRecordId: null, codigo: null, isOnline: false };
+}
+
+/**
+ * Helper to resolve a target access key securely by numeric accessKeyId or unmasked code
+ */
+async function findAccessKeyById(
+  rawParam: any,
+  bodyObj?: any
+): Promise<{
+  accessKeyId: number | null;
+  codigo: string | null;
+  accessStatus: string | null;
+}> {
+  const candidate = bodyObj?.accessKeyId || bodyObj?.id || rawParam;
+
+  if (isDatabaseConfigured()) {
+    await ensureCodigosAcessoTable();
+
+    // 1. If candidate is a numeric ID
+    const numId = Number(candidate);
+    if (!isNaN(numId) && numId > 0 && String(candidate).trim() !== '') {
+      const [rows]: any = await db.query(
+        `SELECT id, codigo, access_status FROM codigos_acesso WHERE id = ? LIMIT 1`,
+        [numId]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        return {
+          accessKeyId: rows[0].id,
+          codigo: rows[0].codigo,
+          accessStatus: rows[0].access_status,
+        };
+      }
+    }
+
+    // 2. Fallback: if candidate is unmasked string code (no asterisks)
+    const rawStr = String(bodyObj?.targetCode || bodyObj?.codigo || rawParam || '').trim();
+    if (rawStr && !rawStr.includes('*')) {
+      const norm = normalizeAccessCode(rawStr);
+      const [rows]: any = await db.query(
+        `SELECT id, codigo, access_status FROM codigos_acesso WHERE codigo = ? LIMIT 1`,
+        [norm]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        return {
+          accessKeyId: rows[0].id,
+          codigo: rows[0].codigo,
+          accessStatus: rows[0].access_status,
+        };
+      }
+    }
+  }
+
+  // 3. Fallback memory check for unmasked code
+  const rawStr = String(bodyObj?.targetCode || bodyObj?.codigo || rawParam || '').trim();
+  if (rawStr && !rawStr.includes('*')) {
+    const norm = normalizeAccessCode(rawStr);
+    if (STUDENT_KEYS.has(norm)) {
       const memKeyInfo = memoryKeyStatusMap.get(norm);
       return {
         accessKeyId: Math.abs(norm.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)),
         codigo: norm,
         accessStatus: memKeyInfo?.accessStatus || 'ACTIVE',
-        sessionRecordId: memSession ? 1 : null,
       };
     }
   }
 
-  return { accessKeyId: null, codigo: null, accessStatus: null, sessionRecordId: null };
+  return { accessKeyId: null, codigo: null, accessStatus: null };
 }
 
 /**
@@ -1445,16 +1485,16 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
       });
     }
 
-    const targetInfo = await findTargetAccessKey(req.params.id, req.body);
+    const sessInfo = await findSessionById(req.params.id, req.body);
 
-    if (!targetInfo.codigo) {
+    if (!sessInfo.codigo) {
       return res.status(404).json({
-        error: 'ACCESS_KEY_NOT_FOUND',
-        message: 'Chave de acesso não encontrada.',
+        error: 'SESSION_NOT_FOUND',
+        message: 'Sessão de acesso não encontrada.',
       });
     }
 
-    if (isMasterKey(targetInfo.codigo)) {
+    if (isMasterKey(sessInfo.codigo)) {
       return res.status(403).json({
         error: 'MASTER_KEY_PROTECTED',
         message: 'Ações administrativas sobre chaves mestras são estritamente proibidas.',
@@ -1469,7 +1509,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
       await ensureCodigosAcessoTable();
 
       let updateRes: any = null;
-      if (targetInfo.sessionRecordId) {
+      if (sessInfo.sessionRecordId) {
         [updateRes] = await db.query(
           `UPDATE sessoes
            SET
@@ -1479,7 +1519,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
              status = 'offline',
              logout_at = NOW()
            WHERE id = ?`,
-          [targetInfo.sessionRecordId]
+          [sessInfo.sessionRecordId]
         );
       } else {
         [updateRes] = await db.query(
@@ -1491,7 +1531,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
              status = 'offline',
              logout_at = NOW()
            WHERE codigo = ?`,
-          [targetInfo.codigo]
+          [sessInfo.codigo]
         );
       }
 
@@ -1499,27 +1539,25 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
         disconnectedCount = updateRes.affectedRows;
       }
 
-      if (targetInfo.accessKeyId) {
-        await db.query(
-          `UPDATE codigos_acesso
-           SET
-             last_admin_action = 'DISCONNECT',
-             last_admin_action_at = NOW()
-           WHERE id = ?`,
-          [targetInfo.accessKeyId]
-        );
-      }
+      await db.query(
+        `UPDATE codigos_acesso
+         SET
+           last_admin_action = 'DISCONNECT',
+           last_admin_action_at = NOW()
+         WHERE codigo = ?`,
+        [sessInfo.codigo]
+      );
     }
 
     // Clear memory session
-    const hadMem = memorySessionsMap.has(targetInfo.codigo);
+    const hadMem = memorySessionsMap.has(sessInfo.codigo);
     if (hadMem) {
-      memorySessionsMap.delete(targetInfo.codigo);
+      memorySessionsMap.delete(sessInfo.codigo);
       if (disconnectedCount === 0) disconnectedCount = 1;
     }
 
     // Audit action
-    await recordAdminAuditAction(targetInfo.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
+    await recordAdminAuditAction(sessInfo.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
 
     if (disconnectedCount === 0) {
       return res.status(200).json({
@@ -1633,16 +1671,16 @@ export async function adminSuspendKeyHandler(req: express.Request, res: express.
       });
     }
 
-    const targetInfo = await findTargetAccessKey(req.params.id, req.body);
+    const keyInfo = await findAccessKeyById(req.params.id, req.body);
 
-    if (!targetInfo.codigo || !targetInfo.accessKeyId) {
+    if (!keyInfo.codigo || !keyInfo.accessKeyId) {
       return res.status(404).json({
         error: 'ACCESS_KEY_NOT_FOUND',
         message: 'Chave de acesso não encontrada.',
       });
     }
 
-    if (isMasterKey(targetInfo.codigo)) {
+    if (isMasterKey(keyInfo.codigo)) {
       return res.status(403).json({
         error: 'MASTER_KEY_PROTECTED',
         message: 'Ações administrativas sobre chaves mestras são estritamente proibidas.',
@@ -1670,7 +1708,7 @@ export async function adminSuspendKeyHandler(req: express.Request, res: express.
              last_admin_action = 'SUSPEND',
              last_admin_action_at = NOW()
          WHERE id = ?`,
-        [finalReason, targetInfo.accessKeyId]
+        [finalReason, keyInfo.accessKeyId]
       );
 
       // Disconnect corresponding session
@@ -1681,17 +1719,13 @@ export async function adminSuspendKeyHandler(req: express.Request, res: express.
              is_online = 0,
              status = 'offline',
              logout_at = NOW()
-         WHERE codigo = (
-           SELECT codigo
-           FROM codigos_acesso
-           WHERE id = ?
-         )`,
-        [targetInfo.accessKeyId]
+         WHERE codigo = ?`,
+        [keyInfo.codigo]
       );
     }
 
     // Memory status update
-    memoryKeyStatusMap.set(targetInfo.codigo, {
+    memoryKeyStatusMap.set(keyInfo.codigo, {
       accessStatus: 'SUSPENDED',
       suspensionReason: finalReason,
       suspendedAt: nowIso,
@@ -1700,14 +1734,14 @@ export async function adminSuspendKeyHandler(req: express.Request, res: express.
       lastAdminActionAt: nowIso,
     });
     saveKeyStatusStore();
-    memorySessionsMap.delete(targetInfo.codigo);
+    memorySessionsMap.delete(keyInfo.codigo);
 
     // Audit log
-    await recordAdminAuditAction(targetInfo.codigo, 'SUSPEND', finalReason, clientIp);
+    await recordAdminAuditAction(keyInfo.codigo, 'SUSPEND', finalReason, clientIp);
 
     return res.json({
       success: true,
-      targetMaskedKey: maskKeyForAdmin(targetInfo.codigo),
+      targetMaskedKey: maskKeyForAdmin(keyInfo.codigo),
       accessStatus: 'SUSPENDED',
       message: 'Chave suspensa com sucesso.',
     });
@@ -1734,16 +1768,16 @@ export async function adminReactivateKeyHandler(req: express.Request, res: expre
       });
     }
 
-    const targetInfo = await findTargetAccessKey(req.params.id, req.body);
+    const keyInfo = await findAccessKeyById(req.params.id, req.body);
 
-    if (!targetInfo.codigo || !targetInfo.accessKeyId) {
+    if (!keyInfo.codigo || !keyInfo.accessKeyId) {
       return res.status(404).json({
         error: 'ACCESS_KEY_NOT_FOUND',
         message: 'Chave de acesso não encontrada.',
       });
     }
 
-    if (isMasterKey(targetInfo.codigo)) {
+    if (isMasterKey(keyInfo.codigo)) {
       return res.status(403).json({
         error: 'MASTER_KEY_PROTECTED',
         message: 'Ações administrativas sobre chaves mestras são estritamente proibidas.',
@@ -1769,12 +1803,12 @@ export async function adminReactivateKeyHandler(req: express.Request, res: expre
              last_admin_action = 'REACTIVATE',
              last_admin_action_at = NOW()
          WHERE id = ?`,
-        [targetInfo.accessKeyId]
+        [keyInfo.accessKeyId]
       );
     }
 
-    const existingMem = memoryKeyStatusMap.get(targetInfo.codigo);
-    memoryKeyStatusMap.set(targetInfo.codigo, {
+    const existingMem = memoryKeyStatusMap.get(keyInfo.codigo);
+    memoryKeyStatusMap.set(keyInfo.codigo, {
       ...existingMem,
       accessStatus: 'ACTIVE',
       reactivatedAt: nowIso,
@@ -1784,11 +1818,11 @@ export async function adminReactivateKeyHandler(req: express.Request, res: expre
     });
     saveKeyStatusStore();
 
-    await recordAdminAuditAction(targetInfo.codigo, 'REACTIVATE', 'Reativação efetuada pelo Mentor', clientIp);
+    await recordAdminAuditAction(keyInfo.codigo, 'REACTIVATE', 'Reativação efetuada pelo Mentor', clientIp);
 
     return res.json({
       success: true,
-      targetMaskedKey: maskKeyForAdmin(targetInfo.codigo),
+      targetMaskedKey: maskKeyForAdmin(keyInfo.codigo),
       accessStatus: 'ACTIVE',
       message: 'Chave reativada com sucesso.',
     });
@@ -1815,16 +1849,16 @@ export async function adminBanKeyHandler(req: express.Request, res: express.Resp
       });
     }
 
-    const targetInfo = await findTargetAccessKey(req.params.id, req.body);
+    const keyInfo = await findAccessKeyById(req.params.id, req.body);
 
-    if (!targetInfo.codigo || !targetInfo.accessKeyId) {
+    if (!keyInfo.codigo || !keyInfo.accessKeyId) {
       return res.status(404).json({
         error: 'ACCESS_KEY_NOT_FOUND',
         message: 'Chave de acesso não encontrada.',
       });
     }
 
-    if (isMasterKey(targetInfo.codigo)) {
+    if (isMasterKey(keyInfo.codigo)) {
       return res.status(403).json({
         error: 'MASTER_KEY_PROTECTED',
         message: 'Ações administrativas sobre chaves mestras são estritamente proibidas.',
@@ -1852,7 +1886,7 @@ export async function adminBanKeyHandler(req: express.Request, res: express.Resp
              last_admin_action = 'BAN',
              last_admin_action_at = NOW()
          WHERE id = ?`,
-        [finalReason, targetInfo.accessKeyId]
+        [finalReason, keyInfo.accessKeyId]
       );
 
       // Disconnect corresponding session
@@ -1863,16 +1897,12 @@ export async function adminBanKeyHandler(req: express.Request, res: express.Resp
              is_online = 0,
              status = 'offline',
              logout_at = NOW()
-         WHERE codigo = (
-           SELECT codigo
-           FROM codigos_acesso
-           WHERE id = ?
-         )`,
-        [targetInfo.accessKeyId]
+         WHERE codigo = ?`,
+        [keyInfo.codigo]
       );
     }
 
-    memoryKeyStatusMap.set(targetInfo.codigo, {
+    memoryKeyStatusMap.set(keyInfo.codigo, {
       accessStatus: 'BANNED',
       bannedReason: finalReason,
       bannedAt: nowIso,
@@ -1881,13 +1911,13 @@ export async function adminBanKeyHandler(req: express.Request, res: express.Resp
       lastAdminActionAt: nowIso,
     });
     saveKeyStatusStore();
-    memorySessionsMap.delete(targetInfo.codigo);
+    memorySessionsMap.delete(keyInfo.codigo);
 
-    await recordAdminAuditAction(targetInfo.codigo, 'BAN', finalReason, clientIp);
+    await recordAdminAuditAction(keyInfo.codigo, 'BAN', finalReason, clientIp);
 
     return res.json({
       success: true,
-      targetMaskedKey: maskKeyForAdmin(targetInfo.codigo),
+      targetMaskedKey: maskKeyForAdmin(keyInfo.codigo),
       accessStatus: 'BANNED',
       message: 'Chave banida com sucesso.',
     });
@@ -1914,9 +1944,9 @@ export async function adminGetAccessHistoryHandler(req: express.Request, res: ex
       });
     }
 
-    const targetInfo = await findTargetAccessKey(req.params.id, req.query);
+    const keyInfo = await findAccessKeyById(req.params.id, req.query);
 
-    if (!targetInfo.codigo) {
+    if (!keyInfo.codigo) {
       return res.status(404).json({
         error: 'ACCESS_KEY_NOT_FOUND',
         message: 'Chave de acesso não encontrada.',
@@ -1933,7 +1963,7 @@ export async function adminGetAccessHistoryHandler(req: express.Request, res: ex
          FROM admin_access_actions
          WHERE target_access_key_id = ? OR target_masked_key = ?
          ORDER BY created_at DESC`,
-        [targetInfo.accessKeyId, maskKeyForAdmin(targetInfo.codigo)]
+        [keyInfo.accessKeyId, maskKeyForAdmin(keyInfo.codigo)]
       );
 
       if (Array.isArray(rows)) {
@@ -1949,7 +1979,7 @@ export async function adminGetAccessHistoryHandler(req: express.Request, res: ex
       }
     } else {
       historyEntries = memoryAuditLogs
-        .filter((l) => l.targetMaskedKey === maskKeyForAdmin(targetInfo.codigo))
+        .filter((l) => l.targetMaskedKey === maskKeyForAdmin(keyInfo.codigo))
         .map((l) => ({
           id: l.id,
           targetMaskedKey: l.targetMaskedKey,
@@ -1963,7 +1993,7 @@ export async function adminGetAccessHistoryHandler(req: express.Request, res: ex
 
     return res.json({
       success: true,
-      targetMaskedKey: maskKeyForAdmin(targetInfo.codigo),
+      targetMaskedKey: maskKeyForAdmin(keyInfo.codigo),
       history: historyEntries,
     });
   } catch (err: any) {
