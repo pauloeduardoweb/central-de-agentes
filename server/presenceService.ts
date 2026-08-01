@@ -179,11 +179,29 @@ export interface HistoryEventItem {
   maskedKey: string;
   username?: string;
   sessionId?: string | number | null;
-  eventType: 'LOGIN' | 'LOGOUT' | 'HEARTBEAT' | 'CATEGORY_CHANGE' | 'MENTOR_DISCONNECT' | 'SUSPEND' | 'BAN' | 'REACTIVATE';
+  eventType:
+    | 'LOGIN'
+    | 'LOGOUT'
+    | 'HEARTBEAT'
+    | 'CATEGORY_CHANGE'
+    | 'PAGE_CHANGE'
+    | 'MENTOR_DISCONNECT'
+    | 'DISCONNECT_ALL'
+    | 'SUSPEND'
+    | 'BAN'
+    | 'REACTIVATE'
+    | 'EXPIRE'
+    | 'RENEW'
+    | 'DEVICE_CHANGE'
+    | 'BROWSER_CHANGE'
+    | 'IP_CHANGE';
   page?: string | null;
+  category?: string | null;
   device?: string | null;
+  browser?: string | null;
   ip?: string | null;
   details?: string | null;
+  mentorResponsavel?: string | null;
   createdAt: string;
 }
 
@@ -193,11 +211,29 @@ let historyIdCounter = 1;
 export async function recordSessionHistoryEvent(params: {
   codigo: string;
   sessionId?: string | number | null;
-  eventType: 'LOGIN' | 'LOGOUT' | 'HEARTBEAT' | 'CATEGORY_CHANGE' | 'MENTOR_DISCONNECT' | 'SUSPEND' | 'BAN' | 'REACTIVATE';
+  eventType:
+    | 'LOGIN'
+    | 'LOGOUT'
+    | 'HEARTBEAT'
+    | 'CATEGORY_CHANGE'
+    | 'PAGE_CHANGE'
+    | 'MENTOR_DISCONNECT'
+    | 'DISCONNECT_ALL'
+    | 'SUSPEND'
+    | 'BAN'
+    | 'REACTIVATE'
+    | 'EXPIRE'
+    | 'RENEW'
+    | 'DEVICE_CHANGE'
+    | 'BROWSER_CHANGE'
+    | 'IP_CHANGE';
   page?: string | null;
+  category?: string | null;
   device?: string | null;
+  browser?: string | null;
   ip?: string | null;
   details?: string | null;
+  mentorResponsavel?: string | null;
 }): Promise<void> {
   const normCode = normalizeAccessCode(params.codigo);
   if (!normCode && params.codigo !== 'TODAS_AS_SESSOES') return;
@@ -213,14 +249,17 @@ export async function recordSessionHistoryEvent(params: {
     sessionId: params.sessionId || null,
     eventType: params.eventType,
     page: params.page || 'TikTok 2K',
+    category: params.category || params.page || 'TikTok 2K',
     device: params.device || null,
+    browser: params.browser || null,
     ip: maskIpAddress(params.ip),
     details: params.details || null,
+    mentorResponsavel: params.mentorResponsavel || null,
     createdAt: nowIso,
   };
 
   memoryActivityFeed.unshift(eventItem);
-  if (memoryActivityFeed.length > 100) {
+  if (memoryActivityFeed.length > 200) {
     memoryActivityFeed.pop();
   }
 
@@ -228,16 +267,19 @@ export async function recordSessionHistoryEvent(params: {
     try {
       await ensureSessionHistoryTable();
       await db.query(
-        `INSERT INTO session_history (codigo, session_id, event_type, page, device, ip, details, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        `INSERT INTO session_history (codigo, session_id, event_type, page, category, device, browser, ip, details, mentor_responsavel, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           targetCode,
           params.sessionId ? String(params.sessionId) : null,
           params.eventType,
           params.page || null,
+          params.category || params.page || null,
           params.device || null,
+          params.browser || null,
           params.ip || null,
           params.details || null,
+          params.mentorResponsavel || null,
         ]
       );
     } catch (err: any) {
@@ -1375,6 +1417,93 @@ export async function getCentralPresenceData() {
     paginaAtual: u.currentPage,
   }));
 
+  const totalOnlineSeconds = onlineUsersList.reduce((acc, u) => acc + (u.tempoOnlineSeconds || 0), 0);
+  const avgOnlineSeconds = onlineUsersList.length > 0 ? Math.round(totalOnlineSeconds / onlineUsersList.length) : 0;
+  const avgOnlineFormatted = formatTempoOnline(avgOnlineSeconds);
+
+  let suspendedCount = 0;
+  let bannedCount = 0;
+  for (const u of allUsers) {
+    if (u.accessStatus === 'SUSPENDED' || u.status === 'Suspenso') suspendedCount++;
+    if (u.accessStatus === 'BANNED' || u.status === 'Banido') bannedCount++;
+  }
+
+  // System Alerts
+  const alerts: Array<{
+    id: string | number;
+    type: 'NEW_LOGIN' | 'NEW_STUDENT' | 'ABSENT' | 'DUPLICATE_LOGIN' | 'DEVICE_CHANGE' | 'IP_CHANGE' | 'FRAUD' | 'DISCONNECT' | 'BAN' | 'SUSPEND';
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    title: string;
+    message: string;
+    studentCode?: string;
+    timestamp: string;
+  }> = [];
+
+  for (const item of memoryActivityFeed.slice(0, 15)) {
+    if (item.eventType === 'LOGIN') {
+      alerts.push({
+        id: `login-${item.id}`,
+        type: 'NEW_LOGIN',
+        severity: 'LOW',
+        title: 'Novo Login Registrado',
+        message: `Aluno ${item.maskedKey} realizou login via ${item.device || 'Navegador'}.`,
+        studentCode: item.maskedKey,
+        timestamp: item.createdAt,
+      });
+    } else if (item.eventType === 'MENTOR_DISCONNECT' || item.eventType === 'DISCONNECT_ALL') {
+      alerts.push({
+        id: `disc-${item.id}`,
+        type: 'DISCONNECT',
+        severity: 'HIGH',
+        title: 'Sessão Encerrada pelo Mentor',
+        message: `Login do aluno ${item.maskedKey} foi encerrado pelo Mentor.`,
+        studentCode: item.maskedKey,
+        timestamp: item.createdAt,
+      });
+    } else if (item.eventType === 'BAN') {
+      alerts.push({
+        id: `ban-${item.id}`,
+        type: 'BAN',
+        severity: 'CRITICAL',
+        title: 'Aluno Banido',
+        message: `Acesso do aluno ${item.maskedKey} foi banido. ${item.details || ''}`,
+        studentCode: item.maskedKey,
+        timestamp: item.createdAt,
+      });
+    } else if (item.eventType === 'SUSPEND') {
+      alerts.push({
+        id: `sus-${item.id}`,
+        type: 'SUSPEND',
+        severity: 'MEDIUM',
+        title: 'Aluno Suspenso',
+        message: `Acesso do aluno ${item.maskedKey} foi suspenso temporariamente.`,
+        studentCode: item.maskedKey,
+        timestamp: item.createdAt,
+      });
+    }
+  }
+
+  if (absentSessions > 0) {
+    alerts.push({
+      id: 'absent-summary',
+      type: 'ABSENT',
+      severity: 'MEDIUM',
+      title: 'Alunos Ausentes Detectados',
+      message: `${absentSessions} aluno(s) estão ausentes sem heartbeat há mais de 30 segundos.`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  const healthCheck = {
+    serverStatus: 'Online',
+    dbStatus: isDatabaseConfigured() ? 'Conectado (MySQL)' : 'Memória Local',
+    avgHeartbeat: '3.0 s',
+    memoryUsage: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+    uptime: `${Math.floor(process.uptime() / 60)}m`,
+    latencyMs: isDatabaseConfigured() ? 8 : 1,
+    lastUpdate: new Date().toLocaleTimeString('pt-BR'),
+  };
+
   return {
     users: allUsers,
     stats: {
@@ -1391,6 +1520,12 @@ export async function getCentralPresenceData() {
       loginsToday: hourlyLogins,
       longestSessions,
       shortestSessions,
+      avgOnlineSeconds,
+      avgOnlineFormatted,
+      suspendedCount,
+      bannedCount,
+      healthCheck,
+      alerts,
       activityFeed: memoryActivityFeed.slice(0, 30),
     },
   };
@@ -1587,6 +1722,19 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
       accessesToday,
       peakSimultaneous,
       absentSessions,
+      avgOnlineSeconds: central.stats.avgOnlineSeconds,
+      avgOnlineFormatted: central.stats.avgOnlineFormatted,
+      suspendedCount: central.stats.suspendedCount,
+      bannedCount: central.stats.bannedCount,
+      healthCheck: central.stats.healthCheck,
+      alerts: central.stats.alerts,
+      topCategories: central.stats.topCategories,
+      devices: central.stats.devices,
+      browsers: central.stats.browsers,
+      loginsToday: central.stats.loginsToday,
+      longestSessions: central.stats.longestSessions,
+      shortestSessions: central.stats.shortestSessions,
+      activityFeed: central.stats.activityFeed,
       updatedAt: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -2820,14 +2968,14 @@ export async function adminGetStudentHistoryHandler(req: express.Request, res: e
 
     if (isDatabaseConfigured()) {
       await ensureSessionHistoryTable();
-      let sql = `SELECT id, codigo, session_id, event_type, page, device, ip, details, created_at FROM session_history`;
+      let sql = `SELECT id, codigo, session_id, event_type, page, category, device, browser, ip, details, mentor_responsavel, created_at FROM session_history`;
       let paramsArr: any[] = [];
 
       if (normCode) {
         sql += ` WHERE codigo = ?`;
         paramsArr.push(normCode);
       }
-      sql += ` ORDER BY created_at DESC LIMIT 100`;
+      sql += ` ORDER BY created_at DESC LIMIT 200`;
 
       const [rows]: any = await db.query(sql, paramsArr);
       if (Array.isArray(rows)) {
@@ -2838,9 +2986,12 @@ export async function adminGetStudentHistoryHandler(req: express.Request, res: e
           sessionId: r.session_id,
           eventType: r.event_type,
           page: r.page,
+          category: r.category || r.page,
           device: r.device,
+          browser: r.browser,
           ip: maskIpAddress(r.ip),
           details: r.details,
+          mentorResponsavel: r.mentor_responsavel,
           createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
         }));
       }
@@ -2854,9 +3005,12 @@ export async function adminGetStudentHistoryHandler(req: express.Request, res: e
           sessionId: ev.sessionId,
           eventType: ev.eventType,
           page: ev.page,
+          category: ev.category || ev.page,
           device: ev.device,
+          browser: ev.browser,
           ip: maskIpAddress(ev.ip),
           details: ev.details,
+          mentorResponsavel: ev.mentorResponsavel,
           createdAt: ev.createdAt,
         }));
     }

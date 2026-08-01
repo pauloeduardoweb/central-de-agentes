@@ -121,6 +121,11 @@ export async function ensureSessionsTable(): Promise<void> {
       `ALTER TABLE sessoes ADD COLUMN disconnect_source VARCHAR(50) DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN disconnected_at DATETIME DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_active_session (active_session_id)`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_current_page (current_page)`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_status (status)`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_heartbeat (last_heartbeat_at)`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_updated (updated_at)`,
     ];
 
     for (const q of alterQueries) {
@@ -146,15 +151,29 @@ export async function ensureSessionHistoryTable(): Promise<void> {
         session_id INT DEFAULT NULL,
         event_type VARCHAR(50) NOT NULL,
         page VARCHAR(255) DEFAULT NULL,
+        category VARCHAR(255) DEFAULT NULL,
         device VARCHAR(255) DEFAULT NULL,
+        browser VARCHAR(255) DEFAULT NULL,
         ip VARCHAR(100) DEFAULT NULL,
         details TEXT DEFAULT NULL,
+        mentor_responsavel VARCHAR(100) DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_hist_codigo (codigo),
         INDEX idx_hist_event (event_type),
-        INDEX idx_hist_created (created_at)
+        INDEX idx_hist_created (created_at),
+        INDEX idx_hist_page (page)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    const alterHistQueries = [
+      `ALTER TABLE session_history ADD COLUMN category VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE session_history ADD COLUMN browser VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE session_history ADD COLUMN mentor_responsavel VARCHAR(100) DEFAULT NULL`,
+      `ALTER TABLE session_history ADD INDEX idx_hist_page (page)`,
+    ];
+    for (const q of alterHistQueries) {
+      await db.query(q).catch(() => {});
+    }
   } catch (err: any) {
     console.warn('[MySQL ensureSessionHistoryTable Error]:', err?.message || err);
   }
