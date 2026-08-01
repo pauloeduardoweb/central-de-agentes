@@ -287,7 +287,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
         connection = await db.getConnection();
         await connection.beginTransaction();
 
-        // Lock row during check (Rule 6)
+        // Lock row during check
         const [rows]: any = await connection.query(
           `SELECT codigo, active_session_id, device_id, expires_at, is_online, status
            FROM sessoes
@@ -299,10 +299,12 @@ async function handleLogin(req: express.Request, res: express.Response) {
         const sessionFound = Array.isArray(rows) && rows.length > 0;
         let activeSessionValid = false;
         let activeSessionIdInDb: string | null = null;
+        let deviceIdInDb: string | null = null;
 
         if (sessionFound) {
           const r = rows[0];
           activeSessionIdInDb = r.active_session_id || null;
+          deviceIdInDb = r.device_id || null;
           if (r.active_session_id && r.expires_at) {
             const expiresAtTime = new Date(r.expires_at).getTime();
             if (expiresAtTime > Date.now()) {
@@ -311,8 +313,14 @@ async function handleLogin(req: express.Request, res: express.Response) {
           }
         }
 
-        // Rule 7: Active session exists and valid on another device -> 409 Conflict
-        if (activeSessionValid && activeSessionIdInDb && activeSessionIdInDb !== existingSessionId) {
+        // Same Device or Same Session check:
+        const isSameDevice = Boolean(
+          (deviceIdInDb && deviceId && deviceIdInDb === deviceId) ||
+          (activeSessionIdInDb && existingSessionId && activeSessionIdInDb === existingSessionId)
+        );
+
+        // Active session exists and valid on another device -> 409 Conflict
+        if (activeSessionValid && activeSessionIdInDb && !isSameDevice) {
           await connection.rollback();
           connection.release();
 
@@ -320,34 +328,35 @@ async function handleLogin(req: express.Request, res: express.Response) {
 
           return res.status(409).json({
             error: 'SESSION_ALREADY_ACTIVE',
-            message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+            message: 'Esta chave já está sendo utilizada em outro dispositivo. Clique em Sair no aparelho anterior ou solicite ao Mentor a desconexão da sessão.',
           });
         }
 
-        // Rule 8 & 20: Reuse existingSessionId if matching or generate new UUID
-        const sessionId = (activeSessionValid && activeSessionIdInDb === existingSessionId)
-          ? existingSessionId!
+        // Reuse activeSessionIdInDb if valid on same device, or existingSessionId, or new UUID
+        const sessionId = (activeSessionValid && activeSessionIdInDb)
+          ? activeSessionIdInDb
           : (existingSessionId || crypto.randomUUID());
 
-        const effectiveDeviceId = deviceId || `device-${sessionId.slice(0, 8)}`;
+        const effectiveDeviceId = deviceId || deviceIdInDb || `device-${sessionId.slice(0, 8)}`;
 
-        // Rule 9 & 19: Insert or Update with 30-day expiration
+        // Insert or Update with 30-day expiration
         await connection.query(
           `INSERT INTO sessoes (
              codigo,
              active_session_id,
              device_id,
+             login_at,
              session_started_at,
              last_heartbeat_at,
              expires_at,
              is_online,
              status
            )
-           VALUES (?, ?, ?, NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, 'online')
+           VALUES (?, ?, ?, NOW(), NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, 'online')
            ON DUPLICATE KEY UPDATE
              active_session_id = VALUES(active_session_id),
              device_id = VALUES(device_id),
-             session_started_at = NOW(),
+             login_at = NOW(),
              last_heartbeat_at = NOW(),
              expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
              is_online = 1,
@@ -355,7 +364,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
           [cleanCode, sessionId, effectiveDeviceId]
         );
 
-        // Rule 10: Commit transaction
+        // Commit transaction
         await connection.commit();
         connection.release();
 
@@ -397,7 +406,6 @@ async function handleLogin(req: express.Request, res: express.Response) {
           connection.release();
         }
         console.error('[MySQL Login Transaction Error]:', dbErr?.message || dbErr);
-        // Rule 11: Return 500, NEVER grant access on database error
         return res.status(500).json({
           error: 'SESSION_DATABASE_ERROR',
           message: 'Não foi possível conectar ao servidor de autenticação. Tente novamente em alguns instantes.',
@@ -405,11 +413,28 @@ async function handleLogin(req: express.Request, res: express.Response) {
       }
     } else {
       // Fallback if MySQL is not configured
-      const sessionId = existingSessionId || crypto.randomUUID();
-      const effectiveDeviceId = deviceId || `device-${sessionId.slice(0, 8)}`;
+      const memSession = memorySessionsMap.get(cleanCode);
+      const isMemValid = Boolean(memSession && memSession.expiresAt && memSession.expiresAt.getTime() > Date.now());
+      const isMemSameDevice = Boolean(
+        memSession && (
+          (memSession.deviceId && deviceId && memSession.deviceId === deviceId) ||
+          (memSession.sessionId && existingSessionId && memSession.sessionId === existingSessionId)
+        )
+      );
+
+      if (isMemValid && !isMemSameDevice) {
+        return res.status(409).json({
+          error: 'SESSION_ALREADY_ACTIVE',
+          message: 'Esta chave já está sendo utilizada em outro dispositivo. Clique em Sair no aparelho anterior ou solicite ao Mentor a desconexão da sessão.',
+        });
+      }
+
+      const sessionId = (isMemValid && memSession?.sessionId) ? memSession.sessionId : (existingSessionId || crypto.randomUUID());
+      const effectiveDeviceId = deviceId || memSession?.deviceId || `device-${sessionId.slice(0, 8)}`;
       const now = new Date();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       const { deviceType, operatingSystem, browserName } = parseUserAgent(req.headers['user-agent'] || '');
+
       memorySessionsMap.set(cleanCode, {
         codigo: cleanCode,
         sessionId,
@@ -420,7 +445,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
         deviceType,
         browserName,
         operatingSystem,
-        startedAt: now,
+        startedAt: memSession?.startedAt || now,
         lastHeartbeatAt: now,
         status: 'online',
         expiresAt,
@@ -508,11 +533,9 @@ apiRouter.post(
                SET
                  active_session_id = NULL,
                  device_id = NULL,
-                 session_started_at = NULL,
-                 last_heartbeat_at = NULL,
-                 expires_at = NULL,
                  is_online = 0,
-                 status = 'offline'
+                 status = 'offline',
+                 logout_at = NOW()
                WHERE codigo = ?
                AND active_session_id = ?`,
               [cleanCode, sessionId]
@@ -523,11 +546,9 @@ apiRouter.post(
                SET
                  active_session_id = NULL,
                  device_id = NULL,
-                 session_started_at = NULL,
-                 last_heartbeat_at = NULL,
-                 expires_at = NULL,
                  is_online = 0,
-                 status = 'offline'
+                 status = 'offline',
+                 logout_at = NOW()
                WHERE codigo = ?`,
               [cleanCode]
             );
@@ -640,7 +661,7 @@ async function validateSessionAsync(req: express.Request, res: express.Response)
           if (r.active_session_id && r.active_session_id !== sessionId) {
             res.status(409).json({
               error: 'SESSION_ALREADY_ACTIVE',
-              message: 'Esta chave já está sendo utilizada em outro dispositivo. Encerre a sessão anterior para continuar.',
+              message: 'Esta chave já está sendo utilizada em outro dispositivo. Clique em Sair no aparelho anterior ou solicite ao Mentor a desconexão da sessão.',
             });
             return false;
           }
