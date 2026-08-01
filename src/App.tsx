@@ -152,29 +152,44 @@ export default function App() {
           }),
         });
 
-        if (!res.ok && (res.status === 423 || res.status === 403 || res.status === 401 || res.status === 409)) {
+        if (!res.ok) {
           let data: any = {};
           try {
             data = await res.json();
           } catch (e) {}
 
-          localStorage.removeItem('user_student_access_code');
-          localStorage.removeItem('user_session_id');
-          localStorage.removeItem('user_gemini_api_key');
-          setUserApiKey('');
-          setStudentCode('');
-          setSessionId('');
-          setShowApiKeyModal(true);
+          const errCode = String(data?.error || data?.code || data?.accessStatus || '').toUpperCase();
+          const isSuspended = res.status === 423 || errCode === 'KEY_SUSPENDED' || errCode === 'SUSPENDED';
+          const isBanned = res.status === 403 || errCode === 'KEY_BANNED' || errCode === 'BANNED';
+          const isInvalidSession = (res.status === 401 || res.status === 409) && (
+            errCode === 'SESSION_EXPIRED' ||
+            errCode === 'ADMIN_DISCONNECTED' ||
+            errCode === 'SESSION_ALREADY_ACTIVE' ||
+            errCode === 'SESSION_REQUIRED' ||
+            errCode === 'INVALID_ACCESS_CODE'
+          );
 
-          let msg = data.message || data.error;
-          if (res.status === 423 || data.error === 'KEY_SUSPENDED') {
-            msg = 'Acesso temporariamente suspenso pelo Mentor.';
-          } else if (res.status === 403 || data.error === 'KEY_BANNED') {
-            msg = 'Acesso permanentemente bloqueado pelo Mentor.';
-          } else if (!msg) {
-            msg = 'Sua sessão foi encerrada.';
+          if (isSuspended || isBanned || isInvalidSession) {
+            localStorage.removeItem('user_student_access_code');
+            localStorage.removeItem('user_session_id');
+            localStorage.removeItem('user_gemini_api_key');
+            setUserApiKey('');
+            setStudentCode('');
+            setSessionId('');
+            setShowApiKeyModal(true);
+
+            let msg = data.message || data.error;
+            if (isSuspended) {
+              msg = 'Acesso temporariamente suspenso pelo Mentor.';
+            } else if (isBanned) {
+              msg = 'Acesso permanentemente bloqueado pelo Mentor.';
+            } else if (!msg) {
+              msg = 'Sua sessão foi encerrada.';
+            }
+            triggerToast(msg);
+          } else {
+            console.warn('[Heartbeat] Temporary server response ignored:', res.status);
           }
-          triggerToast(msg);
         }
       } catch (err) {
         console.warn('[Heartbeat] Network check error:', err);
