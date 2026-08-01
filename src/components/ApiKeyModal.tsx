@@ -17,7 +17,11 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
 
   useEffect(() => {
     const storedCode = localStorage.getItem('user_student_access_code') || '';
-    setAccessCode(storedCode);
+    if (isMandatoryOnboarding || !storedCode) {
+      setAccessCode('');
+    } else {
+      setAccessCode(storedCode);
+    }
 
     // Lock page scrollbar while modal is active
     const originalOverflow = document.body.style.overflow;
@@ -25,7 +29,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
     return () => {
       document.body.style.overflow = originalOverflow;
     };
-  }, []);
+  }, [isMandatoryOnboarding]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
