@@ -44,7 +44,7 @@ export function getCurrentPageLabel({
 }: PageLabelParams): string {
   // 1. Specific Agent Chat Modal open -> Agent Name
   if (selectedChatAgent) {
-    return selectedChatAgent.name || 'Agente GPT';
+    return selectedChatAgent.name || 'Dashboard';
   }
 
   // 2. Modals open
