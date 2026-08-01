@@ -45,6 +45,8 @@ import {
   adminReactivateKeyHandler,
   adminBanKeyHandler,
   adminGetAccessHistoryHandler,
+  getAdminAccessKeysHandler,
+  generateAccessKeysHandler,
   checkCodeKeyType,
   memorySessionsMap,
   getClientIp,
@@ -366,6 +368,15 @@ async function handleLogin(req: express.Request, res: express.Response) {
              status = 'online'`,
           [cleanCode, sessionId, effectiveDeviceId]
         );
+
+        try {
+          await connection.query(
+            `UPDATE codigos_acesso SET usado = 1 WHERE codigo = ?`,
+            [cleanCode]
+          );
+        } catch (uErr) {
+          console.warn('[Mark Key Used Error]:', uErr);
+        }
 
         // Commit transaction
         await connection.commit();
@@ -1086,6 +1097,8 @@ apiRouter.post(['/admin/access-keys/:id/suspend', '/api/admin/access-keys/:id/su
 apiRouter.post(['/admin/access-keys/:id/reactivate', '/api/admin/access-keys/:id/reactivate', '/admin/access-keys/reactivate', '/api/admin/access-keys/reactivate'], requireMentorAuth, adminReactivateKeyHandler);
 apiRouter.post(['/admin/access-keys/:id/ban', '/api/admin/access-keys/:id/ban', '/admin/access-keys/ban', '/api/admin/access-keys/ban'], requireMentorAuth, adminBanKeyHandler);
 apiRouter.get(['/admin/access-keys/:id/history', '/api/admin/access-keys/:id/history', '/admin/access-keys/history', '/api/admin/access-keys/history'], requireMentorAuth, adminGetAccessHistoryHandler);
+apiRouter.get(['/admin/access-keys', '/api/admin/access-keys'], requireMentorAuth, getAdminAccessKeysHandler);
+apiRouter.post(['/admin/access-keys/generate', '/api/admin/access-keys/generate'], requireMentorAuth, generateAccessKeysHandler);
 
 // 1. GET /api/admin/products
 apiRouter.get(['/admin/products', '/api/admin/products'], requireMentorAuth, async (_req, res) => {
