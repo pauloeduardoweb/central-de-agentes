@@ -148,7 +148,7 @@ export interface AuditLogEntry {
   id: number;
   targetAccessKeyId?: number;
   targetMaskedKey: string;
-  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN';
+  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS';
   reason?: string;
   adminIdentifier: string;
   ipAddress: string;
@@ -228,11 +228,11 @@ loadKeyStatusStore();
 
 export async function recordAdminAuditAction(
   targetKey: string,
-  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN',
+  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS',
   reason?: string,
   ipAddress?: string
 ): Promise<void> {
-  const maskedKey = maskKeyForAdmin(targetKey);
+  const maskedKey = targetKey === 'TODAS_AS_SESSOES' ? 'TODAS AS SESSÕES' : maskKeyForAdmin(targetKey);
   const adminId = 'SESSION_MASTER';
   const nowIso = new Date().toISOString();
 
@@ -787,6 +787,8 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
           ca.reactivated_by,
           ca.last_admin_action,
           ca.last_admin_action_at,
+          s.active_session_id,
+          s.expires_at,
           s.current_page,
           s.ip_address,
           s.user_agent,
@@ -835,12 +837,16 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
             ? `${r.operating_system || operatingSystem} • ${r.browser_name || browserName}`
             : `${operatingSystem} • ${browserName}`;
 
+          const isExpiresAtFuture = r.expires_at ? new Date(r.expires_at).getTime() > Date.now() : false;
+          const hasActiveSession = Boolean(r.active_session_id && isExpiresAtFuture);
+
           usersMapByCode.set(r.codigo, {
             _fullCode: r.codigo,
             username: r.nome_usuario || `Aluno ${maskStudentCode(r.codigo)}`,
             avatar: r.avatar || null,
             maskedKey: maskKeyForAdmin(r.codigo),
             presenceStatus: calculatedPresence,
+            hasActiveSession,
             accessStatus: accStat as 'ACTIVE' | 'SUSPENDED' | 'BANNED',
             suspensionReason: r.suspension_reason || null,
             suspendedAt: r.suspended_at ? new Date(r.suspended_at).toISOString() : null,
@@ -883,6 +889,7 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
         }
 
         const accStat = memKeyInfo?.accessStatus || 'ACTIVE';
+        const hasActiveSession = Boolean(memSession);
 
         usersMapByCode.set(key, {
           _fullCode: key,
@@ -890,6 +897,7 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
           avatar: null,
           maskedKey: maskKeyForAdmin(key),
           presenceStatus: accStat === 'ACTIVE' ? presence : 'Offline',
+          hasActiveSession,
           accessStatus: accStat,
           suspensionReason: memKeyInfo?.suspensionReason || null,
           suspendedAt: memKeyInfo?.suspendedAt || null,
@@ -929,12 +937,16 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
       });
     }
 
+    // Calculate active sessions count based strictly on valid active login sessions (active_session_id != null and expires_at > now)
+    const activeSessionsCount = usersList.filter(u => u.hasActiveSession).length;
+
     // Strip internal _fullCode and codigo fields to protect sensitive access keys
     const sanitizedUsers = usersList.map(({ _fullCode, codigo, ...safeUser }) => safeUser);
 
     return res.json({
       success: true,
       totalSessions: sanitizedUsers.length,
+      activeSessionsCount,
       users: sanitizedUsers,
       updatedAt: new Date().toISOString(),
     });
@@ -1022,6 +1034,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
         `UPDATE sessoes
          SET
            active_session_id = NULL,
+           device_id = NULL,
            is_online = 0,
            status = 'offline',
            logout_at = NOW()
@@ -1056,6 +1069,82 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
     return res.status(500).json({
       error: 'SERVER_ERROR',
       message: 'Erro ao desconectar sessão do aluno.',
+    });
+  }
+}
+
+/**
+ * POST /api/admin/users/disconnect-all
+ * Disconnect ALL active student sessions immediately
+ */
+export async function adminDisconnectAllSessionsHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas o Mentor (Sessão MASTER) pode desconectar todas as sessões.',
+      });
+    }
+
+    const clientIp = getClientIp(req);
+    const nowIso = new Date().toISOString();
+    let affectedCount = 0;
+
+    if (isDatabaseConfigured()) {
+      await ensureSessionsTable();
+
+      const [updateRes]: any = await db.query(
+        `UPDATE sessoes
+         SET
+           active_session_id = NULL,
+           device_id = NULL,
+           is_online = 0,
+           status = 'offline',
+           logout_at = NOW()
+         WHERE active_session_id IS NOT NULL
+           AND expires_at IS NOT NULL
+           AND expires_at > NOW()`
+      );
+
+      if (updateRes && typeof updateRes.affectedRows === 'number') {
+        affectedCount = updateRes.affectedRows;
+      }
+
+      memorySessionsMap.clear();
+    } else {
+      affectedCount = memorySessionsMap.size;
+      memorySessionsMap.clear();
+    }
+
+    if (affectedCount > 0) {
+      // Audit console log
+      console.log(`[ADMIN] Todas as sessões encerradas | Quantidade: ${affectedCount} | Data/Hora: ${nowIso}`);
+
+      // Audit action in admin_access_actions
+      await recordAdminAuditAction(
+        'TODAS_AS_SESSOES',
+        'DISCONNECT_ALL_SESSIONS',
+        `Todas as sessões encerradas (${affectedCount} ${affectedCount === 1 ? 'sessão' : 'sessões'})`,
+        clientIp
+      );
+    }
+
+    const messageText = affectedCount === 0
+      ? 'Nenhuma sessão ativa encontrada.'
+      : `${affectedCount} ${affectedCount === 1 ? 'sessão encerrada' : 'sessões encerradas'} com sucesso.`;
+
+    return res.json({
+      success: true,
+      disconnectedCount: affectedCount,
+      count: affectedCount,
+      message: messageText,
+    });
+  } catch (err: any) {
+    console.error('[Admin Disconnect All Sessions Error]:', err?.message || err);
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Não foi possível encerrar todas as sessões. Tente novamente.',
     });
   }
 }
