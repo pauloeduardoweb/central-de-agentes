@@ -371,6 +371,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
              active_session_id = VALUES(active_session_id),
              device_id = VALUES(device_id),
              login_at = NOW(),
+             session_started_at = NOW(),
              last_heartbeat_at = NOW(),
              expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
              is_online = 1,
