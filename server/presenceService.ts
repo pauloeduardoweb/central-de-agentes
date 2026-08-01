@@ -489,7 +489,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
         await ensureSessionsTable();
 
         const [rows]: any = await db.query(
-          `SELECT active_session_id, access_status FROM sessoes WHERE codigo = ?`,
+          `SELECT active_session_id, expires_at, access_status FROM sessoes WHERE codigo = ?`,
           [cleanCode]
         );
 
@@ -517,6 +517,13 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
             return res.status(401).json({
               error: 'SESSION_EXPIRED',
               message: 'Sessão encerrada ou invalidada pelo administrador. Efetue login novamente.',
+            });
+          }
+          if (r.expires_at && new Date(r.expires_at).getTime() <= Date.now()) {
+            memorySessionsMap.delete(cleanCode);
+            return res.status(401).json({
+              error: 'SESSION_EXPIRED',
+              message: 'Sessão expirada. Efetue login novamente.',
             });
           }
           sessionValidated = true;
@@ -620,6 +627,7 @@ export async function presenceLogoutHandler(req: express.Request, res: express.R
         `UPDATE sessoes
          SET
            active_session_id = NULL,
+           device_id = NULL,
            is_online = 0,
            status = 'offline',
            logout_at = NOW()
@@ -670,8 +678,7 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
       const [onlineRows]: any = await db.query(
         `SELECT COUNT(*) AS count
          FROM sessoes
-         WHERE is_online = 1
-         AND (access_status IS NULL OR access_status = 'ACTIVE')
+         WHERE (access_status IS NULL OR access_status = 'ACTIVE')
          AND last_heartbeat_at >= DATE_SUB(NOW(), INTERVAL 90 SECOND)`
       );
       if (Array.isArray(onlineRows) && onlineRows[0]) {
@@ -682,8 +689,7 @@ export async function getAdminMemberStatsHandler(req: express.Request, res: expr
       const [absentRows]: any = await db.query(
         `SELECT COUNT(*) AS count
          FROM sessoes
-         WHERE is_online = 1
-         AND (access_status IS NULL OR access_status = 'ACTIVE')
+         WHERE (access_status IS NULL OR access_status = 'ACTIVE')
          AND last_heartbeat_at < DATE_SUB(NOW(), INTERVAL 90 SECOND)
          AND last_heartbeat_at >= DATE_SUB(NOW(), INTERVAL 300 SECOND)`
       );
@@ -814,10 +820,12 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
           let calculatedPresence: 'Online' | 'Ausente' | 'Offline' = 'Offline';
           const accStat = (r.access_status || 'ACTIVE').toUpperCase();
 
-          if (accStat === 'ACTIVE' && r.is_online && secondsSinceHb <= 90) {
+          if (accStat === 'ACTIVE' && secondsSinceHb <= 90) {
             calculatedPresence = 'Online';
-          } else if (accStat === 'ACTIVE' && r.is_online && secondsSinceHb <= 300) {
+          } else if (accStat === 'ACTIVE' && secondsSinceHb <= 300) {
             calculatedPresence = 'Ausente';
+          } else {
+            calculatedPresence = 'Offline';
           }
 
           const entryDate = r.login_at || r.session_started_at ? new Date(r.login_at || r.session_started_at) : null;
