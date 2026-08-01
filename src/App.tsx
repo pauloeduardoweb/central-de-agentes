@@ -19,11 +19,13 @@ import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/stora
 import { getDeviceId, unbindCurrentDevice } from './utils/deviceId';
 import { isValidStudentCode, isMasterKey, normalizeAccessCode } from './data/studentCodes';
 import { useFavorites } from './hooks/useFavorites';
+import { getCurrentPageLabel } from './utils/pageLabel';
 import { Check } from 'lucide-react';
 
 export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('Tiktok 2K');
+  const [mentorTab, setMentorTab] = useState<string>('products');
   const [userApiKey, setUserApiKey] = useState<string>('');
   const [studentCode, setStudentCode] = useState<string>(() => {
     return localStorage.getItem('user_student_access_code') || '';
@@ -146,14 +148,46 @@ export default function App() {
     }
   }, []);
 
-  // Heartbeat loop every 3 seconds - Presence & Active Session System
+  // Dynamic Real Page Identifier
+  const currentPageLabel = useMemo(() => {
+    return getCurrentPageLabel({
+      activeView,
+      selectedChatAgent,
+      showGeracaoZProModal,
+      showCertificadosModal,
+      showAfiliadosModal,
+      showCreateModal,
+      editingAgent,
+      showImportModal,
+      showMultiAgentModal,
+      showExportModal,
+      showApiKeyModal,
+      activeCategory,
+      mentorTab,
+    });
+  }, [
+    activeView,
+    selectedChatAgent,
+    showGeracaoZProModal,
+    showCertificadosModal,
+    showAfiliadosModal,
+    showCreateModal,
+    editingAgent,
+    showImportModal,
+    showMultiAgentModal,
+    showExportModal,
+    showApiKeyModal,
+    activeCategory,
+    mentorTab,
+  ]);
+
+  // Heartbeat loop every 3 seconds & immediate presence update on page transition
   useEffect(() => {
     if (!studentCode || !sessionId) return;
 
     const sendHeartbeat = async () => {
       try {
         const deviceId = getDeviceId();
-        const pageTitle = activeView === 'mentor' ? 'Painel do Mentor' : (activeCategory || 'Agentes GPT');
 
         const res = await fetch('/api/presence/heartbeat', {
           method: 'POST',
@@ -167,7 +201,7 @@ export default function App() {
             studentAccessCode: studentCode,
             sessionId: sessionId,
             deviceId,
-            currentPage: pageTitle,
+            currentPage: currentPageLabel,
             userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
           }),
         });
@@ -223,7 +257,7 @@ export default function App() {
       }
     };
 
-    // Initial heartbeat after mount
+    // Initial heartbeat immediately when mounted or when currentPageLabel changes
     sendHeartbeat();
 
     // Re-send heartbeat immediately when tab becomes visible after background pause
@@ -240,7 +274,7 @@ export default function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(interval);
     };
-  }, [studentCode, sessionId, activeView, activeCategory]);
+  }, [studentCode, sessionId, currentPageLabel]);
 
   const handleSaveApiKey = (key: string, accessCode: string, newSessionId?: string) => {
     localStorage.setItem('user_gemini_api_key', key);
@@ -441,6 +475,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
           <MentorPanel
             studentCode={studentCode}
             onBackToHub={() => setActiveView('hub')}
+            onTabChange={(tab) => setMentorTab(tab)}
           />
         ) : (
           <>
@@ -461,6 +496,8 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
             <AgentGrid
               agents={displayAgents}
               userIdentifier={userIdentifier}
+              activeCategory={activeCategory}
+              onSelectCategory={(cat) => setActiveCategory(cat)}
               onSelectChat={(agent) => setSelectedChatAgent(agent)}
               onToggleFavorite={handleToggleFavorite}
               onEdit={(agent) => {
