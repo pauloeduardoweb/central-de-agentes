@@ -22,15 +22,20 @@ import {
   X,
   AlertTriangle,
   ShieldAlert,
+  ChevronRight
 } from 'lucide-react';
+import { SessionDrawer } from './SessionDrawer';
+import { StatsCards } from './StatsCards';
+import { Filters } from './Filters';
 
-interface OnlineUser {
+export interface OnlineUser {
   accessKeyId?: number;
   sessionRecordId?: number;
   id?: number;
   username: string;
   avatar: string | null;
   maskedKey: string;
+  codigo?: string;
   status: 'Online' | 'Ausente' | 'Offline';
   accessStatus?: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
   currentPage: string;
@@ -42,9 +47,18 @@ interface OnlineUser {
   loginAt: string;
   lastActivity: string;
   connectedTime: string;
+  tempoOnlineFormatted?: string;
+  tempoOnlineSeconds?: number;
+  lastActivityFormatted?: string;
+  recentAction?: string;
+  lastAction?: string;
   disconnectSource?: string;
   disconnectedAt?: string;
   hasActiveSession?: boolean;
+  suspensionReason?: string;
+  suspendedAt?: string;
+  bannedReason?: string;
+  bannedAt?: string;
 }
 
 interface MemberStats {
@@ -80,21 +94,32 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     updatedAt: new Date().toLocaleTimeString('pt-BR'),
   });
 
+  const [richStats, setRichStats] = useState<{
+    topCategories?: { name: string; count: number }[];
+    devices?: { name: string; count: number; percentage: number }[];
+    browsers?: { name: string; count: number }[];
+    loginsToday?: { hour: string; count: number }[];
+    longestSessions?: { name: string; codigo: string; tempoOnline: string; tempoOnlineSeconds: number; paginaAtual: string }[];
+    shortestSessions?: { name: string; codigo: string; tempoOnline: string; tempoOnlineSeconds: number; paginaAtual: string }[];
+    activityFeed?: any[];
+  }>({});
+
   const [users, setUsers] = useState<OnlineUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('');
 
+  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ativos' | 'todos' | 'online' | 'ausente' | 'offline' | 'desconectados' | 'suspensos' | 'banidos'>('ativos');
+  const [categoryFilter, setCategoryFilter] = useState<string>('todas');
+  const [deviceFilter, setDeviceFilter] = useState<string>('todos');
+  const [browserFilter, setBrowserFilter] = useState<string>('todos');
 
-  const getDisconnectSourceLabel = (src?: string) => {
-    if (src === 'MENTOR_SINGLE') return 'Mentor — sessão individual';
-    if (src === 'MENTOR_ALL') return 'Mentor — desconexão global';
-    if (src === 'STUDENT_LOGOUT') return 'Aluno — botão Sair';
-    return 'Mentor — sessão individual';
-  };
+  // Drawer State
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [drawerStudent, setDrawerStudent] = useState<any | null>(null);
 
   // Administrative Modal States
   const [selectedUser, setSelectedUser] = useState<OnlineUser | null>(null);
@@ -117,6 +142,13 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   const [disconnectAllSuccessMsg, setDisconnectAllSuccessMsg] = useState<string | null>(null);
   const [backendActiveSessionsCount, setBackendActiveSessionsCount] = useState<number | null>(null);
   const [noSessionsNotification, setNoSessionsNotification] = useState<string | null>(null);
+
+  const getDisconnectSourceLabel = (src?: string) => {
+    if (src === 'MENTOR_SINGLE') return 'Mentor — sessão individual';
+    if (src === 'MENTOR_ALL') return 'Mentor — desconexão global';
+    if (src === 'STUDENT_LOGOUT') return 'Aluno — botão Sair';
+    return 'Mentor — sessão individual';
+  };
 
   const getActiveValidSessionsCount = () => {
     if (typeof backendActiveSessionsCount === 'number') {
@@ -225,6 +257,16 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
           absentSessions: statsData.absentSessions ?? 0,
           updatedAt: new Date().toLocaleTimeString('pt-BR'),
         });
+
+        setRichStats({
+          topCategories: statsData.topCategories || [],
+          devices: statsData.devices || [],
+          browsers: statsData.browsers || [],
+          loginsToday: statsData.loginsToday || [],
+          longestSessions: statsData.longestSessions || [],
+          shortestSessions: statsData.shortestSessions || [],
+          activityFeed: statsData.activityFeed || [],
+        });
       }
 
       if (usersRes.ok) {
@@ -250,7 +292,6 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   useEffect(() => {
     fetchData();
 
-    // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
       fetchData();
     }, 30000);
@@ -258,7 +299,8 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     return () => clearInterval(interval);
   }, [studentCode, searchTerm]);
 
-  const openActionModal = (user: OnlineUser, modalType: 'disconnect' | 'suspend' | 'ban' | 'reactivate' | 'history') => {
+  const openActionModal = (e: React.MouseEvent, user: OnlineUser, modalType: 'disconnect' | 'suspend' | 'ban' | 'reactivate' | 'history') => {
+    e.stopPropagation(); // prevent opening drawer when clicking admin buttons
     setSelectedUser(user);
     setActiveModal(modalType);
     setActionReason('Vazamento ou revenda não autorizada de acesso');
@@ -342,7 +384,6 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         throw new Error(data?.message || 'Erro ao desconectar sessão.');
       }
 
-      // Re-fetch data directly from DB confirmed state
       setActionSuccessMsg('✅ 1 sessão desconectada com sucesso.');
       await fetchData();
       setTimeout(() => {
@@ -402,7 +443,6 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               ...u,
               accessStatus: 'SUSPENDED',
               status: 'Offline',
-              presenceStatus: 'Offline',
               hasActiveSession: false,
             };
           }
@@ -475,7 +515,6 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               ...u,
               accessStatus: 'BANNED',
               status: 'Offline',
-              presenceStatus: 'Offline',
               hasActiveSession: false,
             };
           }
@@ -554,7 +593,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     }
   };
 
-  // Helper predicate functions for strict mutual exclusion
+  // Predicates
   const isUserActive = (u: OnlineUser) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED';
   const isUserDesconectado = (u: OnlineUser) =>
     isUserActive(u) &&
@@ -566,67 +605,216 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   const isUserAusente = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Ausente';
   const isUserOffline = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Offline';
 
-  // Filter users list by status (search filtering is handled on backend)
+  // Filter Users
   const filteredUsers = users.filter((u) => {
     const isSuspended = u.accessStatus === 'SUSPENDED';
     const isBanned = u.accessStatus === 'BANNED';
 
-    if (statusFilter === 'ativos') return isUserOnline(u) || isUserAusente(u);
-    if (statusFilter === 'todos') return isUserActive(u) && (Boolean(u.hasActiveSession) || isUserDesconectado(u));
-    if (statusFilter === 'online') return isUserOnline(u);
-    if (statusFilter === 'ausente') return isUserAusente(u);
-    if (statusFilter === 'offline') return isUserOffline(u);
-    if (statusFilter === 'desconectados') return isUserDesconectado(u);
-    if (statusFilter === 'suspensos') return isSuspended;
-    if (statusFilter === 'banidos') return isBanned;
+    let statusMatch = true;
+    if (statusFilter === 'ativos') statusMatch = isUserOnline(u) || isUserAusente(u);
+    else if (statusFilter === 'todos') statusMatch = isUserActive(u) && (Boolean(u.hasActiveSession) || isUserDesconectado(u));
+    else if (statusFilter === 'online') statusMatch = isUserOnline(u);
+    else if (statusFilter === 'ausente') statusMatch = isUserAusente(u);
+    else if (statusFilter === 'offline') statusMatch = isUserOffline(u);
+    else if (statusFilter === 'desconectados') statusMatch = isUserDesconectado(u);
+    else if (statusFilter === 'suspensos') statusMatch = isSuspended;
+    else if (statusFilter === 'banidos') statusMatch = isBanned;
+
+    if (!statusMatch) return false;
+
+    // Category Filter
+    if (categoryFilter !== 'todas' && (u.currentPage || 'TikTok 2K') !== categoryFilter) {
+      return false;
+    }
+
+    // Device Filter
+    if (deviceFilter !== 'todos') {
+      const os = (u.operatingSystem || u.device || '').toLowerCase();
+      const dev = (u.deviceType || u.device || '').toLowerCase();
+      if (deviceFilter === 'Windows' && !os.includes('win')) return false;
+      if (deviceFilter === 'Android' && !os.includes('android') && !dev.includes('mobile')) return false;
+      if (deviceFilter === 'iPhone' && !os.includes('ios') && !os.includes('iphone')) return false;
+      if (deviceFilter === 'Mac' && !os.includes('mac')) return false;
+      if (deviceFilter === 'Linux' && !os.includes('linux')) return false;
+    }
+
+    // Browser Filter
+    if (browserFilter !== 'todos') {
+      const br = (u.browserName || u.device || '').toLowerCase();
+      if (browserFilter === 'Chrome' && !br.includes('chrome')) return false;
+      if (browserFilter === 'Edge' && !br.includes('edge')) return false;
+      if (browserFilter === 'Safari' && !br.includes('safari')) return false;
+      if (browserFilter === 'Firefox' && !br.includes('firefox')) return false;
+      if (browserFilter === 'Opera' && !br.includes('opera')) return false;
+    }
+
     return true;
   });
+
+  // Export Handlers
+  const handleExportCSV = () => {
+    const headers = ['Usuário', 'Chave', 'Status', 'Tempo Online', 'Última Atividade', 'Ação Recente', 'Página Atual', 'Dispositivo', 'IP'];
+    const rows = filteredUsers.map(u => [
+      u.username,
+      u.maskedKey,
+      u.status,
+      u.connectedTime || u.tempoOnlineFormatted || '0s',
+      u.lastActivity || u.lastActivityFormatted || 'Agora',
+      u.recentAction || u.currentPage || 'Navegação',
+      u.currentPage || 'TikTok 2K',
+      u.device || 'Desconhecido',
+      u.maskedIp || 'Oculto'
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `monitoramento_alunos_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportExcel = () => {
+    const headers = ['Usuário', 'Chave de Acesso', 'Status', 'Tempo Online', 'Última Atividade', 'Ação Recente', 'Página Atual', 'Dispositivo', 'IP'];
+    const rows = filteredUsers.map(u => [
+      u.username,
+      u.maskedKey,
+      u.status,
+      u.connectedTime || u.tempoOnlineFormatted || '0s',
+      u.lastActivity || u.lastActivityFormatted || 'Agora',
+      u.recentAction || u.currentPage || 'Navegação',
+      u.currentPage || 'TikTok 2K',
+      u.device || 'Desconhecido',
+      u.maskedIp || 'Oculto'
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join('\t'), ...rows.map(e => e.join('\t'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `monitoramento_alunos_${new Date().toISOString().slice(0, 10)}.xls`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Relatório de Monitoramento - Mentor Geração Z Pro</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; padding: 24px; color: #111; }
+            h1 { font-size: 22px; margin-bottom: 4px; color: #000; }
+            p { font-size: 12px; color: #555; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; }
+            th { background-color: #f4f4f5; font-weight: 700; text-transform: uppercase; }
+            tr:nth-child(even) { background-color: #fafafa; }
+          </style>
+        </head>
+        <body>
+          <h1>Geração Z Pro — Painel de Monitoramento 2.0</h1>
+          <p>Relatório gerado em ${new Date().toLocaleString('pt-BR')} | Total de alunos listados: ${filteredUsers.length}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Chave</th>
+                <th>Status</th>
+                <th>Tempo Online</th>
+                <th>Última Atividade</th>
+                <th>Página Atual</th>
+                <th>Dispositivo</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredUsers.map(u => `
+                <tr>
+                  <td><strong>${u.username}</strong></td>
+                  <td>${u.maskedKey}</td>
+                  <td>${u.status}</td>
+                  <td>${u.connectedTime || u.tempoOnlineFormatted || '0s'}</td>
+                  <td>${u.lastActivity || u.lastActivityFormatted || 'Agora'}</td>
+                  <td>${u.currentPage || 'TikTok 2K'}</td>
+                  <td>${u.device || 'Desconhecido'}</td>
+                  <td>${u.maskedIp || 'Oculto'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const openStudentDrawer = (user: OnlineUser) => {
+    setDrawerStudent({
+      username: user.username,
+      maskedKey: user.maskedKey,
+      codigo: user.codigo || user.maskedKey,
+      _fullCode: user.codigo || user.maskedKey,
+      device: user.device,
+      maskedIp: user.maskedIp,
+      sessionId: user.sessionRecordId || user.id,
+      tempoOnlineFormatted: user.tempoOnlineFormatted || user.connectedTime || '0s',
+      currentPage: user.currentPage,
+      status: user.status,
+      accessStatus: user.accessStatus,
+    });
+    setIsDrawerOpen(true);
+  };
 
   return (
     <div className="space-y-6">
       
-      {/* Top Header Controls Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#020d14]/90 p-4 rounded-2xl border border-cyan-500/20 backdrop-blur-md">
+      {/* Top Controls Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-zinc-900/90 p-5 rounded-2xl border border-zinc-800 shadow-xl">
         <div>
           <div className="flex items-center space-x-2">
-            <Activity className="w-5 h-5 text-cyan-400 animate-pulse" />
-            <h2 className="text-lg font-black text-white tracking-tight">
-              Monitoramento em Tempo Real
+            <Activity className="w-5 h-5 text-amber-400 animate-pulse" />
+            <h2 className="text-xl font-extrabold text-white tracking-tight">
+              Monitoramento do Mentor
             </h2>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/30">
-              Servidor Ativo
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              Painel 2.0 Ativo
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Acompanhamento ao vivo de sessões ativas, status de presença e ações de controle de chaves.
+          <p className="text-xs text-zinc-400 mt-1">
+            Auditoria e acompanhamento em tempo real das sessões de alunos.
           </p>
         </div>
 
         <div className="flex items-center space-x-3 self-end sm:self-auto flex-wrap justify-end gap-y-2">
           {lastUpdatedTime && (
-            <span className="text-[11px] font-mono text-slate-400">
-              Última atualização: <strong className="text-cyan-300">{lastUpdatedTime}</strong>
+            <span className="text-[11px] font-mono text-zinc-400">
+              Última atualização: <strong className="text-amber-400">{lastUpdatedTime}</strong>
             </span>
           )}
 
           <button
             onClick={() => fetchData(true)}
             disabled={refreshing}
-            className="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center space-x-2 transition-all disabled:opacity-50 cursor-pointer"
-            title="Atualizar dados de conexões agora"
+            className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center space-x-2 transition-all disabled:opacity-50 cursor-pointer"
+            title="Atualizar dados agora"
+            id="mentor-refresh-data-btn"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-cyan-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
             <span>{refreshing ? 'Atualizando...' : 'ATUALIZAR AGORA'}</span>
-          </button>
-
-          <button
-            onClick={handleOpenDisconnectAll}
-            disabled={disconnectAllLoading}
-            className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:border-rose-400/50 text-xs font-bold flex items-center space-x-2 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
-            title="Encerrar todas as sessões ativas de alunos"
-          >
-            <LogOut className="w-3.5 h-3.5 text-rose-400" />
-            <span>🔄 Encerrar Todos os Logins</span>
           </button>
         </div>
       </div>
@@ -652,11 +840,9 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
 
       {/* 5 KPI Indicator Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        
-        {/* Card 1: Online Agora */}
-        <div className="p-4 rounded-2xl bg-[#031d2e]/90 border border-cyan-400/40 shadow-lg shadow-cyan-500/5 relative overflow-hidden">
+        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-emerald-500/30 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">Online Agora</span>
+            <span className="text-xs font-bold text-zinc-300">Online Agora</span>
             <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -669,17 +855,16 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               {stats.onlineNow}
             </span>
             <span className="text-[11px] text-emerald-400 ml-2 font-semibold">
-              usuários conectados
+              conectados
             </span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">Atividade nos últimos 90s</p>
+          <p className="text-[10px] text-zinc-500 mt-1">Interação nos últimos 90s</p>
         </div>
 
-        {/* Card 2: Total de Membros */}
-        <div className="p-4 rounded-2xl bg-[#020d14]/80 border border-slate-800 hover:border-cyan-500/30 transition-all">
+        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">Total de Membros</span>
-            <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+            <span className="text-xs font-bold text-zinc-300">Total de Membros</span>
+            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
               <Users className="w-4 h-4" />
             </div>
           </div>
@@ -687,18 +872,17 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
             <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
               {stats.totalMembers}
             </span>
-            <span className="text-[11px] text-cyan-400 ml-2 font-semibold">
-              licenças cadastradas
+            <span className="text-[11px] text-amber-400 ml-2 font-semibold">
+              licenças
             </span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">Geração Z Pro (Alunos)</p>
+          <p className="text-[10px] text-zinc-500 mt-1">Chaves registradas</p>
         </div>
 
-        {/* Card 3: Acessos Hoje */}
-        <div className="p-4 rounded-2xl bg-[#020d14]/80 border border-slate-800 hover:border-cyan-500/30 transition-all">
+        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">Acessos Hoje</span>
-            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+            <span className="text-xs font-bold text-zinc-300">Acessos Hoje</span>
+            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
               <UserCheck className="w-4 h-4" />
             </div>
           </div>
@@ -706,17 +890,16 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
             <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
               {stats.accessesToday}
             </span>
-            <span className="text-[11px] text-indigo-300 ml-2 font-semibold">
-              sessões iniciadas
+            <span className="text-[11px] text-blue-300 ml-2 font-semibold">
+              sessões
             </span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">Desde 00:00h</p>
+          <p className="text-[10px] text-zinc-500 mt-1">Hoje a partir de 00:00h</p>
         </div>
 
-        {/* Card 4: Pico Simultâneo */}
-        <div className="p-4 rounded-2xl bg-[#020d14]/80 border border-slate-800 hover:border-cyan-500/30 transition-all">
+        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">Pico Simultâneo</span>
+            <span className="text-xs font-bold text-zinc-300">Pico Simultâneo</span>
             <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -726,16 +909,15 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               {stats.peakSimultaneous}
             </span>
             <span className="text-[11px] text-purple-300 ml-2 font-semibold">
-              máximo hoje
+              pico hoje
             </span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">Recorde de acessos</p>
+          <p className="text-[10px] text-zinc-500 mt-1">Recorde do dia</p>
         </div>
 
-        {/* Card 5: Ausentes */}
-        <div className="p-4 rounded-2xl bg-[#020d14]/80 border border-slate-800 hover:border-cyan-500/30 transition-all">
+        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">Sessões Ausentes</span>
+            <span className="text-xs font-bold text-zinc-300">Ausentes</span>
             <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
               <Clock className="w-4 h-4" />
             </div>
@@ -748,174 +930,77 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               ausentes
             </span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">Sem interação entre 90s e 1h</p>
+          <p className="text-[10px] text-zinc-500 mt-1">Inativos entre 90s e 1h</p>
         </div>
-
       </div>
 
-      {/* User Sessions Table & Filters */}
-      <div className="p-5 rounded-2xl bg-[#020d14]/90 border border-cyan-500/20 space-y-4">
-        
-        {/* Search & Status Filters Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          
-          {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por usuário, chave, página ou dispositivo..."
-              className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
-            />
-          </div>
+      {/* Rich Analytics Cards Section */}
+      <StatsCards
+        stats={richStats}
+        onSelectStudent={(codigo) => {
+          const found = users.find(u => u.maskedKey === codigo || u.codigo === codigo);
+          if (found) openStudentDrawer(found);
+        }}
+      />
 
-          {/* Status Filter Buttons */}
-          <div className="flex items-center space-x-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 flex-wrap gap-y-1">
-            <button
-              onClick={() => setStatusFilter('ativos')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                statusFilter === 'ativos'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Ativos ({users.filter((u) => isUserOnline(u) || isUserAusente(u)).length})</span>
-            </button>
+      {/* Advanced Filters Bar */}
+      <Filters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={setCategoryFilter}
+        deviceFilter={deviceFilter}
+        onDeviceFilterChange={setDeviceFilter}
+        browserFilter={browserFilter}
+        onBrowserFilterChange={setBrowserFilter}
+        onResetFilters={() => {
+          setSearchTerm('');
+          setStatusFilter('ativos');
+          setCategoryFilter('todas');
+          setDeviceFilter('todos');
+          setBrowserFilter('todos');
+        }}
+        onExportCSV={handleExportCSV}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        onDisconnectAll={handleOpenDisconnectAll}
+        activeSessionsCount={getActiveValidSessionsCount()}
+      />
 
-            <button
-              onClick={() => setStatusFilter('todos')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                statusFilter === 'todos'
-                  ? 'bg-slate-800 text-cyan-300 border border-slate-700'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Todos ({users.filter((u) => isUserActive(u) && (Boolean(u.hasActiveSession) || isUserDesconectado(u))).length})
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('online')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                statusFilter === 'online'
-                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
-                  : 'text-slate-400 hover:text-emerald-300'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>Online ({users.filter(isUserOnline).length})</span>
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('ausente')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                statusFilter === 'ausente'
-                  ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
-                  : 'text-slate-400 hover:text-amber-300'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              <span>Ausente ({users.filter(isUserAusente).length})</span>
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('offline')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                statusFilter === 'offline'
-                  ? 'bg-slate-800 text-slate-300 border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-              <span>Offline ({users.filter(isUserOffline).length})</span>
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('desconectados')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                statusFilter === 'desconectados'
-                  ? 'bg-rose-950 text-rose-300 border border-rose-500/50'
-                  : 'text-slate-400 hover:text-rose-300'
-              }`}
-            >
-              <WifiOff className="w-3.5 h-3.5 text-rose-400" />
-              <span>Desconectados ({users.filter(isUserDesconectado).length})</span>
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('suspensos')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                statusFilter === 'suspensos'
-                  ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
-                  : 'text-slate-400 hover:text-amber-300'
-              }`}
-            >
-              <PauseCircle className="w-3.5 h-3.5 text-amber-400" />
-              <span>Suspensos ({users.filter((u) => u.accessStatus === 'SUSPENDED').length})</span>
-            </button>
-
-            <button
-              onClick={() => setStatusFilter('banidos')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-                statusFilter === 'banidos'
-                  ? 'bg-red-950 text-red-300 border border-red-500/50'
-                  : 'text-slate-400 hover:text-red-300'
-              }`}
-            >
-              <Ban className="w-3.5 h-3.5 text-red-400" />
-              <span>Banidos ({users.filter((u) => u.accessStatus === 'BANNED').length})</span>
-            </button>
-          </div>
-
-        </div>
-
-        {/* Table Container */}
-        <div className="overflow-x-auto rounded-xl border border-slate-800/80">
-          <table className="w-full text-left border-collapse">
+      {/* Main Student Monitoring Table */}
+      <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl space-y-4">
+        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <table className="w-full text-left border-collapse" id="mentor-monitoring-table">
             <thead>
-              <tr className="bg-slate-900/90 text-slate-400 text-[11px] font-bold uppercase tracking-wider border-b border-slate-800">
-                <th className="py-3 px-4">Usuário / Aluno</th>
-                <th className="py-3 px-4">Chave de Acesso</th>
-                <th className="py-3 px-4">
-                  {statusFilter === 'suspensos'
-                    ? 'Motivo da Suspensão'
-                    : statusFilter === 'banidos'
-                    ? 'Motivo do Banimento'
-                    : 'Status de Conexão'}
-                </th>
-                <th className="py-3 px-4">
-                  {statusFilter === 'suspensos'
-                    ? 'Data da Suspensão'
-                    : statusFilter === 'banidos'
-                    ? 'Data do Banimento'
-                    : statusFilter === 'desconectados'
-                    ? 'Data da Desconexão'
-                    : 'Página Atual'}
-                </th>
-                <th className="py-3 px-4">Dispositivo</th>
-                <th className="py-3 px-4">Endereço IP</th>
-                <th className="py-3 px-4 text-center">
-                  {statusFilter === 'desconectados' ? 'Desconectado Por / Ações' : 'Ações Administrativas'}
-                </th>
+              <tr className="bg-zinc-950 text-zinc-400 text-[11px] font-bold uppercase tracking-wider border-b border-zinc-800">
+                <th className="py-3.5 px-4">Aluno / Usuário</th>
+                <th className="py-3.5 px-4">Chave de Acesso</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4">Tempo Online</th>
+                <th className="py-3.5 px-4">Última Atividade</th>
+                <th className="py-3.5 px-4">Ação Recente / Página</th>
+                <th className="py-3.5 px-4">Dispositivo</th>
+                <th className="py-3.5 px-4">Endereço IP</th>
+                <th className="py-3.5 px-4 text-center">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-xs">
+            <tbody className="divide-y divide-zinc-800/60 text-xs">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin text-cyan-400 mx-auto mb-2" />
-                    <p className="text-xs font-medium">Carregando sessões ativas do servidor...</p>
+                  <td colSpan={9} className="py-12 text-center text-zinc-400">
+                    <RefreshCw className="w-6 h-6 animate-spin text-amber-400 mx-auto mb-2" />
+                    <p className="text-xs font-medium">Carregando dados de presença em tempo real...</p>
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <WifiOff className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-slate-300">Nenhuma sessão encontrada</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {searchTerm ? 'Nenhum resultado corresponde à sua pesquisa.' : 'Nenhum registro nesta categoria.'}
+                  <td colSpan={9} className="py-12 text-center text-zinc-400">
+                    <WifiOff className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-zinc-300">Nenhum aluno encontrado</p>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {searchTerm ? 'Nenhum registro atende aos critérios de busca ou filtros.' : 'Nenhum registro nesta listagem.'}
                     </p>
                   </td>
                 </tr>
@@ -927,146 +1012,122 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                   return (
                     <tr
                       key={idx}
-                      className={`hover:bg-cyan-950/20 transition-colors group ${
-                        isBanned ? 'bg-red-950/10' : isSuspended ? 'bg-amber-950/10' : ''
+                      onClick={() => openStudentDrawer(user)}
+                      className={`hover:bg-zinc-800/50 cursor-pointer transition-colors group ${
+                        isBanned ? 'bg-red-950/20' : isSuspended ? 'bg-orange-950/20' : ''
                       }`}
                     >
                       {/* Usuário / Avatar */}
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <div className="flex items-center space-x-2.5">
                           {user.avatar ? (
                             <img
                               src={user.avatar}
                               alt={user.username}
-                              className="w-8 h-8 rounded-full object-cover border border-cyan-500/30"
+                              className="w-8 h-8 rounded-full object-cover border border-amber-500/30"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/40 flex items-center justify-center font-bold text-xs uppercase">
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 text-amber-400 border border-zinc-700 flex items-center justify-center font-bold text-xs uppercase">
                               {user.username.slice(0, 2)}
                             </div>
                           )}
                           <div>
-                            <p className="font-bold text-white group-hover:text-cyan-300 transition-colors">
-                              {user.username}
+                            <p className="font-bold text-white group-hover:text-amber-300 transition-colors flex items-center gap-1">
+                              <span>{user.username}</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </p>
-                            <p className="text-[10px] text-slate-400">
-                              Conectado há: <span className="text-cyan-400 font-medium">{user.connectedTime}</span>
-                            </p>
+                            <p className="text-[10px] text-zinc-500">Clique para ver timeline</p>
                           </div>
                         </div>
                       </td>
 
                       {/* Chave Mascarada */}
-                      <td className="py-3 px-4 font-mono font-bold text-cyan-300 text-[11px]">
-                        <span className="px-2 py-1 rounded bg-slate-900 border border-cyan-500/20">
+                      <td className="py-3.5 px-4 font-mono font-bold text-amber-300 text-[11px]">
+                        <span className="px-2 py-1 rounded bg-zinc-950 border border-zinc-800">
                           {user.maskedKey}
                         </span>
                       </td>
 
-                      {/* Status / Motivo */}
-                      <td className="py-3 px-4">
-                        {statusFilter === 'suspensos' || isSuspended ? (
-                          <div>
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/50 inline-flex items-center space-x-1.5">
-                              <PauseCircle className="w-3 h-3 text-amber-400 shrink-0" />
-                              <span>SUSPENSA</span>
-                            </span>
-                            {user.suspensionReason && (
-                              <p className="text-[10px] text-amber-300/80 mt-1 max-w-[180px] truncate" title={user.suspensionReason}>
-                                {user.suspensionReason}
-                              </p>
-                            )}
-                          </div>
-                        ) : statusFilter === 'banidos' || isBanned ? (
-                          <div>
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-950 text-red-300 border border-red-500/50 inline-flex items-center space-x-1.5">
-                              <Ban className="w-3 h-3 text-red-400 shrink-0" />
-                              <span>BANIDA</span>
-                            </span>
-                            {user.bannedReason && (
-                              <p className="text-[10px] text-red-300/80 mt-1 max-w-[180px] truncate" title={user.bannedReason}>
-                                {user.bannedReason}
-                              </p>
-                            )}
-                          </div>
+                      {/* Status */}
+                      <td className="py-3.5 px-4">
+                        {isSuspended ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30 inline-flex items-center space-x-1">
+                            <PauseCircle className="w-3 h-3 text-orange-400" />
+                            <span>SUSPENSO</span>
+                          </span>
+                        ) : isBanned ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-950/60 text-red-300 border border-red-800/60 inline-flex items-center space-x-1">
+                            <Ban className="w-3 h-3 text-red-400" />
+                            <span>BANIDO</span>
+                          </span>
                         ) : statusFilter === 'desconectados' ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-500/40 inline-flex items-center space-x-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                            <span>Desconectado</span>
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 inline-flex items-center space-x-1">
+                            <WifiOff className="w-3 h-3 text-rose-400" />
+                            <span>ENCERRADO</span>
                           </span>
                         ) : user.status === 'Online' ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40 inline-flex items-center space-x-1.5">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 inline-flex items-center space-x-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                             <span>Online</span>
                           </span>
                         ) : user.status === 'Ausente' ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40 inline-flex items-center space-x-1.5">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 inline-flex items-center space-x-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                             <span>Ausente</span>
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-700 inline-flex items-center space-x-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-500/10 text-zinc-400 border border-zinc-500/30 inline-flex items-center space-x-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
                             <span>Offline</span>
                           </span>
                         )}
                       </td>
 
-                      {/* Página Atual / Data */}
-                      <td className="py-3 px-4">
-                        {statusFilter === 'suspensos' ? (
-                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
-                            {user.suspendedAt ? new Date(user.suspendedAt).toLocaleString('pt-BR') : user.currentPage}
-                          </span>
-                        ) : statusFilter === 'banidos' ? (
-                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
-                            {user.bannedAt ? new Date(user.bannedAt).toLocaleString('pt-BR') : '-'}
-                          </span>
-                        ) : statusFilter === 'desconectados' ? (
-                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
-                            {user.disconnectedAt ? new Date(user.disconnectedAt).toLocaleString('pt-BR') : user.lastActivity ? new Date(user.lastActivity).toLocaleString('pt-BR') : '-'}
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
-                            {user.currentPage}
-                          </span>
-                        )}
+                      {/* Tempo Online */}
+                      <td className="py-3.5 px-4 font-mono text-emerald-400 font-semibold">
+                        {user.tempoOnlineFormatted || user.connectedTime || '0 s'}
                       </td>
 
-                      {/* Dispositivo & Navegador */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center space-x-1.5 text-slate-300 text-xs">
+                      {/* Última Atividade */}
+                      <td className="py-3.5 px-4 text-zinc-300 font-mono text-[11px]">
+                        {user.lastActivityFormatted || user.lastActivity || 'Agora'}
+                      </td>
+
+                      {/* Ação Recente / Página */}
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-zinc-950 text-purple-300 border border-zinc-800 inline-block">
+                          {user.recentAction || user.currentPage || 'TikTok 2K'}
+                        </span>
+                      </td>
+
+                      {/* Dispositivo */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center space-x-1.5 text-zinc-300 text-xs">
                           {user.deviceType === 'Mobile' ? (
-                            <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                            <Smartphone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                           ) : (
-                            <Monitor className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <Monitor className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                           )}
-                          <span>{user.device}</span>
+                          <span className="truncate max-w-[130px]">{user.device}</span>
                         </div>
                       </td>
 
-                      {/* Endereço IP Protegido */}
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-400">
+                      {/* IP */}
+                      <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-400">
                         <div className="flex items-center space-x-1">
-                          <Lock className="w-3 h-3 text-slate-500" />
+                          <Lock className="w-3 h-3 text-zinc-500" />
                           <span>{user.maskedIp}</span>
                         </div>
                       </td>
 
-                      {/* AÇÕES ADMINISTRATIVAS / DESCONECTADO POR */}
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex flex-col items-center justify-center space-y-1 sm:flex-row sm:space-y-0 sm:space-x-1.5">
-                          {statusFilter === 'desconectados' && (
-                            <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-900 text-cyan-300 border border-cyan-500/30">
-                              {getDisconnectSourceLabel(user.disconnectSource)}
-                            </span>
-                          )}
-
-                          {/* Botão Desconectar (apenas para não suspensos / não banidos e não na aba desconectados) */}
+                      {/* Ações Administrativas */}
+                      <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center space-x-1.5">
+                          {/* Botão Encerrar Login (Desconectar) */}
                           {!isSuspended && !isBanned && statusFilter !== 'desconectados' && (
                             <button
-                              onClick={() => openActionModal(user, 'disconnect')}
-                              title="Desconectar sessão ativa imediatamente"
+                              onClick={(e) => openActionModal(e, user, 'disconnect')}
+                              title="Encerrar Login (Desconectar aluno)"
                               className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
                             >
                               <LogOut className="w-3.5 h-3.5" />
@@ -1076,17 +1137,17 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                           {/* Botão Suspender ou Reativar */}
                           {isSuspended || isBanned ? (
                             <button
-                              onClick={() => openActionModal(user, 'reactivate')}
-                              title="Reativar acesso da chave"
+                              onClick={(e) => openActionModal(e, user, 'reactivate')}
+                              title="Reativar Acesso"
                               className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all hover:scale-105 cursor-pointer"
                             >
                               <PlayCircle className="w-3.5 h-3.5" />
                             </button>
                           ) : (
                             <button
-                              onClick={() => openActionModal(user, 'suspend')}
-                              title="Suspender chave temporariamente"
-                              className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
+                              onClick={(e) => openActionModal(e, user, 'suspend')}
+                              title="Suspender Chave"
+                              className="p-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 transition-all hover:scale-105 cursor-pointer"
                             >
                               <PauseCircle className="w-3.5 h-3.5" />
                             </button>
@@ -1095,19 +1156,22 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                           {/* Botão Banir */}
                           {!isBanned && (
                             <button
-                              onClick={() => openActionModal(user, 'ban')}
-                              title="Banir chave permanentemente"
+                              onClick={(e) => openActionModal(e, user, 'ban')}
+                              title="Banir Chave"
                               className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all hover:scale-105 cursor-pointer"
                             >
                               <Ban className="w-3.5 h-3.5" />
                             </button>
                           )}
 
-                          {/* Botão Histórico */}
+                          {/* Botão Histórico / Timeline Drawer */}
                           <button
-                            onClick={() => openActionModal(user, 'history')}
-                            title="Ver histórico de ações administrativas"
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all hover:scale-105 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openStudentDrawer(user);
+                            }}
+                            title="Ver Histórico & Timeline"
+                            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-all hover:scale-105 cursor-pointer"
                           >
                             <History className="w-3.5 h-3.5" />
                           </button>
@@ -1122,26 +1186,29 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         </div>
 
         {/* Footer Info */}
-        <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+        <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-400 pt-2 border-t border-zinc-800">
           <div className="flex items-center space-x-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Ações administrativas auditadas e restritas à sessão MASTER do Mentor.</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            <span>Sessão MASTER ativa do Mentor Bigode. Todas as ações são auditadas.</span>
           </div>
-          <span>Exibindo {filteredUsers.length} de {users.length} sessões registradas</span>
+          <span>Exibindo {filteredUsers.length} de {users.length} alunos monitorados</span>
         </div>
-
       </div>
 
-      {/* ========================================================= */}
-      {/* MODAL 1: DESCONECTAR SESSÃO */}
-      {/* ========================================================= */}
+      {/* Lateral Session History Drawer */}
+      <SessionDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        student={drawerStudent}
+        studentCode={studentCode}
+      />
+
+      {/* Administrative Modals */}
+      {/* Modal Disconnect */}
       {activeModal === 'disconnect' && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#020d14] border border-amber-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl shadow-amber-950/50 space-y-5 relative">
-            <button
-              onClick={closeModal}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
+          <div className="bg-zinc-900 border border-amber-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
+            <button onClick={closeModal} className="absolute top-4 right-4 text-zinc-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
 
@@ -1155,14 +1222,14 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 space-y-1.5">
+            <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 space-y-1.5">
               <p><strong>Aluno:</strong> {selectedUser.username}</p>
               <p><strong>Dispositivo:</strong> {selectedUser.device}</p>
               <p><strong>Página Atual:</strong> {selectedUser.currentPage}</p>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Esta ação encerrará a sessão ativa do aluno imediatamente no servidor. Na próxima verificação periódica (heartbeat), a aplicação do aluno será redirecionada para a tela de login.
+            <p className="text-xs text-zinc-400">
+              Esta ação encerrará o login do aluno imediatamente no servidor.
             </p>
 
             {actionError && (
@@ -1180,17 +1247,13 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
             )}
 
             <div className="flex items-center justify-end space-x-3 pt-2">
-              <button
-                onClick={closeModal}
-                disabled={actionLoading}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-colors"
-              >
+              <button onClick={closeModal} disabled={actionLoading} className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white">
                 Cancelar
               </button>
               <button
                 onClick={executeDisconnect}
                 disabled={actionLoading}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 font-black text-xs transition-all flex items-center space-x-2 cursor-pointer"
               >
                 {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                 <span>{actionLoading ? 'Processando...' : 'ENCERRAR LOGIN AGORA'}</span>
@@ -1200,39 +1263,34 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL 2: SUSPENDER CHAVE */}
-      {/* ========================================================= */}
+      {/* Modal Suspend */}
       {activeModal === 'suspend' && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#020d14] border border-amber-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl shadow-amber-950/50 space-y-5 relative">
-            <button
-              onClick={closeModal}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
+          <div className="bg-zinc-900 border border-orange-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
+            <button onClick={closeModal} className="absolute top-4 right-4 text-zinc-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
 
             <div className="flex items-center space-x-3">
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400">
                 <PauseCircle className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="text-base font-black text-white">Suspender Chave de Acesso</h3>
-                <p className="text-xs text-amber-300 font-mono font-bold mt-0.5">{selectedUser.maskedKey}</p>
+                <p className="text-xs text-orange-300 font-mono font-bold mt-0.5">{selectedUser.maskedKey}</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-400">
-              O aluno será desconectado e não conseguirá mais autenticar enquanto a chave permanecer no status <strong>SUSPENSA</strong>.
+            <p className="text-xs text-zinc-400">
+              O aluno será desconectado e impedido de acessar até ser reativado.
             </p>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300">Motivo da Suspensão:</label>
+              <label className="text-xs font-bold text-zinc-300">Motivo da Suspensão:</label>
               <select
                 value={actionReason}
                 onChange={(e) => setActionReason(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
               >
                 <option value="Suspeita de compartilhamento de chave">Suspeita de compartilhamento de chave</option>
                 <option value="Uso indevido dos recursos da plataforma">Uso indevido dos recursos da plataforma</option>
@@ -1245,9 +1303,9 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                 <textarea
                   value={customReason}
                   onChange={(e) => setCustomReason(e.target.value)}
-                  placeholder="Descreva detalhadamente o motivo da suspensão..."
+                  placeholder="Descreva o motivo..."
                   rows={2}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none"
                 />
               )}
             </div>
@@ -1259,25 +1317,14 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               </div>
             )}
 
-            {actionSuccessMsg && (
-              <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>{actionSuccessMsg}</span>
-              </div>
-            )}
-
             <div className="flex items-center justify-end space-x-3 pt-2">
-              <button
-                onClick={closeModal}
-                disabled={actionLoading}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-colors"
-              >
+              <button onClick={closeModal} disabled={actionLoading} className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white">
                 Cancelar
               </button>
               <button
                 onClick={executeSuspend}
                 disabled={actionLoading}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-zinc-950 font-black text-xs transition-all flex items-center space-x-2 cursor-pointer"
               >
                 {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                 <span>{actionLoading ? 'Processando...' : 'CONFIRMAR SUSPENSÃO'}</span>
@@ -1287,16 +1334,11 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL 3: BANIR CHAVE */}
-      {/* ========================================================= */}
+      {/* Modal Ban */}
       {activeModal === 'ban' && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#020d14] border border-red-500/50 rounded-2xl w-full max-w-md p-6 shadow-2xl shadow-red-950/60 space-y-5 relative">
-            <button
-              onClick={closeModal}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
+          <div className="bg-zinc-900 border border-red-500/50 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
+            <button onClick={closeModal} className="absolute top-4 right-4 text-zinc-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
 
@@ -1316,19 +1358,16 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                   <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                   <div>
                     <strong className="block font-bold">AÇÃO DE SEGURANÇA CRÍTICA</strong>
-                    <span>Esta chave será permanentemente bloqueada. Todos os acessos serão interrompidos imediatamente.</span>
+                    <span>Esta chave será permanentemente bloqueada.</span>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-300">Motivo do Banimento (Obrigatório):</label>
+                  <label className="text-xs font-bold text-zinc-300">Motivo do Banimento:</label>
                   <select
                     value={actionReason}
-                    onChange={(e) => {
-                      setActionReason(e.target.value);
-                      setActionError(null);
-                    }}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500"
+                    onChange={(e) => setActionReason(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
                   >
                     <option value="Vazamento ou revenda não autorizada de acesso">Vazamento ou revenda não autorizada de acesso</option>
                     <option value="Tentativa de ataque ou engenharia reversa">Tentativa de ataque ou engenharia reversa</option>
@@ -1339,13 +1378,10 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                   {actionReason === 'Outro motivo' && (
                     <textarea
                       value={customReason}
-                      onChange={(e) => {
-                        setCustomReason(e.target.value);
-                        setActionError(null);
-                      }}
-                      placeholder="Descreva detalhadamente o motivo do banimento..."
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      placeholder="Descreva o motivo..."
                       rows={2}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-xs text-white"
                     />
                   )}
                 </div>
@@ -1358,25 +1394,14 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                 )}
 
                 <div className="flex items-center justify-end space-x-3 pt-2">
-                  <button
-                    onClick={closeModal}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-colors"
-                  >
+                  <button onClick={closeModal} className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white">
                     Cancelar
                   </button>
                   <button
-                    onClick={() => {
-                      const finalReason = actionReason === 'Outro motivo' ? customReason.trim() : actionReason;
-                      if (!finalReason) {
-                        setActionError('Por favor, descreva o motivo do banimento.');
-                        return;
-                      }
-                      setActionError(null);
-                      setShowBanConfirm(true);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition-all shadow-lg shadow-red-600/30 flex items-center space-x-2 font-mono uppercase tracking-wider"
+                    onClick={() => setShowBanConfirm(true)}
+                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase"
                   >
-                    <span>BANIR CHAVE DEFINITIVAMENTE</span>
+                    BANIR CHAVE DEFINITIVAMENTE
                   </button>
                 </div>
               </>
@@ -1392,46 +1417,21 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/40 space-y-3">
-                  <p className="text-sm font-bold text-red-200">
-                    Tem certeza que deseja banir permanentemente esta chave?
-                  </p>
-                  <div className="text-xs text-slate-300 space-y-1 bg-slate-950/60 p-3 rounded-lg border border-red-900/40 font-mono">
-                    <p><span className="text-slate-400 font-semibold font-sans">Aluno/Usuário:</span> {selectedUser.username}</p>
-                    <p><span className="text-slate-400 font-semibold font-sans">Chave Mascarada:</span> <span className="text-red-300 font-bold">{selectedUser.maskedKey}</span></p>
-                    <p><span className="text-slate-400 font-semibold font-sans">Motivo:</span> {actionReason === 'Outro motivo' ? customReason : actionReason}</p>
-                  </div>
-                </div>
-
-                {actionError && (
-                  <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                    <span>{actionError}</span>
-                  </div>
-                )}
-
-                {actionSuccessMsg && (
-                  <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs flex items-center space-x-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>{actionSuccessMsg}</span>
-                  </div>
-                )}
+                <p className="text-xs text-red-300">
+                  Tem certeza que deseja banir permanentemente este aluno?
+                </p>
 
                 <div className="flex items-center justify-end space-x-3 pt-2">
-                  <button
-                    onClick={() => setShowBanConfirm(false)}
-                    disabled={actionLoading}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-colors"
-                  >
+                  <button onClick={() => setShowBanConfirm(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white">
                     Cancelar
                   </button>
                   <button
                     onClick={executeBan}
                     disabled={actionLoading}
-                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition-all shadow-lg shadow-red-600/30 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs flex items-center space-x-2"
                   >
                     {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                    <span>{actionLoading ? 'Processando...' : 'Confirmar Banimento'}</span>
+                    <span>Confirmar Banimento</span>
                   </button>
                 </div>
               </>
@@ -1440,16 +1440,11 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL 4: REATIVAR CHAVE */}
-      {/* ========================================================= */}
+      {/* Modal Reactivate */}
       {activeModal === 'reactivate' && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#020d14] border border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl shadow-emerald-950/50 space-y-5 relative">
-            <button
-              onClick={closeModal}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
+          <div className="bg-zinc-900 border border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
+            <button onClick={closeModal} className="absolute top-4 right-4 text-zinc-400 hover:text-white">
               <X className="w-5 h-5" />
             </button>
 
@@ -1463,142 +1458,35 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               </div>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Esta ação removerá o bloqueio da chave e permitirá que o aluno efetue login normalmente na plataforma.
+            <p className="text-xs text-zinc-400">
+              A chave voltará ao status ATIVO e o aluno poderá se conectar novamente.
             </p>
 
-            {actionError && (
-              <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/50 text-red-300 text-xs flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{actionError}</span>
-              </div>
-            )}
-
-            {actionSuccessMsg && (
-              <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>{actionSuccessMsg}</span>
-              </div>
-            )}
-
             <div className="flex items-center justify-end space-x-3 pt-2">
-              <button
-                onClick={closeModal}
-                disabled={actionLoading}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-colors"
-              >
+              <button onClick={closeModal} disabled={actionLoading} className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white">
                 Cancelar
               </button>
               <button
                 onClick={executeReactivate}
                 disabled={actionLoading}
-                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center space-x-2 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-black text-xs flex items-center space-x-2"
               >
                 {actionLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>{actionLoading ? 'Processando...' : 'CONFIRMAR REATIVAÇÃO'}</span>
+                <span>CONFIRMAR REATIVAÇÃO</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL 5: HISTÓRICO DE AÇÕES DE ACESSO */}
-      {/* ========================================================= */}
-      {activeModal === 'history' && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#020d14] border border-cyan-500/40 rounded-2xl w-full max-w-lg p-6 shadow-2xl shadow-cyan-950/50 space-y-4 relative max-h-[85vh] flex flex-col">
-            <button
-              onClick={closeModal}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center space-x-3 shrink-0">
-              <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-                <History className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-black text-white">Histórico da Chave</h3>
-                <p className="text-xs text-cyan-300 font-mono font-bold">{selectedUser.maskedKey}</p>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto flex-1 space-y-2.5 pr-1">
-              {historyLoading ? (
-                <div className="py-8 text-center text-slate-400">
-                  <RefreshCw className="w-6 h-6 animate-spin text-cyan-400 mx-auto mb-2" />
-                  <p className="text-xs">Consultando auditoria do servidor...</p>
-                </div>
-              ) : historyList.length === 0 ? (
-                <div className="py-8 text-center text-slate-500 text-xs">
-                  Nenhuma ação administrativa registrada para esta chave até o momento.
-                </div>
-              ) : (
-                historyList.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-xs space-y-1"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`font-black text-[10px] px-2 py-0.5 rounded ${
-                        entry.actionType === 'BAN'
-                          ? 'bg-red-950 text-red-300 border border-red-500/40'
-                          : entry.actionType === 'SUSPEND'
-                          ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
-                          : entry.actionType === 'REACTIVATE'
-                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
-                          : 'bg-indigo-950 text-indigo-300 border border-indigo-500/40'
-                      }`}>
-                        {entry.actionType}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {new Date(entry.createdAt).toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-
-                    <p className="text-slate-200 font-medium pt-1">
-                      <strong>Motivo:</strong> {entry.reason || 'Sem motivo especificado'}
-                    </p>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">
-                      <span>Admin: {entry.adminIdentifier}</span>
-                      <span>IP: {entry.ipAddress}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="pt-2 border-t border-slate-800 flex justify-end shrink-0">
-              <button
-                onClick={closeModal}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition-colors"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* MODAL 6: DESCONECTAR TODAS AS SESSÕES */}
-      {/* ========================================================= */}
+      {/* Modal Disconnect All */}
       {showDisconnectAllModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#020d14] border border-rose-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl shadow-rose-950/50 space-y-5 relative">
+          <div className="bg-zinc-900 border border-rose-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 relative">
             <button
-              onClick={() => {
-                if (!disconnectAllLoading) {
-                  setShowDisconnectAllModal(false);
-                  setDisconnectAllError(null);
-                  setDisconnectAllSuccessMsg(null);
-                }
-              }}
+              onClick={() => setShowDisconnectAllModal(false)}
               disabled={disconnectAllLoading}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1609,19 +1497,13 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               </div>
               <div>
                 <h3 className="text-base font-black text-white">Encerrar todos os logins?</h3>
-                <p className="text-xs text-rose-300 font-semibold mt-0.5">Ação Administrativa de Alto Impacto</p>
+                <p className="text-xs text-rose-300 font-semibold mt-0.5">Ação Global do Mentor</p>
               </div>
             </div>
 
             <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 space-y-2">
-              <p className="text-sm font-bold text-rose-200">
-                ⚠️ Encerrar todos os logins?
-              </p>
-              <p className="text-xs text-rose-100 font-bold">
-                {getActiveValidSessionsCount()} {getActiveValidSessionsCount() === 1 ? 'login será encerrado.' : 'logins serão encerrados.'}
-              </p>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Todos os alunos conectados precisarão realizar login novamente.
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Todos os alunos conectados ({getActiveValidSessionsCount()}) serão desconectados imediatamente.
               </p>
             </div>
 
@@ -1641,22 +1523,16 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
 
             <div className="flex items-center justify-end space-x-3 pt-2">
               <button
-                onClick={() => {
-                  if (!disconnectAllLoading) {
-                    setShowDisconnectAllModal(false);
-                    setDisconnectAllError(null);
-                    setDisconnectAllSuccessMsg(null);
-                  }
-                }}
+                onClick={() => setShowDisconnectAllModal(false)}
                 disabled={disconnectAllLoading}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white"
               >
                 Cancelar
               </button>
               <button
                 onClick={executeDisconnectAll}
                 disabled={disconnectAllLoading}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs transition-all shadow-lg shadow-rose-600/30 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs flex items-center space-x-2 cursor-pointer"
               >
                 {disconnectAllLoading ? (
                   <>
