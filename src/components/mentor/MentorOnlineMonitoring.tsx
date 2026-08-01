@@ -42,6 +42,8 @@ interface OnlineUser {
   loginAt: string;
   lastActivity: string;
   connectedTime: string;
+  disconnectSource?: string;
+  disconnectedAt?: string;
 }
 
 interface MemberStats {
@@ -84,7 +86,14 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('');
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ativos' | 'todos' | 'online' | 'ausente' | 'offline' | 'suspensos' | 'banidos'>('ativos');
+  const [statusFilter, setStatusFilter] = useState<'ativos' | 'todos' | 'online' | 'ausente' | 'offline' | 'desconectados' | 'suspensos' | 'banidos'>('ativos');
+
+  const getDisconnectSourceLabel = (src?: string) => {
+    if (src === 'MENTOR_SINGLE') return 'Mentor — sessão individual';
+    if (src === 'MENTOR_ALL') return 'Mentor — desconexão global';
+    if (src === 'STUDENT_LOGOUT') return 'Aluno — botão Sair';
+    return 'Mentor — sessão individual';
+  };
 
   // Administrative Modal States
   const [selectedUser, setSelectedUser] = useState<OnlineUser | null>(null);
@@ -169,10 +178,26 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
 
       const count = data.disconnectedCount ?? data.count ?? 0;
       const successText = count === 1
-        ? '✅ 1 sessão encerrada com sucesso.'
-        : `✅ ${count} sessões encerradas com sucesso.`;
+        ? '✅ 1 sessão desconectada com sucesso.'
+        : `✅ ${count} sessões desconectadas com sucesso.`;
 
       setDisconnectAllSuccessMsg(successText);
+
+      setUsers((prevUsers) =>
+        prevUsers.map((u) => {
+          if (u.hasActiveSession || u.status === 'Online' || u.status === 'Ausente') {
+            return {
+              ...u,
+              status: 'Offline',
+              presenceStatus: 'Offline',
+              hasActiveSession: false,
+              disconnectSource: 'MENTOR_ALL',
+              disconnectedAt: new Date().toISOString(),
+            };
+          }
+          return u;
+        })
+      );
 
       setTimeout(() => {
         setShowDisconnectAllModal(false);
@@ -344,13 +369,15 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               status: 'Offline',
               presenceStatus: 'Offline',
               hasActiveSession: false,
+              disconnectSource: 'MENTOR_SINGLE',
+              disconnectedAt: new Date().toISOString(),
             };
           }
           return u;
         })
       );
 
-      setActionSuccessMsg('Sessão encerrada com sucesso.');
+      setActionSuccessMsg('✅ 1 sessão desconectada com sucesso.');
       setTimeout(() => {
         closeModal();
         fetchData();
@@ -572,6 +599,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     if (statusFilter === 'online') return isActive && u.status === 'Online';
     if (statusFilter === 'ausente') return isActive && u.status === 'Ausente';
     if (statusFilter === 'offline') return isActive && u.status === 'Offline';
+    if (statusFilter === 'desconectados') return isActive && (Boolean(u.disconnectSource) || Boolean(u.disconnectedAt) || (!u.hasActiveSession && u.status === 'Offline'));
     if (statusFilter === 'suspensos') return isSuspended;
     if (statusFilter === 'banidos') return isBanned;
     return true;
@@ -828,6 +856,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
             </button>
 
             <button
+              onClick={() => setStatusFilter('desconectados')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                statusFilter === 'desconectados'
+                  ? 'bg-rose-950 text-rose-300 border border-rose-500/50'
+                  : 'text-slate-400 hover:text-rose-300'
+              }`}
+            >
+              <WifiOff className="w-3.5 h-3.5 text-rose-400" />
+              <span>Desconectados ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && (Boolean(u.disconnectSource) || Boolean(u.disconnectedAt) || (!u.hasActiveSession && u.status === 'Offline'))).length})</span>
+            </button>
+
+            <button
               onClick={() => setStatusFilter('suspensos')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
                 statusFilter === 'suspensos'
@@ -873,11 +913,15 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                     ? 'Data da Suspensão'
                     : statusFilter === 'banidos'
                     ? 'Data do Banimento'
+                    : statusFilter === 'desconectados'
+                    ? 'Data da Desconexão'
                     : 'Página Atual'}
                 </th>
                 <th className="py-3 px-4">Dispositivo</th>
                 <th className="py-3 px-4">Endereço IP</th>
-                <th className="py-3 px-4 text-center">Ações Administrativas</th>
+                <th className="py-3 px-4 text-center">
+                  {statusFilter === 'desconectados' ? 'Desconectado Por / Ações' : 'Ações Administrativas'}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -968,6 +1012,11 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                               </p>
                             )}
                           </div>
+                        ) : statusFilter === 'desconectados' ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-500/40 inline-flex items-center space-x-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                            <span>Desconectado</span>
+                          </span>
                         ) : user.status === 'Online' ? (
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40 inline-flex items-center space-x-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -996,6 +1045,10 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                           <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
                             {user.bannedAt ? new Date(user.bannedAt).toLocaleString('pt-BR') : '-'}
                           </span>
+                        ) : statusFilter === 'desconectados' ? (
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
+                            {user.disconnectedAt ? new Date(user.disconnectedAt).toLocaleString('pt-BR') : user.lastActivity ? new Date(user.lastActivity).toLocaleString('pt-BR') : '-'}
+                          </span>
                         ) : (
                           <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
                             {user.currentPage}
@@ -1023,11 +1076,17 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                         </div>
                       </td>
 
-                      {/* AÇÕES ADMINISTRATIVAS */}
+                      {/* AÇÕES ADMINISTRATIVAS / DESCONECTADO POR */}
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center space-x-1.5">
-                          {/* Botão Desconectar (apenas para não suspensos / não banidos) */}
-                          {!isSuspended && !isBanned && (
+                        <div className="flex flex-col items-center justify-center space-y-1 sm:flex-row sm:space-y-0 sm:space-x-1.5">
+                          {statusFilter === 'desconectados' && (
+                            <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-900 text-cyan-300 border border-cyan-500/30">
+                              {getDisconnectSourceLabel(user.disconnectSource)}
+                            </span>
+                          )}
+
+                          {/* Botão Desconectar (apenas para não suspensos / não banidos e não na aba desconectados) */}
+                          {!isSuspended && !isBanned && statusFilter !== 'desconectados' && (
                             <button
                               onClick={() => openActionModal(user, 'disconnect')}
                               title="Desconectar sessão ativa imediatamente"
