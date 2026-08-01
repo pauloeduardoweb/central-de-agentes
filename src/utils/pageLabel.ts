@@ -52,9 +52,9 @@ export function getCurrentPageLabel({
     if (mentorTab === 'challenges') return 'Criar Desafios';
     if (mentorTab === 'students') return 'Alunos';
     if (mentorTab === 'codes') return 'Códigos de Acesso';
-    if (mentorTab === 'sessions') return 'Monitoramento Online';
+    if (mentorTab === 'sessions') return 'Sessões Ativas & Membros';
     if (mentorTab === 'stats') return 'Estatísticas';
-    return 'Painel do Mentor';
+    return 'Dashboard';
   }
 
   // 4. Hub Categories & Menus
