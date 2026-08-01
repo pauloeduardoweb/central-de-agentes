@@ -512,20 +512,57 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
               message: 'Esta chave de acesso foi banida pelo Mentor e não pode mais ser utilizada. Caso acredite que isso ocorreu por engano, entre em contato com o suporte da Mentoria Geração Z Pro.',
             });
           }
-          if (!r.active_session_id || r.active_session_id !== sessionId) {
+          if (!r.active_session_id) {
+            memorySessionsMap.delete(cleanCode);
+            return res.status(401).json({
+              error: 'ADMIN_DISCONNECTED',
+              message: 'Sessão encerrada pelo administrador. Efetue login novamente.',
+            });
+          }
+          if (r.active_session_id !== sessionId) {
             memorySessionsMap.delete(cleanCode);
             return res.status(401).json({
               error: 'SESSION_EXPIRED',
-              message: 'Sessão encerrada ou invalidada pelo administrador. Efetue login novamente.',
+              message: 'Esta chave de acesso foi conectada em outro dispositivo. Efetue login novamente.',
             });
           }
           if (r.expires_at && new Date(r.expires_at).getTime() <= Date.now()) {
             memorySessionsMap.delete(cleanCode);
             return res.status(401).json({
               error: 'SESSION_EXPIRED',
-              message: 'Sessão expirada. Efetue login novamente.',
+              message: 'Sessão de 30 dias expirada. Efetue login novamente.',
             });
           }
+          sessionValidated = true;
+        } else {
+          // If no row exists yet in MySQL sessoes table, auto-create/heal row for this valid session
+          await db.query(
+            `INSERT INTO sessoes (
+               codigo,
+               active_session_id,
+               device_id,
+               login_at,
+               session_started_at,
+               last_heartbeat_at,
+               expires_at,
+               is_online,
+               status,
+               current_page,
+               ip_address,
+               user_agent,
+               device_type,
+               browser_name,
+               operating_system
+             )
+             VALUES (?, ?, ?, NOW(), NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, 'online', ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+               active_session_id = VALUES(active_session_id),
+               last_heartbeat_at = NOW(),
+               expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
+               is_online = 1,
+               status = 'online'`,
+            [cleanCode, sessionId, `device-${sessionId.slice(0, 8)}`, currentPage, clientIp, rawUa, deviceType, browserName, operatingSystem]
+          );
           sessionValidated = true;
         }
 
@@ -556,18 +593,20 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
     if (!sessionValidated) {
       // Memory check for fallback
       const memSession = memorySessionsMap.get(cleanCode);
-      if (!memSession || memSession.sessionId !== sessionId) {
-        return res.status(401).json({
-          error: 'SESSION_EXPIRED',
-          message: 'Sessão encerrada ou invalidada pelo administrador. Efetue login novamente.',
-        });
-      }
-      if (memSession.expiresAt && memSession.expiresAt.getTime() < Date.now()) {
-        memorySessionsMap.delete(cleanCode);
-        return res.status(401).json({
-          error: 'SESSION_EXPIRED',
-          message: 'Sessão expirada. Efetue login novamente.',
-        });
+      if (memSession) {
+        if (memSession.sessionId !== sessionId) {
+          return res.status(401).json({
+            error: 'SESSION_EXPIRED',
+            message: 'Esta chave de acesso foi conectada em outro dispositivo. Efetue login novamente.',
+          });
+        }
+        if (memSession.expiresAt && memSession.expiresAt.getTime() < Date.now()) {
+          memorySessionsMap.delete(cleanCode);
+          return res.status(401).json({
+            error: 'SESSION_EXPIRED',
+            message: 'Sessão de 30 dias expirada. Efetue login novamente.',
+          });
+        }
       }
     }
 
