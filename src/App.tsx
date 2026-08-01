@@ -155,7 +155,7 @@ export default function App() {
 
   // Dynamic Real Page Identifier
   const currentPageLabel = useMemo(() => {
-    return getCurrentPageLabel({
+    const label = getCurrentPageLabel({
       activeView,
       selectedChatAgent,
       showGeracaoZProModal,
@@ -170,6 +170,15 @@ export default function App() {
       activeCategory,
       mentorTab,
     });
+
+    console.log('[CURRENT PAGE STATE]', {
+      pathname: typeof window !== 'undefined' ? window.location.pathname : '/',
+      activeCategory,
+      selectedAgent: selectedChatAgent?.name || null,
+      currentPageLabel: label,
+    });
+
+    return label;
   }, [
     activeView,
     selectedChatAgent,
