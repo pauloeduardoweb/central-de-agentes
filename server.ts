@@ -344,6 +344,10 @@ async function handleLogin(req: express.Request, res: express.Response) {
 
         const effectiveDeviceId = deviceId || deviceIdInDb || `device-${sessionId.slice(0, 8)}`;
 
+        const clientIp = getClientIp(req);
+        const rawUa = (req.headers['user-agent'] as string) || '';
+        const { deviceType, operatingSystem, browserName } = parseUserAgent(rawUa);
+
         // Insert or Update with 30-day expiration
         await connection.query(
           `INSERT INTO sessoes (
@@ -355,9 +359,14 @@ async function handleLogin(req: express.Request, res: express.Response) {
              last_heartbeat_at,
              expires_at,
              is_online,
-             status
+             status,
+             ip_address,
+             user_agent,
+             device_type,
+             browser_name,
+             operating_system
            )
-           VALUES (?, ?, ?, NOW(), NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, 'online')
+           VALUES (?, ?, ?, NOW(), NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, 'online', ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE
              active_session_id = VALUES(active_session_id),
              device_id = VALUES(device_id),
@@ -365,8 +374,14 @@ async function handleLogin(req: express.Request, res: express.Response) {
              last_heartbeat_at = NOW(),
              expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
              is_online = 1,
-             status = 'online'`,
-          [cleanCode, sessionId, effectiveDeviceId]
+             status = 'online',
+             logout_at = NULL,
+             ip_address = COALESCE(NULLIF(VALUES(ip_address), ''), ip_address),
+             user_agent = COALESCE(NULLIF(VALUES(user_agent), ''), user_agent),
+             device_type = CASE WHEN VALUES(device_type) IS NOT NULL AND VALUES(device_type) != '' AND VALUES(device_type) != 'Desconhecido' THEN VALUES(device_type) ELSE device_type END,
+             browser_name = CASE WHEN VALUES(browser_name) IS NOT NULL AND VALUES(browser_name) != '' AND VALUES(browser_name) != 'Desconhecido' THEN VALUES(browser_name) ELSE browser_name END,
+             operating_system = CASE WHEN VALUES(operating_system) IS NOT NULL AND VALUES(operating_system) != '' AND VALUES(operating_system) != 'Desconhecido' THEN VALUES(operating_system) ELSE operating_system END`,
+          [cleanCode, sessionId, effectiveDeviceId, clientIp, rawUa, deviceType, browserName, operatingSystem]
         );
 
         try {
@@ -385,7 +400,6 @@ async function handleLogin(req: express.Request, res: express.Response) {
         // Sync session to memorySessionsMap for fast heartbeat fallback
         const now = new Date();
         const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        const { deviceType, operatingSystem, browserName } = parseUserAgent(req.headers['user-agent'] || '');
         memorySessionsMap.set(cleanCode, {
           codigo: cleanCode,
           sessionId,
