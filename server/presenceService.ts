@@ -102,25 +102,27 @@ export function parseUserAgent(ua: string | undefined): {
   operatingSystem: string;
   browserName: string;
 } {
-  if (!ua) {
-    return { deviceType: 'Desktop', operatingSystem: 'Windows', browserName: 'Chrome' };
+  if (!ua || typeof ua !== 'string' || ua.trim() === '') {
+    return { deviceType: 'Desconhecido', operatingSystem: 'Desconhecido', browserName: 'Desconhecido' };
   }
 
   let deviceType = 'Desktop';
   if (/mobile|iphone|ipod|android.*mobile/i.test(ua)) deviceType = 'Mobile';
   else if (/tablet|ipad|android(?!.*mobile)/i.test(ua)) deviceType = 'Tablet';
 
-  let operatingSystem = 'Windows';
-  if (/macintosh|mac os x/i.test(ua)) operatingSystem = 'macOS';
+  let operatingSystem = 'Desconhecido';
+  if (/windows/i.test(ua)) operatingSystem = 'Windows';
+  else if (/macintosh|mac os x/i.test(ua)) operatingSystem = 'macOS';
   else if (/android/i.test(ua)) operatingSystem = 'Android';
   else if (/iphone|ipad|ipod/i.test(ua)) operatingSystem = 'iOS';
   else if (/linux/i.test(ua)) operatingSystem = 'Linux';
 
-  let browserName = 'Chrome';
+  let browserName = 'Desconhecido';
   if (/edg/i.test(ua)) browserName = 'Edge';
   else if (/firefox/i.test(ua)) browserName = 'Firefox';
-  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browserName = 'Safari';
   else if (/opera|opr/i.test(ua)) browserName = 'Opera';
+  else if (/chrome|crios/i.test(ua)) browserName = 'Chrome';
+  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browserName = 'Safari';
 
   return { deviceType, operatingSystem, browserName };
 }
@@ -531,7 +533,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
             memorySessionsMap.delete(cleanCode);
             return res.status(401).json({
               error: 'ADMIN_DISCONNECTED',
-              message: 'Sessão encerrada pelo administrador. Efetue login novamente.',
+              message: 'Sua sessão foi encerrada pelo Mentor.',
             });
           }
           if (r.active_session_id !== sessionId) {
@@ -550,35 +552,12 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
           }
           sessionValidated = true;
         } else {
-          // If no row exists yet in MySQL sessoes table, auto-create/heal row for this valid session
-          await db.query(
-            `INSERT INTO sessoes (
-               codigo,
-               active_session_id,
-               device_id,
-               login_at,
-               session_started_at,
-               last_heartbeat_at,
-               expires_at,
-               is_online,
-               status,
-               current_page,
-               ip_address,
-               user_agent,
-               device_type,
-               browser_name,
-               operating_system
-             )
-             VALUES (?, ?, ?, NOW(), NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 1, 'online', ?, ?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE
-               active_session_id = VALUES(active_session_id),
-               last_heartbeat_at = NOW(),
-               expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
-               is_online = 1,
-               status = 'online'`,
-            [cleanCode, sessionId, `device-${sessionId.slice(0, 8)}`, currentPage, clientIp, rawUa, deviceType, browserName, operatingSystem]
-          );
-          sessionValidated = true;
+          // If session row does not exist in DB, treat as disconnected/invalidated
+          memorySessionsMap.delete(cleanCode);
+          return res.status(401).json({
+            error: 'ADMIN_DISCONNECTED',
+            message: 'Sua sessão foi encerrada pelo Mentor.',
+          });
         }
 
         if (sessionValidated) {
@@ -590,14 +569,23 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
                is_online = 1,
                status = 'online',
                current_page = ?,
-               ip_address = ?,
-               user_agent = ?,
-               device_type = ?,
-               browser_name = ?,
-               operating_system = ?
+               ip_address = COALESCE(NULLIF(?, ''), ip_address),
+               user_agent = COALESCE(NULLIF(?, ''), user_agent),
+               device_type = CASE WHEN ? IS NOT NULL AND ? != '' AND ? != 'Desconhecido' THEN ? ELSE device_type END,
+               browser_name = CASE WHEN ? IS NOT NULL AND ? != '' AND ? != 'Desconhecido' THEN ? ELSE browser_name END,
+               operating_system = CASE WHEN ? IS NOT NULL AND ? != '' AND ? != 'Desconhecido' THEN ? ELSE operating_system END
              WHERE codigo = ?
              AND active_session_id = ?`,
-            [currentPage, clientIp, rawUa, deviceType, browserName, operatingSystem, cleanCode, sessionId]
+            [
+              currentPage,
+              clientIp,
+              rawUa,
+              deviceType, deviceType, deviceType, deviceType,
+              browserName, browserName, browserName, browserName,
+              operatingSystem, operatingSystem, operatingSystem, operatingSystem,
+              cleanCode,
+              sessionId
+            ]
           );
         }
       } catch (dbErr) {
@@ -1517,8 +1505,10 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
              device_id = NULL,
              is_online = 0,
              status = 'offline',
-             logout_at = NOW()
-           WHERE id = ?`,
+             logout_at = NOW(),
+             updated_at = NOW()
+           WHERE id = ?
+             AND active_session_id IS NOT NULL`,
           [sessInfo.sessionRecordId]
         );
       } else {
@@ -1529,8 +1519,10 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
              device_id = NULL,
              is_online = 0,
              status = 'offline',
-             logout_at = NOW()
-           WHERE codigo = ?`,
+             logout_at = NOW(),
+             updated_at = NOW()
+           WHERE codigo = ?
+             AND active_session_id IS NOT NULL`,
           [sessInfo.codigo]
         );
       }
@@ -1550,11 +1542,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
     }
 
     // Clear memory session
-    const hadMem = memorySessionsMap.has(sessInfo.codigo);
-    if (hadMem) {
-      memorySessionsMap.delete(sessInfo.codigo);
-      if (disconnectedCount === 0) disconnectedCount = 1;
-    }
+    memorySessionsMap.delete(sessInfo.codigo);
 
     // Audit action
     await recordAdminAuditAction(sessInfo.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
@@ -1562,14 +1550,15 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
     if (disconnectedCount === 0) {
       return res.status(200).json({
         success: false,
-        error: 'SESSION_NOT_FOUND',
-        message: 'Nenhuma sessão ativa foi encontrada para este aluno.',
+        error: 'SESSION_NOT_ACTIVE',
+        message: 'Esta sessão já estava encerrada ou não possui sessão ativa.',
       });
     }
 
     return res.json({
       success: true,
-      disconnectedCount,
+      error: null,
+      disconnectedCount: 1,
       message: 'Sessão encerrada com sucesso.',
     });
   } catch (err: any) {
