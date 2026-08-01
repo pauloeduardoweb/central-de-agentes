@@ -16,6 +16,17 @@ interface PageLabelParams {
   mentorTab?: string;
 }
 
+function normalizeCategoryKey(rawCategory: string): string {
+  if (!rawCategory) return '';
+  return rawCategory
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[-_]/g, ' ')           // normalize hyphens/underscores to spaces
+    .replace(/\s+/g, ' ')            // normalize duplicate spaces
+    .trim();
+}
+
 export function getCurrentPageLabel({
   activeView,
   selectedChatAgent,
@@ -57,15 +68,29 @@ export function getCurrentPageLabel({
     return 'Dashboard';
   }
 
-  // 4. Hub Categories & Menus
-  if (activeCategory === 'Tiktok 2K' || activeCategory === 'TikTok 2K') return 'TikTok 2K';
-  if (activeCategory === 'Tiktok Shop' || activeCategory === 'TikTok Shop') return 'TikTok Shop';
-  if (activeCategory === 'Recurso Anti-Violação') return 'Recurso Anti-Violação';
-  if (activeCategory === 'Suporte') return 'Suporte';
-  if (activeCategory === 'Grupo de Network') return 'Grupo de Network';
-  if (activeCategory === 'Flow Ultra') return 'Flow Ultra';
-  if (activeCategory === 'Academia de Desafios') return 'Academia de Desafios';
-  if (activeCategory === 'Prompts de Movimentos') return 'Prompts de Movimentos';
+  // 4. Hub Categories & Menus with explicit normalized mapping
+  const normalizedKey = normalizeCategoryKey(activeCategory);
 
-  return activeCategory || 'TikTok 2K';
+  if (normalizedKey === 'tiktok 2k' || normalizedKey === 'tiktok2k') return 'TikTok 2K';
+  if (normalizedKey === 'tiktok shop' || normalizedKey === 'tiktokshop') return 'TikTok Shop';
+  if (
+    normalizedKey === 'recurso anti violacao' ||
+    normalizedKey === 'anti violacao' ||
+    normalizedKey === 'recurso anti violacao geracao z pro'
+  ) {
+    return 'Recurso Anti-Violação';
+  }
+  if (normalizedKey === 'suporte') return 'Suporte';
+  if (normalizedKey === 'grupo de network' || normalizedKey === 'network') return 'Grupo de Network';
+  if (normalizedKey === 'flow ultra' || normalizedKey === 'flowultra') return 'Flow Ultra';
+  if (normalizedKey === 'academia de desafios' || normalizedKey === 'desafios') return 'Academia de Desafios';
+  if (normalizedKey === 'prompts de movimentos' || normalizedKey === 'movimentos') return 'Prompts de Movimentos';
+
+  // If activeCategory is 'todos', 'all', or empty/unrecognized, fallback to 'Dashboard'
+  if (!activeCategory || normalizedKey === 'todos' || normalizedKey === 'all') {
+    return 'Dashboard';
+  }
+
+  return activeCategory;
 }
+
