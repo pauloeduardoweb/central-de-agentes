@@ -61,6 +61,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onClose, onSave, isMan
         body: JSON.stringify({
           accessCode: cleanCode,
           deviceId,
+          isNewLogin: true,
         }),
       });
 
