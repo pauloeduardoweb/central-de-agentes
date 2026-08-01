@@ -563,13 +563,17 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
 
   // Filter users list by status (search filtering is handled on backend)
   const filteredUsers = users.filter((u) => {
-    if (statusFilter === 'ativos') return u.status === 'Online' || u.status === 'Ausente';
-    if (statusFilter === 'todos') return true;
-    if (statusFilter === 'online') return u.status === 'Online';
-    if (statusFilter === 'ausente') return u.status === 'Ausente';
-    if (statusFilter === 'offline') return u.status === 'Offline';
-    if (statusFilter === 'suspensos') return u.accessStatus === 'SUSPENDED';
-    if (statusFilter === 'banidos') return u.accessStatus === 'BANNED';
+    const isSuspended = u.accessStatus === 'SUSPENDED';
+    const isBanned = u.accessStatus === 'BANNED';
+    const isActive = !isSuspended && !isBanned;
+
+    if (statusFilter === 'ativos') return isActive && (u.status === 'Online' || u.status === 'Ausente');
+    if (statusFilter === 'todos') return isActive;
+    if (statusFilter === 'online') return isActive && u.status === 'Online';
+    if (statusFilter === 'ausente') return isActive && u.status === 'Ausente';
+    if (statusFilter === 'offline') return isActive && u.status === 'Offline';
+    if (statusFilter === 'suspensos') return isSuspended;
+    if (statusFilter === 'banidos') return isBanned;
     return true;
   });
 
@@ -766,61 +770,85 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
           <div className="flex items-center space-x-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800 flex-wrap gap-y-1">
             <button
               onClick={() => setStatusFilter('ativos')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
                 statusFilter === 'ativos'
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Activity className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Ativos ({users.filter((u) => u.status === 'Online' || u.status === 'Ausente').length})</span>
+              <span>Ativos ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && (u.status === 'Online' || u.status === 'Ausente')).length})</span>
             </button>
 
             <button
               onClick={() => setStatusFilter('todos')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 statusFilter === 'todos'
                   ? 'bg-slate-800 text-cyan-300 border border-slate-700'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Todos ({users.length})
+              Todos ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED').length})
             </button>
 
             <button
               onClick={() => setStatusFilter('online')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
                 statusFilter === 'online'
                   ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
                   : 'text-slate-400 hover:text-emerald-300'
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>Online ({users.filter((u) => u.status === 'Online').length})</span>
+              <span>Online ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && u.status === 'Online').length})</span>
             </button>
 
             <button
               onClick={() => setStatusFilter('ausente')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
                 statusFilter === 'ausente'
                   ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
                   : 'text-slate-400 hover:text-amber-300'
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              <span>Ausente ({users.filter((u) => u.status === 'Ausente').length})</span>
+              <span>Ausente ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && u.status === 'Ausente').length})</span>
             </button>
 
             <button
               onClick={() => setStatusFilter('offline')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
                 statusFilter === 'offline'
                   ? 'bg-slate-800 text-slate-300 border border-slate-700'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-              <span>Offline ({users.filter((u) => u.status === 'Offline').length})</span>
+              <span>Offline ({users.filter((u) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED' && u.status === 'Offline').length})</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('suspensos')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                statusFilter === 'suspensos'
+                  ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
+                  : 'text-slate-400 hover:text-amber-300'
+              }`}
+            >
+              <PauseCircle className="w-3.5 h-3.5 text-amber-400" />
+              <span>Suspensos ({users.filter((u) => u.accessStatus === 'SUSPENDED').length})</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('banidos')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+                statusFilter === 'banidos'
+                  ? 'bg-red-950 text-red-300 border border-red-500/50'
+                  : 'text-slate-400 hover:text-red-300'
+              }`}
+            >
+              <Ban className="w-3.5 h-3.5 text-red-400" />
+              <span>Banidos ({users.filter((u) => u.accessStatus === 'BANNED').length})</span>
             </button>
           </div>
 
@@ -833,8 +861,20 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
               <tr className="bg-slate-900/90 text-slate-400 text-[11px] font-bold uppercase tracking-wider border-b border-slate-800">
                 <th className="py-3 px-4">Usuário / Aluno</th>
                 <th className="py-3 px-4">Chave de Acesso</th>
-                <th className="py-3 px-4">Status de Conexão</th>
-                <th className="py-3 px-4">Página Atual</th>
+                <th className="py-3 px-4">
+                  {statusFilter === 'suspensos'
+                    ? 'Motivo da Suspensão'
+                    : statusFilter === 'banidos'
+                    ? 'Motivo do Banimento'
+                    : 'Status de Conexão'}
+                </th>
+                <th className="py-3 px-4">
+                  {statusFilter === 'suspensos'
+                    ? 'Data da Suspensão'
+                    : statusFilter === 'banidos'
+                    ? 'Data do Banimento'
+                    : 'Página Atual'}
+                </th>
                 <th className="py-3 px-4">Dispositivo</th>
                 <th className="py-3 px-4">Endereço IP</th>
                 <th className="py-3 px-4 text-center">Ações Administrativas</th>
@@ -854,7 +894,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                     <WifiOff className="w-8 h-8 text-slate-600 mx-auto mb-2" />
                     <p className="text-sm font-bold text-slate-300">Nenhuma sessão encontrada</p>
                     <p className="text-xs text-slate-500 mt-1">
-                      {searchTerm ? 'Nenhum resultado corresponde à sua pesquisa.' : 'Nenhum aluno conectado no momento.'}
+                      {searchTerm ? 'Nenhum resultado corresponde à sua pesquisa.' : 'Nenhum registro nesta categoria.'}
                     </p>
                   </td>
                 </tr>
@@ -902,18 +942,32 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                         </span>
                       </td>
 
-                      {/* Status */}
+                      {/* Status / Motivo */}
                       <td className="py-3 px-4">
-                        {isBanned ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-950 text-red-300 border border-red-500/50 inline-flex items-center space-x-1.5">
-                            <Ban className="w-3 h-3 text-red-400 shrink-0" />
-                            <span>BANIDA</span>
-                          </span>
-                        ) : isSuspended ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/50 inline-flex items-center space-x-1.5">
-                            <PauseCircle className="w-3 h-3 text-amber-400 shrink-0" />
-                            <span>SUSPENSA</span>
-                          </span>
+                        {statusFilter === 'suspensos' || isSuspended ? (
+                          <div>
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/50 inline-flex items-center space-x-1.5">
+                              <PauseCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                              <span>SUSPENSA</span>
+                            </span>
+                            {user.suspensionReason && (
+                              <p className="text-[10px] text-amber-300/80 mt-1 max-w-[180px] truncate" title={user.suspensionReason}>
+                                {user.suspensionReason}
+                              </p>
+                            )}
+                          </div>
+                        ) : statusFilter === 'banidos' || isBanned ? (
+                          <div>
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-950 text-red-300 border border-red-500/50 inline-flex items-center space-x-1.5">
+                              <Ban className="w-3 h-3 text-red-400 shrink-0" />
+                              <span>BANIDA</span>
+                            </span>
+                            {user.bannedReason && (
+                              <p className="text-[10px] text-red-300/80 mt-1 max-w-[180px] truncate" title={user.bannedReason}>
+                                {user.bannedReason}
+                              </p>
+                            )}
+                          </div>
                         ) : user.status === 'Online' ? (
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40 inline-flex items-center space-x-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -932,11 +986,21 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                         )}
                       </td>
 
-                      {/* Página Atual */}
+                      {/* Página Atual / Data */}
                       <td className="py-3 px-4">
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
-                          {user.currentPage}
-                        </span>
+                        {statusFilter === 'suspensos' ? (
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
+                            {user.suspendedAt ? new Date(user.suspendedAt).toLocaleString('pt-BR') : user.currentPage}
+                          </span>
+                        ) : statusFilter === 'banidos' ? (
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
+                            {user.bannedAt ? new Date(user.bannedAt).toLocaleString('pt-BR') : '-'}
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-slate-200 border border-slate-800 inline-block">
+                            {user.currentPage}
+                          </span>
+                        )}
                       </td>
 
                       {/* Dispositivo & Navegador */}
@@ -962,21 +1026,23 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                       {/* AÇÕES ADMINISTRATIVAS */}
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center space-x-1.5">
-                          {/* Botão Desconectar */}
-                          <button
-                            onClick={() => openActionModal(user, 'disconnect')}
-                            title="Desconectar sessão ativa imediatamente"
-                            className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all hover:scale-105"
-                          >
-                            <LogOut className="w-3.5 h-3.5" />
-                          </button>
+                          {/* Botão Desconectar (apenas para não suspensos / não banidos) */}
+                          {!isSuspended && !isBanned && (
+                            <button
+                              onClick={() => openActionModal(user, 'disconnect')}
+                              title="Desconectar sessão ativa imediatamente"
+                              className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
+                            >
+                              <LogOut className="w-3.5 h-3.5" />
+                            </button>
+                          )}
 
                           {/* Botão Suspender ou Reativar */}
                           {isSuspended || isBanned ? (
                             <button
                               onClick={() => openActionModal(user, 'reactivate')}
                               title="Reativar acesso da chave"
-                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all hover:scale-105"
+                              className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all hover:scale-105 cursor-pointer"
                             >
                               <PlayCircle className="w-3.5 h-3.5" />
                             </button>
@@ -984,7 +1050,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                             <button
                               onClick={() => openActionModal(user, 'suspend')}
                               title="Suspender chave temporariamente"
-                              className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all hover:scale-105"
+                              className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
                             >
                               <PauseCircle className="w-3.5 h-3.5" />
                             </button>
@@ -995,7 +1061,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                             <button
                               onClick={() => openActionModal(user, 'ban')}
                               title="Banir chave permanentemente"
-                              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all hover:scale-105"
+                              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-all hover:scale-105 cursor-pointer"
                             >
                               <Ban className="w-3.5 h-3.5" />
                             </button>
@@ -1005,7 +1071,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                           <button
                             onClick={() => openActionModal(user, 'history')}
                             title="Ver histórico de ações administrativas"
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all hover:scale-105"
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all hover:scale-105 cursor-pointer"
                           >
                             <History className="w-3.5 h-3.5" />
                           </button>

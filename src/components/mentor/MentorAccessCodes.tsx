@@ -96,7 +96,7 @@ export const MentorAccessCodes: React.FC<MentorAccessCodesProps> = ({ studentCod
             maskedKey: k.maskedKey,
             accessStatus: k.accessStatus || 'ACTIVE',
             createdAt: k.createdAt || new Date().toISOString(),
-            expiresAt: '30 dias',
+            expiresAt: 'Vitalício',
             activeSessionId: k.hasSession ? 'active-sess' : null,
             isOnline: Boolean(k.isOnline),
             username: k.username,
@@ -332,7 +332,7 @@ export const MentorAccessCodes: React.FC<MentorAccessCodesProps> = ({ studentCod
               <th className="py-3 px-4">Chave de Acesso</th>
               <th className="py-3 px-4">Aluno Vinculado</th>
               <th className="py-3 px-4">Status da Licença</th>
-              <th className="py-3 px-4">Validade</th>
+              <th className="py-3 px-4">Tipo de Acesso</th>
               <th className="py-3 px-4">Conexão Atual</th>
               <th className="py-3 px-4 text-center">Ações</th>
             </tr>
@@ -383,8 +383,8 @@ export const MentorAccessCodes: React.FC<MentorAccessCodesProps> = ({ studentCod
                     )}
                   </td>
 
-                  <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">
-                    {keyItem.expiresAt || '30 dias renováveis'}
+                  <td className="py-3 px-4 text-cyan-300 font-semibold text-xs">
+                    Vitalício
                   </td>
 
                   <td className="py-3 px-4">
@@ -488,7 +488,7 @@ export const MentorAccessCodes: React.FC<MentorAccessCodesProps> = ({ studentCod
                 </div>
 
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Cada nova chave gerada terá acesso padrão de 30 dias renováveis e poderá ser entregue diretamente ao aluno.
+                  Cada nova chave gerada terá acesso vitalício e poderá ser entregue diretamente ao aluno.
                 </p>
 
                 <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-800">
