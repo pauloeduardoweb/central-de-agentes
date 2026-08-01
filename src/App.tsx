@@ -126,7 +126,7 @@ export default function App() {
     }
   }, []);
 
-  // Heartbeat loop every 45 seconds - Presence & Active Session System
+  // Heartbeat loop every 3 seconds - Presence & Active Session System
   useEffect(() => {
     if (!studentCode || !sessionId) return;
 
@@ -199,7 +199,7 @@ export default function App() {
     // Initial heartbeat after mount
     sendHeartbeat();
 
-    const interval = setInterval(sendHeartbeat, 45000); // 45 seconds heartbeat
+    const interval = setInterval(sendHeartbeat, 3000); // 3 seconds heartbeat
     return () => clearInterval(interval);
   }, [studentCode, sessionId, activeView, activeCategory]);
 
