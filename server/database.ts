@@ -138,35 +138,20 @@ export async function ensureSessionsTable(): Promise<void> {
 export async function cleanLegacyDisconnections(): Promise<void> {
   if (!isDatabaseConfigured()) return;
   try {
-    // 1. Clear disconnect metadata from active sessions (if active_session_id IS NOT NULL, session is active/offline, not disconnected)
+    // 1. Clear disconnect metadata from active sessions (if active_session_id IS NOT NULL, session is active)
     await db.query(`
       UPDATE sessoes
       SET disconnect_source = NULL, disconnected_at = NULL
       WHERE active_session_id IS NOT NULL
     `).catch(() => {});
 
-    // 2. Clear disconnect metadata from inactive sessions where disconnect_source was populated without explicit audit action or student logout
+    // 2. Clear invalid disconnect sources
     await db.query(`
       UPDATE sessoes
       SET disconnect_source = NULL, disconnected_at = NULL
       WHERE active_session_id IS NULL
-        AND (
-          disconnect_source NOT IN ('MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT')
-          OR disconnect_source IS NULL
-          OR (
-            disconnect_source IN ('MENTOR_SINGLE', 'MENTOR_ALL')
-            AND codigo NOT IN (
-              SELECT ca.codigo
-              FROM admin_access_actions a
-              JOIN codigos_acesso ca ON a.target_access_key_id = ca.id
-              WHERE a.action_type IN ('DISCONNECT', 'DISCONNECT_ALL_SESSIONS')
-            )
-            AND NOT EXISTS (
-              SELECT 1 FROM admin_access_actions a2
-              WHERE a2.action_type = 'DISCONNECT_ALL_SESSIONS'
-            )
-          )
-        )
+        AND disconnect_source IS NOT NULL
+        AND disconnect_source NOT IN ('MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT')
     `).catch(() => {});
   } catch (err: any) {
     console.warn('[cleanLegacyDisconnections Warning]:', err?.message || err);

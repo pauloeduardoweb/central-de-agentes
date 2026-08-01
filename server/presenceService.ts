@@ -607,8 +607,23 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
             ]
           );
         }
-      } catch (dbErr) {
-        console.warn('[Heartbeat DB Warning - fallback to memory map]:', dbErr);
+      } catch (dbErr: any) {
+        console.error('[Heartbeat DB Warning]', {
+          message: dbErr?.message,
+          code: dbErr?.code,
+          errno: dbErr?.errno,
+          sqlMessage: dbErr?.sqlMessage,
+          sqlState: dbErr?.sqlState,
+          stack: dbErr?.stack,
+        });
+
+        // In production with database configured, return HTTP 500 error on DB error instead of memory fallback
+        return res.status(500).json({
+          success: false,
+          error: 'SESSION_DATABASE_ERROR',
+          presenceVersion: PRESENCE_VERSION,
+          message: 'Erro ao processar heartbeat no banco de dados.',
+        });
       }
     }
 
@@ -1667,6 +1682,12 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
         });
       }
 
+      console.log('[DISCONNECT TARGET]', {
+        sessionRecordId: targetRow.id,
+        codigo: targetRow.codigo,
+        activeSessionIdBefore: targetRow.active_session_id,
+      });
+
       const clientIp = getClientIp(req);
 
       const [updateRes]: any = await db.query(
@@ -1687,7 +1708,7 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
 
       const affectedRows = updateRes && typeof updateRes.affectedRows === 'number' ? updateRes.affectedRows : 0;
 
-      if (affectedRows !== 1) {
+      if (affectedRows < 1) {
         return res.status(409).json({
           success: false,
           error: 'SESSION_NOT_ACTIVE',
@@ -1706,22 +1727,40 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
 
       memorySessionsMap.delete(targetRow.codigo);
 
-      await recordAdminAuditAction(targetRow.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
-
+      // Verify DB disconnect result
       const [checkRows]: any = await db.query(
-        `SELECT active_session_id FROM sessoes WHERE codigo = ? ORDER BY id DESC LIMIT 1`,
-        [targetRow.codigo]
+        `SELECT id, codigo, active_session_id, disconnect_source, disconnected_at, logout_at FROM sessoes WHERE id = ? LIMIT 1`,
+        [targetRow.id]
       );
-      const activeSessionIdAfter = (Array.isArray(checkRows) && checkRows.length > 0) ? checkRows[0].active_session_id : null;
+      const rowAfter = (Array.isArray(checkRows) && checkRows.length > 0) ? checkRows[0] : null;
+      const activeSessionIdAfter = rowAfter?.active_session_id ?? null;
+      const disconnectSourceAfter = rowAfter?.disconnect_source ?? null;
+      const disconnectedAtAfter = rowAfter?.disconnected_at ? new Date(rowAfter.disconnected_at).toISOString() : null;
 
-      if (activeSessionIdAfter !== null) {
+      console.log('[DISCONNECT RESULT]', {
+        affectedRows,
+        activeSessionIdAfter,
+        disconnectSourceAfter,
+        disconnectedAtAfter,
+      });
+
+      if (activeSessionIdAfter !== null || disconnectSourceAfter !== 'MENTOR_SINGLE' || !disconnectedAtAfter) {
         return res.status(500).json({
           success: false,
           presenceVersion: PRESENCE_VERSION,
           error: 'DISCONNECT_FAILED',
           message: 'Falha ao validar o encerramento da sessão no banco de dados.',
           activeSessionIdAfter,
+          disconnectSourceAfter,
+          disconnectedAtAfter,
         });
+      }
+
+      // Record audit log safely without allowing audit errors to rollback disconnection
+      try {
+        await recordAdminAuditAction(targetRow.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
+      } catch (auditErr) {
+        console.warn('[Audit Log Record Warning - Disconnect Succeeded]:', auditErr);
       }
 
       return res.json({
