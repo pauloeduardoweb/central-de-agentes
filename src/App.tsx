@@ -226,6 +226,10 @@ export default function App() {
             sessionId: sessionId,
             deviceId,
             currentPage: currentPageLabel,
+            currentAction: selectedChatAgent ? 'Conversando com agente' : 'Visualizando',
+            currentAgentId: selectedChatAgent?.id || null,
+            currentAgentName: selectedChatAgent?.name || null,
+            agentCategory: selectedChatAgent?.category || activeCategory || null,
             userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
           }),
         });
