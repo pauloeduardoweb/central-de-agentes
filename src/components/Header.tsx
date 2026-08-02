@@ -49,8 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="sticky top-0 z-30 border-b border-cyan-500/20 bg-[#020d14]/90 backdrop-blur-md px-3 sm:px-6 py-2.5 sm:py-3 transition-colors">
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 sm:gap-3.5">
         
-        {/* Navigation Tabs (Master or Hub View Toggle) */}
-        {isMaster && onSelectView ? (
+        {/* Navigation Tabs (Master View Toggle exclusively for MASTER) */}
+        {isMaster && onSelectView && (
           <div className="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-cyan-500/30 shadow-sm">
             <button
               onClick={() => onSelectView('hub')}
@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Bot className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Agentes GPT</span>
+              <span>Central de Agentes</span>
             </button>
             <button
               onClick={() => onSelectView('mentor')}
@@ -74,11 +74,6 @@ export const Header: React.FC<HeaderProps> = ({
               <Crown className="w-3.5 h-3.5 text-amber-400" />
               <span>Painel do Mentor</span>
             </button>
-          </div>
-        ) : (
-          <div className="flex items-center space-x-1.5 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-cyan-500/30 text-cyan-300 text-xs font-bold shadow-sm">
-            <Bot className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Agentes GPT</span>
           </div>
         )}
 
