@@ -87,7 +87,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 md:gap-6 mb-6 md:mb-8">
       {/* 1. Health Check do Servidor */}
       <HealthCheckCard
         health={healthCheck}
@@ -102,7 +102,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
       />
 
       {/* 3. Atividade em Tempo Real */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
+      <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col h-[290px] md:h-[320px]">
         <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 mb-3">
           <div className="flex items-center space-x-2">
             <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">

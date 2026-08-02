@@ -785,33 +785,33 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     <div className="space-y-6">
       
       {/* Top Controls Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-zinc-900/90 p-5 rounded-2xl border border-zinc-800 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-zinc-900/90 p-3.5 sm:p-5 rounded-2xl border border-zinc-800 shadow-xl">
         <div>
           <div className="flex items-center space-x-2">
-            <Activity className="w-5 h-5 text-amber-400 animate-pulse" />
-            <h2 className="text-xl font-extrabold text-white tracking-tight">
+            <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 animate-pulse" />
+            <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
               Monitoramento do Mentor
             </h2>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              Painel 2.0 Ativo
+            <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              Painel 2.0
             </span>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-[11px] sm:text-xs text-zinc-400 mt-1">
             Auditoria e acompanhamento em tempo real das sessões de alunos.
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 self-end sm:self-auto flex-wrap justify-end gap-y-2">
+        <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-end gap-y-2 pt-1 sm:pt-0 border-t sm:border-0 border-zinc-800/80">
           {lastUpdatedTime && (
-            <span className="text-[11px] font-mono text-zinc-400">
-              Última atualização: <strong className="text-amber-400">{lastUpdatedTime}</strong>
+            <span className="text-[10px] sm:text-[11px] font-mono text-zinc-400">
+              Atualizado: <strong className="text-amber-400">{lastUpdatedTime}</strong>
             </span>
           )}
 
           <button
             onClick={() => fetchData(true)}
             disabled={refreshing}
-            className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center space-x-2 transition-all disabled:opacity-50 cursor-pointer"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center space-x-1.5 sm:space-x-2 transition-all disabled:opacity-50 cursor-pointer"
             title="Atualizar dados agora"
             id="mentor-refresh-data-btn"
           >
@@ -840,99 +840,99 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         </div>
       )}
 
-      {/* 5 KPI Indicator Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-emerald-500/30 shadow-lg relative overflow-hidden">
+      {/* 5 KPI Indicator Cards - 2 Columns on Mobile */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
+        <div className="col-span-2 sm:col-span-1 p-3 sm:p-4 rounded-2xl bg-zinc-900/90 border border-emerald-500/30 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-zinc-300">Online Agora</span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-              <span className="relative flex h-2.5 w-2.5">
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-300">Online Agora</span>
+            <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <span className="relative flex h-2 sm:h-2.5 w-2 sm:w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+                <span className="relative inline-flex rounded-full h-2 sm:h-2.5 w-2 sm:w-2.5 bg-emerald-400"></span>
               </span>
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <div className="mt-2 sm:mt-3 flex items-baseline gap-1.5">
+            <span className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
               {stats.onlineNow}
             </span>
-            <span className="text-[11px] text-emerald-400 ml-2 font-semibold">
+            <span className="text-[10px] sm:text-[11px] text-emerald-400 font-semibold">
               conectados
             </span>
           </div>
-          <p className="text-[10px] text-zinc-500 mt-1">Interação nos últimos 90s</p>
+          <p className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 sm:mt-1">Interação nos últimos 90s</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
+        <div className="p-3 sm:p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-zinc-300">Total de Membros</span>
-            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-              <Users className="w-4 h-4" />
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-300">Total Membros</span>
+            <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <div className="mt-2 sm:mt-3 flex items-baseline gap-1.5">
+            <span className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
               {stats.totalMembers}
             </span>
-            <span className="text-[11px] text-amber-400 ml-2 font-semibold">
+            <span className="text-[10px] sm:text-[11px] text-amber-400 font-semibold">
               licenças
             </span>
           </div>
-          <p className="text-[10px] text-zinc-500 mt-1">Chaves registradas</p>
+          <p className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 sm:mt-1">Chaves registradas</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
+        <div className="p-3 sm:p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-zinc-300">Acessos Hoje</span>
-            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
-              <UserCheck className="w-4 h-4" />
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-300">Acessos Hoje</span>
+            <div className="p-1.5 sm:p-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400">
+              <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <div className="mt-2 sm:mt-3 flex items-baseline gap-1.5">
+            <span className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
               {stats.accessesToday}
             </span>
-            <span className="text-[11px] text-blue-300 ml-2 font-semibold">
+            <span className="text-[10px] sm:text-[11px] text-blue-300 font-semibold">
               sessões
             </span>
           </div>
-          <p className="text-[10px] text-zinc-500 mt-1">Hoje a partir de 00:00h</p>
+          <p className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 sm:mt-1">A partir de 00:00h</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
+        <div className="p-3 sm:p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-zinc-300">Pico Simultâneo</span>
-            <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
-              <TrendingUp className="w-4 h-4" />
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-300">Pico Hoje</span>
+            <div className="p-1.5 sm:p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
+              <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <div className="mt-2 sm:mt-3 flex items-baseline gap-1.5">
+            <span className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
               {stats.peakSimultaneous}
             </span>
-            <span className="text-[11px] text-purple-300 ml-2 font-semibold">
-              pico hoje
+            <span className="text-[10px] sm:text-[11px] text-purple-300 font-semibold">
+              pico
             </span>
           </div>
-          <p className="text-[10px] text-zinc-500 mt-1">Recorde do dia</p>
+          <p className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 sm:mt-1">Recorde do dia</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
+        <div className="p-3 sm:p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-zinc-300">Ausentes</span>
-            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-              <Clock className="w-4 h-4" />
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-300">Ausentes</span>
+            <div className="p-1.5 sm:p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <div className="mt-2 sm:mt-3 flex items-baseline gap-1.5">
+            <span className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
               {stats.absentSessions}
             </span>
-            <span className="text-[11px] text-amber-400 ml-2 font-semibold">
+            <span className="text-[10px] sm:text-[11px] text-amber-400 font-semibold">
               ausentes
             </span>
           </div>
-          <p className="text-[10px] text-zinc-500 mt-1">Inativos entre 90s e 1h</p>
+          <p className="text-[9px] sm:text-[10px] text-zinc-500 mt-0.5 sm:mt-1">Inativos 90s-1h</p>
         </div>
       </div>
 
@@ -971,9 +971,195 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         activeSessionsCount={getActiveValidSessionsCount()}
       />
 
-      {/* Main Student Monitoring Table */}
-      <div className="p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl space-y-4">
-        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+      {/* Main Student Monitoring Container */}
+      <div className="p-3.5 sm:p-5 rounded-2xl bg-zinc-900/90 border border-zinc-800 shadow-xl space-y-4">
+        
+        {/* Mobile View: Individual Compact Student Cards (< 768px) */}
+        <div className="block md:hidden space-y-3">
+          {loading ? (
+            <div className="p-8 text-center text-zinc-400 bg-zinc-950/60 rounded-xl border border-zinc-800">
+              <RefreshCw className="w-6 h-6 animate-spin text-amber-400 mx-auto mb-2" />
+              <p className="text-xs font-medium">Carregando alunos em tempo real...</p>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="p-8 text-center text-zinc-400 bg-zinc-950/60 rounded-xl border border-zinc-800">
+              <WifiOff className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+              <p className="text-sm font-bold text-zinc-300">Nenhum aluno encontrado</p>
+              <p className="text-xs text-zinc-500 mt-1">
+                {searchTerm ? 'Nenhum registro atende aos critérios de busca.' : 'Nenhum registro nesta listagem.'}
+              </p>
+            </div>
+          ) : (
+            filteredUsers.map((user, idx) => {
+              const isSuspended = user.accessStatus === 'SUSPENDED';
+              const isBanned = user.accessStatus === 'BANNED';
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => openStudentDrawer(user)}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-2.5 shadow-md ${
+                    isBanned
+                      ? 'bg-red-950/30 border-red-900/60'
+                      : isSuspended
+                      ? 'bg-orange-950/30 border-orange-900/60'
+                      : 'bg-zinc-950/90 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  {/* Line 1: Avatar + Name + Status + Key */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.username}
+                          className="w-8 h-8 rounded-full object-cover border border-amber-500/30 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 text-amber-400 border border-zinc-700 flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                          {user.username.slice(0, 2)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-white text-xs truncate flex items-center gap-1">
+                          <span>{user.username}</span>
+                          <ChevronRight className="w-3 h-3 text-amber-400 shrink-0" />
+                        </p>
+                        <span className="font-mono text-[10px] font-bold text-amber-300 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800 inline-block mt-0.5">
+                          {user.maskedKey}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      {isSuspended ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30 flex items-center gap-1">
+                          <PauseCircle className="w-2.5 h-2.5" /> SUSPENSO
+                        </span>
+                      ) : isBanned ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-950/60 text-red-300 border border-red-800/60 flex items-center gap-1">
+                          <Ban className="w-2.5 h-2.5 text-red-400" /> BANIDO
+                        </span>
+                      ) : statusFilter === 'desconectados' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                          <WifiOff className="w-2.5 h-2.5" /> ENCERRADO
+                        </span>
+                      ) : user.status === 'Online' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Online
+                        </span>
+                      ) : user.status === 'Ausente' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Ausente
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-500/10 text-zinc-400 border border-zinc-500/30 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-500"></span> Offline
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Line 2: Device & IP */}
+                  <div className="grid grid-cols-2 gap-2 text-[11px] text-zinc-400 pt-1 border-t border-zinc-800/50">
+                    <div className="flex items-center space-x-1.5 truncate">
+                      {user.deviceType === 'Mobile' ? (
+                        <Smartphone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      ) : (
+                        <Monitor className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      )}
+                      <span className="truncate">{user.device}</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5 font-mono text-[10px] justify-end">
+                      <Lock className="w-3 h-3 text-zinc-500 shrink-0" />
+                      <span>{user.maskedIp}</span>
+                    </div>
+                  </div>
+
+                  {/* Line 3: Page + Time Online + Activity */}
+                  <div className="flex items-center justify-between text-[11px] pt-1">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-900 text-purple-300 border border-zinc-800 truncate max-w-[140px]">
+                      {user.recentAction || user.currentPage || 'TikTok 2K'}
+                    </span>
+
+                    <div className="flex items-center space-x-2 font-mono text-[10px]">
+                      <span className="text-emerald-400 font-semibold">
+                        ⏱️ {user.tempoOnlineFormatted || user.connectedTime || '0s'}
+                      </span>
+                      <span className="text-zinc-500">
+                        {user.lastActivityFormatted || user.lastActivity || 'Agora'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Line 4: Compact Action Buttons Bar */}
+                  <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-zinc-800/80" onClick={(e) => e.stopPropagation()}>
+                    {!isSuspended && !isBanned && statusFilter !== 'desconectados' ? (
+                      <button
+                        onClick={(e) => openActionModal(e, user, 'disconnect')}
+                        className="py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer"
+                        title="Encerrar Login"
+                      >
+                        <LogOut className="w-3 h-3" />
+                        <span>Sair</span>
+                      </button>
+                    ) : (
+                      <div className="text-[10px] text-zinc-600 flex items-center justify-center font-mono">--</div>
+                    )}
+
+                    {isSuspended || isBanned ? (
+                      <button
+                        onClick={(e) => openActionModal(e, user, 'reactivate')}
+                        className="py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer"
+                        title="Reativar"
+                      >
+                        <PlayCircle className="w-3 h-3" />
+                        <span>Ativar</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => openActionModal(e, user, 'suspend')}
+                        className="py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer"
+                        title="Suspender"
+                      >
+                        <PauseCircle className="w-3 h-3" />
+                        <span>Susp.</span>
+                      </button>
+                    )}
+
+                    {!isBanned ? (
+                      <button
+                        onClick={(e) => openActionModal(e, user, 'ban')}
+                        className="py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer"
+                        title="Banir"
+                      >
+                        <Ban className="w-3 h-3" />
+                        <span>Banir</span>
+                      </button>
+                    ) : (
+                      <div className="text-[10px] text-zinc-600 flex items-center justify-center font-mono">--</div>
+                    )}
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openStudentDrawer(user);
+                      }}
+                      className="py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-[10px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer"
+                      title="Timeline"
+                    >
+                      <History className="w-3 h-3" />
+                      <span>Timeline</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Full Table (>= 768px) */}
+        <div className="hidden md:block overflow-x-auto rounded-xl border border-zinc-800">
           <table className="w-full text-left border-collapse" id="mentor-monitoring-table">
             <thead>
               <tr className="bg-zinc-950 text-zinc-400 text-[11px] font-bold uppercase tracking-wider border-b border-zinc-800">

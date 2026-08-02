@@ -41,7 +41,7 @@ export const HealthCheckCard: React.FC<HealthCheckCardProps> = ({
   loading = false,
 }) => {
   return (
-    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col justify-between h-[320px]">
+    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col justify-between h-[290px] md:h-[320px]">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
         <div className="flex items-center space-x-2">

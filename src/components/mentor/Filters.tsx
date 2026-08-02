@@ -48,9 +48,9 @@ export const Filters: React.FC<FiltersProps> = ({
   activeSessionsCount,
 }) => {
   return (
-    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 mb-6 shadow-xl space-y-4">
+    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-3.5 sm:p-5 mb-6 shadow-xl space-y-3.5 sm:space-y-4">
       {/* Top row: Search input + Disconnect All + Export Buttons */}
-      <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-stretch lg:items-center justify-between">
         {/* Search */}
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
@@ -65,11 +65,11 @@ export const Filters: React.FC<FiltersProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5">
           {/* Disconnect All Button */}
           <button
             onClick={onDisconnectAll}
-            className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold flex items-center space-x-2 transition-all shadow-sm active:scale-95"
+            className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold flex items-center justify-center space-x-2 transition-all shadow-sm active:scale-95 cursor-pointer"
             id="mentor-disconnect-all-btn"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -77,10 +77,10 @@ export const Filters: React.FC<FiltersProps> = ({
           </button>
 
           {/* Export Dropdown / Buttons */}
-          <div className="flex items-center space-x-1.5 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+          <div className="flex items-center justify-between sm:justify-start space-x-1.5 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
             <button
               onClick={onExportCSV}
-              className="px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-medium flex items-center space-x-1.5 transition-colors"
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
               title="Exportar CSV"
               id="export-csv-btn"
             >
@@ -89,7 +89,7 @@ export const Filters: React.FC<FiltersProps> = ({
             </button>
             <button
               onClick={onExportExcel}
-              className="px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-medium flex items-center space-x-1.5 transition-colors"
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
               title="Exportar Excel"
               id="export-excel-btn"
             >
@@ -98,7 +98,7 @@ export const Filters: React.FC<FiltersProps> = ({
             </button>
             <button
               onClick={onExportPDF}
-              className="px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-medium flex items-center space-x-1.5 transition-colors"
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
               title="Imprimir ou Salvar em PDF"
               id="export-pdf-btn"
             >
@@ -109,9 +109,9 @@ export const Filters: React.FC<FiltersProps> = ({
         </div>
       </div>
 
-      {/* Status Badges */}
-      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-800/60">
-        <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mr-2 flex items-center gap-1">
+      {/* Status Badges - Horizontal scroll on mobile */}
+      <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/60 overflow-x-auto pb-1.5 scrollbar-none">
+        <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mr-1 flex items-center gap-1 shrink-0">
           <Filter className="w-3 h-3 text-amber-400" /> Status:
         </span>
 
@@ -130,7 +130,7 @@ export const Filters: React.FC<FiltersProps> = ({
             <button
               key={item.key}
               onClick={() => onStatusFilterChange(item.key)}
-              className={`px-3 py-1 rounded-xl text-xs font-medium transition-all ${
+              className={`px-3 py-1 rounded-xl text-xs font-medium transition-all shrink-0 cursor-pointer ${
                 active
                   ? 'bg-amber-500 text-zinc-950 font-bold shadow-md shadow-amber-500/20'
                   : 'bg-zinc-950 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700'
@@ -143,7 +143,7 @@ export const Filters: React.FC<FiltersProps> = ({
       </div>
 
       {/* Detailed Select Dropdowns (Category, Device, Browser) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-2">
         {/* Category Select */}
         <div>
           <label className="block text-[10px] font-medium text-zinc-400 mb-1">Página / Categoria Atual</label>
@@ -201,7 +201,7 @@ export const Filters: React.FC<FiltersProps> = ({
 
           <button
             onClick={onResetFilters}
-            className="p-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
+            className="p-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors shrink-0 cursor-pointer"
             title="Limpar Filtros"
           >
             <RotateCcw className="w-4 h-4" />

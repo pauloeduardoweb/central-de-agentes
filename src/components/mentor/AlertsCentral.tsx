@@ -67,7 +67,7 @@ export const AlertsCentral: React.FC<AlertsCentralProps> = ({
   };
 
   return (
-    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg flex flex-col h-[320px]">
+    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col h-[290px] md:h-[320px]">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 mb-3">
         <div className="flex items-center space-x-2">
