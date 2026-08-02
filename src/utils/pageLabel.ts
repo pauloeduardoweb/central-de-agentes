@@ -50,7 +50,7 @@ export function getCurrentPageLabel({
   // 2. Modals open
   if (showGeracaoZProModal) return 'Recurso Anti-Violação';
   if (showCertificadosModal) return 'Certificados';
-  if (showAfiliadosModal) return 'Biblioteca de Produtos';
+  if (showAfiliadosModal) return 'Programa de Afiliados';
   if (showMultiAgentModal) return 'Flow Ultra';
   if (showCreateModal || editingAgent) return 'Criar / Editar Agente';
   if (showImportModal) return 'Importar ChatGPT';
