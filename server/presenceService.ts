@@ -108,23 +108,49 @@ export function parseUserAgent(ua: string | undefined): {
     return { deviceType: 'Desconhecido', operatingSystem: 'Desconhecido', browserName: 'Desconhecido' };
   }
 
-  let deviceType = 'Desktop';
-  if (/mobile|iphone|ipod|android.*mobile/i.test(ua)) deviceType = 'Mobile';
-  else if (/tablet|ipad|android(?!.*mobile)/i.test(ua)) deviceType = 'Tablet';
-
+  // 1. Operating System (Strict Priority Order: iOS > Android > Windows > macOS > ChromeOS > Linux)
   let operatingSystem = 'Desconhecido';
-  if (/windows/i.test(ua)) operatingSystem = 'Windows';
-  else if (/macintosh|mac os x/i.test(ua)) operatingSystem = 'macOS';
-  else if (/android/i.test(ua)) operatingSystem = 'Android';
-  else if (/iphone|ipad|ipod/i.test(ua)) operatingSystem = 'iOS';
-  else if (/linux/i.test(ua)) operatingSystem = 'Linux';
+  if (/iphone|ipad|ipod/i.test(ua)) {
+    operatingSystem = 'iOS';
+  } else if (/android/i.test(ua)) {
+    operatingSystem = 'Android';
+  } else if (/windows|win32|win64/i.test(ua)) {
+    operatingSystem = 'Windows';
+  } else if (/macintosh|mac os x|mac_powerpc/i.test(ua)) {
+    operatingSystem = 'macOS';
+  } else if (/cros/i.test(ua)) {
+    operatingSystem = 'ChromeOS';
+  } else if (/linux/i.test(ua)) {
+    operatingSystem = 'Linux';
+  }
 
-  let browserName = 'Desconhecido';
-  if (/edg/i.test(ua)) browserName = 'Edge';
-  else if (/firefox/i.test(ua)) browserName = 'Firefox';
-  else if (/opera|opr/i.test(ua)) browserName = 'Opera';
-  else if (/chrome|crios/i.test(ua)) browserName = 'Chrome';
-  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browserName = 'Safari';
+  // 2. Device Type (Celular, Tablet, Computador)
+  let deviceType = 'Computador';
+  if (/iphone|ipod|android.*mobile|mobile/i.test(ua)) {
+    deviceType = 'Celular';
+  } else if (/ipad|tablet|android(?!.*mobile)/i.test(ua)) {
+    deviceType = 'Tablet';
+  } else if (/windows|macintosh|mac os x|linux|cros/i.test(ua)) {
+    deviceType = 'Computador';
+  } else {
+    deviceType = 'Desconhecido';
+  }
+
+  // 3. Browser Name (Opera > Edge > Samsung Internet > Chrome > Firefox > Safari > Outros)
+  let browserName = 'Outros';
+  if (/opera|opr/i.test(ua)) {
+    browserName = 'Opera';
+  } else if (/edg/i.test(ua)) {
+    browserName = 'Edge';
+  } else if (/samsungbrowser/i.test(ua)) {
+    browserName = 'Samsung Internet';
+  } else if (/chrome|crios/i.test(ua)) {
+    browserName = 'Chrome';
+  } else if (/firefox|fxios/i.test(ua)) {
+    browserName = 'Firefox';
+  } else if (/safari/i.test(ua) && !/chrome|crios|edg|opr|samsung/i.test(ua)) {
+    browserName = 'Safari';
+  }
 
   return { deviceType, operatingSystem, browserName };
 }
@@ -533,6 +559,10 @@ export interface MemorySession {
   sessionId: string;
   deviceId: string;
   currentPage: string;
+  currentAction?: string;
+  currentAgentId?: string | null;
+  currentAgentName?: string | null;
+  agentCategory?: string | null;
   ipAddress: string;
   userAgent: string;
   deviceType: string;
@@ -931,19 +961,36 @@ export async function recordAgentInteraction(
   studentCode: string | undefined,
   agentId: string,
   agentName: string,
-  category?: string
+  category?: string,
+  actionType: 'AGENT_OPEN' | 'AGENT_MESSAGE' = 'AGENT_MESSAGE'
 ) {
   const norm = normalizeAccessCode(studentCode) || 'ANONYMOUS';
-  const cleanCategory = category || 'Geral';
+  let cleanCategory = category || 'TikTok Shop';
+  if (cleanCategory === 'Agentes GPT') cleanCategory = 'Dashboard';
+  if (cleanCategory === 'Biblioteca de Produtos' && !isMasterKey(norm)) cleanCategory = 'Programa de Afiliados';
+
+  const cleanAgentName = agentName && agentName !== 'Agente GPT' ? agentName : 'Agente Pro';
+  const actionText = actionType === 'AGENT_MESSAGE' ? 'Conversando com agente' : 'Visualizando agente';
   const now = new Date();
 
   memoryAgentInteractions.unshift({
     codigo: norm,
     agentId,
-    agentName,
+    agentName: cleanAgentName,
     category: cleanCategory,
     createdAt: now,
   });
+  if (memoryAgentInteractions.length > 300) memoryAgentInteractions.pop();
+
+  const memSession = memorySessionsMap.get(norm);
+  if (memSession) {
+    memSession.currentPage = cleanCategory;
+    memSession.currentAction = actionText;
+    memSession.currentAgentId = agentId;
+    memSession.currentAgentName = cleanAgentName;
+    memSession.agentCategory = cleanCategory;
+    memSession.lastHeartbeatAt = now;
+  }
 
   if (isDatabaseConfigured()) {
     try {
@@ -951,7 +998,20 @@ export async function recordAgentInteraction(
       await db.query(
         `INSERT INTO interacoes_agentes (codigo, agent_id, agent_name, category, created_at)
          VALUES (?, ?, ?, ?, NOW())`,
-        [norm, agentId, agentName, cleanCategory]
+        [norm, agentId, cleanAgentName, cleanCategory]
+      );
+
+      await db.query(
+        `UPDATE sessoes
+         SET
+           current_page = ?,
+           current_action = ?,
+           current_agent_id = ?,
+           current_agent_name = ?,
+           agent_category = ?,
+           last_heartbeat_at = NOW()
+         WHERE codigo = ?`,
+        [cleanCategory, actionText, agentId, cleanAgentName, cleanCategory, norm]
       );
     } catch (err) {
       console.warn('[recordAgentInteraction DB Warning]:', err);
@@ -1314,71 +1374,163 @@ export async function getCentralPresenceData() {
     return false;
   }).length;
 
-  // 1. Top Categories
-  const categoryCounts: Record<string, number> = {
-    'TikTok Shop': 0,
-    'Flow Ultra': 0,
-    'TikTok 2K': 0,
-    'Suporte': 0,
-    'Grupo Network': 0,
-    'Academia': 0,
-    'Prompts': 0,
-    'Dashboard': 0,
-  };
-  for (const u of allUsers) {
-    const page = u.currentPage || 'TikTok 2K';
-    categoryCounts[page] = (categoryCounts[page] || 0) + 1;
+  // 1. Top Categories (Strict Whitelist Only)
+  const ALLOWED_CATEGORIES = [
+    'TikTok Shop',
+    'TikTok 2K',
+    'Recurso Anti-Violação',
+    'Suporte',
+    'Grupo de Network',
+    'Flow Ultra',
+    'Academia de Desafios',
+    'Prompts de Movimentos',
+    'Programa de Afiliados',
+    'Certificados',
+    'Detalhes do Site',
+    'Dashboard',
+  ];
+
+  const categoryCounts: Record<string, number> = {};
+  for (const cat of ALLOWED_CATEGORIES) {
+    categoryCounts[cat] = 0;
   }
+
+  for (const u of allUsers) {
+    const rawPage = u.currentPage || 'Dashboard';
+    if (categoryCounts[rawPage] !== undefined) {
+      categoryCounts[rawPage]++;
+    } else if (u.agentCategory && categoryCounts[u.agentCategory] !== undefined) {
+      categoryCounts[u.agentCategory]++;
+    } else {
+      categoryCounts['Dashboard']++;
+    }
+  }
+
   const topCategories = Object.entries(categoryCounts)
     .map(([name, count]) => ({ name, count }))
+    .filter((item) => item.count > 0)
     .sort((a, b) => b.count - a.count);
 
-  // 2. Devices distribution
-  const deviceCounts: Record<string, number> = {
+  if (topCategories.length === 0) {
+    topCategories.push({ name: 'TikTok Shop', count: 0 }, { name: 'TikTok 2K', count: 0 });
+  }
+
+  // Top Agentes Reais
+  let topAgents: { name: string; count: number; category: string }[] = [];
+  if (isDatabaseConfigured()) {
+    try {
+      const [agentRows]: any = await db.query(`
+        SELECT agent_name, category, COUNT(*) as count
+        FROM interacoes_agentes
+        WHERE agent_name IS NOT NULL
+          AND agent_name != ''
+          AND agent_name != 'Agente GPT'
+          AND category != 'Agentes GPT'
+          AND codigo NOT LIKE 'MASTER%'
+        GROUP BY agent_name, category
+        ORDER BY count DESC
+        LIMIT 10
+      `);
+      if (Array.isArray(agentRows) && agentRows.length > 0) {
+        topAgents = agentRows.map((r: any) => ({
+          name: r.agent_name,
+          count: Number(r.count),
+          category: r.category || 'TikTok Shop',
+        }));
+      }
+    } catch (e) {}
+  }
+
+  if (topAgents.length === 0 && memoryAgentInteractions.length > 0) {
+    const agentMap = new Map<string, { count: number; category: string }>();
+    for (const item of memoryAgentInteractions) {
+      if (!item.agentName || item.agentName === 'Agente GPT' || item.category === 'Agentes GPT') continue;
+      const existing = agentMap.get(item.agentName) || { count: 0, category: item.category || 'TikTok Shop' };
+      existing.count += 1;
+      agentMap.set(item.agentName, existing);
+    }
+    topAgents = Array.from(agentMap.entries())
+      .map(([name, val]) => ({ name, count: val.count, category: val.category }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }
+
+  // 2. Sistemas Operacionais (Windows, macOS, Android, iOS, Linux, ChromeOS)
+  const osCounts: Record<string, number> = {
     Windows: 0,
+    macOS: 0,
     Android: 0,
-    iPhone: 0,
-    Mac: 0,
+    iOS: 0,
     Linux: 0,
-    Outro: 0,
+    ChromeOS: 0,
   };
   for (const u of allUsers) {
-    const os = (u.operatingSystem || '').toLowerCase();
-    const dev = (u.deviceType || '').toLowerCase();
-    if (os.includes('win')) deviceCounts.Windows++;
-    else if (os.includes('android') || dev.includes('mobile')) deviceCounts.Android++;
-    else if (os.includes('ios') || os.includes('iphone') || os.includes('ipad')) deviceCounts.iPhone++;
-    else if (os.includes('mac')) deviceCounts.Mac++;
-    else if (os.includes('linux')) deviceCounts.Linux++;
-    else deviceCounts.Outro++;
+    const os = u.operatingSystem || 'Desconhecido';
+    if (osCounts[os] !== undefined) {
+      osCounts[os]++;
+    } else {
+      if (/ios/i.test(os)) osCounts.iOS++;
+      else if (/android/i.test(os)) osCounts.Android++;
+      else if (/win/i.test(os)) osCounts.Windows++;
+      else if (/mac/i.test(os)) osCounts.macOS++;
+      else if (/linux/i.test(os)) osCounts.Linux++;
+      else if (/chrome/i.test(os)) osCounts.ChromeOS++;
+      else osCounts.Windows++;
+    }
   }
-  const totalDevs = Math.max(1, allUsers.length);
-  const devices = Object.entries(deviceCounts).map(([name, count]) => ({
+  const totalOs = Math.max(1, allUsers.length);
+  const operatingSystems = Object.entries(osCounts).map(([name, count]) => ({
     name,
     count,
-    percentage: Math.round((count / totalDevs) * 100),
+    percentage: Math.round((count / totalOs) * 100),
   }));
 
-  // 3. Browsers distribution
-  const browserCounts: Record<string, number> = {
-    Chrome: 0,
-    Edge: 0,
-    Safari: 0,
-    Firefox: 0,
-    Opera: 0,
+  // 3. Tipos de Dispositivo (Computador, Celular, Tablet)
+  const devTypeCounts: Record<string, number> = {
+    Computador: 0,
+    Celular: 0,
+    Tablet: 0,
   };
   for (const u of allUsers) {
-    const br = (u.browserName || '').toLowerCase();
-    if (br.includes('chrome')) browserCounts.Chrome++;
-    else if (br.includes('edge')) browserCounts.Edge++;
-    else if (br.includes('safari')) browserCounts.Safari++;
-    else if (br.includes('firefox')) browserCounts.Firefox++;
-    else if (br.includes('opera')) browserCounts.Opera++;
-    else browserCounts.Chrome++;
+    const dt = u.deviceType || 'Computador';
+    if (dt === 'Celular' || dt === 'Mobile') devTypeCounts.Celular++;
+    else if (dt === 'Tablet') devTypeCounts.Tablet++;
+    else devTypeCounts.Computador++;
   }
+  const totalDevTypes = Math.max(1, allUsers.length);
+  const deviceTypes = Object.entries(devTypeCounts).map(([name, count]) => ({
+    name,
+    count,
+    percentage: Math.round((count / totalDevTypes) * 100),
+  }));
+
+  // 4. Navegadores (Chrome, Safari, Edge, Firefox, Opera, Samsung Internet, Outros)
+  const browserCounts: Record<string, number> = {
+    Chrome: 0,
+    Safari: 0,
+    Edge: 0,
+    Firefox: 0,
+    Opera: 0,
+    'Samsung Internet': 0,
+    Outros: 0,
+  };
+  for (const u of allUsers) {
+    const br = u.browserName || 'Outros';
+    if (browserCounts[br] !== undefined) {
+      browserCounts[br]++;
+    } else if (br.includes('Chrome')) browserCounts.Chrome++;
+    else if (br.includes('Safari')) browserCounts.Safari++;
+    else if (br.includes('Edge')) browserCounts.Edge++;
+    else if (br.includes('Firefox')) browserCounts.Firefox++;
+    else if (br.includes('Opera')) browserCounts.Opera++;
+    else if (br.includes('Samsung')) browserCounts['Samsung Internet']++;
+    else browserCounts.Outros++;
+  }
+  const totalBrowsers = Math.max(1, allUsers.length);
   const browsers = Object.entries(browserCounts).map(([name, count]) => ({
     name,
     count,
+    percentage: Math.round((count / totalBrowsers) * 100),
   }));
 
   // 4. Logins today by hour
@@ -1515,7 +1667,10 @@ export async function getCentralPresenceData() {
       accessesToday,
       mentorOnline: true,
       topCategories,
-      devices,
+      topAgents,
+      operatingSystems,
+      deviceTypes,
+      devices: deviceTypes,
       browsers,
       loginsToday: hourlyLogins,
       longestSessions,

@@ -111,9 +111,13 @@ export async function ensureSessionsTable(): Promise<void> {
     const alterQueries = [
       `ALTER TABLE sessoes ADD COLUMN id INT AUTO_INCREMENT UNIQUE KEY`,
       `ALTER TABLE sessoes ADD COLUMN current_page VARCHAR(255) DEFAULT 'TikTok 2K'`,
+      `ALTER TABLE sessoes ADD COLUMN current_action VARCHAR(255) DEFAULT 'Visualizando'`,
+      `ALTER TABLE sessoes ADD COLUMN current_agent_id VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE sessoes ADD COLUMN current_agent_name VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE sessoes ADD COLUMN agent_category VARCHAR(255) DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN ip_address VARCHAR(100) DEFAULT NULL`,
       `ALTER TABLE sessoes ADD COLUMN user_agent TEXT DEFAULT NULL`,
-      `ALTER TABLE sessoes ADD COLUMN device_type VARCHAR(50) DEFAULT 'Desktop'`,
+      `ALTER TABLE sessoes ADD COLUMN device_type VARCHAR(50) DEFAULT 'Computador'`,
       `ALTER TABLE sessoes ADD COLUMN browser_name VARCHAR(50) DEFAULT 'Desconhecido'`,
       `ALTER TABLE sessoes ADD COLUMN operating_system VARCHAR(50) DEFAULT 'Desconhecido'`,
       `ALTER TABLE sessoes ADD COLUMN login_at DATETIME DEFAULT NULL`,
@@ -123,6 +127,10 @@ export async function ensureSessionsTable(): Promise<void> {
       `ALTER TABLE sessoes ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
       `ALTER TABLE sessoes ADD INDEX idx_sessoes_active_session (active_session_id)`,
       `ALTER TABLE sessoes ADD INDEX idx_sessoes_current_page (current_page)`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_current_agent_id (current_agent_id)`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_operating_system (operating_system)`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_device_type (device_type)`,
+      `ALTER TABLE sessoes ADD INDEX idx_sessoes_browser_name (browser_name)`,
       `ALTER TABLE sessoes ADD INDEX idx_sessoes_status (status)`,
       `ALTER TABLE sessoes ADD INDEX idx_sessoes_heartbeat (last_heartbeat_at)`,
       `ALTER TABLE sessoes ADD INDEX idx_sessoes_updated (updated_at)`,
@@ -135,7 +143,9 @@ export async function ensureSessionsTable(): Promise<void> {
     await ensureCodigosAcessoTable();
     await ensureAdminAccessTable();
     await ensureSessionHistoryTable();
+    await ensureAgentInteractionsTable();
     await cleanLegacyDisconnections();
+    await migrateLegacyStatsAndPages();
   } catch (err: any) {
     console.warn('[MySQL ensureSessionsTable Error]:', err?.message || err);
   }
@@ -167,9 +177,15 @@ export async function ensureSessionHistoryTable(): Promise<void> {
 
     const alterHistQueries = [
       `ALTER TABLE session_history ADD COLUMN category VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE session_history ADD COLUMN current_action VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE session_history ADD COLUMN agent_id VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE session_history ADD COLUMN agent_name VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE session_history ADD COLUMN agent_category VARCHAR(255) DEFAULT NULL`,
       `ALTER TABLE session_history ADD COLUMN browser VARCHAR(255) DEFAULT NULL`,
       `ALTER TABLE session_history ADD COLUMN mentor_responsavel VARCHAR(100) DEFAULT NULL`,
       `ALTER TABLE session_history ADD INDEX idx_hist_page (page)`,
+      `ALTER TABLE session_history ADD INDEX idx_hist_agent_id (agent_id)`,
+      `ALTER TABLE session_history ADD INDEX idx_hist_agent_cat (agent_category)`,
     ];
     for (const q of alterHistQueries) {
       await db.query(q).catch(() => {});
@@ -177,6 +193,75 @@ export async function ensureSessionHistoryTable(): Promise<void> {
   } catch (err: any) {
     console.warn('[MySQL ensureSessionHistoryTable Error]:', err?.message || err);
   }
+}
+
+export async function migrateLegacyStatsAndPages(): Promise<{
+  agentesGptSessoes: number;
+  agentesGptHistory: number;
+  agentesGptInteracoes: number;
+  bibliotecaAfiliadosSessoes: number;
+  bibliotecaAfiliadosHistory: number;
+}> {
+  const result = {
+    agentesGptSessoes: 0,
+    agentesGptHistory: 0,
+    agentesGptInteracoes: 0,
+    bibliotecaAfiliadosSessoes: 0,
+    bibliotecaAfiliadosHistory: 0,
+  };
+
+  if (!isDatabaseConfigured()) return result;
+
+  try {
+    // 1. Agentes GPT in sessoes -> Dashboard
+    const [res1]: any = await db.query(
+      `UPDATE sessoes SET current_page = 'Dashboard' WHERE current_page = 'Agentes GPT'`
+    ).catch(() => [null]);
+    result.agentesGptSessoes = res1?.affectedRows || 0;
+
+    // 2. Agentes GPT in session_history -> Dashboard
+    const [res2]: any = await db.query(
+      `UPDATE session_history SET page = 'Dashboard' WHERE page = 'Agentes GPT'`
+    ).catch(() => [null]);
+    const [res2cat]: any = await db.query(
+      `UPDATE session_history SET category = 'Dashboard' WHERE category = 'Agentes GPT'`
+    ).catch(() => [null]);
+    result.agentesGptHistory = (res2?.affectedRows || 0) + (res2cat?.affectedRows || 0);
+
+    // 3. Agentes GPT in interacoes_agentes -> Dashboard
+    const [res3]: any = await db.query(
+      `UPDATE interacoes_agentes SET category = 'Dashboard' WHERE category = 'Agentes GPT'`
+    ).catch(() => [null]);
+    result.agentesGptInteracoes = res3?.affectedRows || 0;
+
+    // 4. Biblioteca de Produtos wrongly set for student sessoes -> Programa de Afiliados
+    const [res4]: any = await db.query(
+      `UPDATE sessoes SET current_page = 'Programa de Afiliados' WHERE current_page = 'Biblioteca de Produtos' AND codigo NOT LIKE 'MASTER%'`
+    ).catch(() => [null]);
+    result.bibliotecaAfiliadosSessoes = res4?.affectedRows || 0;
+
+    // 5. Biblioteca de Produtos in session_history for students -> Programa de Afiliados
+    const [res5]: any = await db.query(
+      `UPDATE session_history SET page = 'Programa de Afiliados' WHERE page = 'Biblioteca de Produtos' AND codigo NOT LIKE 'MASTER%'`
+    ).catch(() => [null]);
+    const [res5cat]: any = await db.query(
+      `UPDATE session_history SET category = 'Programa de Afiliados' WHERE category = 'Biblioteca de Produtos' AND codigo NOT LIKE 'MASTER%'`
+    ).catch(() => [null]);
+    result.bibliotecaAfiliadosHistory = (res5?.affectedRows || 0) + (res5cat?.affectedRows || 0);
+
+    if (
+      result.agentesGptSessoes > 0 ||
+      result.agentesGptHistory > 0 ||
+      result.bibliotecaAfiliadosSessoes > 0 ||
+      result.bibliotecaAfiliadosHistory > 0
+    ) {
+      console.log('[MIGRATION STATS COMPLETED]', result);
+    }
+  } catch (err: any) {
+    console.warn('[Migration Warning]:', err?.message || err);
+  }
+
+  return result;
 }
 
 export async function cleanLegacyDisconnections(): Promise<void> {
