@@ -880,14 +880,50 @@ apiRouter.post('/chat', async (req, res) => {
       req.headers['x-student-access-code'];
     const agId = req.body?.agentId || req.body?.agent?.id || 'agente-gpt';
     const agName = req.body?.agentName || req.body?.agent?.name || 'Agente GPT';
-    const agCategory = req.body?.category || req.body?.agent?.category || 'Geral';
+    const agCategory = req.body?.category || req.body?.agent?.category || 'TikTok Shop';
 
-    recordAgentInteraction(String(studentCode || ''), String(agId), String(agName), String(agCategory));
+    recordAgentInteraction(
+      String(studentCode || ''),
+      String(agId),
+      String(agName),
+      String(agCategory),
+      'AGENT_MESSAGE'
+    );
 
     res.json({ reply: replyText });
   } catch (err: any) {
     console.error('Error in /api/chat:', err);
     return handleGeminiError(err, res);
+  }
+});
+
+// Endpoint for recording agent interactions (open agent / message sent)
+apiRouter.post('/presence/agent-event', async (req, res) => {
+  try {
+    const studentCode =
+      req.body?.accessCode ??
+      req.body?.studentAccessCode ??
+      req.body?.accessKey ??
+      req.body?.code ??
+      req.headers['x-access-code'] ??
+      req.headers['x-student-access-code'];
+    const agId = req.body?.agentId || 'agente-pro';
+    const agName = req.body?.agentName || 'Agente Pro';
+    const agCategory = req.body?.agentCategory || req.body?.category || 'TikTok Shop';
+    const actionType = req.body?.action === 'AGENT_OPEN' ? 'AGENT_OPEN' : 'AGENT_MESSAGE';
+
+    await recordAgentInteraction(
+      String(studentCode || ''),
+      String(agId),
+      String(agName),
+      String(agCategory),
+      actionType
+    );
+
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('Error in /api/presence/agent-event:', err);
+    res.status(500).json({ error: 'FAILED_TO_RECORD_AGENT_EVENT' });
   }
 });
 
