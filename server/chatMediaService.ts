@@ -47,7 +47,19 @@ export async function processAndUploadMedia(params: UploadMediaParams): Promise<
       return { success: false, error: 'Nenhum dado de mídia foi enviado.' };
     }
 
-    const cleanBase64 = String(base64).replace(/^data:[^;]+;base64,/, '');
+    const rawBase64 = String(base64).trim();
+
+    const cleanBase64 = rawBase64.startsWith('data:')
+      ? rawBase64.slice(rawBase64.indexOf(',') + 1)
+      : rawBase64;
+
+    if (!cleanBase64 || cleanBase64.length < 20) {
+      return {
+        success: false,
+        error: 'INVALID_BASE64: Conteúdo de mídia ausente ou inválido.',
+      };
+    }
+
     const buffer = Buffer.from(cleanBase64, 'base64');
 
     console.log('[AUDIO BACKEND BUFFER]', {
