@@ -356,7 +356,7 @@ export async function createChatProfile(
       if (err?.code === 'ER_DUP_ENTRY') {
         return { success: false, error: 'Nickname ou chave já em uso.' };
       }
-      return { success: false, error: 'Erro ao criar perfil de chat no banco de dados.' };
+      return { success: false, error: 'Não foi possível salvar o perfil.' };
     }
   }
 
@@ -439,7 +439,7 @@ export async function updateChatProfile(
       return { success: true, profile: rows[0] };
     } catch (err) {
       console.error('[updateChatProfile Error]:', err);
-      return { success: false, error: 'Erro ao atualizar perfil.' };
+      return { success: false, error: 'Não foi possível atualizar a foto do perfil.' };
     }
   }
 
