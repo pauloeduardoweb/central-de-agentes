@@ -65,6 +65,7 @@ export const ChatProfileModal: React.FC<ChatProfileModalProps> = ({
   const countryDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setError(null);
     if (initialProfile) {
       if (initialProfile.nickname) setNickname(initialProfile.nickname);
       if (initialProfile.photo_url !== undefined) setPhotoUrl(initialProfile.photo_url);

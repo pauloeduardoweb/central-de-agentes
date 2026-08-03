@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Crown, Reply, MoreVertical, Edit2, Trash2, Flag, Pin, CheckCheck, Check, Lock, Copy, ArrowDown, Star, Share2 } from 'lucide-react';
+import { Crown, Reply, Smile, Edit2, Trash2, Flag, Pin, CheckCheck, Check, Lock, Copy, ArrowDown, Star, Share2 } from 'lucide-react';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
 import { resolveChatMediaUrl, getSafeImageUrl } from '../../utils/chatMediaUrl';
 import { ReactionsBar, ReactionItem } from './ReactionsBar';
@@ -107,7 +107,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   onHashtagClick,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+  const [activeEmojiPickerId, setActiveEmojiPickerId] = useState<number | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [readReceiptsMsg, setReadReceiptsMsg] = useState<ChatMessage | null>(null);
@@ -417,7 +417,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
 
                 {/* Message Bubble Container */}
                 <div
-                  className={`relative max-w-[88%] md:max-w-[78%] lg:max-w-[70%] rounded-2xl px-3.5 py-2 text-xs shadow-xs transition-all ${
+                  className={`relative max-w-[88%] md:max-w-[78%] lg:max-w-[70%] rounded-2xl px-3 py-1.5 text-xs shadow-xs transition-all ${
                     isMentorAuthor
                       ? 'bg-[#FFF7D6] border border-[#E5C14A] text-[#3B3100]'
                       : isSelf
@@ -427,7 +427,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                 >
                   {/* Reply Context (If replying to another message) */}
                   {msg.reply_to && (
-                    <div className={`mb-1.5 p-2 rounded-lg border-l-4 border-[#00A884] text-[11px] ${
+                    <div className={`mb-1 p-1.5 rounded-lg border-l-4 border-[#00A884] text-[11px] ${
                       isSelf ? 'bg-[#C2F2BB] text-[#111B21]' : 'bg-[#F0F2F5] text-[#111B21]'
                     }`}>
                       <span className="font-bold text-[#00A884] block text-[10px]">
@@ -439,36 +439,161 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                     </div>
                   )}
 
-                  {/* Header: Author Nickname & Badges (Shown on first message of a group) */}
-                  {!isGrouped && (
-                    <div className="flex items-center space-x-1.5 mb-1">
-                      <button
-                        onClick={() => authorId && onViewProfile(authorId)}
-                        className={`font-bold hover:underline text-[12px] ${
-                          isMentorAuthor ? 'text-[#8A6500]' : 'text-[#111B21]'
-                        }`}
-                      >
-                        {authorNick}
-                      </button>
+                  {/* Header Row: Author Name, Badges, Reaction, Favorite & Hover Actions */}
+                  <div className="flex items-center justify-between gap-1.5 mb-0.5 min-w-[120px]">
+                    {!isGrouped ? (
+                      <div className="flex items-center space-x-1.5 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => authorId && onViewProfile(authorId)}
+                          className={`font-bold hover:underline text-[12px] truncate cursor-pointer ${
+                            isMentorAuthor ? 'text-[#8A6500]' : 'text-[#111B21]'
+                          }`}
+                        >
+                          {authorNick}
+                        </button>
 
-                      {isMentorAuthor && (
-                        <span className="bg-[#F5D75C] text-[#4A3900] border border-[#E5C14A] text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                          <Crown className="w-2.5 h-2.5 text-[#8A6500]" />
-                          MENTOR OFICIAL
-                        </span>
-                      )}
-                    </div>
-                  )}
+                        {isMentorAuthor && (
+                          <span className="bg-[#F5D75C] text-[#4A3900] border border-[#E5C14A] text-[9px] font-bold px-1.5 py-0.2 rounded flex items-center gap-1 shrink-0">
+                            <Crown className="w-2.5 h-2.5 text-[#8A6500]" />
+                            MENTOR
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div />
+                    )}
 
-                  {/* Highlighted Message Badge (Item 8) */}
+                    {/* Header Action Tools: Reaction Smile, Personal Favorite, Reply, Edit, Delete, Pin, Report */}
+                    {!isDeleted && (
+                      <div className="flex items-center space-x-1 shrink-0 select-none">
+                        {/* Reaction Smile Trigger Button beside author name */}
+                        {onReact && (
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveEmojiPickerId(activeEmojiPickerId === msg.id ? null : msg.id);
+                              }}
+                              className="p-0.5 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer rounded"
+                              title="Reagir"
+                            >
+                              <Smile className="w-3.5 h-3.5" />
+                            </button>
+
+                            {activeEmojiPickerId === msg.id && (
+                              <div
+                                className={`absolute top-5 ${isSelf ? 'right-0' : 'left-0'} z-40 bg-[#111b21] border border-slate-700/80 rounded-2xl p-1 shadow-xl flex items-center space-x-1 animate-scale-in`}
+                                onMouseLeave={() => setActiveEmojiPickerId(null)}
+                              >
+                                {['👍', '❤️', '😂', '😮', '👏', '🔥'].map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => {
+                                      onReact(msg.id, emoji);
+                                      setActiveEmojiPickerId(null);
+                                    }}
+                                    className="p-1 text-base hover:scale-125 transition-transform active:scale-95 cursor-pointer"
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Personal Favorite Star button (only yellow for this user) */}
+                        {onToggleFavorite && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleFavorite(msg.id);
+                            }}
+                            className={`p-0.5 transition-colors cursor-pointer rounded ${
+                              msg.is_favorite
+                                ? 'text-amber-500 opacity-100'
+                                : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-amber-500'
+                            }`}
+                            title={msg.is_favorite ? 'Remover das Favoritas' : 'Favoritar Mensagem'}
+                          >
+                            <Star className={`w-3.5 h-3.5 ${msg.is_favorite ? 'fill-amber-400' : ''}`} />
+                          </button>
+                        )}
+
+                        {/* Reply button on hover */}
+                        <button
+                          type="button"
+                          onClick={() => onReply(msg)}
+                          className="p-0.5 text-slate-400 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                          title="Responder"
+                        >
+                          <Reply className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Owner Edit button on hover */}
+                        {isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => onEdit(msg)}
+                            className="p-0.5 text-slate-400 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        )}
+
+                        {/* Mentor Pin button on hover */}
+                        {isMentor && onPinMessage && (
+                          <button
+                            type="button"
+                            onClick={() => onPinMessage(msg)}
+                            className="p-0.5 text-slate-400 hover:text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                            title="Fixar no topo"
+                          >
+                            <Pin className="w-3 h-3" />
+                          </button>
+                        )}
+
+                        {/* Owner or Mentor Delete button on hover */}
+                        {(isSelf || isMentor) && (
+                          <button
+                            type="button"
+                            onClick={() => onDelete(msg)}
+                            className="p-0.5 text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+
+                        {/* Report button on hover for other users */}
+                        {!isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => onReport(msg)}
+                            className="p-0.5 text-slate-400 hover:text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                            title="Denunciar"
+                          >
+                            <Flag className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Highlighted Message Badge */}
                   {(msg.is_highlight || (msg.reactions && msg.reactions.reduce((acc, r) => acc + r.count, 0) >= 3)) && (
-                    <div className="my-1 px-2 py-0.5 rounded-md bg-[#FFF4C6] border border-[#FDE68A] text-[#715B00] font-bold text-[10px] inline-flex items-center gap-1 shadow-xs animate-pulse">
+                    <div className="my-0.5 px-1.5 py-0.2 rounded-md bg-[#FFF4C6] border border-[#FDE68A] text-[#715B00] font-bold text-[9px] inline-flex items-center gap-1 shadow-xs animate-pulse">
                       <span>🔥 Mensagem em destaque</span>
                     </div>
                   )}
 
                   {/* Message Content: Image, Audio, Sticker, GIF, or Text */}
-                  <div className="break-words whitespace-pre-wrap text-[13px] leading-relaxed select-text">
+                  <div className="break-words whitespace-pre-wrap text-[13px] leading-snug select-text">
                     {isDeleted ? (
                       <span className="italic text-[#667781] flex items-center gap-1 text-[11px]">
                         <Trash2 className="w-3 h-3 text-[#667781]" />
@@ -481,7 +606,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                         const stickerUrl = resolveChatMediaUrl(msg.image_url || getSafeImageUrl(msg));
                         if (stickerUrl) {
                           return (
-                            <div className="my-1 flex flex-col items-center select-none">
+                            <div className="my-0.5 flex flex-col items-center select-none">
                               <img
                                 src={stickerUrl}
                                 alt={msg.content || 'Sticker'}
@@ -494,7 +619,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                           );
                         }
                         return (
-                          <div className="my-1 px-3 py-2 bg-[#F0F2F5] border border-[#DADDE1] rounded-2xl flex items-center space-x-2 text-center shadow-xs">
+                          <div className="my-0.5 px-2.5 py-1.5 bg-[#F0F2F5] border border-[#DADDE1] rounded-2xl flex items-center space-x-2 text-center shadow-xs">
                             <span className="text-3xl select-none">{msg.image_url || '🔥'}</span>
                             <span className="text-xs font-bold text-[#00A884]">{msg.content ? msg.content.replace(/^.*?Sticker:\s*/i, '') : 'Sticker'}</span>
                           </div>
@@ -505,7 +630,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                         const gifUrl = getSafeImageUrl(msg) || resolveChatMediaUrl(msg.image_url);
                         if (gifUrl) {
                           return (
-                            <div className="rounded-xl overflow-hidden border border-[#DADDE1] max-w-xs my-1 relative bg-black/5">
+                            <div className="rounded-xl overflow-hidden border border-[#DADDE1] max-w-xs my-0.5 relative bg-black/5">
                               <img
                                 src={gifUrl}
                                 alt="GIF"
@@ -526,7 +651,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                           );
                         }
                         return (
-                          <div className="p-3 bg-[#F0F2F5] rounded-xl text-center border border-[#DADDE1] my-1">
+                          <div className="p-2 bg-[#F0F2F5] rounded-xl text-center border border-[#DADDE1] my-0.5">
                             <span className="text-xs text-[#54656F] italic">🎬 GIF indisponível</span>
                           </div>
                         );
@@ -559,7 +684,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   </div>
 
                   {/* Footer Meta: Time, Edited Tag & Status */}
-                  <div className="flex items-center justify-end space-x-1.5 mt-1 text-[10px] text-[#667781] select-none">
+                  <div className="flex items-center justify-end space-x-1 mt-0.5 text-[10px] text-[#667781] select-none leading-none">
                     {msg.edited_at && !isDeleted && <span className="italic text-[9px]">editada</span>}
                     <span>{formatTime(msg.created_at)}</span>
                     {isSelf && !isDeleted && (
@@ -578,112 +703,15 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                     )}
                   </div>
 
-                  {/* Reactions & Favorites Bar */}
+                  {/* Reactions Bar (Public active reaction counters) */}
                   {!isDeleted && onReact && (
                     <ReactionsBar
                       messageId={msg.id}
                       reactions={msg.reactions}
-                      isFavorite={msg.is_favorite}
                       isHighlight={msg.is_highlight}
                       onReact={onReact}
-                      onToggleFavorite={onToggleFavorite}
                     />
                   )}
-
-                  {/* Context Action Menu Trigger Button */}
-                  {!isDeleted && msg.message_type !== 'AUDIO' && (
-                    <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => setActiveMenuId(activeMenuId === msg.id ? null : msg.id)}
-                        className="p-1 rounded-full bg-[#F0F2F5] text-[#54656F] hover:text-[#111B21] transition-colors shadow-xs"
-                      >
-                        <MoreVertical className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Dropdown Menu Popup */}
-                      {activeMenuId === msg.id && (
-                        <div
-                          className="absolute right-0 top-6 z-30 w-40 bg-[#FFFFFF] border border-[#DADDE1] rounded-xl shadow-xl py-1 text-[11px] text-[#111B21]"
-                          onMouseLeave={() => setActiveMenuId(null)}
-                        >
-                          <button
-                            onClick={() => {
-                              onReply(msg);
-                              setActiveMenuId(null);
-                            }}
-                            className="w-full px-3 py-1.5 text-left hover:bg-[#F0F2F5] flex items-center space-x-2 text-[#00A884]"
-                          >
-                            <Reply className="w-3.5 h-3.5" />
-                            <span>Responder</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              copyToClipboard(msg);
-                              setActiveMenuId(null);
-                            }}
-                            className="w-full px-3 py-1.5 text-left hover:bg-[#F0F2F5] flex items-center space-x-2 text-[#111B21]"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>{copiedId === msg.id ? 'Copiado!' : 'Copiar Texto'}</span>
-                          </button>
-
-                          {isMentor && onPinMessage && (
-                            <button
-                              onClick={() => {
-                                onPinMessage(msg);
-                                setActiveMenuId(null);
-                              }}
-                              className="w-full px-3 py-1.5 text-left hover:bg-[#F0F2F5] flex items-center space-x-2 text-[#8A6500]"
-                            >
-                              <Pin className="w-3.5 h-3.5" />
-                              <span>Fixar no topo</span>
-                            </button>
-                          )}
-
-                          {isSelf && (
-                            <button
-                              onClick={() => {
-                                onEdit(msg);
-                                setActiveMenuId(null);
-                              }}
-                              className="w-full px-3 py-1.5 text-left hover:bg-[#F0F2F5] flex items-center space-x-2 text-[#00A884]"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                              <span>Editar</span>
-                            </button>
-                          )}
-
-                          {(isSelf || isMentor) && (
-                            <button
-                              onClick={() => {
-                                onDelete(msg);
-                                setActiveMenuId(null);
-                              }}
-                              className="w-full px-3 py-1.5 text-left hover:bg-[#F0F2F5] flex items-center space-x-2 text-rose-600"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Excluir</span>
-                            </button>
-                          )}
-
-                          {!isSelf && (
-                            <button
-                              onClick={() => {
-                                onReport(msg);
-                                setActiveMenuId(null);
-                              }}
-                              className="w-full px-3 py-1.5 text-left hover:bg-[#F0F2F5] flex items-center space-x-2 text-amber-600"
-                            >
-                              <Flag className="w-3.5 h-3.5" />
-                              <span>Denunciar</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                 </div>
 
                 {/* Author Avatar (Right side for own messages) */}

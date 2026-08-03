@@ -624,6 +624,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   // Profile photo upload handler
   const handleUploadAvatar = async (file: File) => {
     try {
+      const isCreateMode = !profile?.id;
+      const endpoint = isCreateMode
+        ? '/api/chat/upload-onboarding-photo'
+        : '/api/chat/upload-profile-photo';
+
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
@@ -632,7 +637,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
       });
       const base64 = await base64Promise;
 
-      const res = await chatApiFetch('/api/chat/upload-profile-photo', {
+      const res = await chatApiFetch(endpoint, {
         method: 'POST',
         body: {
           base64,
@@ -653,7 +658,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
       }
       return {
         success: false,
-        error: res.data?.message || res.error || 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.',
+        error: 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.',
       };
     } catch (err: any) {
       return { success: false, error: 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.' };
