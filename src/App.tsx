@@ -217,11 +217,17 @@ export default function App() {
     mentorTab,
   ]);
 
-  // Heartbeat loop every 3 seconds & immediate presence update on page transition
+  // Heartbeat loop every 30 seconds & immediate presence update on page transition
   useEffect(() => {
     if (!studentCode || !sessionId) return;
 
+    let isSending = false;
+
     const sendHeartbeat = async () => {
+      if (document.visibilityState === 'hidden') return;
+      if (isSending) return;
+      isSending = true;
+
       try {
         const deviceId = getDeviceId();
         console.log('[HEARTBEAT CURRENT PAGE]', currentPageLabel);
@@ -309,6 +315,8 @@ export default function App() {
         }
       } catch (err) {
         console.warn('[Heartbeat] Network error ignored (keeping session intact):', err);
+      } finally {
+        isSending = false;
       }
     };
 
@@ -323,7 +331,7 @@ export default function App() {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    const interval = setInterval(sendHeartbeat, 3000); // 3 seconds heartbeat
+    const interval = setInterval(sendHeartbeat, 30000); // 30 seconds heartbeat
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
