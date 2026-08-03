@@ -22,7 +22,7 @@ interface ChatProfileModalProps {
     phone: string;
     phone_visibility: 'MENTOR_ONLY' | 'MEMBERS';
     accept_rules: boolean;
-  }) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<{ success: boolean; error?: string; field?: string; message?: string }>;
   onUploadAvatar?: (file: File) => Promise<{ success: boolean; photoUrl?: string; error?: string }>;
   initialProfile?: {
     nickname?: string;
@@ -220,7 +220,7 @@ export const ChatProfileModal: React.FC<ChatProfileModalProps> = ({
       });
 
       if (!result.success) {
-        setError(result.error || 'Erro ao registrar perfil.');
+        setError(result.message || result.error || 'Erro ao registrar perfil.');
       } else {
         onClose();
       }

@@ -517,19 +517,32 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     profile.chat_status !== 'BANNED'
   );
 
+  const isPollingRef = useRef<boolean>(false);
+
   useEffect(() => {
     if (hasValidChatProfile && activeRoomId) {
       fetchMessages(activeRoomId);
       fetchPoll();
 
-      // Polling every 2.5s for real-time messages, typing status, and notification badge
-      const interval = setInterval(() => {
-        fetchMessages(activeRoomId, true);
-        fetchTypingUsers();
-        fetchOnlineMembers();
-        fetchPoll();
-        fetchUnreadNotificationCount();
-      }, 2500);
+      // Polling every 12s for real-time messages and status with visibility & concurrency guards
+      const interval = setInterval(async () => {
+        if (document.visibilityState === 'hidden') return;
+        if (isPollingRef.current) return;
+        isPollingRef.current = true;
+
+        try {
+          await Promise.allSettled([
+            fetchMessages(activeRoomId, true),
+            fetchTypingUsers(),
+            fetchOnlineMembers(),
+            fetchPoll(),
+            fetchUnreadNotificationCount(),
+          ]);
+        } catch (e) {
+        } finally {
+          isPollingRef.current = false;
+        }
+      }, 12000);
 
       return () => clearInterval(interval);
     }
@@ -595,11 +608,16 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         fetchMessages(activeRoomId);
         return { success: true, profile: newProf };
       }
-      const customErr = result.error || result.message || (isUpdateMode ? 'Não foi possível atualizar a foto do perfil.' : 'Não foi possível salvar o perfil.');
-      return { success: false, error: customErr };
+      const customErr = result.message || result.error || (isUpdateMode ? 'Não foi possível atualizar o perfil.' : 'Não foi possível salvar o perfil.');
+      return {
+        success: false,
+        error: customErr,
+        field: result.field,
+        message: customErr,
+      };
     } catch (err: any) {
       console.error('[handleProfileSubmit Error]:', err);
-      return { success: false, error: 'Sessão expirada. Entre novamente.' };
+      return { success: false, error: 'Erro de conexão ao salvar o perfil.' };
     }
   };
 
