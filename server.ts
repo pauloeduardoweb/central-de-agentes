@@ -1992,7 +1992,7 @@ apiRouter.put(['/chat/messages/:messageId', '/api/chat/messages/:messageId'], as
     if (!result.success) {
       return res.status(400).json({ error: 'EDIT_FAILED', message: result.error });
     }
-    return res.json({ success: true });
+    return res.json({ success: true, message: result.message });
   } catch (err: any) {
     console.error('[PUT /api/chat/messages/:messageId Error]:', err);
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao editar mensagem.' });
