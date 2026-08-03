@@ -1720,7 +1720,7 @@ apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', 
   try {
     const { accessCode } = extractChatCredentials(req);
     if (!accessCode) {
-      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão expirada. Entre novamente.' });
     }
     const { profile } = await getProfileBySessionCode(accessCode);
     if (!profile) {
@@ -1742,7 +1742,10 @@ apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', 
     } else if (req.body && typeof req.body === 'object') {
       const { base64, mime: bodyMime } = req.body;
       if (base64 && typeof base64 === 'string') {
-        const cleanBase64 = base64.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+        const rawBase64 = String(base64).trim();
+        const cleanBase64 = rawBase64.startsWith('data:')
+          ? rawBase64.slice(rawBase64.indexOf(',') + 1)
+          : rawBase64;
         buffer = Buffer.from(cleanBase64, 'base64');
         if (bodyMime) mime = bodyMime;
       }
@@ -1764,7 +1767,7 @@ apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', 
     });
 
     if (!uploadResult.success || !uploadResult.media) {
-      return res.status(400).json({ error: 'UPLOAD_FAILED', message: uploadResult.error || 'Erro no upload do avatar.' });
+      return res.status(400).json({ error: 'UPLOAD_FAILED', message: uploadResult.error || 'Não foi possível atualizar a foto do perfil.' });
     }
 
     const photoUrl = uploadResult.media.url;
@@ -1783,7 +1786,7 @@ apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', 
     });
   } catch (err: any) {
     console.error('[POST /api/chat/upload-profile-photo Error]:', err);
-    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao processar e salvar foto de perfil.' });
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Não foi possível atualizar a foto do perfil.' });
   }
 });
 
