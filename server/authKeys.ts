@@ -256,6 +256,10 @@ export function lookupKeyType(rawCode: unknown): KeyCategory {
   return 'INVALID';
 }
 
+export function isMasterKey(rawCode: unknown): boolean {
+  return lookupKeyType(rawCode) === 'MASTER';
+}
+
 // Utility to safely format/mask code for server logs (Rule 17)
 export function maskCodeForLogs(rawCode: unknown): string {
   const norm = normalizeAccessCode(rawCode);

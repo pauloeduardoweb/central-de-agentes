@@ -6,6 +6,7 @@ export const db = mysql.createPool({
   database: process.env.DB_NAME || '',
   user: process.env.DB_USER || '',
   password: process.env.DB_PASSWORD || '',
+  charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 5,
   queueLimit: 0,
@@ -466,6 +467,435 @@ export async function ensureAgentInteractionsTable(): Promise<void> {
     `);
   } catch (err: any) {
     console.warn('[MySQL ensureAgentInteractionsTable Error]:', err?.message || err);
+  }
+}
+
+export async function ensureChatTables(): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  try {
+    // 1. chat_profiles
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_profiles (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        access_key_id BIGINT UNSIGNED DEFAULT NULL,
+        codigo VARCHAR(100) NOT NULL UNIQUE,
+        nickname VARCHAR(30) NOT NULL UNIQUE,
+        photo_url VARCHAR(500) DEFAULT NULL,
+        phone VARCHAR(30) NOT NULL,
+        phone_visibility ENUM('MENTOR_ONLY', 'MEMBERS') DEFAULT 'MENTOR_ONLY',
+        bio VARCHAR(160) DEFAULT NULL,
+        chat_status ENUM('ACTIVE', 'SUSPENDED', 'BANNED') DEFAULT 'ACTIVE',
+        community_rules_accepted_at DATETIME DEFAULT NULL,
+        last_chat_activity_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_chat_codigo (codigo),
+        INDEX idx_chat_nickname (nickname),
+        INDEX idx_chat_status (chat_status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Ensure V1.2 profile columns
+    const profColQueries = [
+      `ALTER TABLE chat_profiles ADD COLUMN bio VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE chat_profiles ADD COLUMN cidade VARCHAR(100) DEFAULT NULL`,
+      `ALTER TABLE chat_profiles ADD COLUMN instagram VARCHAR(100) DEFAULT NULL`,
+      `ALTER TABLE chat_profiles ADD COLUMN tiktok VARCHAR(100) DEFAULT NULL`,
+      `ALTER TABLE chat_profiles ADD COLUMN xp INT UNSIGNED DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN xp_total BIGINT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN current_level INT UNSIGNED NOT NULL DEFAULT 1`,
+      `ALTER TABLE chat_profiles ADD COLUMN message_count BIGINT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN reply_count BIGINT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN reaction_given_count BIGINT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN reaction_received_count BIGINT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN image_count BIGINT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN audio_count BIGINT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN poll_vote_count BIGINT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN current_streak INT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN longest_streak INT UNSIGNED NOT NULL DEFAULT 0`,
+      `ALTER TABLE chat_profiles ADD COLUMN last_participation_date DATE DEFAULT NULL`,
+      `ALTER TABLE chat_profiles ADD COLUMN last_xp_event_at DATETIME DEFAULT NULL`,
+      `ALTER TABLE chat_profiles ADD COLUMN profile_rank INT UNSIGNED DEFAULT NULL`,
+    ];
+    for (const q of profColQueries) {
+      await db.query(q).catch(() => {});
+    }
+
+    // 2. chat_rooms
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_rooms (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        slug VARCHAR(120) NOT NULL UNIQUE,
+        description VARCHAR(255) DEFAULT NULL,
+        room_type ENUM('PUBLIC', 'PRIVATE', 'SYSTEM') DEFAULT 'PUBLIC',
+        is_active TINYINT(1) DEFAULT 1,
+        created_by BIGINT UNSIGNED DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_room_slug (slug)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Initial room seeding
+    await db.query(`
+      INSERT INTO chat_rooms (name, slug, description, room_type, is_active)
+      VALUES ('💬 Comunidade Geração Z Pro', 'comunidade-geracao-z-pro', 'Sala geral exclusiva para alunos da Mentoria Geração Z Pro.', 'PUBLIC', 1)
+      ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description)
+    `).catch(() => {});
+
+    // 3. chat_room_members
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_room_members (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        room_id BIGINT UNSIGNED NOT NULL,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        member_role ENUM('MEMBER', 'MODERATOR', 'MENTOR') DEFAULT 'MEMBER',
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_read_message_id BIGINT UNSIGNED DEFAULT NULL,
+        is_muted TINYINT(1) DEFAULT 0,
+        is_active TINYINT(1) DEFAULT 1,
+        UNIQUE KEY uk_room_profile (room_id, profile_id),
+        INDEX idx_room_m_profile (room_id, profile_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 4. chat_messages
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        room_id BIGINT UNSIGNED NOT NULL,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        reply_to_message_id BIGINT UNSIGNED DEFAULT NULL,
+        message_type VARCHAR(30) DEFAULT 'TEXT',
+        content TEXT NOT NULL,
+        image_url VARCHAR(1000) DEFAULT NULL,
+        image_width INT DEFAULT NULL,
+        image_height INT DEFAULT NULL,
+        image_size BIGINT DEFAULT NULL,
+        image_mime VARCHAR(100) DEFAULT NULL,
+        caption VARCHAR(1000) DEFAULT NULL,
+        edited_at DATETIME DEFAULT NULL,
+        deleted_at DATETIME DEFAULT NULL,
+        deleted_by BIGINT UNSIGNED DEFAULT NULL,
+        is_pinned TINYINT(1) DEFAULT 0,
+        pinned_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_msg_room_id (room_id, id),
+        INDEX idx_msg_room_created (room_id, created_at),
+        INDEX idx_msg_profile_created (profile_id, created_at),
+        INDEX idx_msg_reply (reply_to_message_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    const msgColQueries = [
+      `ALTER TABLE chat_messages MODIFY COLUMN message_type VARCHAR(30) DEFAULT 'TEXT'`,
+      `ALTER TABLE chat_messages ADD COLUMN image_url VARCHAR(1000) DEFAULT NULL`,
+      `ALTER TABLE chat_messages ADD COLUMN image_width INT DEFAULT NULL`,
+      `ALTER TABLE chat_messages ADD COLUMN image_height INT DEFAULT NULL`,
+      `ALTER TABLE chat_messages ADD COLUMN image_size BIGINT DEFAULT NULL`,
+      `ALTER TABLE chat_messages ADD COLUMN image_mime VARCHAR(100) DEFAULT NULL`,
+      `ALTER TABLE chat_messages ADD COLUMN caption VARCHAR(1000) DEFAULT NULL`,
+      `ALTER TABLE chat_messages ADD COLUMN client_request_id VARCHAR(100) DEFAULT NULL`,
+      `ALTER TABLE chat_messages ADD UNIQUE KEY uk_prof_client_req (profile_id, client_request_id)`,
+    ];
+    for (const q of msgColQueries) {
+      await db.query(q).catch(() => {});
+    }
+
+    // 5. chat_message_reports
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_message_reports (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        message_id BIGINT UNSIGNED NOT NULL,
+        reporter_profile_id BIGINT UNSIGNED NOT NULL,
+        reason VARCHAR(50) NOT NULL,
+        details VARCHAR(500) DEFAULT NULL,
+        report_status ENUM('OPEN', 'REVIEWED', 'RESOLVED', 'DISMISSED') DEFAULT 'OPEN',
+        reviewed_by BIGINT UNSIGNED DEFAULT NULL,
+        reviewed_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_report_msg_reporter (message_id, reporter_profile_id),
+        INDEX idx_rep_message (message_id),
+        INDEX idx_rep_status (report_status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 6. chat_moderation_actions
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_moderation_actions (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        mentor_identifier VARCHAR(100) NOT NULL,
+        target_profile_id BIGINT UNSIGNED DEFAULT NULL,
+        message_id BIGINT UNSIGNED DEFAULT NULL,
+        action_type ENUM(
+          'MESSAGE_DELETE',
+          'WARNING',
+          'CHAT_SUSPEND',
+          'CHAT_BAN',
+          'CHAT_REACTIVATE',
+          'MESSAGE_PIN',
+          'NOTICE_CREATE'
+        ) NOT NULL,
+        reason VARCHAR(500) DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_mod_target (target_profile_id),
+        INDEX idx_mod_action (action_type)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 7. chat_notices
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_notices (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        room_id BIGINT UNSIGNED NOT NULL,
+        content TEXT NOT NULL,
+        created_by VARCHAR(100) NOT NULL,
+        is_active TINYINT(1) DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_notice_room (room_id, is_active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 8. chat_reactions
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_reactions (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        message_id BIGINT UNSIGNED NOT NULL,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        emoji VARCHAR(20) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_msg_prof_emoji (message_id, profile_id, emoji),
+        INDEX idx_react_msg (message_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 9. chat_mentions
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_mentions (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        message_id BIGINT UNSIGNED NOT NULL,
+        source_profile_id BIGINT UNSIGNED NOT NULL,
+        target_profile_id BIGINT UNSIGNED NOT NULL,
+        is_read TINYINT(1) DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_mention_target (target_profile_id, is_read)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 10. chat_polls
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_polls (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        room_id BIGINT UNSIGNED NOT NULL,
+        question VARCHAR(255) NOT NULL,
+        options_json JSON NOT NULL,
+        created_by VARCHAR(100) NOT NULL,
+        is_active TINYINT(1) DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_poll_room (room_id, is_active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 11. chat_poll_votes
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_poll_votes (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        poll_id BIGINT UNSIGNED NOT NULL,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        option_index INT UNSIGNED NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_poll_prof (poll_id, profile_id),
+        INDEX idx_poll_v_id (poll_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 12. chat_favorites
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_favorites (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        message_id BIGINT UNSIGNED NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_fav_prof_msg (profile_id, message_id),
+        INDEX idx_fav_prof (profile_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 13. chat_xp_events
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_xp_events (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        reference_type VARCHAR(50) DEFAULT NULL,
+        reference_id BIGINT UNSIGNED DEFAULT NULL,
+        xp_amount INT NOT NULL,
+        deduplication_key VARCHAR(191) DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_chat_xp_deduplication (deduplication_key),
+        INDEX idx_xp_prof_created (profile_id, created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 14. chat_achievements
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_achievements (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(80) NOT NULL UNIQUE,
+        name VARCHAR(120) NOT NULL,
+        description VARCHAR(255) DEFAULT NULL,
+        icon VARCHAR(50) DEFAULT NULL,
+        xp_reward INT NOT NULL DEFAULT 0,
+        criteria_type VARCHAR(50) NOT NULL,
+        criteria_value INT NOT NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 15. chat_profile_achievements
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_profile_achievements (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        achievement_id BIGINT UNSIGNED NOT NULL,
+        unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_prof_ach (profile_id, achievement_id),
+        INDEX idx_prof_ach_prof (profile_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 16. chat_announcements
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_announcements (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(150) NOT NULL,
+        content TEXT NOT NULL,
+        announcement_type ENUM('NOTICE', 'UPDATE', 'NEW_AGENT', 'LIVE', 'IMPORTANT') NOT NULL DEFAULT 'NOTICE',
+        badge VARCHAR(100) DEFAULT NULL,
+        is_pinned TINYINT(1) NOT NULL DEFAULT 0,
+        starts_at DATETIME DEFAULT NULL,
+        ends_at DATETIME DEFAULT NULL,
+        created_by VARCHAR(100) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_ann_pinned (is_pinned, created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 17. chat_notifications
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_notifications (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        notification_type VARCHAR(50) NOT NULL,
+        reference_type VARCHAR(50) DEFAULT NULL,
+        reference_id BIGINT UNSIGNED DEFAULT NULL,
+        title VARCHAR(150) NOT NULL,
+        content TEXT DEFAULT NULL,
+        related_message_id BIGINT UNSIGNED DEFAULT NULL,
+        related_profile_id BIGINT UNSIGNED DEFAULT NULL,
+        related_room_id BIGINT UNSIGNED DEFAULT NULL,
+        related_poll_id BIGINT UNSIGNED DEFAULT NULL,
+        related_achievement_id BIGINT UNSIGNED DEFAULT NULL,
+        deduplication_key VARCHAR(255) DEFAULT NULL,
+        is_read TINYINT(1) DEFAULT 0,
+        read_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_notif_prof (profile_id, is_read, created_at),
+        UNIQUE KEY uq_notif_dedup (deduplication_key)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    const notifColQueries = [
+      `ALTER TABLE chat_notifications ADD COLUMN content TEXT DEFAULT NULL`,
+      `ALTER TABLE chat_notifications ADD COLUMN related_message_id BIGINT UNSIGNED DEFAULT NULL`,
+      `ALTER TABLE chat_notifications ADD COLUMN related_profile_id BIGINT UNSIGNED DEFAULT NULL`,
+      `ALTER TABLE chat_notifications ADD COLUMN related_room_id BIGINT UNSIGNED DEFAULT NULL`,
+      `ALTER TABLE chat_notifications ADD COLUMN related_poll_id BIGINT UNSIGNED DEFAULT NULL`,
+      `ALTER TABLE chat_notifications ADD COLUMN related_achievement_id BIGINT UNSIGNED DEFAULT NULL`,
+      `ALTER TABLE chat_notifications ADD COLUMN deduplication_key VARCHAR(255) DEFAULT NULL`,
+      `ALTER TABLE chat_notifications ADD UNIQUE KEY uq_notif_dedup (deduplication_key)`,
+    ];
+    for (const q of notifColQueries) {
+      await db.query(q).catch(() => {});
+    }
+
+    // 18. chat_message_reads
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_message_reads (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        message_id BIGINT UNSIGNED NOT NULL,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_msg_read_prof (message_id, profile_id),
+        INDEX idx_msg_reads (message_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 19. chat_media
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_media (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        room_id BIGINT UNSIGNED DEFAULT NULL,
+        message_id BIGINT UNSIGNED DEFAULT NULL,
+        media_type ENUM('IMAGE', 'AUDIO', 'AVATAR', 'STICKER', 'GIF') NOT NULL,
+        storage_provider VARCHAR(50) NOT NULL DEFAULT 'LOCAL',
+        storage_key VARCHAR(500) NOT NULL,
+        public_url VARCHAR(1000) NOT NULL,
+        mime_type VARCHAR(100) NOT NULL,
+        file_size BIGINT UNSIGNED NOT NULL,
+        width INT DEFAULT NULL,
+        height INT DEFAULT NULL,
+        duration_seconds DECIMAL(10,2) DEFAULT NULL,
+        upload_status ENUM('PENDING', 'READY', 'FAILED', 'DELETED') DEFAULT 'READY',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME DEFAULT NULL,
+        INDEX idx_media_prof (profile_id),
+        INDEX idx_media_msg (message_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await db.query(`ALTER TABLE chat_media MODIFY COLUMN media_type ENUM('IMAGE', 'AUDIO', 'AVATAR', 'STICKER', 'GIF') NOT NULL`).catch(() => {});
+
+    // 20. chat_message_edits
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_message_edits (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        message_id BIGINT UNSIGNED NOT NULL,
+        edited_by_profile_id BIGINT UNSIGNED NOT NULL,
+        previous_content TEXT NOT NULL,
+        new_content TEXT NOT NULL,
+        edited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_edits_msg (message_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 21. chat_user_mutes
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_user_mutes (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        muted_profile_id BIGINT UNSIGNED NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_prof_muted (profile_id, muted_profile_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 22. chat_user_blocks
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_user_blocks (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        profile_id BIGINT UNSIGNED NOT NULL,
+        blocked_profile_id BIGINT UNSIGNED NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_prof_blocked (profile_id, blocked_profile_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+  } catch (err: any) {
+    console.warn('[MySQL ensureChatTables Error]:', err?.message || err);
   }
 }
 
