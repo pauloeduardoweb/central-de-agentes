@@ -1749,6 +1749,74 @@ apiRouter.post(['/chat/upload-image', '/api/chat/upload-image'], async (req, res
   }
 });
 
+// POST /api/chat/upload-onboarding-photo
+apiRouter.post(['/chat/upload-onboarding-photo', '/api/chat/upload-onboarding-photo'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'Sessão expirada. Entre novamente.' });
+    }
+
+    let buffer: Buffer | null = null;
+    let mime = 'image/jpeg';
+
+    if (Buffer.isBuffer(req.body)) {
+      buffer = req.body;
+      const headerMime = req.headers['content-type'];
+      if (headerMime && headerMime.startsWith('image/')) {
+        mime = headerMime;
+      }
+    } else if (req.body && typeof req.body === 'object') {
+      const { base64, mime: bodyMime } = req.body;
+      if (base64 && typeof base64 === 'string') {
+        const rawBase64 = String(base64).trim();
+        const cleanBase64 = rawBase64.startsWith('data:')
+          ? rawBase64.slice(rawBase64.indexOf(',') + 1)
+          : rawBase64;
+        buffer = Buffer.from(cleanBase64, 'base64');
+        if (bodyMime) mime = bodyMime;
+      }
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ success: false, error: 'INVALID_FILE', message: 'Nenhuma foto foi enviada.' });
+    }
+
+    if (buffer.length > 8 * 1024 * 1024) {
+      return res.status(400).json({ success: false, error: 'FILE_TOO_LARGE', message: 'A foto excede o tamanho máximo de 8 MB.' });
+    }
+
+    const uploadResult = await processAndUploadMedia({
+      profileId: 0,
+      base64: buffer.toString('base64'),
+      mime,
+      mediaType: 'AVATAR',
+    });
+
+    if (!uploadResult.success || !uploadResult.media) {
+      return res.status(400).json({
+        success: false,
+        error: 'UPLOAD_FAILED',
+        message: 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.',
+      });
+    }
+
+    const photoUrl = uploadResult.media.url;
+
+    return res.json({
+      success: true,
+      photoUrl,
+    });
+  } catch (err: any) {
+    console.error('[POST /api/chat/upload-onboarding-photo Error]:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'SERVER_ERROR',
+      message: 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.',
+    });
+  }
+});
+
 // POST /api/chat/upload-profile-photo & POST /api/chat/profile/photo
 apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', '/chat/profile/photo', '/api/chat/profile/photo'], async (req, res) => {
   try {
