@@ -535,11 +535,15 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     }
   }, [hasValidChatProfile, activeRoomId]);
 
-  // Profile creation handler
+  // Profile creation & update handler
   const handleProfileSubmit = async (data: any) => {
     try {
-      const res = await fetch('/api/chat/profile', {
-        method: 'POST',
+      const isUpdateMode = hasValidChatProfile || Boolean(profile);
+      const url = '/api/chat/profile';
+      const method = isUpdateMode ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           'x-access-code': studentCode,
@@ -547,8 +551,13 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         },
         body: JSON.stringify(data),
       });
+
+      if (res.status === 401) {
+        return { success: false, error: 'Sessão expirada. Entre novamente.' };
+      }
+
       const result = await res.json();
-      if (result.success) {
+      if (result.success && result.profile) {
         const newProf = result.profile;
         setHasProfile(true);
         setProfile(newProf);
@@ -586,9 +595,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         fetchMessages(activeRoomId);
         return { success: true, profile: newProf };
       }
-      return { success: false, error: result.message || 'Erro ao criar perfil' };
+      const customErr = result.error || result.message || (isUpdateMode ? 'Não foi possível atualizar a foto do perfil.' : 'Não foi possível salvar o perfil.');
+      return { success: false, error: customErr };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Erro de rede ao salvar perfil' };
+      console.error('[handleProfileSubmit Error]:', err);
+      return { success: false, error: 'Sessão expirada. Entre novamente.' };
     }
   };
 

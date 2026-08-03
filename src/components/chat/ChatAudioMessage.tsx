@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Download, Mic, AlertCircle } from 'lucide-react';
+import { Play, Pause, AlertCircle } from 'lucide-react';
 
 interface ChatAudioMessageProps {
   audioUrl: string;
@@ -112,7 +112,7 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
   };
 
   const handleError = () => {
-    // Handle corrupted or 15-byte audio files cleanly
+    // Handle corrupted or empty audio files cleanly
     setIsCorrupted(true);
     setIsPlaying(false);
     setPlaybackError('Áudio antigo indisponível');
@@ -146,17 +146,6 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
       )}
 
       <div className="flex items-center gap-2 min-w-0">
-        {/* Mic Icon Badge */}
-        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 ${
-          isCorrupted
-            ? 'bg-slate-800 text-slate-500 border border-slate-700'
-            : isOwn
-            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-            : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-        }`}>
-          {isCorrupted ? <AlertCircle className="w-4 h-4 text-amber-500" /> : <Mic className="w-4 h-4" />}
-        </div>
-
         {/* Play/Pause Button */}
         <button
           type="button"
@@ -221,22 +210,11 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
             {playbackRate}x
           </button>
         )}
-
-        {/* Download Audio Button */}
-        {!isCorrupted && (
-          <a
-            href={audioUrl}
-            download="audio_geracaoz.webm"
-            className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-            title="Baixar Áudio"
-          >
-            <Download className="w-3.5 h-3.5" />
-          </a>
-        )}
       </div>
 
       {isCorrupted && (
         <div className="text-[11px] text-amber-400 font-medium px-1 flex items-center gap-1">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
           <span>Áudio antigo indisponível</span>
         </div>
       )}

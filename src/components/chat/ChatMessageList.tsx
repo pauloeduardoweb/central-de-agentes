@@ -591,7 +591,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   )}
 
                   {/* Context Action Menu Trigger Button */}
-                  {!isDeleted && (
+                  {!isDeleted && msg.message_type !== 'AUDIO' && (
                     <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => setActiveMenuId(activeMenuId === msg.id ? null : msg.id)}
