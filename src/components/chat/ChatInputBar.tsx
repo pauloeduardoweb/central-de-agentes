@@ -197,6 +197,12 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           type: finalMime,
         });
 
+        console.log('[AUDIO]', {
+          chunks: audioChunksRef.current.length,
+          sizes: audioChunksRef.current.map(c => c.size),
+          finalBlob: audioBlob.size
+        });
+
         const cleanupResources = () => {
           if (audioStreamRef.current) {
             audioStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -220,10 +226,28 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           return;
         }
 
+        console.log('[AUDIO FRONTEND BLOB]', {
+          blobSize: audioBlob.size,
+          blobType: audioBlob.type,
+          chunks: audioChunksRef.current.length,
+          chunkSizes: audioChunksRef.current.map(chunk => chunk.size),
+        });
+
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
-          const base64data = reader.result as string;
+          const rawResult = String(reader.result || '');
+          const base64Only = rawResult.includes(',')
+            ? rawResult.split(',')[1]
+            : rawResult;
+
+          console.log('[AUDIO FRONTEND BASE64]', {
+            dataUrlLength: rawResult.length,
+            base64Length: base64Only.length,
+            prefix: rawResult.slice(0, 80),
+          });
+
+          const base64data = rawResult;
 
           try {
             // Call backend media upload endpoint
@@ -341,19 +365,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
     setIsRecordingAudio(false);
 
     try {
-      if (recorder.state === 'recording') {
-        if (typeof recorder.requestData === 'function') {
-          try {
-            recorder.requestData();
-          } catch {}
-        }
-
-        window.setTimeout(() => {
-          if (recorder.state !== 'inactive') {
-            recorder.stop();
-          }
-        }, 100);
-      } else if (recorder.state !== 'inactive') {
+      if (recorder.state !== 'inactive') {
         recorder.stop();
       } else {
         setErrorMsg('A gravação já foi encerrada.');
