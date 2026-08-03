@@ -19,13 +19,13 @@ export function formatBytes(bytes: number, decimals = 1): string {
 
 export async function compressAndPrepareImage(
   file: File,
-  maxDimension = 1600,
-  quality = 0.85
+  initialMaxDimension = 1600,
+  initialQuality = 0.82
 ): Promise<CompressedImageResult> {
   return new Promise((resolve, reject) => {
-    // 1. Check raw file size limit (8 MB)
-    if (file.size > 8 * 1024 * 1024) {
-      return reject(new Error('A foto selecionada é grande demais. O limite é de 8 MB.'));
+    // 1. Check raw file size limit (15 MB input limit before browser compression)
+    if (file.size > 15 * 1024 * 1024) {
+      return reject(new Error('A foto selecionada é grande demais. O limite máximo é de 15 MB.'));
     }
 
     // 2. Allowed extensions check
@@ -33,12 +33,12 @@ export async function compressAndPrepareImage(
     const fileNameLower = file.name.toLowerCase();
     const isAllowedExt = /\.(jpg|jpeg|png|webp)$/i.test(fileNameLower);
 
-    if (!allowedMimes.includes(file.type) || !isAllowedExt) {
+    if (!allowedMimes.includes(file.type) && !isAllowedExt) {
       return reject(new Error('Formato não suportado. Apenas JPG, JPEG, PNG e WEBP são permitidos.'));
     }
 
-    // 3. Reject GIFs or double extension scripts
-    if (fileNameLower.endsWith('.gif') || fileNameLower.includes('.php') || fileNameLower.includes('.exe')) {
+    // 3. Reject GIFs or dangerous scripts in image upload
+    if (fileNameLower.endsWith('.gif') || fileNameLower.includes('.php') || fileNameLower.includes('.exe') || fileNameLower.includes('.sh')) {
       return reject(new Error('Formato de arquivo inválido ou não suportado.'));
     }
 
@@ -48,48 +48,91 @@ export async function compressAndPrepareImage(
       const img = new Image();
       img.onerror = () => reject(new Error('Arquivo de imagem corrompido ou inválido.'));
       img.onload = () => {
-        let width = img.width;
-        let height = img.height;
+        let maxDimension = initialMaxDimension;
+        let quality = initialQuality;
 
-        // Scale dimensions while maintaining aspect ratio
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
+        // Function to attempt render and compression at given maxDimension & quality
+        const attemptCompression = (dim: number, qual: number) => {
+          let width = img.width;
+          let height = img.height;
+
+          // Scale dimensions maintaining aspect ratio
+          if (width > dim || height > dim) {
+            if (width > height) {
+              height = Math.round((height * dim) / width);
+              width = dim;
+            } else {
+              width = Math.round((width * dim) / height);
+              height = dim;
+            }
           }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            throw new Error('Não foi possível inicializar o renderizador de imagem.');
+          }
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          // Prefer WEBP; fallback to JPEG if WEBP is unsupported
+          let outputMime = 'image/webp';
+          let base64 = canvas.toDataURL(outputMime, qual);
+          if (!base64.startsWith('data:image/webp')) {
+            outputMime = 'image/jpeg';
+            base64 = canvas.toDataURL(outputMime, qual);
+          }
+
+          const base64Length = base64.length - (base64.indexOf(',') + 1);
+          const approxSize = Math.ceil((base64Length * 3) / 4);
+
+          return { base64, mime: outputMime, width: canvas.width, height: canvas.height, size: approxSize };
+        };
+
+        const MAX_ALLOWED_BYTES = 1.8 * 1024 * 1024; // 1.8 MB safety threshold for Vercel payloads
+        let result = attemptCompression(maxDimension, quality);
+
+        // Progressive quality & dimension reduction loop if output exceeds 1.8MB
+        const qualitySteps = [0.82, 0.70, 0.55, 0.40, 0.25];
+        const dimensionSteps = [1600, 1200, 960, 720];
+
+        let dimIdx = 0;
+        let qualIdx = 0;
+
+        while (result.size > MAX_ALLOWED_BYTES && (dimIdx < dimensionSteps.length || qualIdx < qualitySteps.length)) {
+          if (qualIdx < qualitySteps.length - 1) {
+            qualIdx++;
+          } else if (dimIdx < dimensionSteps.length - 1) {
+            dimIdx++;
+            qualIdx = 1; // Reset to medium quality for smaller dimension
+          } else {
+            break;
+          }
+
+          maxDimension = dimensionSteps[dimIdx];
+          quality = qualitySteps[qualIdx];
+
+          console.log(`[IMAGE COMPRESS] Reducing payload: dim=${maxDimension}, quality=${quality}, prevSize=${(result.size / 1024 / 1024).toFixed(2)}MB`);
+          result = attemptCompression(maxDimension, quality);
         }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          return reject(new Error('Não foi possível inicializar o renderizador de imagem.'));
+        if (result.size > 2.0 * 1024 * 1024) {
+          return reject(new Error('A imagem é muito complexa para envio. Escolha uma foto com menor resolução.'));
         }
 
-        // Smooth image rendering
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Export to JPEG base64
-        const outputMime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-        const base64 = canvas.toDataURL(outputMime, quality);
-
-        // Approximate size from base64
-        const stringLength = base64.length - (base64.indexOf(',') + 1);
-        const approxSize = Math.ceil((stringLength * 3) / 4);
+        console.log(`[IMAGE COMPRESS SUCCESS] Final Size: ${(result.size / 1024).toFixed(1)} KB, Dim: ${result.width}x${result.height}, Mime: ${result.mime}`);
 
         resolve({
-          base64,
-          mime: outputMime,
-          width,
-          height,
-          size: approxSize,
+          base64: result.base64,
+          mime: result.mime,
+          width: result.width,
+          height: result.height,
+          size: result.size,
           name: file.name,
           file,
         });
