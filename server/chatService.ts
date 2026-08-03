@@ -1280,7 +1280,7 @@ export async function editMessage(
   messageId: number,
   profileId: number,
   newContent: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; message?: any }> {
   if (!newContent || newContent.trim() === '') {
     return { success: false, error: 'A mensagem não pode estar vazia.' };
   }
@@ -1292,7 +1292,7 @@ export async function editMessage(
   if (isDatabaseConfigured()) {
     try {
       const [rows]: any = await db.query(
-        `SELECT id, profile_id, deleted_at FROM chat_messages WHERE id = ? LIMIT 1`,
+        `SELECT id, profile_id, deleted_at, content, edited_at FROM chat_messages WHERE id = ? LIMIT 1`,
         [messageId]
       );
       if (!Array.isArray(rows) || rows.length === 0) {
@@ -1305,11 +1305,38 @@ export async function editMessage(
         return { success: false, error: 'Mensagens apagadas não podem ser editadas.' };
       }
 
+      if (rows[0].content === clean) {
+        return {
+          success: true,
+          message: { id: messageId, content: clean, edited_at: rows[0].edited_at },
+        };
+      }
+
       await db.query(
         `UPDATE chat_messages SET content = ?, edited_at = NOW() WHERE id = ?`,
         [clean, messageId]
       );
-      return { success: true };
+
+      const [updatedRows]: any = await db.query(
+        `SELECT id, content, edited_at FROM chat_messages WHERE id = ? LIMIT 1`,
+        [messageId]
+      );
+      const updated = updatedRows?.[0];
+
+      const memMsg = memoryMessagesList.find((m) => m.id === messageId);
+      if (memMsg) {
+        memMsg.content = clean;
+        memMsg.edited_at = updated?.edited_at || new Date().toISOString();
+      }
+
+      return {
+        success: true,
+        message: {
+          id: messageId,
+          content: clean,
+          edited_at: updated?.edited_at || new Date().toISOString(),
+        },
+      };
     } catch (err) {
       console.error('[editMessage Error]:', err);
       return { success: false, error: 'Erro ao editar mensagem.' };
@@ -1321,9 +1348,20 @@ export async function editMessage(
   if (msg.profile_id !== profileId) return { success: false, error: 'Você só pode editar suas próprias mensagens.' };
   if (msg.deleted_at) return { success: false, error: 'Mensagens apagadas não podem ser editadas.' };
 
+  if (msg.content === clean) {
+    return { success: true, message: { id: messageId, content: clean, edited_at: msg.edited_at } };
+  }
+
   msg.content = clean;
   msg.edited_at = new Date().toISOString();
-  return { success: true };
+  return {
+    success: true,
+    message: {
+      id: messageId,
+      content: clean,
+      edited_at: msg.edited_at,
+    },
+  };
 }
 
 /**
