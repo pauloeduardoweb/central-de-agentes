@@ -69,6 +69,9 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioTimerRef = useRef<any>(null);
+  const audioDurationRef = useRef(0);
+  const audioStartedAtRef = useRef<number | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
 
   // Mobile attachments menu state
   const [showMobileToolsMenu, setShowMobileToolsMenu] = useState(false);
@@ -129,6 +132,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
     } catch (err: any) {
       console.warn('[AUDIO RECORD PERMISSION ERROR]', err);
       const errName = err?.name || '';
@@ -166,9 +170,55 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
+      mediaRecorder.onerror = (event: any) => {
+        console.error('[AUDIO MEDIARECORDER ERROR]', event);
+        setErrorMsg('Ocorreu um erro durante a gravação do áudio.');
+        setIsRecordingAudio(false);
+      };
+
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: selectedMime });
-        const finalDuration = audioDuration;
+        const elapsedByClock = audioStartedAtRef.current
+          ? Math.max(1, Math.round((Date.now() - audioStartedAtRef.current) / 1000))
+          : 1;
+
+        const finalDuration = Math.max(
+          1,
+          audioDurationRef.current,
+          elapsedByClock
+        );
+
+        const finalMime =
+          mediaRecorder.mimeType ||
+          selectedMime ||
+          audioChunksRef.current[0]?.type ||
+          'audio/webm';
+
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: finalMime,
+        });
+
+        const cleanupResources = () => {
+          if (audioStreamRef.current) {
+            audioStreamRef.current.getTracks().forEach((track) => track.stop());
+            audioStreamRef.current = null;
+          }
+          if (audioTimerRef.current) {
+            clearInterval(audioTimerRef.current);
+            audioTimerRef.current = null;
+          }
+          audioStartedAtRef.current = null;
+          mediaRecorderRef.current = null;
+          setIsRecordingAudio(false);
+        };
+
+        if (audioChunksRef.current.length === 0 || audioBlob.size === 0) {
+          setErrorMsg(
+            'Nenhum áudio foi capturado. Verifique a permissão do microfone e tente novamente.'
+          );
+          cleanupResources();
+          audioChunksRef.current = [];
+          return;
+        }
 
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
@@ -181,7 +231,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
               method: 'POST',
               body: {
                 base64: base64data,
-                mime: selectedMime,
+                mime: finalMime,
                 mediaType: 'AUDIO',
                 duration: finalDuration,
               },
@@ -222,40 +272,125 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
             }
           } catch (err: any) {
             setErrorMsg(err?.message || 'Erro de conexão ao enviar áudio.');
+          } finally {
+            cleanupResources();
+            audioChunksRef.current = [];
           }
         };
-
-        stream.getTracks().forEach((track) => track.stop());
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(250);
       setIsRecordingAudio(true);
+
+      audioStartedAtRef.current = Date.now();
+      audioDurationRef.current = 0;
       setAudioDuration(0);
-      audioTimerRef.current = setInterval(() => {
-        setAudioDuration((prev) => prev + 1);
-      }, 1000);
+
+      if (audioTimerRef.current) {
+        clearInterval(audioTimerRef.current);
+      }
+
+      audioTimerRef.current = window.setInterval(() => {
+        const startedAt = audioStartedAtRef.current;
+
+        if (!startedAt) return;
+
+        const elapsed = Math.max(
+          0,
+          Math.floor((Date.now() - startedAt) / 1000)
+        );
+
+        audioDurationRef.current = elapsed;
+        setAudioDuration(elapsed);
+      }, 250);
     } catch (err: any) {
       console.warn('[AUDIO MEDIARECORDER INIT ERROR]', err);
       setErrorMsg('Não foi possível iniciar a gravação de áudio neste navegador.');
-      stream.getTracks().forEach((track) => track.stop());
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      audioStreamRef.current = null;
     }
   };
 
   const stopAndSendAudio = () => {
-    if (mediaRecorderRef.current && isRecordingAudio) {
-      mediaRecorderRef.current.stop();
-      setIsRecordingAudio(false);
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder) {
+      setErrorMsg('O gravador de áudio não está disponível.');
+      return;
+    }
+
+    if (audioTimerRef.current) {
       clearInterval(audioTimerRef.current);
+      audioTimerRef.current = null;
+    }
+
+    if (audioStartedAtRef.current) {
+      const elapsed = Math.max(
+        1,
+        Math.round(
+          (Date.now() - audioStartedAtRef.current) / 1000
+        )
+      );
+
+      audioDurationRef.current = elapsed;
+      setAudioDuration(elapsed);
+    }
+
+    setIsRecordingAudio(false);
+
+    try {
+      if (recorder.state === 'recording') {
+        if (typeof recorder.requestData === 'function') {
+          try {
+            recorder.requestData();
+          } catch {}
+        }
+
+        window.setTimeout(() => {
+          if (recorder.state !== 'inactive') {
+            recorder.stop();
+          }
+        }, 100);
+      } else if (recorder.state !== 'inactive') {
+        recorder.stop();
+      } else {
+        setErrorMsg('A gravação já foi encerrada.');
+      }
+    } catch (err: any) {
+      setErrorMsg(
+        err?.message || 'Não foi possível finalizar o áudio.'
+      );
     }
   };
 
   const cancelAudioRecording = () => {
-    if (mediaRecorderRef.current && isRecordingAudio) {
-      mediaRecorderRef.current.onstop = null;
-      mediaRecorderRef.current.stop();
-      setIsRecordingAudio(false);
+    if (audioTimerRef.current) {
       clearInterval(audioTimerRef.current);
+      audioTimerRef.current = null;
     }
+    audioStartedAtRef.current = null;
+    audioDurationRef.current = 0;
+    audioChunksRef.current = [];
+
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((track) => track.stop());
+      audioStreamRef.current = null;
+    }
+
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.onstop = null;
+      try {
+        if (mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch {}
+      mediaRecorderRef.current = null;
+    }
+
+    setAudioDuration(0);
+    setIsRecordingAudio(false);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
