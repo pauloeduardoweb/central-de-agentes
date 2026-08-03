@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, Smile, AlertCircle, CornerUpLeft, Mic, Square, Trash2, Flame, Image as ImageIcon } from 'lucide-react';
+import { Send, X, Smile, AlertCircle, CornerUpLeft, Mic, Square, Trash2, Flame, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { ChatMessage } from './ChatMessageList';
 import { MentionsAutocomplete, MentionMember } from './MentionsAutocomplete';
 import { ImageAttachmentButton } from './ImageAttachmentButton';
@@ -84,6 +84,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
   // Photo Attachment state
   const [selectedImage, setSelectedImage] = useState<CompressedImageResult | null>(null);
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadErrorMsg, setUploadErrorMsg] = useState<string | null>(null);
@@ -432,11 +433,14 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   const handleFileSelect = async (file: File) => {
     setErrorMsg(null);
     setUploadErrorMsg(null);
+    setIsPreparingImage(true);
     try {
       const compressed = await compressAndPrepareImage(file);
       setSelectedImage(compressed);
     } catch (err: any) {
       setErrorMsg(err?.message || 'Erro ao processar imagem selecionada.');
+    } finally {
+      setIsPreparingImage(false);
     }
   };
 
@@ -653,6 +657,14 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           >
             <X className="w-3.5 h-3.5" />
           </button>
+        </div>
+      )}
+
+      {/* Image Compression Banner */}
+      {isPreparingImage && (
+        <div className="mb-2 p-2.5 bg-[#E7F8F3] border border-[#A7F3D0] rounded-xl text-[#00A884] text-xs flex items-center space-x-2 animate-pulse font-medium">
+          <Loader2 className="w-4 h-4 animate-spin text-[#00A884] shrink-0" />
+          <span>Otimizando foto para envio...</span>
         </div>
       )}
 

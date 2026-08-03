@@ -326,6 +326,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     try {
       setIsCheckingProfile(true);
       const res = await chatApiFetch('/api/chat/profile');
+      if (res.status === 401 || res.code === 'UNAUTHORIZED') {
+        return { hasProfile: false, error: 'Sessão expirada. Atualize a página e tente novamente.' };
+      }
       if (res.data) {
         setHasProfile(res.data.hasProfile);
         setProfile(res.data.profile);
@@ -333,13 +336,32 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
 
         if (!res.data.hasProfile) {
           setShowProfileModal(true);
+        } else {
+          setShowProfileModal(false);
         }
+        return res.data;
       }
     } catch (err) {
       console.error('[ChatPage fetchProfile Error]:', err);
     } finally {
       setIsCheckingProfile(false);
     }
+    return null;
+  };
+
+  // Helper to ensure profile is verified before sensitive media operations
+  const ensureProfileVerified = async () => {
+    if (profile && profile.id && profile.nickname) {
+      return { success: true, profile };
+    }
+    const profData = await fetchProfile();
+    if (profData?.hasProfile && profData?.profile?.id) {
+      return { success: true, profile: profData.profile };
+    }
+    if (profData?.error) {
+      return { success: false, error: profData.error };
+    }
+    return { success: false, error: 'Perfil do chat não cadastrado.' };
   };
 
   // 2. Fetch Chat Rooms
@@ -606,6 +628,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   // Upload image handler
   const handleUploadImage = async (fileData: any) => {
     try {
+      const verified = await ensureProfileVerified();
+      if (!verified.success) {
+        return { success: false, error: verified.error || 'Perfil do chat não cadastrado.' };
+      }
+
       const res = await chatApiFetch('/api/chat/upload-image', {
         method: 'POST',
         body: {
@@ -615,6 +642,38 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           height: fileData.height,
         },
       });
+
+      if (!res.ok) {
+        if (res.status === 401 || res.code === 'UNAUTHORIZED') {
+          return { success: false, error: 'Sessão expirada. Atualize a página e tente novamente.' };
+        }
+        if (res.code === 'NO_PROFILE' || (res.status === 400 && res.error?.includes('Perfil'))) {
+          const freshProf = await fetchProfile();
+          if (freshProf?.hasProfile && freshProf?.profile) {
+            const retryRes = await chatApiFetch('/api/chat/upload-image', {
+              method: 'POST',
+              body: {
+                base64: fileData.base64,
+                mime: fileData.mime,
+                width: fileData.width,
+                height: fileData.height,
+              },
+            });
+            if (retryRes.ok && retryRes.data?.success) {
+              return {
+                success: true,
+                imageUrl: retryRes.data.imageUrl,
+                width: retryRes.data.imageWidth,
+                height: retryRes.data.imageHeight,
+                size: retryRes.data.imageSize,
+                mime: retryRes.data.imageMime,
+              };
+            }
+          }
+        }
+        return { success: false, error: res.error || res.data?.message || 'Erro ao realizar upload da foto.' };
+      }
+
       if (res.ok && res.data?.success) {
         return {
           success: true,
