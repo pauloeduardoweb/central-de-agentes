@@ -30,6 +30,7 @@ interface ChatPageProps {
 }
 
 export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLogout }) => {
+  const [isCheckingProfile, setIsCheckingProfile] = useState<boolean>(true);
   const [profile, setProfile] = useState<any | null>(null);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [isMentor, setIsMentor] = useState<boolean>(false);
@@ -200,30 +201,98 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     } catch (e) {}
   };
 
-  // Reaction Handler
+  // Optimistic Reaction Handler
   const handleReact = async (messageId: number, emoji: string) => {
+    const prevMessages = messages;
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== messageId) return msg;
+
+        const currentReactions = msg.reactions || [];
+        const existingIdx = currentReactions.findIndex((r) => r.emoji === emoji);
+
+        let newReactions = [...currentReactions];
+        if (existingIdx >= 0) {
+          const item = newReactions[existingIdx];
+          const hasReacted = item.hasReacted;
+          const newCount = hasReacted ? item.count - 1 : item.count + 1;
+
+          if (newCount <= 0) {
+            newReactions.splice(existingIdx, 1);
+          } else {
+            newReactions[existingIdx] = {
+              ...item,
+              count: newCount,
+              hasReacted: !hasReacted,
+            };
+          }
+        } else {
+          newReactions.push({
+            emoji,
+            count: 1,
+            hasReacted: true,
+          });
+        }
+
+        return {
+          ...msg,
+          reactions: newReactions,
+        };
+      })
+    );
+
     try {
       const res = await chatApiFetch(`/api/chat/messages/${messageId}/react`, {
         method: 'POST',
         body: { emoji },
       });
-      if (res.ok) {
-        fetchMessages(activeRoomId, true);
+      if (!res.ok) {
+        setMessages(prevMessages);
       }
-    } catch (e) {}
+    } catch (e) {
+      setMessages(prevMessages);
+    }
   };
 
-  // Favorite Toggle Handler
+  // Optimistic Favorite Toggle Handler
   const handleToggleFavorite = async (messageId: number) => {
+    const prevMessages = messages;
+    const prevFavorites = favorites;
+
+    const targetMsg = messages.find((m) => m.id === messageId);
+    const wasFavorite = targetMsg?.is_favorite || false;
+
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, is_favorite: !wasFavorite } : m))
+    );
+
+    if (wasFavorite) {
+      setFavorites((prev) => prev.filter((f) => f.id !== messageId));
+    } else if (targetMsg) {
+      const newFav: FavoriteMessageItem = {
+        id: targetMsg.id,
+        content: targetMsg.content,
+        message_type: targetMsg.message_type || 'TEXT',
+        author_nickname: targetMsg.author?.nickname || 'Aluno',
+        author_photo: targetMsg.author?.photo_url || null,
+        created_at: targetMsg.created_at || new Date().toISOString(),
+      };
+      setFavorites((prev) => [newFav, ...prev]);
+    }
+
     try {
       const res = await chatApiFetch(`/api/chat/messages/${messageId}/favorite`, {
         method: 'POST',
       });
-      if (res.ok) {
-        fetchMessages(activeRoomId, true);
-        fetchFavorites();
+      if (!res.ok) {
+        setMessages(prevMessages);
+        setFavorites(prevFavorites);
       }
-    } catch (e) {}
+    } catch (e) {
+      setMessages(prevMessages);
+      setFavorites(prevFavorites);
+    }
   };
 
   // Poll Vote Handler
@@ -255,6 +324,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   // 1. Fetch User Profile
   const fetchProfile = async () => {
     try {
+      setIsCheckingProfile(true);
       const res = await chatApiFetch('/api/chat/profile');
       if (res.data) {
         setHasProfile(res.data.hasProfile);
@@ -267,6 +337,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
       }
     } catch (err) {
       console.error('[ChatPage fetchProfile Error]:', err);
+    } finally {
+      setIsCheckingProfile(false);
     }
   };
 
@@ -832,6 +904,23 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     return true;
   });
 
+  if (isCheckingProfile) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] bg-[#0b141a] text-white p-4 select-none">
+        <div className="flex flex-col items-center space-y-4 bg-[#111b21] border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+          <div className="relative flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-400 animate-spin" />
+            <MessageSquare className="w-5 h-5 text-emerald-400 absolute" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-bold text-base text-white">Carregando Bate-papo</h3>
+            <p className="text-xs text-slate-400">Verificando perfil da comunidade...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-7xl mx-auto h-full p-0 sm:p-2 lg:p-4 animate-fade-in flex flex-col overflow-hidden flex-1">
       
@@ -1191,7 +1280,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
 
       {/* Profile Registration / Edit Modal */}
       <ChatProfileModal
-        isOpen={showProfileModal || !hasValidChatProfile}
+        isOpen={showProfileModal || (!isCheckingProfile && !hasValidChatProfile)}
         onClose={() => {
           if (hasValidChatProfile) {
             setShowProfileModal(false);

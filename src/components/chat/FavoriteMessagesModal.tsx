@@ -6,6 +6,7 @@ import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 export interface FavoriteMessageItem {
   id: number;
   content: string;
+  message_type?: string;
   image_url?: string | null;
   created_at: string;
   author_nickname: string;
