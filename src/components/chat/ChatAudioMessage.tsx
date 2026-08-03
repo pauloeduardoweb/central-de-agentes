@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Download, Volume2, Mic, RotateCcw } from 'lucide-react';
+import { Play, Pause, Download, Mic } from 'lucide-react';
 
 interface ChatAudioMessageProps {
   audioUrl: string;
@@ -15,53 +15,52 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState<number>(
-    typeof duration === 'number' ? duration : 0
+    typeof duration === 'number' && duration > 0
+      ? duration
+      : typeof duration === 'string' && !isNaN(Number(duration)) && Number(duration) > 0
+      ? Number(duration)
+      : 0
   );
   const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
-
-    const onLoadedMetadata = () => {
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-        setTotalDuration(audio.duration);
-      }
-    };
-
-    const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-
-    const onEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('ended', onEnded);
-
-    return () => {
-      audio.pause();
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('ended', onEnded);
-    };
-  }, [audioUrl]);
-
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
+    if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate;
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => console.error('Error playing audio:', err));
+    }
+  }, [playbackRate]);
+
+  useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setPlaybackError(null);
+    if (typeof duration === 'number' && duration > 0) {
+      setTotalDuration(duration);
+    } else if (typeof duration === 'string' && !isNaN(Number(duration)) && Number(duration) > 0) {
+      setTotalDuration(Number(duration));
+    } else {
+      setTotalDuration(0);
+    }
+  }, [audioUrl, duration]);
+
+  const handlePlayPause = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    setPlaybackError(null);
+
+    try {
+      if (audio.paused) {
+        audio.playbackRate = playbackRate;
+        await audio.play();
+      } else {
+        audio.pause();
+      }
+    } catch (error) {
+      console.error('[AUDIO PLAYBACK ERROR]', error);
+      setPlaybackError('Não foi possível reproduzir este áudio.');
+      setIsPlaying(false);
     }
   };
 
@@ -83,6 +82,34 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
     }
   };
 
+  const handleLoadedMetadata = () => {
+    const audio = audioRef.current;
+    if (audio && audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      setTotalDuration(audio.duration);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    const audio = audioRef.current;
+    if (audio) {
+      setCurrentTime(audio.currentTime);
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  const handleError = () => {
+    console.error('[AUDIO ELEMENT ERROR]', audioRef.current?.error);
+    setPlaybackError('Erro ao carregar o áudio.');
+    setIsPlaying(false);
+  };
+
   const formatSeconds = (sec: number) => {
     if (isNaN(sec) || !isFinite(sec) || sec < 0) return '0:00';
     const m = Math.floor(sec / 60);
@@ -90,12 +117,24 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const progressPercent = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
-
   return (
     <div className={`p-3 rounded-2xl flex flex-col gap-2 min-w-[240px] sm:min-w-[280px] max-w-xs sm:max-w-md ${
       isOwn ? 'bg-emerald-950/40 border border-emerald-500/30' : 'bg-[#111b21] border border-slate-700/60'
     }`}>
+      {/* Real HTML5 Audio Element */}
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        preload="metadata"
+        playsInline
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={handleEnded}
+        onLoadedMetadata={handleLoadedMetadata}
+        onTimeUpdate={handleTimeUpdate}
+        onError={handleError}
+      />
+
       <div className="flex items-center gap-2.5">
         {/* Mic Icon Badge */}
         <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
@@ -107,10 +146,12 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
         {/* Play/Pause Button */}
         <button
           type="button"
-          onClick={togglePlay}
-          className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold transition-all transform active:scale-95 shadow-md cursor-pointer ${
+          onClick={handlePlayPause}
+          style={{ touchAction: 'manipulation' }}
+          className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold transition-all transform active:scale-95 shadow-md cursor-pointer shrink-0 z-20 ${
             isOwn ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-cyan-600 hover:bg-cyan-500'
           }`}
+          aria-label={isPlaying ? 'Pausar áudio' : 'Reproduzir áudio'}
           title={isPlaying ? 'Pausar Áudio' : 'Ouvir Áudio'}
         >
           {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
@@ -152,7 +193,8 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
         <button
           type="button"
           onClick={toggleSpeed}
-          className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 cursor-pointer"
+          style={{ touchAction: 'manipulation' }}
+          className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 cursor-pointer shrink-0"
           title="Velocidade de reprodução"
         >
           {playbackRate}x
@@ -162,12 +204,18 @@ export const ChatAudioMessage: React.FC<ChatAudioMessageProps> = ({
         <a
           href={audioUrl}
           download="audio_geracaoz.webm"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
           title="Baixar Áudio"
         >
           <Download className="w-3.5 h-3.5" />
         </a>
       </div>
+
+      {playbackError && (
+        <div className="text-[11px] text-red-400 font-medium px-1">
+          {playbackError}
+        </div>
+      )}
     </div>
   );
 };
