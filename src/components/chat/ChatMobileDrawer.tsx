@@ -269,7 +269,7 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
                 >
                   <div className="flex items-center space-x-2.5">
                     <Bell className="w-4 h-4 text-[#00A884] shrink-0" />
-                    <span>Notificações</span>
+                    <span>Central de Notificações</span>
                   </div>
                   {unreadNotificationCount > 0 && (
                     <span className="bg-rose-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full animate-pulse">

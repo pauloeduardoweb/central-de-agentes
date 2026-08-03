@@ -382,37 +382,34 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
               >
                 {/* Author Avatar (Left side for received messages) */}
                 {!isSelf && (
-                  !isGrouped ? (
-                    <button
-                      onClick={() => {
-                        if (authorPhoto && onOpenAvatar) {
-                          onOpenAvatar(authorPhoto, authorNick);
-                        } else if (authorId) {
-                          onViewProfile(authorId);
-                        }
-                      }}
-                      className="shrink-0 transition-transform active:scale-95 focus:outline-none"
-                      title={`Ver foto de ${authorNick}`}
-                    >
-                      {authorPhoto ? (
-                        <img
-                          src={resolveChatMediaUrl(authorPhoto)}
-                          alt={authorNick}
-                          className="w-8 h-8 rounded-full object-cover border border-[#DADDE1] hover:brightness-105"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs bg-gradient-to-tr ${getAvatarGradient(authorNick)} text-white shadow-xs`}>
-                          {getNicknameInitials(authorNick)}
-                        </div>
-                      )}
-                    </button>
-                  ) : (
-                    /* Alignment spacer for grouped messages */
-                    <div className="w-8 h-8 shrink-0 invisible pointer-events-none" />
-                  )
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (authorPhoto && onOpenAvatar) {
+                        onOpenAvatar(authorPhoto, authorNick);
+                      } else if (authorId) {
+                        onViewProfile(authorId);
+                      }
+                    }}
+                    className="shrink-0 transition-transform active:scale-95 focus:outline-none cursor-pointer"
+                    title={`Ver foto de ${authorNick}`}
+                    aria-label={`Ver foto de ${authorNick}`}
+                  >
+                    {authorPhoto ? (
+                      <img
+                        src={resolveChatMediaUrl(authorPhoto)}
+                        alt={authorNick}
+                        className="w-8 h-8 rounded-full object-cover border border-[#DADDE1] hover:brightness-105"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs bg-gradient-to-tr ${getAvatarGradient(authorNick)} text-white shadow-xs`}>
+                        {getNicknameInitials(authorNick)}
+                      </div>
+                    )}
+                  </button>
                 )}
 
                 {/* Message Bubble Container */}
@@ -439,32 +436,28 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                     </div>
                   )}
 
-                  {/* Header Row: Author Name, Badges, Reaction, Favorite & Hover Actions */}
+                  {/* Header Row: Author Name, Badges, Reaction, Favorite & Always-Visible Actions */}
                   <div className="flex items-center justify-between gap-1.5 mb-0.5 min-w-[120px]">
-                    {!isGrouped ? (
-                      <div className="flex items-center space-x-1.5 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => authorId && onViewProfile(authorId)}
-                          className={`font-bold hover:underline text-[12px] truncate cursor-pointer ${
-                            isMentorAuthor ? 'text-[#8A6500]' : 'text-[#111B21]'
-                          }`}
-                        >
-                          {authorNick}
-                        </button>
+                    <div className="flex items-center space-x-1.5 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => authorId && onViewProfile(authorId)}
+                        className={`font-bold hover:underline text-[12px] truncate cursor-pointer ${
+                          isMentorAuthor ? 'text-[#8A6500]' : 'text-[#111B21]'
+                        }`}
+                      >
+                        {authorNick}
+                      </button>
 
-                        {isMentorAuthor && (
-                          <span className="bg-[#F5D75C] text-[#4A3900] border border-[#E5C14A] text-[9px] font-bold px-1.5 py-0.2 rounded flex items-center gap-1 shrink-0">
-                            <Crown className="w-2.5 h-2.5 text-[#8A6500]" />
-                            MENTOR
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div />
-                    )}
+                      {isMentorAuthor && (
+                        <span className="bg-[#F5D75C] text-[#4A3900] border border-[#E5C14A] text-[9px] font-bold px-1.5 py-0.2 rounded flex items-center gap-1 shrink-0">
+                          <Crown className="w-2.5 h-2.5 text-[#8A6500]" />
+                          MENTOR
+                        </span>
+                      )}
+                    </div>
 
-                    {/* Header Action Tools: Reaction Smile, Personal Favorite, Reply, Edit, Delete, Pin, Report */}
+                    {/* Header Action Tools: Always visible Reaction Smile, Personal Favorite, Reply, Edit, Delete, Pin, Report */}
                     {!isDeleted && (
                       <div className="flex items-center space-x-1 shrink-0 select-none">
                         {/* Reaction Smile Trigger Button beside author name */}
@@ -476,8 +469,9 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                 e.stopPropagation();
                                 setActiveEmojiPickerId(activeEmojiPickerId === msg.id ? null : msg.id);
                               }}
-                              className="p-0.5 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer rounded"
+                              className="p-1 text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer rounded"
                               title="Reagir"
+                              aria-label="Reagir"
                             >
                               <Smile className="w-3.5 h-3.5" />
                             </button>
@@ -496,6 +490,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                       setActiveEmojiPickerId(null);
                                     }}
                                     className="p-1 text-base hover:scale-125 transition-transform active:scale-95 cursor-pointer"
+                                    aria-label={`Reagir com ${emoji}`}
                                   >
                                     {emoji}
                                   </button>
@@ -513,70 +508,76 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                               e.stopPropagation();
                               onToggleFavorite(msg.id);
                             }}
-                            className={`p-0.5 transition-colors cursor-pointer rounded ${
+                            className={`p-1 transition-colors cursor-pointer rounded ${
                               msg.is_favorite
-                                ? 'text-amber-500 opacity-100'
-                                : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:text-amber-500'
+                                ? 'text-amber-500'
+                                : 'text-slate-400 hover:text-amber-500'
                             }`}
                             title={msg.is_favorite ? 'Remover das Favoritas' : 'Favoritar Mensagem'}
+                            aria-label={msg.is_favorite ? 'Remover das Favoritas' : 'Favoritar Mensagem'}
                           >
-                            <Star className={`w-3.5 h-3.5 ${msg.is_favorite ? 'fill-amber-400' : ''}`} />
+                            <Star className={`w-3.5 h-3.5 ${msg.is_favorite ? 'fill-amber-400 text-amber-500' : ''}`} />
                           </button>
                         )}
 
-                        {/* Reply button on hover */}
+                        {/* Reply button */}
                         <button
                           type="button"
                           onClick={() => onReply(msg)}
-                          className="p-0.5 text-slate-400 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                          className="p-1 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer rounded"
                           title="Responder"
+                          aria-label="Responder"
                         >
                           <Reply className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* Owner Edit button on hover */}
+                        {/* Owner Edit button */}
                         {isSelf && (
                           <button
                             type="button"
                             onClick={() => onEdit(msg)}
-                            className="p-0.5 text-slate-400 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                            className="p-1 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer rounded"
                             title="Editar"
+                            aria-label="Editar"
                           >
                             <Edit2 className="w-3 h-3" />
                           </button>
                         )}
 
-                        {/* Mentor Pin button on hover */}
+                        {/* Mentor Pin button */}
                         {isMentor && onPinMessage && (
                           <button
                             type="button"
                             onClick={() => onPinMessage(msg)}
-                            className="p-0.5 text-slate-400 hover:text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                            className="p-1 text-slate-400 hover:text-amber-600 transition-colors cursor-pointer rounded"
                             title="Fixar no topo"
+                            aria-label="Fixar no topo"
                           >
                             <Pin className="w-3 h-3" />
                           </button>
                         )}
 
-                        {/* Owner or Mentor Delete button on hover */}
+                        {/* Owner or Mentor Delete button */}
                         {(isSelf || isMentor) && (
                           <button
                             type="button"
                             onClick={() => onDelete(msg)}
-                            className="p-0.5 text-slate-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer rounded"
                             title="Excluir"
+                            aria-label="Excluir"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
                         )}
 
-                        {/* Report button on hover for other users */}
+                        {/* Report button for other users */}
                         {!isSelf && (
                           <button
                             type="button"
                             onClick={() => onReport(msg)}
-                            className="p-0.5 text-slate-400 hover:text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded"
+                            className="p-1 text-slate-400 hover:text-amber-600 transition-colors cursor-pointer rounded"
                             title="Denunciar"
+                            aria-label="Denunciar"
                           >
                             <Flag className="w-3 h-3" />
                           </button>
@@ -716,37 +717,34 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
 
                 {/* Author Avatar (Right side for own messages) */}
                 {isSelf && (
-                  !isGrouped ? (
-                    <button
-                      onClick={() => {
-                        if (authorPhoto && onOpenAvatar) {
-                          onOpenAvatar(authorPhoto, authorNick);
-                        } else if (authorId) {
-                          onViewProfile(authorId);
-                        }
-                      }}
-                      className="shrink-0 transition-transform active:scale-95 focus:outline-none"
-                      title={`Ver foto de ${authorNick}`}
-                    >
-                      {authorPhoto ? (
-                        <img
-                          src={resolveChatMediaUrl(authorPhoto)}
-                          alt={authorNick}
-                          className="w-8 h-8 rounded-full object-cover border border-[#DADDE1] hover:brightness-105"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs bg-gradient-to-tr ${getAvatarGradient(authorNick)} text-white shadow-xs`}>
-                          {getNicknameInitials(authorNick)}
-                        </div>
-                      )}
-                    </button>
-                  ) : (
-                    /* Alignment spacer for grouped messages */
-                    <div className="w-8 h-8 shrink-0 invisible pointer-events-none" />
-                  )
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (authorPhoto && onOpenAvatar) {
+                        onOpenAvatar(authorPhoto, authorNick);
+                      } else if (authorId) {
+                        onViewProfile(authorId);
+                      }
+                    }}
+                    className="shrink-0 transition-transform active:scale-95 focus:outline-none cursor-pointer"
+                    title={`Ver foto de ${authorNick}`}
+                    aria-label={`Ver foto de ${authorNick}`}
+                  >
+                    {authorPhoto ? (
+                      <img
+                        src={resolveChatMediaUrl(authorPhoto)}
+                        alt={authorNick}
+                        className="w-8 h-8 rounded-full object-cover border border-[#DADDE1] hover:brightness-105"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs bg-gradient-to-tr ${getAvatarGradient(authorNick)} text-white shadow-xs`}>
+                        {getNicknameInitials(authorNick)}
+                      </div>
+                    )}
+                  </button>
                 )}
               </div>
             );
