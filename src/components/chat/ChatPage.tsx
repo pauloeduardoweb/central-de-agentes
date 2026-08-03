@@ -630,9 +630,15 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         }
         return { success: true, photoUrl };
       }
-      return { success: false, error: res.error || res.data?.message || 'Erro ao enviar foto de perfil.' };
+      if (res.status === 401) {
+        return { success: false, error: 'Sessão expirada. Entre novamente.' };
+      }
+      return {
+        success: false,
+        error: res.data?.message || res.error || 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.',
+      };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Erro de conexão no upload.' };
+      return { success: false, error: 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.' };
     }
   };
 

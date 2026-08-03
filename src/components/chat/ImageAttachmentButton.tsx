@@ -43,7 +43,7 @@ export const ImageAttachmentButton: React.FC<ImageAttachmentButtonProps> = ({
         onClick={handleClick}
         disabled={disabled}
         aria-label="Anexar foto"
-        className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl text-slate-300 hover:text-cyan-400 hover:bg-slate-800/80 active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        className="min-w-[44px] min-h-[44px] p-2.5 rounded-xl text-[#54656F] hover:text-[#00A884] hover:bg-[#FFFFFF] transition-colors shrink-0 flex items-center justify-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         title="Anexar foto (JPG, PNG, WEBP)"
       >
         <Paperclip className="w-5 h-5" />

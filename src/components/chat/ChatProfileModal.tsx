@@ -134,12 +134,12 @@ export const ChatProfileModal: React.FC<ChatProfileModalProps> = ({
           }
           setPhotoUrl(res.photoUrl);
         } else {
-          setError(res.error || 'Não foi possível enviar a foto para o servidor.');
+          setError(res.error || 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.');
         }
       }
     } catch (err: any) {
       console.warn('[Avatar upload note]:', err);
-      setError('Erro ao preparar e enviar imagem de perfil.');
+      setError('Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.');
     } finally {
       setUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
