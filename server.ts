@@ -18,6 +18,7 @@ import {
   ensureProductsTable,
   ensureProgressTable,
   ensureProfilesTable,
+  ensureChatTables,
 } from './server/database.js';
 import {
   getGlobalRankingHandler,
@@ -345,11 +346,12 @@ async function handleLogin(req: express.Request, res: express.Response) {
     }
 
     if (isDatabaseConfigured()) {
-      let connection;
+      let connection: any = null;
+      let transactionStarted = false;
       try {
-        await ensureSessionsTable();
         connection = await db.getConnection();
         await connection.beginTransaction();
+        transactionStarted = true;
 
         // Lock row during check
         const [rows]: any = await connection.query(
@@ -386,7 +388,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
         // Active session exists and valid on another device -> 409 Conflict
         if (activeSessionValid && activeSessionIdInDb && !isSameDevice) {
           await connection.rollback();
-          connection.release();
+          transactionStarted = false;
 
           console.log(`[AUTH LOG] type=STUDENT masked=${maskedCode} sessionFound=${sessionFound} sessionValid=true recorded=false http=409`);
 
@@ -399,7 +401,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
         // If session is no longer active in DB, and client is attempting auto-verification of an old disconnected session ID -> 401 Disconnected
         if (!activeSessionValid && existingSessionId && !req.body?.isNewLogin) {
           await connection.rollback();
-          connection.release();
+          transactionStarted = false;
           memorySessionsMap.delete(cleanCode);
 
           console.log(`[AUTH LOG] type=STUDENT masked=${maskedCode} sessionFound=${sessionFound} sessionValid=false rejectedDisconnected=true http=401`);
@@ -471,7 +473,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
 
         // Commit transaction
         await connection.commit();
-        connection.release();
+        transactionStarted = false;
 
         // Sync session to memorySessionsMap for fast heartbeat fallback
         const now = new Date();
@@ -516,15 +518,19 @@ async function handleLogin(req: express.Request, res: express.Response) {
           onlineDevices: '1/1',
         });
       } catch (dbErr: any) {
-        if (connection) {
+        if (connection && transactionStarted) {
           try { await connection.rollback(); } catch (e) {}
-          connection.release();
+          transactionStarted = false;
         }
-        console.error('[MySQL Login Transaction Error]:', dbErr?.message || dbErr);
+        console.error('[PROFILE DB ERROR]', 'code:', dbErr?.code, 'errno:', dbErr?.errno, 'sqlState:', dbErr?.sqlState, 'message:', dbErr?.message || dbErr);
         return res.status(500).json({
           error: 'SESSION_DATABASE_ERROR',
-          message: 'Não foi possível conectar ao servidor de autenticação. Tente novamente em alguns instantes.',
+          message: 'O banco de dados está temporariamente sobrecarregado. Aguarde alguns minutos e tente novamente.',
         });
+      } finally {
+        if (connection) {
+          try { connection.release(); } catch (e) {}
+        }
       }
     } else {
       // Fallback if MySQL is not configured
@@ -1495,16 +1501,30 @@ apiRouter.post(['/chat/profile', '/api/chat/profile'], async (req, res) => {
   try {
     const { accessCode } = extractChatCredentials(req);
     if (!accessCode) {
-      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        field: 'session',
+        message: 'Sessão não identificada.',
+      });
     }
     const result = await createChatProfile(accessCode, req.body);
     if (!result.success) {
-      return res.status(400).json({ error: 'VALIDATION_ERROR', message: result.error });
+      return res.status(400).json({
+        success: false,
+        error: result.error || 'VALIDATION_ERROR',
+        field: result.field || 'general',
+        message: result.message || result.error || 'Erro ao validar o perfil.',
+      });
     }
     return res.status(201).json({ success: true, profile: result.profile });
   } catch (err: any) {
-    console.error('[POST /api/chat/profile Error]:', err);
-    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao criar perfil do chat.' });
+    console.error('[PROFILE DB ERROR]', 'code:', err?.code, 'errno:', err?.errno, 'sqlState:', err?.sqlState, 'message:', err?.message || err);
+    return res.status(500).json({
+      success: false,
+      error: 'SERVER_ERROR',
+      message: 'O banco de dados está temporariamente sobrecarregado. Aguarde alguns minutos e tente novamente.',
+    });
   }
 });
 
@@ -1513,16 +1533,30 @@ apiRouter.put(['/chat/profile', '/api/chat/profile'], async (req, res) => {
   try {
     const { accessCode } = extractChatCredentials(req);
     if (!accessCode) {
-      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        field: 'session',
+        message: 'Sessão não identificada.',
+      });
     }
     const result = await updateChatProfile(accessCode, req.body);
     if (!result.success) {
-      return res.status(400).json({ error: 'VALIDATION_ERROR', message: result.error });
+      return res.status(400).json({
+        success: false,
+        error: result.error || 'VALIDATION_ERROR',
+        field: result.field || 'general',
+        message: result.message || result.error || 'Erro ao atualizar o perfil.',
+      });
     }
     return res.json({ success: true, profile: result.profile });
   } catch (err: any) {
-    console.error('[PUT /api/chat/profile Error]:', err);
-    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao atualizar perfil do chat.' });
+    console.error('[PROFILE DB ERROR]', 'code:', err?.code, 'errno:', err?.errno, 'sqlState:', err?.sqlState, 'message:', err?.message || err);
+    return res.status(500).json({
+      success: false,
+      error: 'SERVER_ERROR',
+      message: 'O banco de dados está temporariamente sobrecarregado. Aguarde alguns minutos e tente novamente.',
+    });
   }
 });
 
@@ -2287,6 +2321,21 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // Setup Vite development or static production serving
 async function startServer() {
+  if (isDatabaseConfigured()) {
+    try {
+      await Promise.all([
+        ensureChatTables(),
+        ensureSessionsTable(),
+        ensureProductsTable(),
+        ensureProgressTable(),
+        ensureProfilesTable(),
+      ]);
+      console.log('[MySQL] All database schemas verified');
+    } catch (e: any) {
+      console.warn('[MySQL Initialization Warning]:', e?.message || e);
+    }
+  }
+
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
