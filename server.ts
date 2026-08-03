@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
+import fs from 'fs';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import {
@@ -56,6 +57,44 @@ import {
   parseUserAgent,
   PRESENCE_VERSION,
 } from './server/presenceService.js';
+import {
+  getProfileBySessionCode,
+  createChatProfile,
+  updateChatProfile,
+  getPublicProfile,
+  getRooms,
+  getRoomMessages,
+  sendMessage,
+  editMessage,
+  deleteMessage,
+  reportMessage,
+  markRoomAsRead,
+  getAdminReports,
+  getAdminProfilesList,
+  updateChatStatusByMentor,
+  createOfficialNotice,
+  getActiveNotice,
+  setTypingStatus,
+  getTypingUsers,
+  pinMessage,
+  getPinnedMessage,
+  warnUserByMentor,
+  getUnreadCountForProfile,
+  toggleReaction,
+  getUnreadMentionsCount,
+  markMentionsAsRead,
+  getCommunityMembersListForAutocomplete,
+  createPoll,
+  votePoll,
+  getActivePoll,
+  toggleFavoriteMessage,
+  getUserFavoriteMessages,
+  getOnlineMembersDrawerList,
+  getCommunityRanking,
+  getCommunityStats,
+} from './server/chatService.js';
+import { chatExtraRouter } from './server/chatExtraRoutes.js';
+import { processAndUploadMedia } from './server/chatMediaService.js';
 
 dotenv.config();
 
@@ -70,6 +109,8 @@ console.log(`Total de chaves carregadas: ${totalCount}`);
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 const PORT = 3000;
 
@@ -83,6 +124,7 @@ function getGeminiClient(customApiKey?: string) {
 }
 
 const apiRouter = express.Router();
+apiRouter.use(chatExtraRouter);
 
 // Health check endpoint
 apiRouter.get(['/health', '/api/health'], (_req, res) => {
@@ -1402,6 +1444,826 @@ apiRouter.delete(['/admin/products/:id', '/api/admin/products/:id'], requireMent
   } catch (err: any) {
     console.error('[Admin DELETE Product Error]:', err?.message || err);
     return res.status(500).json({ error: 'DATABASE_ERROR', message: 'Erro ao excluir produto.' });
+  }
+});
+
+// Helper for extracting credentials from Chat requests
+function extractChatCredentials(req: express.Request) {
+  const accessCode =
+    req.headers['x-access-code'] ||
+    req.headers['x-student-access-code'] ||
+    req.body?.accessCode ||
+    req.body?.code ||
+    req.query?.accessCode;
+
+  const sessionId =
+    req.headers['x-session-id'] ||
+    req.body?.sessionId ||
+    req.query?.sessionId;
+
+  return {
+    accessCode: String(accessCode || '').trim(),
+    sessionId: String(sessionId || '').trim(),
+  };
+}
+
+// ==================================================
+// CHAT API ROUTES
+// ==================================================
+
+// GET /api/chat/profile
+apiRouter.get(['/chat/profile', '/api/chat/profile'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile, isMentor } = await getProfileBySessionCode(accessCode);
+    return res.json({
+      hasProfile: Boolean(profile),
+      profile,
+      isMentor,
+    });
+  } catch (err: any) {
+    console.error('[GET /api/chat/profile Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao buscar perfil do chat.' });
+  }
+});
+
+// POST /api/chat/profile
+apiRouter.post(['/chat/profile', '/api/chat/profile'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const result = await createChatProfile(accessCode, req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: result.error });
+    }
+    return res.status(201).json({ success: true, profile: result.profile });
+  } catch (err: any) {
+    console.error('[POST /api/chat/profile Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao criar perfil do chat.' });
+  }
+});
+
+// PUT /api/chat/profile
+apiRouter.put(['/chat/profile', '/api/chat/profile'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const result = await updateChatProfile(accessCode, req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: result.error });
+    }
+    return res.json({ success: true, profile: result.profile });
+  } catch (err: any) {
+    console.error('[PUT /api/chat/profile Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao atualizar perfil do chat.' });
+  }
+});
+
+// GET /api/chat/profiles/:id/public
+apiRouter.get(['/chat/profiles/:id/public', '/api/chat/profiles/:id/public'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    const targetId = Number(req.params.id);
+    if (!targetId) {
+      return res.status(400).json({ error: 'INVALID_ID', message: 'ID do perfil inválido.' });
+    }
+    const publicProfile = await getPublicProfile(targetId, accessCode);
+    if (!publicProfile) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: 'Perfil não encontrado.' });
+    }
+    return res.json({ profile: publicProfile });
+  } catch (err: any) {
+    console.error('[GET /api/chat/profiles/:id/public Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao buscar dados do perfil.' });
+  }
+});
+
+// GET /api/chat/rooms
+apiRouter.get(['/chat/rooms', '/api/chat/rooms'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+    const rooms = await getRooms(profile.id);
+    return res.json({ rooms });
+  } catch (err: any) {
+    console.error('[GET /api/chat/rooms Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao buscar salas do chat.' });
+  }
+});
+
+// GET /api/chat/rooms/:roomId/messages
+apiRouter.get(['/chat/rooms/:roomId/messages', '/api/chat/rooms/:roomId/messages'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+
+    const roomId = Number(req.params.roomId);
+    const beforeId = req.query.beforeId ? Number(req.query.beforeId) : undefined;
+    const afterId = req.query.afterId ? Number(req.query.afterId) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+
+    const messages = await getRoomMessages(roomId, profile.id, { beforeId, afterId, limit });
+    const notice = await getActiveNotice(roomId);
+
+    return res.json({ messages, notice });
+  } catch (err: any) {
+    console.error('[GET /api/chat/rooms/:roomId/messages Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao buscar mensagens.' });
+  }
+});
+
+// POST /api/chat/rooms/:roomId/messages
+apiRouter.post(['/chat/rooms/:roomId/messages', '/api/chat/rooms/:roomId/messages'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+
+    const roomId = Number(req.params.roomId);
+    const result = await sendMessage(roomId, profile, req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: 'SEND_FAILED', message: result.error });
+    }
+    return res.status(201).json({ success: true, message: result.message });
+  } catch (err: any) {
+    console.error('[POST /api/chat/rooms/:roomId/messages Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao enviar mensagem.' });
+  }
+});
+
+// POST /api/chat/upload-image
+apiRouter.post(['/chat/upload-image', '/api/chat/upload-image'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+    if (profile.chat_status === 'SUSPENDED' || profile.chat_status === 'BANNED') {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Sua conta está sem permissão para enviar imagens.' });
+    }
+
+    const { base64, mime, width, height } = req.body || {};
+    if (!base64 || typeof base64 !== 'string') {
+      return res.status(400).json({ error: 'INVALID_FILE', message: 'Nenhuma imagem foi enviada.' });
+    }
+
+    const cleanBase64 = base64.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+
+    // Max raw size check: 8 MB
+    if (buffer.length > 8 * 1024 * 1024) {
+      return res.status(400).json({ error: 'FILE_TOO_LARGE', message: 'A imagem excede o tamanho máximo de 8 MB.' });
+    }
+
+    // Validate MIME type
+    const allowedMimes: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+    };
+
+    const targetMime = (mime || '').toLowerCase();
+    if (!allowedMimes[targetMime]) {
+      return res.status(400).json({ error: 'UNSUPPORTED_FORMAT', message: 'Apenas imagens JPG, PNG ou WEBP são permitidas.' });
+    }
+
+    // Header / Magic Bytes Validation
+    let isValidMagic = false;
+    if (buffer.length >= 4) {
+      if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+        // JPEG
+        isValidMagic = true;
+      } else if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+        // PNG
+        isValidMagic = true;
+      } else if (
+        buffer.length >= 12 &&
+        buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 && // RIFF
+        buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x51  // WEBP
+      ) {
+        // WEBP
+        isValidMagic = true;
+      }
+    }
+
+    if (!isValidMagic) {
+      return res.status(400).json({ error: 'INVALID_IMAGE_HEADER', message: 'O arquivo enviado não possui um cabeçalho de imagem válido.' });
+    }
+
+    const uploadResult = await processAndUploadMedia({
+      profileId: profile.id,
+      base64: buffer.toString('base64'),
+      mime: targetMime,
+      mediaType: 'IMAGE',
+      width: width || 800,
+      height: height || 600,
+    });
+
+    if (!uploadResult.success || !uploadResult.media) {
+      return res.status(400).json({ error: 'UPLOAD_FAILED', message: uploadResult.error || 'Erro no upload.' });
+    }
+
+    const imageUrl = uploadResult.media.url;
+
+    return res.json({
+      success: true,
+      imageUrl,
+      image: {
+        url: imageUrl,
+        width: width || 800,
+        height: height || 600,
+        size: buffer.length,
+        mime: targetMime,
+      },
+      imageWidth: width || 800,
+      imageHeight: height || 600,
+      imageSize: buffer.length,
+      imageMime: targetMime,
+    });
+  } catch (err: any) {
+    console.error('[POST /api/chat/upload-image Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao processar e salvar a imagem.' });
+  }
+});
+
+// POST /api/chat/upload-profile-photo & POST /api/chat/profile/photo
+apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', '/chat/profile/photo', '/api/chat/profile/photo'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+    if (profile.chat_status === 'SUSPENDED' || profile.chat_status === 'BANNED') {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Sua conta está sem permissão para atualizar foto.' });
+    }
+
+    let buffer: Buffer | null = null;
+    let mime = 'image/jpeg';
+
+    if (Buffer.isBuffer(req.body)) {
+      buffer = req.body;
+      const headerMime = req.headers['content-type'];
+      if (headerMime && headerMime.startsWith('image/')) {
+        mime = headerMime;
+      }
+    } else if (req.body && typeof req.body === 'object') {
+      const { base64, mime: bodyMime } = req.body;
+      if (base64 && typeof base64 === 'string') {
+        const cleanBase64 = base64.replace(/^data:image\/[a-zA-Z+]+;base64,/, '');
+        buffer = Buffer.from(cleanBase64, 'base64');
+        if (bodyMime) mime = bodyMime;
+      }
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'INVALID_FILE', message: 'Nenhuma foto foi enviada.' });
+    }
+
+    if (buffer.length > 8 * 1024 * 1024) {
+      return res.status(400).json({ error: 'FILE_TOO_LARGE', message: 'A foto excede o tamanho máximo de 8 MB.' });
+    }
+
+    const uploadResult = await processAndUploadMedia({
+      profileId: profile.id,
+      base64: buffer.toString('base64'),
+      mime,
+      mediaType: 'AVATAR',
+    });
+
+    if (!uploadResult.success || !uploadResult.media) {
+      return res.status(400).json({ error: 'UPLOAD_FAILED', message: uploadResult.error || 'Erro no upload do avatar.' });
+    }
+
+    const photoUrl = uploadResult.media.url;
+
+    // Update profile photo_url directly in DB/memory
+    await updateChatProfile(accessCode, { photo_url: photoUrl });
+
+    return res.json({
+      success: true,
+      photoUrl,
+      image: {
+        url: photoUrl,
+        size: buffer.length,
+        mime,
+      },
+    });
+  } catch (err: any) {
+    console.error('[POST /api/chat/upload-profile-photo Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao processar e salvar foto de perfil.' });
+  }
+});
+
+// POST /api/chat/upload-audio
+apiRouter.post(['/chat/upload-audio', '/api/chat/upload-audio'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      console.warn('[CHAT PERMISSION] /api/chat/upload-audio DENIED: No accessCode');
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      console.warn('[CHAT PERMISSION] /api/chat/upload-audio DENIED: Profile not found', { accessCode: maskCodeForLogs(accessCode) });
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+    if (profile.chat_status === 'SUSPENDED' || profile.chat_status === 'BANNED') {
+      console.warn('[CHAT PERMISSION] /api/chat/upload-audio DENIED: Profile suspended/banned', { profileId: profile.id, status: profile.chat_status });
+      return res.status(403).json({ error: 'CHAT_SUSPENDED', message: 'Sua conta do chat está suspensa ou banida.' });
+    }
+
+    let buffer: Buffer | null = null;
+    let mimeType = 'audio/webm';
+    let durationSec = 0;
+
+    if (req.body && typeof req.body === 'object' && req.body.base64) {
+      const match = req.body.base64.match(/^data:(audio\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        buffer = Buffer.from(match[2], 'base64');
+      } else {
+        buffer = Buffer.from(req.body.base64, 'base64');
+      }
+      if (req.body.mime) mimeType = req.body.mime;
+      if (req.body.duration) durationSec = Number(req.body.duration) || 0;
+    } else if (Buffer.isBuffer(req.body)) {
+      buffer = req.body;
+      mimeType = (req.headers['content-type'] as string) || 'audio/webm';
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'INVALID_FILE', message: 'Nenhum áudio recebido.' });
+    }
+
+    if (buffer.length > 15 * 1024 * 1024) {
+      return res.status(400).json({ error: 'FILE_TOO_LARGE', message: 'O arquivo de áudio excede o limite de 15 MB.' });
+    }
+
+    const uploadResult = await processAndUploadMedia({
+      profileId: profile.id,
+      base64: buffer.toString('base64'),
+      mime: mimeType,
+      mediaType: 'AUDIO',
+      duration: durationSec,
+    });
+
+    if (!uploadResult.success || !uploadResult.media) {
+      return res.status(400).json({ error: 'UPLOAD_FAILED', message: uploadResult.error || 'Erro no upload do áudio.' });
+    }
+
+    const audioUrl = uploadResult.media.url;
+    console.log('[CHAT AUDIO UPLOAD OK]', { audioUrl, size: buffer.length, mimeType, durationSec });
+
+    return res.json({
+      success: true,
+      audioUrl,
+      audio: {
+        url: audioUrl,
+        size: buffer.length,
+        mime: mimeType,
+        duration: durationSec,
+      },
+      duration: durationSec,
+    });
+  } catch (err: any) {
+    console.error('[POST /api/chat/upload-audio Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao salvar áudio gravado.' });
+  }
+});
+
+// PUT /api/chat/messages/:messageId
+apiRouter.put(['/chat/messages/:messageId', '/api/chat/messages/:messageId'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+
+    const messageId = Number(req.params.messageId);
+    const { content } = req.body;
+    const result = await editMessage(messageId, profile.id, content);
+    if (!result.success) {
+      return res.status(400).json({ error: 'EDIT_FAILED', message: result.error });
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[PUT /api/chat/messages/:messageId Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao editar mensagem.' });
+  }
+});
+
+// DELETE /api/chat/messages/:messageId
+apiRouter.delete(['/chat/messages/:messageId', '/api/chat/messages/:messageId'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile, isMentor } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+
+    const messageId = Number(req.params.messageId);
+    const reason = req.body?.reason || req.query?.reason;
+    const result = await deleteMessage(messageId, profile.id, isMentor, reason);
+    if (!result.success) {
+      return res.status(400).json({ error: 'DELETE_FAILED', message: result.error });
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/chat/messages/:messageId Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao excluir mensagem.' });
+  }
+});
+
+// POST /api/chat/messages/:messageId/report
+apiRouter.post(['/chat/messages/:messageId/report', '/api/chat/messages/:messageId/report'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+
+    const messageId = Number(req.params.messageId);
+    const { reason, details } = req.body;
+    const result = await reportMessage(messageId, profile.id, reason, details);
+    if (!result.success) {
+      return res.status(400).json({ error: 'REPORT_FAILED', message: result.error });
+    }
+    return res.json({ success: true, message: 'Denúncia enviada ao Mentor com sucesso.' });
+  } catch (err: any) {
+    console.error('[POST /api/chat/messages/:messageId/report Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao enviar denúncia.' });
+  }
+});
+
+// POST /api/chat/rooms/:roomId/read
+apiRouter.post(['/chat/rooms/:roomId/read', '/api/chat/rooms/:roomId/read'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+
+    const roomId = Number(req.params.roomId);
+    const result = await markRoomAsRead(roomId, profile.id);
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[POST /api/chat/rooms/:roomId/read Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao marcar mensagens como lidas.' });
+  }
+});
+
+// POST /api/chat/typing
+apiRouter.post(['/chat/typing', '/api/chat/typing'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const { roomId = 1, isTyping } = req.body;
+    setTypingStatus(Number(roomId), profile.id, profile.nickname, Boolean(isTyping));
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/chat/rooms/:roomId/typing
+apiRouter.get(['/chat/rooms/:roomId/typing', '/api/chat/rooms/:roomId/typing'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    const { profile } = accessCode ? await getProfileBySessionCode(accessCode) : { profile: null };
+    const roomId = Number(req.params.roomId);
+    const typingUsers = getTypingUsers(roomId, profile?.id);
+    return res.json({ typingUsers });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// POST /api/chat/messages/:messageId/pin
+apiRouter.post(['/chat/messages/:messageId/pin', '/api/chat/messages/:messageId/pin'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { isMentor } = await getProfileBySessionCode(accessCode);
+    if (!isMentor) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Apenas o Mentor Bigode pode fixar mensagens.' });
+    }
+
+    const messageId = Number(req.params.messageId);
+    const { isPinned } = req.body;
+    const result = await pinMessage(messageId, Boolean(isPinned));
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/chat/rooms/:roomId/pinned
+apiRouter.get(['/chat/rooms/:roomId/pinned', '/api/chat/rooms/:roomId/pinned'], async (req, res) => {
+  try {
+    const roomId = Number(req.params.roomId);
+    const pinnedMessage = await getPinnedMessage(roomId);
+    return res.json({ pinnedMessage });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/chat/unread-count
+apiRouter.get(['/chat/unread-count', '/api/chat/unread-count'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.json({ totalUnread: 0 });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.json({ totalUnread: 0 });
+
+    const totalUnread = await getUnreadCountForProfile(profile.id);
+    const mentionsUnread = await getUnreadMentionsCount(profile.id);
+    return res.json({ totalUnread, mentionsUnread });
+  } catch (err: any) {
+    return res.json({ totalUnread: 0, mentionsUnread: 0 });
+  }
+});
+
+// V1.2 COMUNIDADE VIVA ROUTES
+
+// POST /api/chat/messages/:messageId/react
+apiRouter.post(['/chat/messages/:messageId/react', '/api/chat/messages/:messageId/react'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const messageId = Number(req.params.messageId);
+    const { emoji } = req.body;
+    if (!emoji) return res.status(400).json({ error: 'EMOJI_REQUIRED' });
+
+    const result = await toggleReaction(messageId, profile.id, String(emoji));
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/chat/members
+apiRouter.get(['/chat/members', '/api/chat/members'], async (_req, res) => {
+  try {
+    const members = await getCommunityMembersListForAutocomplete();
+    return res.json({ members });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// POST /api/chat/mentions/mark-read
+apiRouter.post(['/chat/mentions/mark-read', '/api/chat/mentions/mark-read'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const result = await markMentionsAsRead(profile.id);
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET & POST /api/chat/polls
+apiRouter.get(['/chat/polls', '/api/chat/polls'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    const { profile } = accessCode ? await getProfileBySessionCode(accessCode) : { profile: null };
+    const roomId = req.query.roomId ? Number(req.query.roomId) : 1;
+    const poll = await getActivePoll(roomId, profile?.id || 0);
+    return res.json({ poll });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+apiRouter.post(['/chat/polls', '/api/chat/polls'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { isMentor } = await getProfileBySessionCode(accessCode);
+    if (!isMentor) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Apenas o Mentor pode criar enquetes.' });
+    }
+
+    const { roomId = 1, question, options } = req.body;
+    const result = await createPoll(Number(roomId), question, options, accessCode);
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// POST /api/chat/polls/:id/vote
+apiRouter.post(['/chat/polls/:id/vote', '/api/chat/polls/:id/vote'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const pollId = Number(req.params.id);
+    const { optionIndex } = req.body;
+    if (optionIndex === undefined) return res.status(400).json({ error: 'OPTION_REQUIRED' });
+
+    const result = await votePoll(pollId, profile.id, Number(optionIndex));
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// POST & GET /api/chat/favorites
+apiRouter.post(['/chat/messages/:messageId/favorite', '/api/chat/messages/:messageId/favorite'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const messageId = Number(req.params.messageId);
+    const result = await toggleFavoriteMessage(profile.id, messageId);
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+apiRouter.get(['/chat/favorites', '/api/chat/favorites'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const favorites = await getUserFavoriteMessages(profile.id);
+    return res.json({ favorites });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/chat/online-members
+apiRouter.get(['/chat/online-members', '/api/chat/online-members'], async (_req, res) => {
+  try {
+    const members = await getOnlineMembersDrawerList();
+    return res.json({ members });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// GET /api/chat/ranking & /api/chat/stats
+apiRouter.get(['/chat/ranking', '/api/chat/ranking'], async (_req, res) => {
+  try {
+    const ranking = await getCommunityRanking();
+    return res.json({ ranking });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+apiRouter.get(['/chat/stats', '/api/chat/stats'], async (_req, res) => {
+  try {
+    const stats = await getCommunityStats();
+    return res.json({ stats });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// ADMIN MENTOR CHAT MODERATION ROUTES
+apiRouter.get(['/admin/chat/reports', '/api/admin/chat/reports'], requireMentorAuth, async (_req, res) => {
+  try {
+    const reports = await getAdminReports();
+    return res.json({ reports });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao buscar denúncias.' });
+  }
+});
+
+apiRouter.get(['/admin/chat/profiles', '/api/admin/chat/profiles'], requireMentorAuth, async (_req, res) => {
+  try {
+    const profiles = await getAdminProfilesList();
+    return res.json({ profiles });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao listar perfis do chat.' });
+  }
+});
+
+apiRouter.post(['/admin/chat/profiles/:profileId/suspend', '/api/admin/chat/profiles/:profileId/suspend'], requireMentorAuth, async (req, res) => {
+  try {
+    const profileId = Number(req.params.profileId);
+    const { reason } = req.body;
+    const result = await updateChatStatusByMentor(profileId, 'SUSPENDED', reason);
+    if (!result.success) return res.status(400).json({ error: 'ACTION_FAILED', message: result.error });
+    return res.json({ success: true, message: 'Usuário suspenso do chat.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao suspender usuário do chat.' });
+  }
+});
+
+apiRouter.post(['/admin/chat/profiles/:profileId/ban', '/api/admin/chat/profiles/:profileId/ban'], requireMentorAuth, async (req, res) => {
+  try {
+    const profileId = Number(req.params.profileId);
+    const { reason } = req.body;
+    const result = await updateChatStatusByMentor(profileId, 'BANNED', reason);
+    if (!result.success) return res.status(400).json({ error: 'ACTION_FAILED', message: result.error });
+    return res.json({ success: true, message: 'Usuário banido do chat.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao banir usuário do chat.' });
+  }
+});
+
+apiRouter.post(['/admin/chat/profiles/:profileId/reactivate', '/api/admin/chat/profiles/:profileId/reactivate'], requireMentorAuth, async (req, res) => {
+  try {
+    const profileId = Number(req.params.profileId);
+    const { reason } = req.body;
+    const result = await updateChatStatusByMentor(profileId, 'ACTIVE', reason);
+    if (!result.success) return res.status(400).json({ error: 'ACTION_FAILED', message: result.error });
+    return res.json({ success: true, message: 'Usuário reativado no chat.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao reativar usuário no chat.' });
+  }
+});
+
+apiRouter.post(['/admin/chat/profiles/:profileId/warn', '/api/admin/chat/profiles/:profileId/warn'], requireMentorAuth, async (req, res) => {
+  try {
+    const profileId = Number(req.params.profileId);
+    const { reason } = req.body;
+    const result = await warnUserByMentor(profileId, reason || 'Advertência por conduta no bate-papo');
+    if (!result.success) return res.status(400).json({ error: 'ACTION_FAILED', message: result.error });
+    return res.json({ success: true, message: 'Advertência registrada.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao aplicar advertência.' });
+  }
+});
+
+apiRouter.post(['/admin/chat/notices', '/api/admin/chat/notices'], requireMentorAuth, async (req, res) => {
+  try {
+    const { roomId = 1, content } = req.body;
+    const result = await createOfficialNotice(Number(roomId), content);
+    if (!result.success) return res.status(400).json({ error: 'ACTION_FAILED', message: result.error });
+    return res.json({ success: true, message: 'Aviso oficial publicado.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao publicar aviso.' });
   }
 });
 
