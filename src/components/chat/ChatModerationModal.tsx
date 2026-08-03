@@ -1,0 +1,359 @@
+import React, { useState, useEffect } from 'react';
+import { X, ShieldAlert, Flag, Users, Pin, CheckCircle, Ban, AlertTriangle, RefreshCw, Trash2, ShieldCheck } from 'lucide-react';
+
+interface ChatModerationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  studentCode: string;
+}
+
+export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
+  isOpen,
+  onClose,
+  studentCode,
+}) => {
+  const [activeTab, setActiveTab] = useState<'reports' | 'members' | 'notice'>('reports');
+  const [reports, setReports] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [noticeContent, setNoticeContent] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchReports = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/chat/reports', {
+        headers: { 'x-access-code': studentCode },
+      });
+      const data = await res.json();
+      if (data.reports) setReports(data.reports);
+    } catch (err) {
+      console.error('Error fetching reports:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProfiles = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/chat/profiles', {
+        headers: { 'x-access-code': studentCode },
+      });
+      const data = await res.json();
+      if (data.profiles) setProfiles(data.profiles);
+    } catch (err) {
+      console.error('Error fetching chat profiles:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      if (activeTab === 'reports') fetchReports();
+      if (activeTab === 'members') fetchProfiles();
+    }
+  }, [isOpen, activeTab]);
+
+  if (!isOpen) return null;
+
+  const handleUpdateStatus = async (profileId: number, status: 'SUSPENDED' | 'BANNED' | 'ACTIVE', reason: string) => {
+    try {
+      const endpoint = status === 'SUSPENDED' ? 'suspend' : status === 'BANNED' ? 'ban' : 'reactivate';
+      const res = await fetch(`/api/admin/chat/profiles/${profileId}/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': studentCode,
+        },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMsg(`Ação executada com sucesso.`);
+        fetchProfiles();
+        setTimeout(() => setActionMsg(null), 3000);
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+    }
+  };
+
+  const handlePublishNotice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!noticeContent.trim()) return;
+
+    try {
+      const res = await fetch('/api/admin/chat/notices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': studentCode,
+        },
+        body: JSON.stringify({ roomId: 1, content: noticeContent.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMsg('Aviso oficial publicado com sucesso!');
+        setNoticeContent('');
+        setTimeout(() => setActionMsg(null), 3000);
+      }
+    } catch (err) {
+      console.error('Error publishing notice:', err);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      const res = await fetch(`/api/chat/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': studentCode,
+        },
+        body: JSON.stringify({ reason: 'Removida pela moderação do Mentor' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMsg('Mensagem excluída.');
+        fetchReports();
+        setTimeout(() => setActionMsg(null), 3000);
+      }
+    } catch (err) {
+      console.error('Error deleting message:', err);
+    }
+  };
+
+  const filteredProfiles = profiles.filter((p) =>
+    p.nickname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.phone && p.phone.includes(searchTerm))
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+      <div className="bg-[#0b141a] border border-amber-500/40 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-[#111b21] via-[#1f2c34] to-[#111b21] p-4 border-b border-amber-500/30 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-base flex items-center gap-2">
+                Painel de Moderação do Bate-papo
+              </h3>
+              <p className="text-amber-400/80 text-xs">Gestão exclusiva do Mentor Bigode</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/60 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="bg-[#111b21] px-4 pt-3 flex space-x-2 border-b border-slate-800">
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+              activeTab === 'reports'
+                ? 'bg-[#0b141a] text-amber-300 border-t-2 border-x border-amber-500/50'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Flag className="w-3.5 h-3.5" />
+            <span>Denúncias ({reports.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+              activeTab === 'members'
+                ? 'bg-[#0b141a] text-emerald-300 border-t-2 border-x border-emerald-500/50'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Alunos do Chat ({profiles.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('notice')}
+            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+              activeTab === 'notice'
+                ? 'bg-[#0b141a] text-cyan-300 border-t-2 border-x border-cyan-500/50'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Pin className="w-3.5 h-3.5" />
+            <span>Publicar Aviso Oficial</span>
+          </button>
+        </div>
+
+        {/* Action feedback */}
+        {actionMsg && (
+          <div className="mx-4 mt-3 p-2.5 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-300 text-xs flex items-center space-x-2">
+            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{actionMsg}</span>
+          </div>
+        )}
+
+        {/* Tab Body */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 text-slate-200">
+          
+          {/* TAB 1: REPORTS */}
+          {activeTab === 'reports' && (
+            <div className="space-y-3">
+              {reports.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs bg-[#111b21] rounded-2xl border border-slate-800">
+                  <ShieldCheck className="w-8 h-8 text-emerald-400 mx-auto mb-2 opacity-60" />
+                  Nenhuma denúncia pendente na comunidade.
+                </div>
+              ) : (
+                reports.map((rep) => (
+                  <div key={rep.id} className="p-3.5 bg-[#111b21] border border-amber-500/30 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-amber-300 flex items-center gap-1">
+                        <Flag className="w-3.5 h-3.5 text-amber-400" />
+                        Motivo: {rep.reason}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Denunciado por: {rep.reporter_nickname}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-[#0b141a] rounded-lg border border-slate-800 text-xs">
+                      <span className="text-emerald-400 font-bold text-[11px] block mb-0.5">
+                        {rep.author_nickname} (Tel: {rep.author_phone || 'Privado'})
+                      </span>
+                      <p className="text-slate-200 italic">
+                        "{rep.message_content}"
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-end space-x-2 pt-1">
+                      <button
+                        onClick={() => handleDeleteMessage(rep.message_id)}
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 hover:bg-rose-900 text-[11px] font-semibold flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Apagar Mensagem
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(rep.author_profile_id, 'SUSPENDED', rep.reason)}
+                        className="px-2.5 py-1.5 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 hover:bg-amber-900 text-[11px] font-semibold flex items-center gap-1"
+                      >
+                        <AlertTriangle className="w-3 h-3" />
+                        Suspender Aluno
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: MEMBERS */}
+          {activeTab === 'members' && (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nickname ou telefone..."
+                className="w-full bg-[#111b21] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+
+              <div className="space-y-2">
+                {filteredProfiles.map((p) => (
+                  <div key={p.id} className="p-3 bg-[#111b21] border border-slate-800 rounded-xl flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-white text-sm">{p.nickname}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          p.chat_status === 'ACTIVE'
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40'
+                            : p.chat_status === 'SUSPENDED'
+                            ? 'bg-amber-950 text-amber-400 border border-amber-500/40'
+                            : 'bg-rose-950 text-rose-400 border border-rose-500/40'
+                        }`}>
+                          {p.chat_status === 'ACTIVE' ? 'Ativo' : p.chat_status === 'SUSPENDED' ? 'Suspenso' : 'Banido'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 block mt-0.5">
+                        WhatsApp: {p.phone} • Msgs: {p.message_count || 0} • Denúncias: {p.report_count || 0}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-1.5">
+                      {p.chat_status === 'ACTIVE' ? (
+                        <>
+                          <button
+                            onClick={() => handleUpdateStatus(p.id, 'SUSPENDED', 'Ação direta do Mentor')}
+                            className="px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[11px] font-semibold hover:bg-amber-900"
+                          >
+                            Suspender
+                          </button>
+                          <button
+                            onClick={() => handleUpdateStatus(p.id, 'BANNED', 'Ação direta do Mentor')}
+                            className="px-2.5 py-1 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 text-[11px] font-semibold hover:bg-rose-900"
+                          >
+                            Banir
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => handleUpdateStatus(p.id, 'ACTIVE', 'Reativado pelo Mentor')}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold hover:bg-emerald-900 flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Reativar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: NOTICE */}
+          {activeTab === 'notice' && (
+            <form onSubmit={handlePublishNotice} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Texto do Aviso Fixo no Topo do Chat
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={noticeContent}
+                  onChange={(e) => setNoticeContent(e.target.value)}
+                  placeholder="Escreva a mensagem oficial que ficará fixada no topo da sala de bate-papo para todos os alunos..."
+                  className="w-full bg-[#111b21] border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={!noticeContent.trim()}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transition-all shadow-lg shadow-cyan-950/50 disabled:opacity-50 flex items-center space-x-1.5"
+                >
+                  <Pin className="w-3.5 h-3.5" />
+                  <span>Publicar e Fixar Aviso</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+};
