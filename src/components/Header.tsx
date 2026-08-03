@@ -150,11 +150,12 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Sair Button */}
             {onDisconnectApiKey && (
               <button
+                type="button"
                 onClick={onDisconnectApiKey}
-                className="px-2 py-1 rounded-lg text-[11px] font-bold flex items-center space-x-1 border border-rose-500/40 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 transition-all shadow-xs shrink-0 ml-4 sm:ml-0"
+                className="px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg text-xs sm:text-[11px] font-bold flex items-center space-x-1.5 border border-rose-500/40 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 transition-all shadow-xs shrink-0 ml-4 sm:ml-2.5 active:scale-95 cursor-pointer min-h-[36px] sm:min-h-0"
                 title="Sair"
               >
-                <LogOut className="w-3 h-3 shrink-0" />
+                <LogOut className="w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0 text-rose-400" />
                 <span>Sair</span>
               </button>
             )}
