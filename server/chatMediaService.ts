@@ -50,7 +50,23 @@ export async function processAndUploadMedia(params: UploadMediaParams): Promise<
     const cleanBase64 = String(base64).replace(/^data:[^;]+;base64,/, '');
     const buffer = Buffer.from(cleanBase64, 'base64');
 
+    console.log('[AUDIO BACKEND BUFFER]', {
+      receivedBase64Length: String(base64).length,
+      cleanBase64Length: cleanBase64.length,
+      bufferLength: buffer.length,
+      mime,
+      mediaType,
+    });
+
     const isAudio = mediaType === 'AUDIO' || (mime && mime.startsWith('audio'));
+
+    if (isAudio && buffer.length < 100) {
+      return {
+        success: false,
+        error: 'AUDIO_EMPTY: O áudio capturado está vazio ou corrompido.',
+      };
+    }
+
     const isAvatar = mediaType === 'AVATAR';
     const finalType: 'IMAGE' | 'AUDIO' | 'AVATAR' | 'STICKER' | 'GIF' = isAudio ? 'AUDIO' : isAvatar ? 'AVATAR' : (mediaType === 'STICKER' ? 'STICKER' : (mediaType === 'GIF' || (mime && mime.includes('gif')) ? 'GIF' : 'IMAGE'));
 
@@ -99,6 +115,14 @@ export async function processAndUploadMedia(params: UploadMediaParams): Promise<
       const blob = new Blob([buffer], { type: mimeType });
       formData.append('file', blob, fileName);
       formData.append('storage_key', storageKey);
+
+      console.log('[AUDIO HOSTINGER SEND]', {
+        fileName,
+        storageKey,
+        mimeType,
+        bufferLength: buffer.length,
+        blobSize: blob.size,
+      });
 
       const response = await fetch(HOSTINGER_UPLOAD_API, {
         method: 'POST',
