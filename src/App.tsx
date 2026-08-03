@@ -13,6 +13,7 @@ import { MultiAgentModal } from './components/MultiAgentModal';
 import { ExportModal } from './components/ExportModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { MentorPanel } from './components/mentor/MentorPanel';
+import { ChatPage } from './components/chat/ChatPage';
 import { TechGridBackground } from './components/TechGridBackground';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
@@ -34,7 +35,7 @@ export default function App() {
     return localStorage.getItem('user_session_id') || '';
   });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [activeView, setActiveView] = useState<'hub' | 'mentor'>('hub');
+  const [activeView, setActiveView] = useState<'hub' | 'mentor' | 'chat'>('hub');
 
   const isMaster = isMasterKey(studentCode);
   const userIdentifier = studentCode
@@ -60,6 +61,18 @@ export default function App() {
   const [showGeracaoZProModal, setShowGeracaoZProModal] = useState(false);
   const [showCertificadosModal, setShowCertificadosModal] = useState(false);
   const [showAfiliadosModal, setShowAfiliadosModal] = useState(false);
+
+  // Lock body scroll when in chat view to prevent external scrollbar on mobile
+  useEffect(() => {
+    if (activeView === 'chat') {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [activeView]);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -502,10 +515,12 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
   }
 
   return (
-    <div className="min-h-screen bg-[#03131c] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white pb-20 relative overflow-x-hidden">
+    <div className={`min-h-screen bg-[#03131c] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white relative overflow-x-hidden ${
+      activeView === 'chat' ? 'h-screen overflow-hidden flex flex-col p-0' : 'pb-20'
+    }`}>
       <TechGridBackground />
 
-      <div className="relative z-10">
+      <div className={`relative z-10 ${activeView === 'chat' ? 'h-full flex flex-col overflow-hidden' : ''}`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 flex items-center space-x-2 bg-slate-900 text-white dark:bg-emerald-600 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold animate-in slide-in-from-bottom duration-200">
@@ -535,9 +550,19 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
       />
 
       {/* Container */}
-      <main className={`max-w-7xl mx-auto px-4 lg:px-8 pt-6 transition-all duration-300 ${!userApiKey ? 'filter blur-lg opacity-20 pointer-events-none select-none' : ''}`}>
+      <main className={`transition-all duration-300 ${
+        activeView === 'chat'
+          ? 'w-full flex-1 min-h-0 overflow-hidden p-0 m-0 max-w-full flex flex-col'
+          : 'max-w-7xl mx-auto px-4 lg:px-8 pt-6'
+      } ${!userApiKey ? 'filter blur-lg opacity-20 pointer-events-none select-none' : ''}`}>
         
-        {isMaster && activeView === 'mentor' ? (
+        {activeView === 'chat' ? (
+          <ChatPage
+            studentCode={studentCode}
+            sessionId={sessionId}
+            onLogout={handleDisconnectApiKey}
+          />
+        ) : isMaster && activeView === 'mentor' ? (
           <MentorPanel
             studentCode={studentCode}
             onBackToHub={() => setActiveView('hub')}

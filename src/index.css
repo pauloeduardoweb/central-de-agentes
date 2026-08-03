@@ -67,3 +67,77 @@
   -webkit-transform: rotateY(180deg);
 }
 
+@keyframes msgEntry {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-msg-entry {
+  animation: msgEntry 180ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-msg-entry {
+    animation: none !important;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar alias for chat feed (#EFEAE2 clear background) */
+.custom-scrollbar::-webkit-scrollbar,
+.chat-feed-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track,
+.chat-feed-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.chat-feed-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(0, 168, 132, 0.18);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.chat-feed-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #FFFFFF;
+}
+.custom-scrollbar,
+.chat-feed-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.98) transparent;
+}
+
+/* Dark panel scrollbar for dark drawers & modals */
+.dark-panel-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.dark-panel-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dark-panel-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(174, 186, 193, 0.28);
+  border-radius: 9999px;
+}
+.dark-panel-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(174, 186, 193, 0.45);
+}
+.dark-panel-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(174, 186, 193, 0.28) transparent;
+}
+
