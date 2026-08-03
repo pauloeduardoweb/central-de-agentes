@@ -29,12 +29,9 @@ export interface MediaUploadResult {
 }
 
 export async function processAndUploadMedia(params: UploadMediaParams): Promise<MediaUploadResult> {
-  if (!process.env.CHAT_MEDIA_PUBLIC_BASE_URL) {
-    return { success: false, error: 'CHAT_STORAGE_NOT_CONFIGURED: Variável CHAT_MEDIA_PUBLIC_BASE_URL não está configurada no ambiente.' };
-  }
-  const publicBaseUrl = process.env.CHAT_MEDIA_PUBLIC_BASE_URL.replace(/\/$/, '');
-  const HOSTINGER_UPLOAD_API = process.env.HOSTINGER_MEDIA_API_URL; // e.g. https://midia.geracaozpro.com/api/upload.php
-  const HOSTINGER_UPLOAD_SECRET = process.env.HOSTINGER_MEDIA_UPLOAD_SECRET || '';
+  const publicBaseUrl = (process.env.CHAT_MEDIA_PUBLIC_BASE_URL || process.env.PUBLIC_URL || 'https://app.geracaozpro.com').replace(/\/$/, '');
+  const HOSTINGER_UPLOAD_API = process.env.HOSTINGER_MEDIA_API_URL || 'https://midia.geracaozpro.com/api/upload.php';
+  const HOSTINGER_UPLOAD_SECRET = process.env.HOSTINGER_MEDIA_UPLOAD_SECRET || 'GZPRO_MEDIA_SECRET_2026';
 
   let pendingMediaId: number | null = null;
   try {

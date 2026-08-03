@@ -415,6 +415,7 @@ const handleMediaUpload = async (req: Request, res: Response) => {
 
 chatExtraRouter.post('/chat/upload', handleMediaUpload);
 chatExtraRouter.post('/chat/upload-audio', handleMediaUpload);
+chatExtraRouter.post('/chat/upload-image', handleMediaUpload);
 
 // POST /api/admin/chat/profiles/:id/xp (Mentor manually adjusts user XP)
 chatExtraRouter.post('/admin/chat/profiles/:id/xp', async (req: Request, res: Response) => {

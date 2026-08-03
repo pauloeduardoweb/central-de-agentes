@@ -30,8 +30,9 @@ export async function testDatabaseConnection(): Promise<boolean> {
   }
 }
 
+let codigosAcessoEnsured = false;
 export async function ensureCodigosAcessoTable(): Promise<void> {
-  if (!isDatabaseConfigured()) return;
+  if (!isDatabaseConfigured() || codigosAcessoEnsured) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS codigos_acesso (
@@ -77,13 +78,15 @@ export async function ensureCodigosAcessoTable(): Promise<void> {
     for (const q of alterQueries) {
       await db.query(q).catch(() => {});
     }
+    codigosAcessoEnsured = true;
   } catch (err: any) {
     console.warn('[MySQL ensureCodigosAcessoTable Error]:', err?.message || err);
   }
 }
 
+let sessionsTableEnsured = false;
 export async function ensureSessionsTable(): Promise<void> {
-  if (!isDatabaseConfigured()) return;
+  if (!isDatabaseConfigured() || sessionsTableEnsured) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS sessoes (
@@ -147,6 +150,7 @@ export async function ensureSessionsTable(): Promise<void> {
     await ensureAgentInteractionsTable();
     await cleanLegacyDisconnections();
     await migrateLegacyStatsAndPages();
+    sessionsTableEnsured = true;
   } catch (err: any) {
     console.warn('[MySQL ensureSessionsTable Error]:', err?.message || err);
   }
@@ -470,8 +474,9 @@ export async function ensureAgentInteractionsTable(): Promise<void> {
   }
 }
 
+let chatTablesEnsured = false;
 export async function ensureChatTables(): Promise<void> {
-  if (!isDatabaseConfigured()) return;
+  if (!isDatabaseConfigured() || chatTablesEnsured) return;
   try {
     // 1. chat_profiles
     await db.query(`
@@ -894,6 +899,7 @@ export async function ensureChatTables(): Promise<void> {
         UNIQUE KEY uk_prof_blocked (profile_id, blocked_profile_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+    chatTablesEnsured = true;
   } catch (err: any) {
     console.warn('[MySQL ensureChatTables Error]:', err?.message || err);
   }
