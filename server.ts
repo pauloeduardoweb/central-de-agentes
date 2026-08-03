@@ -1723,10 +1723,7 @@ apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', 
       return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão expirada. Entre novamente.' });
     }
     const { profile } = await getProfileBySessionCode(accessCode);
-    if (!profile) {
-      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
-    }
-    if (profile.chat_status === 'SUSPENDED' || profile.chat_status === 'BANNED') {
+    if (profile && (profile.chat_status === 'SUSPENDED' || profile.chat_status === 'BANNED')) {
       return res.status(403).json({ error: 'FORBIDDEN', message: 'Sua conta está sem permissão para atualizar foto.' });
     }
 
@@ -1760,20 +1757,25 @@ apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', 
     }
 
     const uploadResult = await processAndUploadMedia({
-      profileId: profile.id,
+      profileId: profile ? profile.id : null,
       base64: buffer.toString('base64'),
       mime,
       mediaType: 'AVATAR',
     });
 
     if (!uploadResult.success || !uploadResult.media) {
-      return res.status(400).json({ error: 'UPLOAD_FAILED', message: uploadResult.error || 'Não foi possível atualizar a foto do perfil.' });
+      return res.status(400).json({
+        error: 'UPLOAD_FAILED',
+        message: 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.',
+      });
     }
 
     const photoUrl = uploadResult.media.url;
 
-    // Update profile photo_url directly in DB/memory
-    await updateChatProfile(accessCode, { photo_url: photoUrl });
+    // Update profile photo_url in DB/memory ONLY IF profile already exists (Edit Mode)
+    if (profile) {
+      await updateChatProfile(accessCode, { photo_url: photoUrl });
+    }
 
     return res.json({
       success: true,
@@ -1786,7 +1788,10 @@ apiRouter.post(['/chat/upload-profile-photo', '/api/chat/upload-profile-photo', 
     });
   } catch (err: any) {
     console.error('[POST /api/chat/upload-profile-photo Error]:', err);
-    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Não foi possível atualizar a foto do perfil.' });
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Não foi possível enviar a foto. Você pode concluir o cadastro sem ela.',
+    });
   }
 });
 
