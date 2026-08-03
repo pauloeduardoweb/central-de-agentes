@@ -265,21 +265,42 @@ export async function createChatProfile(
     phone_visibility?: 'MENTOR_ONLY' | 'MEMBERS';
     accept_rules: boolean;
   }
-): Promise<{ success: boolean; profile?: any; error?: string }> {
+): Promise<{ success: boolean; profile?: any; error?: string; field?: string; message?: string }> {
+  console.log('[PROFILE SAVE START]');
+  console.log('[PROFILE SAVE MODE] CREATE');
+
   const cleanCode = normalizeAccessCode(rawCode);
   const isMentor = isMasterKey(cleanCode);
 
   if (!data.accept_rules) {
-    return { success: false, error: 'É necessário aceitar as regras da comunidade para se cadastrar.' };
+    console.log('[PROFILE VALIDATION ERROR] field: rules_accepted, message: É necessário aceitar as regras da comunidade para se cadastrar.');
+    return {
+      success: false,
+      error: 'VALIDATION_ERROR',
+      field: 'rules_accepted',
+      message: 'É necessário aceitar as regras da comunidade para se cadastrar.',
+    };
   }
 
   if (!data.phone || typeof data.phone !== 'string' || data.phone.trim().length < 8) {
-    return { success: false, error: 'Informe um número de telefone válido.' };
+    console.log('[PROFILE VALIDATION ERROR] field: phone, message: Informe um número de telefone válido.');
+    return {
+      success: false,
+      error: 'VALIDATION_ERROR',
+      field: 'phone',
+      message: 'Informe um número de telefone válido.',
+    };
   }
 
   const validNick = validateNickname(data.nickname, isMentor);
   if (!validNick.valid) {
-    return { success: false, error: validNick.message };
+    console.log(`[PROFILE VALIDATION ERROR] field: nickname, message: ${validNick.message}`);
+    return {
+      success: false,
+      error: 'VALIDATION_ERROR',
+      field: 'nickname',
+      message: validNick.message,
+    };
   }
 
   const cleanNick = data.nickname.trim();
@@ -303,7 +324,6 @@ export async function createChatProfile(
   }
 
   if (isDatabaseConfigured()) {
-    await ensureChatTables();
     try {
       // Check nickname uniqueness
       const [existing]: any = await db.query(
@@ -311,7 +331,13 @@ export async function createChatProfile(
         [cleanNick, cleanCode]
       );
       if (Array.isArray(existing) && existing.length > 0) {
-        return { success: false, error: 'Este Nickname já está em uso por outro aluno. Escolha outro.' };
+        console.log('[PROFILE VALIDATION ERROR] field: nickname, message: Este Nickname já está em uso por outro aluno.');
+        return {
+          success: false,
+          error: 'VALIDATION_ERROR',
+          field: 'nickname',
+          message: 'Este Nickname já está em uso por outro aluno. Escolha outro.',
+        };
       }
 
       // Check if profile already exists for code
@@ -352,18 +378,33 @@ export async function createChatProfile(
       const [pRows]: any = await db.query(`SELECT * FROM chat_profiles WHERE id = ?`, [newId]);
       return { success: true, profile: pRows[0] };
     } catch (err: any) {
-      console.error('[createChatProfile Error]:', err);
+      console.error('[PROFILE DB ERROR]', 'code:', err?.code, 'errno:', err?.errno, 'sqlState:', err?.sqlState, 'message:', err?.message || err);
       if (err?.code === 'ER_DUP_ENTRY') {
-        return { success: false, error: 'Nickname ou chave já em uso.' };
+        return {
+          success: false,
+          error: 'VALIDATION_ERROR',
+          field: 'nickname',
+          message: 'Nickname ou chave já em uso.',
+        };
       }
-      return { success: false, error: 'Não foi possível salvar o perfil.' };
+      return {
+        success: false,
+        error: 'DATABASE_ERROR',
+        message: 'O banco de dados está temporariamente sobrecarregado. Aguarde alguns minutos e tente novamente.',
+      };
     }
   }
 
   // Memory fallback
   for (const p of memoryProfilesMap.values()) {
     if (p.nickname.toLowerCase() === cleanNick.toLowerCase() && p.codigo !== cleanCode) {
-      return { success: false, error: 'Este Nickname já está em uso por outro aluno. Escolha outro.' };
+      console.log('[PROFILE VALIDATION ERROR] field: nickname, message: Este Nickname já está em uso por outro aluno.');
+      return {
+        success: false,
+        error: 'VALIDATION_ERROR',
+        field: 'nickname',
+        message: 'Este Nickname já está em uso por outro aluno. Escolha outro.',
+      };
     }
   }
 
@@ -394,17 +435,62 @@ export async function createChatProfile(
 export async function updateChatProfile(
   rawCode: string,
   data: {
+    nickname?: string;
     photo_url?: string | null;
     phone?: string;
     phone_visibility?: 'MENTOR_ONLY' | 'MEMBERS';
     bio?: string | null;
   }
-): Promise<{ success: boolean; profile?: any; error?: string }> {
+): Promise<{ success: boolean; profile?: any; error?: string; field?: string; message?: string }> {
+  console.log('[PROFILE SAVE START]');
+  console.log('[PROFILE SAVE MODE] UPDATE');
+
   const cleanCode = normalizeAccessCode(rawCode);
+  const isMentor = isMasterKey(cleanCode);
 
   const { profile } = await getProfileBySessionCode(cleanCode);
   if (!profile) {
-    return { success: false, error: 'Perfil não encontrado.' };
+    return {
+      success: false,
+      error: 'VALIDATION_ERROR',
+      field: 'session',
+      message: 'Perfil não encontrado.',
+    };
+  }
+
+  let nickname = profile.nickname;
+  if (data.nickname && typeof data.nickname === 'string' && data.nickname.trim() !== profile.nickname) {
+    const validNick = validateNickname(data.nickname, isMentor);
+    if (!validNick.valid) {
+      console.log(`[PROFILE VALIDATION ERROR] field: nickname, message: ${validNick.message}`);
+      return {
+        success: false,
+        error: 'VALIDATION_ERROR',
+        field: 'nickname',
+        message: validNick.message,
+      };
+    }
+    const cleanNickCandidate = data.nickname.trim();
+    if (isDatabaseConfigured()) {
+      try {
+        const [existing]: any = await db.query(
+          `SELECT id FROM chat_profiles WHERE nickname = ? AND id != ? LIMIT 1`,
+          [cleanNickCandidate, profile.id]
+        );
+        if (Array.isArray(existing) && existing.length > 0) {
+          console.log('[PROFILE VALIDATION ERROR] field: nickname, message: Este Nickname já está em uso por outro aluno.');
+          return {
+            success: false,
+            error: 'VALIDATION_ERROR',
+            field: 'nickname',
+            message: 'Este Nickname já está em uso por outro aluno. Escolha outro.',
+          };
+        }
+      } catch (e: any) {
+        console.error('[PROFILE DB ERROR]', 'code:', e?.code, 'errno:', e?.errno, 'sqlState:', e?.sqlState, 'message:', e?.message || e);
+      }
+    }
+    nickname = cleanNickCandidate;
   }
 
   let photo = data.photo_url !== undefined ? data.photo_url : profile.photo_url;
@@ -431,18 +517,23 @@ export async function updateChatProfile(
     try {
       await db.query(
         `UPDATE chat_profiles
-         SET photo_url = ?, phone = ?, phone_visibility = ?, bio = ?, updated_at = NOW()
+         SET nickname = ?, photo_url = ?, phone = ?, phone_visibility = ?, bio = ?, updated_at = NOW()
          WHERE id = ?`,
-        [photo, phone, visibility, bio, profile.id]
+        [nickname, photo, phone, visibility, bio, profile.id]
       );
       const [rows]: any = await db.query(`SELECT * FROM chat_profiles WHERE id = ?`, [profile.id]);
       return { success: true, profile: rows[0] };
-    } catch (err) {
-      console.error('[updateChatProfile Error]:', err);
-      return { success: false, error: 'Não foi possível atualizar a foto do perfil.' };
+    } catch (err: any) {
+      console.error('[PROFILE DB ERROR]', 'code:', err?.code, 'errno:', err?.errno, 'sqlState:', err?.sqlState, 'message:', err?.message || err);
+      return {
+        success: false,
+        error: 'DATABASE_ERROR',
+        message: 'O banco de dados está temporariamente sobrecarregado. Aguarde alguns minutos e tente novamente.',
+      };
     }
   }
 
+  profile.nickname = nickname;
   profile.photo_url = photo;
   profile.phone = phone;
   profile.phone_visibility = visibility;
