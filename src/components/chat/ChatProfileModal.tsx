@@ -117,23 +117,29 @@ export const ChatProfileModal: React.FC<ChatProfileModalProps> = ({
     setError(null);
     setUploadingAvatar(true);
 
+    let tempBlobUrl: string | null = null;
     try {
-      const localPreviewUrl = URL.createObjectURL(file);
-      setPhotoUrl(localPreviewUrl);
+      tempBlobUrl = URL.createObjectURL(file);
+      setPhotoUrl(tempBlobUrl);
     } catch (err) {}
 
     try {
       const compressed = await compressAndPrepareAvatar(file);
-      setPhotoUrl(compressed.base64);
 
       if (onUploadAvatar) {
         const res = await onUploadAvatar(compressed.file);
         if (res.success && res.photoUrl) {
+          if (tempBlobUrl) {
+            try { URL.revokeObjectURL(tempBlobUrl); } catch (e) {}
+          }
           setPhotoUrl(res.photoUrl);
+        } else {
+          setError(res.error || 'Não foi possível enviar a foto para o servidor.');
         }
       }
     } catch (err: any) {
       console.warn('[Avatar upload note]:', err);
+      setError('Erro ao preparar e enviar imagem de perfil.');
     } finally {
       setUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

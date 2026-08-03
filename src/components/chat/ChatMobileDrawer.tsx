@@ -363,10 +363,10 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
                   onOpenRules();
                   onClose();
                 }}
-                className="w-full p-2.5 rounded-xl bg-[#111B21] hover:bg-[#182229] text-white border border-[#263A43] flex items-center space-x-2.5 transition-colors text-left cursor-pointer"
+                className="w-full p-2.5 rounded-xl bg-[#111B21] hover:bg-[#182229] text-white border border-[#263A43] flex items-center gap-2.5 transition-colors text-left cursor-pointer"
               >
                 <BookOpen className="w-4 h-4 text-[#00A884] shrink-0" />
-                <span>Regras da Comunidade</span>
+                <span className="text-xs font-medium text-white leading-normal">Regras da Comunidade</span>
               </button>
 
               {onLogout && (

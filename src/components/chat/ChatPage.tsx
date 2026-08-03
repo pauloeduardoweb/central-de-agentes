@@ -573,23 +573,31 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   // Profile photo upload handler
   const handleUploadAvatar = async (file: File) => {
     try {
-      const res = await fetch('/api/chat/upload-profile-photo', {
-        method: 'POST',
-        headers: {
-          'x-access-code': studentCode,
-          'x-session-id': sessionId || '',
-        },
-        body: file,
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        const photoUrl = data.photoUrl || data.image?.url;
+      const base64 = await base64Promise;
+
+      const res = await chatApiFetch('/api/chat/upload-profile-photo', {
+        method: 'POST',
+        body: {
+          base64,
+          mime: file.type || 'image/webp',
+          mediaType: 'AVATAR',
+        },
+      });
+
+      if (res.ok && res.data?.success) {
+        const photoUrl = res.data.photoUrl || res.data.imageUrl || res.data.media?.url;
         if (profile) {
           setProfile({ ...profile, photo_url: photoUrl });
         }
         return { success: true, photoUrl };
       }
-      return { success: false, error: data.message || 'Erro ao enviar foto de perfil.' };
+      return { success: false, error: res.error || res.data?.message || 'Erro ao enviar foto de perfil.' };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Erro de conexão no upload.' };
     }
