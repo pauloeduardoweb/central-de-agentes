@@ -1,1 +1,19 @@
+# Prevent execution of scripts in uploads directory
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|cgi|asp|js|sh)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
 
+# Allow access to media formats
+<FilesMatch "\.(jpg|jpeg|png|webp|gif|webm|ogg|mp3|wav|m4a|svg)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# CORS Headers for cross-origin media loading
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, OPTIONS"
+    Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept"
+    Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>
