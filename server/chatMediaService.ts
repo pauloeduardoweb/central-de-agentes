@@ -1,5 +1,3 @@
-import path from 'path';
-import fs from 'fs';
 import crypto from 'crypto';
 import { db, isDatabaseConfigured } from './database.js';
 
@@ -29,9 +27,17 @@ export interface MediaUploadResult {
 }
 
 export async function processAndUploadMedia(params: UploadMediaParams): Promise<MediaUploadResult> {
-  const publicBaseUrl = (process.env.CHAT_MEDIA_PUBLIC_BASE_URL || process.env.PUBLIC_URL || 'https://app.geracaozpro.com').replace(/\/$/, '');
+  const publicBaseUrl = (process.env.CHAT_MEDIA_PUBLIC_BASE_URL || 'https://midia.geracaozpro.com').replace(/\/$/, '');
   const HOSTINGER_UPLOAD_API = process.env.HOSTINGER_MEDIA_API_URL || 'https://midia.geracaozpro.com/api/upload.php';
-  const HOSTINGER_UPLOAD_SECRET = process.env.HOSTINGER_MEDIA_UPLOAD_SECRET || 'GZPRO_MEDIA_SECRET_2026';
+  const HOSTINGER_UPLOAD_SECRET = process.env.HOSTINGER_MEDIA_UPLOAD_SECRET;
+
+  if (!HOSTINGER_UPLOAD_SECRET) {
+    console.error('[STORAGE_CONFIG_ERROR] HOSTINGER_MEDIA_UPLOAD_SECRET não está configurada no ambiente.');
+    return {
+      success: false,
+      error: 'STORAGE_CONFIG_ERROR: Servidor de armazenamento remoto de mídia não está configurado (segredo de upload ausente).',
+    };
+  }
 
   let pendingMediaId: number | null = null;
   try {
@@ -72,7 +78,7 @@ export async function processAndUploadMedia(params: UploadMediaParams): Promise<
     }
 
     let absolutePublicUrl = '';
-    let storageProvider = 'HOSTINGER_MEDIA';
+    const storageProvider = 'HOSTINGER_MEDIA';
 
     // Record PENDING record in MySQL first
     if (isDatabaseConfigured()) {
@@ -87,42 +93,43 @@ export async function processAndUploadMedia(params: UploadMediaParams): Promise<
       }
     }
 
-    // Attempt Hostinger Upload API
-    if (HOSTINGER_UPLOAD_API && HOSTINGER_UPLOAD_SECRET) {
-      try {
-        const formData = new FormData();
-        const blob = new Blob([buffer], { type: mimeType });
-        formData.append('file', blob, fileName);
-        formData.append('storage_key', storageKey);
+    // Hostinger Upload API execution
+    try {
+      const formData = new FormData();
+      const blob = new Blob([buffer], { type: mimeType });
+      formData.append('file', blob, fileName);
+      formData.append('storage_key', storageKey);
 
-        const response = await fetch(HOSTINGER_UPLOAD_API, {
-          method: 'POST',
-          headers: {
-            'x-media-upload-secret': HOSTINGER_UPLOAD_SECRET,
-          },
-          body: formData,
-        });
+      const response = await fetch(HOSTINGER_UPLOAD_API, {
+        method: 'POST',
+        headers: {
+          'x-media-upload-secret': HOSTINGER_UPLOAD_SECRET,
+        },
+        body: formData,
+      });
 
-        const resData: any = await response.json();
-        if (response.ok && resData?.success && resData?.url) {
-          absolutePublicUrl = resData.url;
+      const resData: any = await response.json();
+      if (response.ok && resData?.success && resData?.url) {
+        absolutePublicUrl = resData.url;
+      } else {
+        console.error('[Hostinger Media Upload API Error]:', response.status, resData);
+        if (pendingMediaId && isDatabaseConfigured()) {
+          await db.query(`UPDATE chat_media SET upload_status = 'FAILED' WHERE id = ?`, [pendingMediaId]).catch(() => {});
         }
-      } catch (err) {
-        console.warn('[Hostinger Media Upload API Warning]:', err);
+        return {
+          success: false,
+          error: `HOSTINGER_UPLOAD_FAILED: ${resData?.message || resData?.error || 'Falha no servidor Hostinger.'}`,
+        };
       }
-    }
-
-    // Absolute fallback URL construction when remote API is unreachable or in dev preview
-    if (!absolutePublicUrl) {
-      const relativeDir = path.join('uploads', 'chat', subFolder, String(year), month);
-      const absoluteDir = path.join(process.cwd(), 'public', relativeDir);
-      fs.mkdirSync(absoluteDir, { recursive: true });
-
-      const fullPath = path.join(absoluteDir, fileName);
-      fs.writeFileSync(fullPath, buffer);
-
-      absolutePublicUrl = `${publicBaseUrl}/uploads/chat/${subFolder}/${year}/${month}/${fileName}`;
-      storageProvider = 'HOSTINGER_MEDIA';
+    } catch (err: any) {
+      console.error('[Hostinger Media Upload Connection Error]:', err);
+      if (pendingMediaId && isDatabaseConfigured()) {
+        await db.query(`UPDATE chat_media SET upload_status = 'FAILED' WHERE id = ?`, [pendingMediaId]).catch(() => {});
+      }
+      return {
+        success: false,
+        error: `HOSTINGER_CONNECTION_ERROR: ${err?.message || 'Erro ao conectar com servidor de mídias.'}`,
+      };
     }
 
     // Ensure absolute HTTPS URL starting with https://
@@ -151,7 +158,7 @@ export async function processAndUploadMedia(params: UploadMediaParams): Promise<
       }
     }
 
-    console.log(`[CHAT MEDIA UPLOAD RESULT] mediaId=${mediaId}, type=${finalType}, uploadStatus=READY, hasMediaUrl=${Boolean(absolutePublicUrl)}`);
+    console.log(`[CHAT MEDIA UPLOAD RESULT] mediaId=${mediaId}, type=${finalType}, uploadStatus=READY, url=${absolutePublicUrl}`);
 
     return {
       success: true,
@@ -168,9 +175,7 @@ export async function processAndUploadMedia(params: UploadMediaParams): Promise<
     };
   } catch (err: any) {
     console.error('[processAndUploadMedia Error]:', err?.message || err);
-    console.log(`[CHAT MEDIA UPLOAD RESULT] mediaId=${pendingMediaId || 0}, type=${params.mediaType || 'UNKNOWN'}, uploadStatus=FAILED`);
 
-    // Mark PENDING as FAILED if error occurred
     if (pendingMediaId && isDatabaseConfigured()) {
       await db.query(`UPDATE chat_media SET upload_status = 'FAILED' WHERE id = ?`, [pendingMediaId]).catch(() => {});
     }

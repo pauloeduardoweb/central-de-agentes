@@ -3,6 +3,7 @@ import { normalizeAccessCode, isMasterKey } from './authKeys.js';
 import { memorySessionsMap, getCentralPresenceData } from './presenceService.js';
 import { awardXp, recalculateUserStats, calculateLevelFromXp } from './chatXpService.js';
 import { createNotification, createNotificationForActiveProfiles } from './notificationService.js';
+import { processAndUploadMedia } from './chatMediaService.js';
 
 export function extractChatCredentials(req: any) {
   const accessCode =
@@ -283,8 +284,23 @@ export async function createChatProfile(
 
   const cleanNick = data.nickname.trim();
   const cleanPhone = data.phone.trim();
-  const cleanPhoto = data.photo_url ? String(data.photo_url).trim() : null;
+  let cleanPhoto = data.photo_url ? String(data.photo_url).trim() : null;
   const visibility = data.phone_visibility === 'MEMBERS' ? 'MEMBERS' : 'MENTOR_ONLY';
+
+  if (cleanPhoto && (cleanPhoto.startsWith('blob:') || cleanPhoto.startsWith('file:'))) {
+    cleanPhoto = null;
+  } else if (cleanPhoto && cleanPhoto.startsWith('data:image/')) {
+    const uploadRes = await processAndUploadMedia({
+      profileId: 0,
+      base64: cleanPhoto,
+      mediaType: 'AVATAR',
+    });
+    if (uploadRes.success && uploadRes.media?.url) {
+      cleanPhoto = uploadRes.media.url;
+    } else {
+      cleanPhoto = null;
+    }
+  }
 
   if (isDatabaseConfigured()) {
     await ensureChatTables();
@@ -391,7 +407,22 @@ export async function updateChatProfile(
     return { success: false, error: 'Perfil não encontrado.' };
   }
 
-  const photo = data.photo_url !== undefined ? data.photo_url : profile.photo_url;
+  let photo = data.photo_url !== undefined ? data.photo_url : profile.photo_url;
+  if (photo && (photo.startsWith('blob:') || photo.startsWith('file:'))) {
+    photo = profile.photo_url || null;
+  } else if (photo && photo.startsWith('data:image/')) {
+    const uploadRes = await processAndUploadMedia({
+      profileId: profile.id,
+      base64: photo,
+      mediaType: 'AVATAR',
+    });
+    if (uploadRes.success && uploadRes.media?.url) {
+      photo = uploadRes.media.url;
+    } else {
+      photo = profile.photo_url || null;
+    }
+  }
+
   const phone = data.phone ? data.phone.trim() : profile.phone;
   const visibility = data.phone_visibility || profile.phone_visibility;
   const bio = data.bio !== undefined ? data.bio : profile.bio;
