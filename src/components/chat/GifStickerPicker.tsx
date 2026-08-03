@@ -18,12 +18,18 @@ const OFFICIAL_STICKERS = [
 ];
 
 const CURATED_GIFS = [
-  { title: 'Dinheiro Vendas', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcTYyeG43NHlycDRidTN0c3Z4am1oOGw5cm44MzlveHFmbzJ6MnRleSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/LdOyjZ7io5Msw/giphy.gif' },
-  { title: 'Foco Sucesso', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExc29tdGZwbWVxOGlhcmF1Z3FiY294MmtkdjNzeWpwcWV4YjhzZHVyMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKP7yvT1Bvh7M2c/giphy.gif' },
-  { title: 'Festa Comemoração', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMzlmbmRma2ttczg3MGF3ZW9kMmcyMmV2bjM5a2pzc3lyam9seTlrNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/g9582DNuQppxC/giphy.gif' },
-  { title: 'Mindset Fogo', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNnkxdW9jbmhrdDRxZGk4MXR2Z210aGJtcXV6dGVtcGt2cnprcnVvOSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0IybQ6l8J455FuZX/giphy.gif' },
-  { title: 'Foguete Subindo', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMGl4Y3VsdGN3Zncyc3NzcWFtOXo4ZHZrbXZhOWp3enNvbjlreGxubSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/mi6f94v6yQS5i/giphy.gif' },
-  { title: 'Mentalidade Pro', url: 'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaGcxem0yYnA0cmE0NmRucGhhcjRmcXlnbTBqNzQ3MGlrd2E4eTlsdyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/d31w24psGYeedC64/giphy.gif' },
+  { title: 'Comemoração Festa', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif' },
+  { title: 'Dinheiro Vendas', url: 'https://media.giphy.com/media/LdOyjZ7io5Msw/giphy.gif' },
+  { title: 'Sucesso Mindset', url: 'https://media.giphy.com/media/3o7TKP7yvT1Bvh7M2c/giphy.gif' },
+  { title: 'Motivação Fogo', url: 'https://media.giphy.com/media/l0IybQ6l8J455FuZX/giphy.gif' },
+  { title: 'Surpresa Uau', url: 'https://media.giphy.com/media/5vkx5R161nQG4/giphy.gif' },
+  { title: 'Risada KKK', url: 'https://media.giphy.com/media/10JhvoUG6Jotao/giphy.gif' },
+  { title: 'Aprovação Like', url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif' },
+  { title: 'Viral Chamas', url: 'https://media.giphy.com/media/xT0xezQGU5xCDJuCPe/giphy.gif' },
+  { title: 'Foco Trabalho', url: 'https://media.giphy.com/media/d31w24psGYeedC64/giphy.gif' },
+  { title: 'Foguete Subindo', url: 'https://media.giphy.com/media/mi6f94v6yQS5i/giphy.gif' },
+  { title: 'Vencedor Campeão', url: 'https://media.giphy.com/media/nUxC6MRNmw32E/giphy.gif' },
+  { title: 'Energia Maxima', url: 'https://media.giphy.com/media/l41YtZOb9EUwklMlt/giphy.gif' },
 ];
 
 export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
@@ -34,11 +40,20 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'STICKERS' | 'GIFS'>('STICKERS');
   const [searchQuery, setSearchQuery] = useState('');
+  const [failedGifs, setFailedGifs] = useState<Set<string>>(new Set());
 
   if (!isOpen) return null;
 
-  const filteredGifs = CURATED_GIFS.filter((g) =>
-    g.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const handleGifError = (url: string) => {
+    setFailedGifs((prev) => {
+      const next = new Set(prev);
+      next.add(url);
+      return next;
+    });
+  };
+
+  const filteredGifs = CURATED_GIFS.filter(
+    (g) => !failedGifs.has(g.url) && g.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -139,6 +154,7 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
                     alt={gif.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     loading="lazy"
+                    onError={() => handleGifError(gif.url)}
                   />
                   <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 to-transparent text-[10px] text-slate-200 truncate font-semibold">
                     {gif.title}

@@ -747,31 +747,31 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
       {/* Audio Recording Active State */}
       {isRecordingAudio ? (
-        <div className="flex items-center justify-between bg-[#FFF4C6] border border-[#FDE68A] rounded-2xl p-2 px-4 animate-pulse">
-          <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-[#00A884] animate-ping" />
-            <span className="text-xs font-bold text-[#715B00] font-mono">
-              Gravando Áudio: {formatAudioTime(audioDuration)}
+        <div className="flex items-center justify-between bg-[#FFF4C6] border border-[#FDE68A] rounded-2xl p-2 px-3 sm:px-4 animate-pulse w-full">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#00A884] animate-ping shrink-0" />
+            <span className="text-xs font-bold text-[#715B00] font-mono whitespace-nowrap truncate">
+              Gravando áudio: {formatAudioTime(audioDuration)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               type="button"
               onClick={cancelAudioRecording}
-              className="p-2 rounded-xl bg-[#FFFFFF] hover:bg-[#F0F2F5] text-[#111B21] border border-[#DADDE1] text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+              className="p-1.5 sm:p-2 rounded-xl bg-[#FFFFFF] hover:bg-[#F0F2F5] text-[#111B21] border border-[#DADDE1] text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
             >
-              <Trash2 className="w-4 h-4 text-rose-600" />
-              <span>Cancelar</span>
+              <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600" />
+              <span className="hidden sm:inline">Cancelar</span>
             </button>
 
             <button
               type="button"
               onClick={stopAndSendAudio}
-              className="p-2 px-3 rounded-xl bg-[#00A884] hover:bg-[#008F72] text-white text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1"
+              className="p-1.5 sm:p-2 px-2.5 sm:px-3 rounded-xl bg-[#00A884] hover:bg-[#008F72] text-white text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1"
             >
-              <Send className="w-4 h-4" />
-              <span>Enviar Áudio</span>
+              <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Enviar</span>
             </button>
           </div>
         </div>

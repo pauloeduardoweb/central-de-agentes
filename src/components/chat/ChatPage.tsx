@@ -905,6 +905,18 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
       });
       const result = await res.json();
       if (result.success) {
+        const updatedMsg = result.message || { id: editingMessage.id, content: editContent.trim() };
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === editingMessage.id
+              ? {
+                  ...item,
+                  content: updatedMsg.content || editContent.trim(),
+                  edited_at: updatedMsg.edited_at || item.edited_at || new Date().toISOString(),
+                }
+              : item
+          )
+        );
         setEditingMessage(null);
         setEditContent('');
         fetchMessages(activeRoomId, true);

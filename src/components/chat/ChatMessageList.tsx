@@ -108,7 +108,6 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeEmojiPickerId, setActiveEmojiPickerId] = useState<number | null>(null);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [readReceiptsMsg, setReadReceiptsMsg] = useState<ChatMessage | null>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -158,10 +157,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   };
 
   const handleScroll = () => {
-    if (!containerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const isBottom = scrollHeight - scrollTop - clientHeight < 150;
-    setShowScrollBottom(!isBottom);
+    // Scroll listener for pagination or position tracking
   };
 
   const scrollToBottom = () => {
@@ -171,7 +167,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   };
 
   useEffect(() => {
-    if (containerRef.current && !showScrollBottom) {
+    if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [messages.length]);
@@ -531,8 +527,8 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                           <Reply className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* Owner Edit button */}
-                        {isSelf && (
+                        {/* Owner Edit button (ONLY for text messages) */}
+                        {isSelf && (msg.message_type === 'TEXT' || (!msg.message_type && !msg.image_url)) && (
                           <button
                             type="button"
                             onClick={() => onEdit(msg)}
@@ -751,18 +747,6 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
           })}
         </div>
       ))}
-
-      {/* Floating Scroll to Bottom Button */}
-      {showScrollBottom && (
-        <button
-          onClick={scrollToBottom}
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-6 z-30 px-4 py-2 rounded-full bg-[#FFFFFF] text-[#00A884] border border-[#DADDE1] shadow-lg transition-all animate-bounce cursor-pointer flex items-center gap-2 font-bold text-xs hover:bg-[#F0F2F5]"
-          title="Rolar para as mensagens recentes"
-        >
-          <ArrowDown className="w-4 h-4 text-[#00A884]" />
-          <span>Novas mensagens</span>
-        </button>
-      )}
 
       {/* Fullscreen Image Viewer Modal */}
       {viewerImage && (
