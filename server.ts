@@ -2408,13 +2408,6 @@ async function startServer() {
     }
   }
 
-  // Execute environment cleanup once on startup
-  try {
-    await performEnvironmentCleanup();
-  } catch (cleanErr) {
-    console.warn('[Startup Environment Cleanup Error]:', cleanErr);
-  }
-
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
