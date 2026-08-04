@@ -502,7 +502,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#03131c] text-slate-100 font-sans antialiased flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="notranslate min-h-screen bg-[#03131c] text-slate-100 font-sans antialiased flex items-center justify-center p-4 relative overflow-hidden" translate="no">
         <TechGridBackground />
 
         {/* Toast Notification */}
@@ -523,9 +523,9 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
   }
 
   return (
-    <div className={`bg-[#03131c] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white relative overflow-x-hidden ${
+    <div className={`notranslate bg-[#03131c] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white relative overflow-x-hidden ${
       activeView === 'chat' ? 'h-[var(--chat-viewport-height,100dvh)] min-h-[100dvh] overflow-hidden flex flex-col p-0' : 'min-h-screen pb-20'
-    }`}>
+    }`} translate="no">
       <TechGridBackground />
 
       <div className={`relative z-10 ${activeView === 'chat' ? 'h-full flex-1 min-h-0 flex flex-col overflow-hidden' : ''}`}>
