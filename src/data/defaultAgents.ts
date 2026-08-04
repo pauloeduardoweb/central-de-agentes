@@ -3280,6 +3280,41 @@ Responder apenas:
     createdAt: '2026-07-30T10:00:00Z'
   },
   {
+    id: 'agent-shop-pov-viral-motion',
+    name: 'POV Viral Motion',
+    tagline: 'Roteiros e movimentos virais em POV para bombar vendas no TikTok Shop',
+    description: 'Especialista em criar roteiros virais, movimentos dinâmicos e ganchos em POV para produtos do TikTok Shop, gerando engajamento e cliques no Carrinho Amarelo.',
+    category: 'Tiktok Shop',
+    posterSlug: 'pov-viral-motion',
+    coverImage: 'https://i.postimg.cc/NMcmc3Lx/Chat-GPT-Image-4-de-ago-de-2026-19-15-57.png',
+    chatBackgroundImage: 'https://i.postimg.cc/NMcmc3Lx/Chat-GPT-Image-4-de-ago-de-2026-19-15-57.png',
+    iconName: 'ShoppingBag',
+    colorTheme: 'emerald',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7145f5fbac8191a34b723b402b9339-pov-shop-viral-ia',
+    geminiUrl: 'https://gemini.google.com/gem/1G4A92x1IqbuWuDZOOjNef1ZLj3bHFnL4?usp=sharing',
+    exampleVideoUrl: 'https://vimeo.com/1212504629?fl=tl&fe=ec',
+    exampleVideoUrls: [
+      'https://vimeo.com/1212504629?fl=tl&fe=ec',
+      'https://vimeo.com/1212504627?fl=tl&fe=ec'
+    ],
+    conversationStarters: [
+      'Gera um roteiro POV Viral Motion para TikTok Shop',
+      'Como criar ganchos de movimento viral em POV para produtos?',
+      'Ideias de movimentos POV para demonstrar produtos no TikTok'
+    ],
+    capabilities: {
+      codeInterpreter: true,
+      webSearch: true,
+      imageGeneration: true,
+      jsonOutput: true
+    },
+    temperature: 0.7,
+    isFavorite: false,
+    isCustom: false,
+    usageCount: 190,
+    createdAt: '2026-08-04T12:00:00Z'
+  },
+  {
     id: 'agent-shop-vitrine-realista',
     name: 'Vitrine Realista',
     tagline: 'Modelos e estúdios fotorrealistas para exposição no TikTok Shop',
