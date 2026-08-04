@@ -256,12 +256,14 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   };
 
   // Sort messages chronologically (oldest first) before grouping by date
-  const sortedMessages = [...messages].sort((a, b) => {
-    const timeA = new Date(a.created_at).getTime();
-    const timeB = new Date(b.created_at).getTime();
-    if (timeA !== timeB) return timeA - timeB;
-    return a.id - b.id;
-  });
+  const sortedMessages = [...messages]
+    .filter((m) => m.message_type !== 'NOTICE' && m.message_type !== 'ANNOUNCEMENT')
+    .sort((a, b) => {
+      const timeA = new Date(a.created_at).getTime();
+      const timeB = new Date(b.created_at).getTime();
+      if (timeA !== timeB) return timeA - timeB;
+      return a.id - b.id;
+    });
 
   // Group messages by date
   const groupedMessages: { date: string; msgs: ChatMessage[] }[] = [];
@@ -285,21 +287,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
         <MessageListSkeleton />
       ) : (
         <>
-          {/* Official Notice Banner (if active) */}
-      {notice && (
-        <div className="sticky top-0 z-20 mx-auto max-w-xl bg-[#FFF7D6] border border-[#E5C14A] rounded-xl p-3 shadow-md backdrop-blur-md text-[#3B3100] text-xs flex items-start space-x-2.5 animate-slide-down">
-          <Pin className="w-4 h-4 text-[#8A6500] shrink-0 mt-0.5 animate-bounce" />
-          <div className="flex-1">
-            <div className="flex items-center justify-between font-bold text-[#8A6500] text-[11px] mb-0.5">
-              <span>Aviso Oficial do Mentor</span>
-              <span className="text-[10px] text-[#8A6500]/70">{formatTime(notice.created_at)}</span>
-            </div>
-            <p className="text-[#3B3100] text-xs leading-relaxed">{notice.content}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Render Grouped Messages */}
+          {/* Render Grouped Messages */}
       {groupedMessages.map((group, gIdx) => (
         <div key={gIdx} className="space-y-1.5">
           
