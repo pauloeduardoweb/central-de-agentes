@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { db, isDatabaseConfigured } from './database.js';
-import { extractChatCredentials, getProfileBySessionCode, memoryMessagesList, performOneTimeChatCleanup } from './chatService.js';
+import { extractChatCredentials, getProfileBySessionCode, memoryMessagesList, performOneTimeChatCleanup, deleteChatProfile, clearChatRoom } from './chatService.js';
 import { awardXp, calculateLevelFromXp } from './chatXpService.js';
 import { processAndUploadMedia } from './chatMediaService.js';
 import { isMasterKey, normalizeAccessCode } from './authKeys.js';
@@ -569,4 +569,50 @@ chatExtraRouter.post('/admin/chat/clean-history', async (req: Request, res: Resp
     return res.status(500).json({ error: 'SERVER_ERROR', message: err?.message || 'Erro ao realizar limpeza' });
   }
 });
+
+// DELETE /api/admin/chat-profiles/:profileId & /api/admin/chat/profiles/:profileId
+const handleDeleteProfileRoute = async (req: Request, res: Response) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode || !isMasterKey(accessCode)) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Apenas o Mentor pode excluir perfis do Bate-papo.' });
+    }
+
+    const profileId = Number(req.params.profileId);
+    if (!profileId || isNaN(profileId)) {
+      return res.status(400).json({ error: 'BAD_REQUEST', message: 'ID de perfil inválido.' });
+    }
+
+    const result = await deleteChatProfile(profileId);
+    return res.json({ success: true, message: result.message });
+  } catch (err: any) {
+    console.error('[DELETE /api/admin/chat-profiles Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: err?.message || 'Erro ao excluir perfil' });
+  }
+};
+
+chatExtraRouter.delete('/admin/chat-profiles/:profileId', handleDeleteProfileRoute);
+chatExtraRouter.delete('/admin/chat/profiles/:profileId', handleDeleteProfileRoute);
+
+// POST /api/admin/chat/rooms/:roomId/clear & DELETE /api/admin/chat/rooms/:roomId/messages
+const handleClearRoomRoute = async (req: Request, res: Response) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode || !isMasterKey(accessCode)) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Apenas o Mentor pode limpar a conversa geral.' });
+    }
+
+    const roomId = Number(req.params.roomId) || 1;
+    const { preserveNotices = true } = req.body || {};
+
+    const result = await clearChatRoom(roomId, Boolean(preserveNotices));
+    return res.json({ success: true, message: 'Conversa geral limpa com sucesso.', ...result });
+  } catch (err: any) {
+    console.error('[CLEAR ROOM Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: err?.message || 'Erro ao limpar conversa geral' });
+  }
+};
+
+chatExtraRouter.post('/admin/chat/rooms/:roomId/clear', handleClearRoomRoute);
+chatExtraRouter.delete('/admin/chat/rooms/:roomId/messages', handleClearRoomRoute);
 

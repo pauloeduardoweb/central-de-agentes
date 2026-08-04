@@ -2791,4 +2791,211 @@ export async function performEnvironmentCleanup(): Promise<{ profilesRemoved: nu
   return { profilesRemoved: 0, messagesRemoved: result.messagesRemoved };
 }
 
+export async function deleteChatProfile(profileId: number): Promise<{ success: boolean; message: string }> {
+  console.log('[CHAT PROFILE DELETE START]', { profileId });
+
+  // 1. Clear memory profiles map
+  for (const [code, p] of memoryProfilesMap.entries()) {
+    if (p.id === profileId) {
+      memoryProfilesMap.delete(code);
+    }
+  }
+
+  // 2. Database transaction if configured
+  if (isDatabaseConfigured()) {
+    const connection: any = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Ensure 'Usuário sem perfil' system profile exists
+      let unlinkedProfileId = 0;
+      const [unlinkedRows]: any = await connection.query(
+        `SELECT id FROM chat_profiles WHERE codigo = 'UNLINKED_SYSTEM_PROFILE' LIMIT 1`
+      );
+
+      if (Array.isArray(unlinkedRows) && unlinkedRows.length > 0) {
+        unlinkedProfileId = unlinkedRows[0].id;
+      } else {
+        const [insRes]: any = await connection.query(
+          `INSERT INTO chat_profiles (codigo, nickname, phone, phone_visibility, bio, chat_status)
+           VALUES ('UNLINKED_SYSTEM_PROFILE', 'Usuário sem perfil', '00000000000', 'MENTOR_ONLY', 'Perfil excluído do Bate-papo', 'ACTIVE')`
+        );
+        unlinkedProfileId = insRes.insertId;
+      }
+
+      // Reassign messages to unlinkedProfileId so chat history stays intact
+      if (unlinkedProfileId && unlinkedProfileId !== profileId) {
+        await connection.query(
+          `UPDATE chat_messages SET profile_id = ? WHERE profile_id = ?`,
+          [unlinkedProfileId, profileId]
+        );
+      }
+
+      // Delete student personal chat records
+      await connection.query(`DELETE FROM chat_room_members WHERE profile_id = ?`, [profileId]);
+      await connection.query(`DELETE FROM chat_reactions WHERE profile_id = ?`, [profileId]);
+      await connection.query(`DELETE FROM chat_poll_votes WHERE profile_id = ?`, [profileId]);
+      await connection.query(`DELETE FROM chat_favorites WHERE profile_id = ?`, [profileId]);
+      await connection.query(`DELETE FROM chat_xp_events WHERE profile_id = ?`, [profileId]);
+      await connection.query(`DELETE FROM chat_profile_achievements WHERE profile_id = ?`, [profileId]);
+      await connection.query(`DELETE FROM chat_notifications WHERE profile_id = ?`, [profileId]);
+      await connection.query(`DELETE FROM chat_message_reads WHERE profile_id = ?`, [profileId]);
+      await connection.query(`DELETE FROM chat_mentions WHERE source_profile_id = ? OR target_profile_id = ?`, [profileId, profileId]);
+      await connection.query(`DELETE FROM chat_user_mutes WHERE profile_id = ? OR muted_profile_id = ?`, [profileId, profileId]);
+      await connection.query(`DELETE FROM chat_user_blocks WHERE profile_id = ? OR blocked_profile_id = ?`, [profileId, profileId]);
+      await connection.query(`DELETE FROM chat_message_reports WHERE reporter_profile_id = ?`, [profileId]);
+
+      // Delete the chat profile row itself
+      await connection.query(`DELETE FROM chat_profiles WHERE id = ?`, [profileId]);
+
+      await connection.commit();
+      connection.release();
+      console.log('[CHAT PROFILE DELETE SUCCESS]', { profileId });
+    } catch (err: any) {
+      await connection.rollback().catch(() => {});
+      connection.release();
+      console.error('[CHAT PROFILE DELETE ERROR]', err);
+      throw err;
+    }
+  }
+
+  return { success: true, message: 'Perfil do Bate-papo excluído com sucesso.' };
+}
+
+export async function clearChatRoom(
+  roomId: number = 1,
+  preserveNotices: boolean = true
+): Promise<{
+  success: boolean;
+  messagesRemoved: number;
+  reactionsRemoved: number;
+  favoritesRemoved: number;
+  mentionsRemoved: number;
+  readsRemoved: number;
+  reportsRemoved: number;
+  notificationsRemoved: number;
+  mediaRemoved: number;
+}> {
+  console.log('[CHAT ROOM CLEAR START]', { roomId, preserveNotices });
+
+  let messagesRemoved = 0;
+  let reactionsRemoved = 0;
+  let favoritesRemoved = 0;
+  let mentionsRemoved = 0;
+  let readsRemoved = 0;
+  let reportsRemoved = 0;
+  let notificationsRemoved = 0;
+  let mediaRemoved = 0;
+
+  if (isDatabaseConfigured()) {
+    const connection: any = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      let msgQuery = `SELECT id FROM chat_messages WHERE room_id = ?`;
+      if (preserveNotices) {
+        msgQuery += ` AND message_type NOT IN ('NOTICE', 'ANNOUNCEMENT', 'SYSTEM')`;
+      }
+
+      const [msgRows]: any = await connection.query(msgQuery, [roomId]);
+      const msgIds: number[] = (msgRows || []).map((r: any) => r.id);
+
+      if (msgIds.length > 0) {
+        const placeholders = msgIds.map(() => '?').join(',');
+
+        const [rx]: any = await connection.query(`DELETE FROM chat_reactions WHERE message_id IN (${placeholders})`, msgIds);
+        reactionsRemoved = rx?.affectedRows || 0;
+
+        const [fav]: any = await connection.query(`DELETE FROM chat_favorites WHERE message_id IN (${placeholders})`, msgIds);
+        favoritesRemoved = fav?.affectedRows || 0;
+
+        const [mnet]: any = await connection.query(`DELETE FROM chat_mentions WHERE message_id IN (${placeholders})`, msgIds);
+        mentionsRemoved = mnet?.affectedRows || 0;
+
+        const [rd]: any = await connection.query(`DELETE FROM chat_message_reads WHERE message_id IN (${placeholders})`, msgIds);
+        readsRemoved = rd?.affectedRows || 0;
+
+        const [rep]: any = await connection.query(`DELETE FROM chat_message_reports WHERE message_id IN (${placeholders})`, msgIds);
+        reportsRemoved = rep?.affectedRows || 0;
+
+        const [notif]: any = await connection.query(`DELETE FROM chat_notifications WHERE related_message_id IN (${placeholders})`, msgIds);
+        notificationsRemoved = notif?.affectedRows || 0;
+
+        const [med]: any = await connection.query(`DELETE FROM chat_media WHERE message_id IN (${placeholders})`, msgIds);
+        mediaRemoved = med?.affectedRows || 0;
+
+        await connection.query(`UPDATE chat_messages SET reply_to_message_id = NULL WHERE reply_to_message_id IN (${placeholders})`, msgIds);
+
+        const [msgDel]: any = await connection.query(`DELETE FROM chat_messages WHERE id IN (${placeholders})`, msgIds);
+        messagesRemoved = msgDel?.affectedRows || 0;
+      }
+
+      // Reset room preview
+      const [lastMsgRows]: any = await connection.query(
+        `SELECT content, created_at FROM chat_messages WHERE room_id = ? ORDER BY id DESC LIMIT 1`,
+        [roomId]
+      );
+
+      let lastMsgContent = null;
+      let lastMsgAt = null;
+      if (Array.isArray(lastMsgRows) && lastMsgRows.length > 0) {
+        lastMsgContent = lastMsgRows[0].content;
+        lastMsgAt = lastMsgRows[0].created_at;
+      }
+
+      await connection.query(
+        `UPDATE chat_rooms SET last_message_content = ?, last_message_at = ? WHERE id = ?`,
+        [lastMsgContent, lastMsgAt, roomId]
+      );
+
+      await connection.query(
+        `UPDATE chat_room_members SET last_read_message_id = 0 WHERE room_id = ?`,
+        [roomId]
+      );
+
+      await connection.commit();
+      connection.release();
+    } catch (err: any) {
+      await connection.rollback().catch(() => {});
+      connection.release();
+      console.error('[CHAT ROOM CLEAR ERROR]', err);
+      throw err;
+    }
+  }
+
+  // Clear memory cache
+  for (let i = memoryMessagesList.length - 1; i >= 0; i--) {
+    const m = memoryMessagesList[i];
+    if (m.room_id === roomId) {
+      if (!preserveNotices || (m.message_type !== 'NOTICE' && m.message_type !== 'ANNOUNCEMENT' && m.message_type !== 'SYSTEM')) {
+        memoryMessagesList.splice(i, 1);
+      }
+    }
+  }
+
+  console.log('[CHAT ROOM CLEAR COUNTS]', {
+    messagesRemoved,
+    reactionsRemoved,
+    favoritesRemoved,
+    mentionsRemoved,
+    readsRemoved,
+    reportsRemoved,
+    notificationsRemoved,
+    mediaRemoved,
+  });
+  console.log('[CHAT ROOM CLEAR SUCCESS]', { roomId });
+
+  return {
+    success: true,
+    messagesRemoved,
+    reactionsRemoved,
+    favoritesRemoved,
+    mentionsRemoved,
+    readsRemoved,
+    reportsRemoved,
+    notificationsRemoved,
+    mediaRemoved,
+  };
+}
+
 
