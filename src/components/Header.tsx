@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { ExternalLink, Key, CheckCircle2, AlertTriangle, LogOut, Lock, Unlock, Copy, Check, Crown, Bot, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ExternalLink, Key, CheckCircle2, AlertTriangle, LogOut, Lock, Unlock, Copy, Check, Crown, Bot, MessageSquare, Zap, Bell, ShieldCheck, X } from 'lucide-react';
+import { resolveChatMediaUrl } from '../utils/chatMediaUrl';
+import { getNicknameInitials } from '../utils/avatarUtils';
+import { CommunityRulesModal } from './chat/CommunityRulesModal';
 
 interface HeaderProps {
   onOpenCreate?: () => void;
@@ -29,6 +32,25 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isKeyHidden, setIsKeyHidden] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+
+  useEffect(() => {
+    if (!studentCode) return;
+    fetch('/api/chat/profile', {
+      headers: {
+        'x-student-access-code': studentCode,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.profile) {
+          setProfile(data.profile);
+        }
+      })
+      .catch(() => {});
+  }, [studentCode]);
 
   const formatKeyDisplay = (code?: string) => {
     if (!code) return 'NÃO DEFINIDA';
@@ -194,6 +216,122 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
       </div>
+
+      {/* MOBILE CENTRAL DE AGENTES HEADER (2 COMPACT LINES) */}
+      {activeView === 'hub' && hasApiKey && (
+        <div className="sm:hidden max-w-7xl mx-auto bg-[#02131e] border border-cyan-500/30 rounded-xl p-2.5 space-y-2 mt-2 shadow-lg">
+          {/* LINHA 1 */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-2 min-w-0">
+              {/* Foto / Avatar */}
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 p-0.5 shrink-0 shadow-xs">
+                {profile?.photo_url ? (
+                  <img
+                    src={resolveChatMediaUrl(profile.photo_url)}
+                    alt={profile?.nickname || 'FrutasFeliz'}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center font-bold text-xs text-cyan-300">
+                    {getNicknameInitials(profile?.nickname || 'FrutasFeliz')}
+                  </div>
+                )}
+              </div>
+
+              {/* Nome + Nível & XP */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center space-x-1.5">
+                  <span className="font-extrabold text-xs text-white truncate max-w-[120px]">
+                    {profile?.nickname || 'FrutasFeliz'}
+                  </span>
+                  {/* Status Online */}
+                  <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Online</span>
+                  </span>
+                </div>
+                <div className="text-[10px] text-cyan-300/90 font-mono font-medium truncate">
+                  🏆 Nível {profile?.level || 1} • {profile?.xp || 61} XP
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* LINHA 2 */}
+          <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-cyan-500/20 text-xs">
+            {/* Contador de Tokens */}
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 font-mono text-[11px] font-bold">
+              <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0 fill-cyan-400" />
+              <span>100.000 Tokens</span>
+            </div>
+
+            <div className="flex items-center space-x-1.5 shrink-0">
+              {/* Botão de Notificações */}
+              <button
+                type="button"
+                onClick={() => setShowNotificationsModal(true)}
+                className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs flex items-center space-x-1 transition-all cursor-pointer relative"
+                title="Notificações"
+              >
+                <Bell className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[10px]">Notificações</span>
+              </button>
+
+              {/* Atalho para Regras */}
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(true)}
+                className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs flex items-center space-x-1 transition-all cursor-pointer"
+                title="Regras"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[10px]">Regras</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rules Modal */}
+      {showRulesModal && (
+        <CommunityRulesModal onClose={() => setShowRulesModal(false)} />
+      )}
+
+      {/* Notifications Modal */}
+      {showNotificationsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in"
+          onClick={() => setShowNotificationsModal(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-5 text-slate-100 relative space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowNotificationsModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
+              <Bell className="w-5 h-5 text-amber-400" />
+              <h3 className="font-bold text-sm text-white">Central de Notificações</h3>
+            </div>
+
+            <p className="text-xs text-slate-300 bg-slate-950 p-3 rounded-xl border border-slate-800">
+              Você não possui novas notificações no momento.
+            </p>
+
+            <button
+              onClick={() => setShowNotificationsModal(false)}
+              className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition-all"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 };
