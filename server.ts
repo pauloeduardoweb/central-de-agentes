@@ -94,6 +94,7 @@ import {
   getOnlineMembersDrawerList,
   getCommunityRanking,
   getCommunityStats,
+  performEnvironmentCleanup,
 } from './server/chatService.js';
 import { chatExtraRouter } from './server/chatExtraRoutes.js';
 import { processAndUploadMedia } from './server/chatMediaService.js';
@@ -2405,6 +2406,13 @@ async function startServer() {
     } catch (e: any) {
       console.warn('[MySQL Initialization Warning]:', e?.message || e);
     }
+  }
+
+  // Execute environment cleanup once on startup
+  try {
+    await performEnvironmentCleanup();
+  } catch (cleanErr) {
+    console.warn('[Startup Environment Cleanup Error]:', cleanErr);
   }
 
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
