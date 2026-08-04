@@ -154,13 +154,20 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
     return agents
       .filter((agent) => {
         // Exclude specific removed names from TikTok Shop if present
+        const agentNameLower = agent.name.toLowerCase();
+        if (
+          agentNameLower.includes('fábrica viral 2.0') ||
+          agentNameLower.includes('fabrica viral 2.0')
+        ) {
+          return false;
+        }
+
         if (agent.category === 'Tiktok Shop') {
-          const nameLower = agent.name.toLowerCase();
           if (
-            nameLower.includes('roteirista tiktok shop') ||
-            nameLower.includes('copywriter afiliado tiktok shop') ||
-            nameLower.includes('estrategista tiktok shop') ||
-            nameLower.includes('achadinhos')
+            agentNameLower.includes('roteirista tiktok shop') ||
+            agentNameLower.includes('copywriter afiliado tiktok shop') ||
+            agentNameLower.includes('estrategista tiktok shop') ||
+            agentNameLower.includes('achadinhos')
           ) {
             return false;
           }
@@ -227,6 +234,9 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
       'Todas': agents.length,
     };
     agents.forEach((a) => {
+      if (a.name.toLowerCase().includes('fábrica viral 2.0') || a.name.toLowerCase().includes('fabrica viral 2.0')) {
+        return;
+      }
       if (a.category === 'Recurso Anti-Violação') {
         if (a.id === 'agent-recurso-anti-violacao-geracaozpro' || a.name.toLowerCase().includes('anti-violação geração z pro')) {
           counts['Recurso Anti-Violação'] = 1;
