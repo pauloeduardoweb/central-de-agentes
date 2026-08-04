@@ -1141,7 +1141,6 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
 
       {/* Outer Container */}
       <div 
-        style={viewportHeight ? { height: `${viewportHeight}px`, maxHeight: `${viewportHeight}px` } : undefined}
         className="flex-1 min-h-0 h-full bg-[#FFFFFF] border-0 sm:border border-[#00A884]/28 rounded-none sm:rounded-2xl overflow-hidden shadow-xl flex flex-col lg:flex-row relative w-full max-w-full text-[#111B21]"
       >
 
