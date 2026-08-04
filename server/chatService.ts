@@ -74,9 +74,15 @@ interface MemoryProfile {
   phone_visibility: 'MENTOR_ONLY' | 'MEMBERS';
   bio: string | null;
   chat_status: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
-  community_rules_accepted_at: string | null;
-  last_chat_activity_at: string | null;
+  community_rules_accepted_at?: string | null;
+  last_chat_activity_at?: string | null;
   created_at: string;
+  xp_total?: number;
+  current_level?: number;
+  current_streak?: number;
+  last_participation_date?: string;
+  message_count?: number;
+  reply_count?: number;
 }
 
 interface MemoryMedia {
@@ -151,18 +157,18 @@ interface MemoryNotice {
   created_at: string;
 }
 
-const memoryProfilesMap = new Map<string, MemoryProfile>();
-const memoryMessagesList: MemoryMessage[] = [];
-const memoryReportsList: MemoryReport[] = [];
-const memoryAuditList: MemoryAudit[] = [];
-const memoryNoticesList: MemoryNotice[] = [];
-const memoryRoomMembersMap = new Map<string, { last_read_message_id: number | null; joined_at: string }>();
+export const memoryProfilesMap = new Map<string, MemoryProfile>();
+export const memoryMessagesList: MemoryMessage[] = [];
+export const memoryReportsList: MemoryReport[] = [];
+export const memoryAuditList: MemoryAudit[] = [];
+export const memoryNoticesList: MemoryNotice[] = [];
+export const memoryRoomMembersMap = new Map<string, { last_read_message_id: number | null; joined_at: string }>();
 
-const memoryReactionsList: { id: number; message_id: number; profile_id: number; emoji: string }[] = [];
-const memoryFavoritesList: { profile_id: number; message_id: number }[] = [];
-const memoryPollsList: { id: number; room_id: number; question: string; options: string[]; created_by: string; is_active: number; created_at: string }[] = [];
-const memoryPollVotesList: { id: number; poll_id: number; profile_id: number; option_index: number }[] = [];
-const memoryMentionsList: { id: number; message_id: number; source_profile_id: number; target_profile_id: number; is_read: number }[] = [];
+export const memoryReactionsList: { id: number; message_id: number; profile_id: number; emoji: string }[] = [];
+export const memoryFavoritesList: { profile_id: number; message_id: number }[] = [];
+export const memoryPollsList: { id: number; room_id: number; question: string; options: string[]; created_by: string; is_active: number; created_at: string }[] = [];
+export const memoryPollVotesList: { id: number; poll_id: number; profile_id: number; option_index: number }[] = [];
+export const memoryMentionsList: { id: number; message_id: number; source_profile_id: number; target_profile_id: number; is_read: number }[] = [];
 
 let memoryProfileIdCounter = 1;
 let memoryMessageIdCounter = 1;
@@ -2541,4 +2547,124 @@ export async function getCommunityStats() {
     totalMessagesToday,
   };
 }
+
+export let cleanupStats = {
+  profilesRemoved: 0,
+  messagesRemoved: 0,
+  executedAt: '',
+};
+
+export async function performEnvironmentCleanup(): Promise<{ profilesRemoved: number; messagesRemoved: number }> {
+  let profilesRemoved = 0;
+  let messagesRemoved = 0;
+
+  if (isDatabaseConfigured()) {
+    await ensureChatTables();
+    try {
+      const [allProfiles]: any = await db.query(`SELECT id, codigo, nickname FROM chat_profiles`);
+
+      if (Array.isArray(allProfiles)) {
+        const toDelete = allProfiles.filter((p: any) => {
+          const nick = (p.nickname || '').toLowerCase();
+          const isAnderson = nick.includes('anderson') || nick.includes('profeta');
+          const isMentor = nick.includes('mentor');
+          return !isAnderson && !isMentor;
+        });
+
+        for (const p of toDelete) {
+          const profId = p.id;
+          const code = p.codigo;
+
+          const [msgRows]: any = await db.query(`SELECT COUNT(*) as cnt FROM chat_messages WHERE profile_id = ?`, [profId]).catch(() => []);
+          if (Array.isArray(msgRows) && msgRows[0]?.cnt) {
+            messagesRemoved += Number(msgRows[0].cnt);
+          }
+
+          await db.query(`DELETE FROM chat_favorites WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_reactions WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_xp_events WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_profile_achievements WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_notifications WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_room_members WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_poll_votes WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_message_reads WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_user_blocks WHERE profile_id = ? OR blocked_profile_id = ?`, [profId, profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_user_mutes WHERE profile_id = ? OR muted_profile_id = ?`, [profId, profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_mentions WHERE source_profile_id = ? OR target_profile_id = ?`, [profId, profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_media WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_messages WHERE profile_id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM chat_profiles WHERE id = ?`, [profId]).catch(() => {});
+          await db.query(`DELETE FROM sessoes WHERE codigo = ?`, [code]).catch(() => {});
+          await db.query(`DELETE FROM perfis_alunos WHERE codigo = ?`, [code]).catch(() => {});
+          await db.query(`DELETE FROM progresso_alunos WHERE codigo = ?`, [code]).catch(() => {});
+
+          profilesRemoved++;
+        }
+      }
+    } catch (dbErr) {
+      console.error('[CLEANUP DB ERROR]', dbErr);
+    }
+  }
+
+  // Memory cleanup
+  for (const [code, p] of memoryProfilesMap.entries()) {
+    const nick = (p.nickname || '').toLowerCase();
+    const isAnderson = nick.includes('anderson') || nick.includes('profeta');
+    const isMentor = nick.includes('mentor');
+    if (!isAnderson && !isMentor) {
+      memoryProfilesMap.delete(code);
+      profilesRemoved++;
+    }
+  }
+
+  // Ensure Anderson Profeta Logado exists if no student profile remains
+  const hasAnderson = Array.from(memoryProfilesMap.values()).some((p) => {
+    const nick = (p.nickname || '').toLowerCase();
+    return nick.includes('anderson') || nick.includes('profeta');
+  });
+
+  if (!hasAnderson) {
+    const cleanCode = 'GZ-5KRT-SRGB';
+    memoryProfilesMap.set(cleanCode, {
+      id: 2,
+      codigo: cleanCode,
+      nickname: 'Anderson Profeta Logado',
+      photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+      phone: '(11) 99999-8888',
+      phone_visibility: 'MEMBERS',
+      bio: 'Aluno da Geração Z Pro - Anderson Profeta',
+      chat_status: 'ACTIVE',
+      created_at: new Date().toISOString(),
+      xp_total: 150,
+      current_level: 2,
+      current_streak: 3,
+      last_participation_date: new Date().toISOString().split('T')[0],
+      message_count: 5,
+      reply_count: 2,
+    });
+  }
+
+  // Filter memory messages
+  const initialMsgCount = memoryMessagesList.length;
+  const filteredMessages = memoryMessagesList.filter((m) => {
+    const nick = (m.author?.nickname || (m as any).nickname || '').toLowerCase();
+    const isAnderson = nick.includes('anderson') || nick.includes('profeta');
+    const isMentor = nick.includes('mentor');
+    return isAnderson || isMentor;
+  });
+  messagesRemoved += (initialMsgCount - filteredMessages.length);
+  memoryMessagesList.length = 0;
+  memoryMessagesList.push(...filteredMessages);
+
+  cleanupStats = {
+    profilesRemoved,
+    messagesRemoved,
+    executedAt: new Date().toISOString(),
+  };
+
+  console.log(`[TEST ENVIRONMENT CLEANUP COMPLETED] Profiles removed: ${profilesRemoved}, Messages removed: ${messagesRemoved}`);
+
+  return { profilesRemoved, messagesRemoved };
+}
+
 

@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { db, isDatabaseConfigured } from './database.js';
-import { extractChatCredentials, getProfileBySessionCode } from './chatService.js';
+import { extractChatCredentials, getProfileBySessionCode, memoryMessagesList } from './chatService.js';
 import { awardXp, calculateLevelFromXp } from './chatXpService.js';
 import { processAndUploadMedia } from './chatMediaService.js';
 import { isMasterKey, normalizeAccessCode } from './authKeys.js';
@@ -145,11 +145,23 @@ chatExtraRouter.get('/chat/profile/achievements', async (req: Request, res: Resp
   }
 });
 
+const memoryAnnouncementsList: Array<{
+  id: number;
+  title: string;
+  content: string;
+  type: string;
+  badge: string | null;
+  isPinned: boolean;
+  createdBy: string;
+  createdAt: string;
+}> = [];
+let memoryAnnouncementIdCounter = 1;
+
 // GET /api/chat/announcements
 chatExtraRouter.get('/chat/announcements', async (_req: Request, res: Response) => {
   try {
     if (!isDatabaseConfigured()) {
-      return res.json({ announcements: [] });
+      return res.json({ announcements: memoryAnnouncementsList });
     }
 
     const [rows]: any = await db.query(
@@ -173,7 +185,7 @@ chatExtraRouter.get('/chat/announcements', async (_req: Request, res: Response) 
     });
   } catch (err: any) {
     console.error('[GET /api/chat/announcements Error]:', err?.message || err);
-    return res.status(500).json({ error: 'SERVER_ERROR' });
+    return res.status(500).json({ error: 'SERVER_ERROR', announcements: memoryAnnouncementsList });
   }
 });
 
@@ -207,7 +219,27 @@ chatExtraRouter.post('/admin/chat/announcements', async (req: Request, res: Resp
       return res.json({ success: true, announcementId: resIns.insertId });
     }
 
-    return res.json({ success: true });
+    const newId = memoryAnnouncementIdCounter++;
+    const newAnn = {
+      id: newId,
+      title: title.trim(),
+      content: content.trim(),
+      type,
+      badge: badge || '📢 AVISO OFICIAL',
+      isPinned: Boolean(isPinned),
+      createdBy: 'Mentor Bigode',
+      createdAt: new Date().toISOString(),
+    };
+    memoryAnnouncementsList.unshift(newAnn);
+
+    createNotificationForActiveProfiles({
+      notificationType: 'ANNOUNCEMENT_PUBLISHED',
+      title: 'O Mentor publicou um novo comunicado.',
+      message: title.trim(),
+      deduplicationKeyPrefix: `announcement:${newId}`,
+    }).catch(() => {});
+
+    return res.json({ success: true, announcementId: newId });
   } catch (err: any) {
     console.error('[POST /api/admin/chat/announcements Error]:', err?.message || err);
     return res.status(500).json({ error: 'SERVER_ERROR' });
@@ -225,6 +257,10 @@ chatExtraRouter.delete('/admin/chat/announcements/:id', async (req: Request, res
     const annId = Number(req.params.id);
     if (isDatabaseConfigured()) {
       await db.query(`DELETE FROM chat_announcements WHERE id = ?`, [annId]);
+    }
+    const idx = memoryAnnouncementsList.findIndex((a) => a.id === annId);
+    if (idx !== -1) {
+      memoryAnnouncementsList.splice(idx, 1);
     }
     return res.json({ success: true });
   } catch (err: any) {
@@ -417,6 +453,80 @@ chatExtraRouter.post('/chat/upload', handleMediaUpload);
 chatExtraRouter.post('/chat/upload-audio', handleMediaUpload);
 chatExtraRouter.post('/chat/upload-image', handleMediaUpload);
 chatExtraRouter.post('/chat/upload-profile-photo', handleMediaUpload);
+
+// GET /api/chat/media (Community Gallery media listing)
+chatExtraRouter.get('/chat/media', async (_req: Request, res: Response) => {
+  try {
+    if (isDatabaseConfigured()) {
+      const [rows]: any = await db.query(`
+        SELECT 
+          m.id,
+          m.message_type,
+          m.content,
+          m.image_url,
+          m.caption,
+          m.created_at,
+          p.nickname AS author_nickname,
+          p.codigo,
+          cm.public_url AS media_public_url,
+          cm.media_type
+        FROM chat_messages m
+        JOIN chat_profiles p ON p.id = m.profile_id
+        LEFT JOIN chat_media cm ON cm.message_id = m.id OR (m.image_url IS NOT NULL AND cm.public_url = m.image_url)
+        WHERE m.deleted_at IS NULL
+          AND (m.image_url IS NOT NULL OR m.message_type IN ('IMAGE', 'GIF', 'STICKER') OR cm.public_url IS NOT NULL)
+        ORDER BY m.id DESC
+      `);
+
+      const items = (rows || []).map((r: any) => {
+        const url = r.media_public_url || r.image_url || '';
+        let type: 'IMAGE' | 'GIF' | 'FILE' = 'IMAGE';
+        if (r.media_type === 'GIF' || r.message_type === 'GIF' || (url && url.toLowerCase().includes('.gif'))) {
+          type = 'GIF';
+        } else if (r.message_type === 'AUDIO' || r.media_type === 'AUDIO') {
+          type = 'FILE';
+        }
+        return {
+          id: r.id,
+          url,
+          type,
+          caption: r.caption || r.content || null,
+          authorNickname: isMasterKey(r.codigo) ? 'Mentor Bigode' : (r.author_nickname || 'Aluno'),
+          createdAt: r.created_at,
+        };
+      }).filter((item: any) => Boolean(item.url));
+
+      return res.json({ success: true, items });
+    }
+
+    // Fallback to memory
+    const items = memoryMessagesList
+      .filter((m) => !m.deleted_at && (m.image_url || m.media?.public_url || ['IMAGE', 'GIF', 'STICKER'].includes(m.message_type)))
+      .map((m) => {
+        const url = m.media?.public_url || m.image_url || '';
+        let type: 'IMAGE' | 'GIF' | 'FILE' = 'IMAGE';
+        if (m.message_type === 'GIF' || (url && url.toLowerCase().includes('.gif'))) {
+          type = 'GIF';
+        } else if (m.message_type === 'AUDIO') {
+          type = 'FILE';
+        }
+        return {
+          id: m.id,
+          url,
+          type,
+          caption: m.caption || m.content || null,
+          authorNickname: m.author?.nickname || (m as any).nickname || 'Aluno',
+          createdAt: m.created_at,
+        };
+      })
+      .filter((item) => Boolean(item.url));
+
+    return res.json({ success: true, items });
+  } catch (err: any) {
+    console.error('[GET /api/chat/media Error]:', err?.message || err);
+    return res.status(500).json({ error: 'SERVER_ERROR', items: [] });
+  }
+});
 
 // POST /api/admin/chat/profiles/:id/xp (Mentor manually adjusts user XP)
 chatExtraRouter.post('/admin/chat/profiles/:id/xp', async (req: Request, res: Response) => {

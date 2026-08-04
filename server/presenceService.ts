@@ -4,6 +4,8 @@ import path from 'path';
 import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable, ensureSessionHistoryTable, ensureAgentInteractionsTable, ensureProgressTable, ensureChatTables } from './database.js';
 import { normalizeAccessCode, lookupKeyType, STUDENT_KEYS, MASTER_KEYS } from './authKeys.js';
 import { maskStudentCode } from './rankingService.js';
+import { memoryProfilesMap as chatMemoryProfilesMap } from './chatService.js';
+import { memoryProfilesMap as studentMemoryProfilesMap } from './studentProfileService.js';
 
 export const PRESENCE_VERSION = '2026-08-01-final-disconnect-v1';
 
@@ -2939,6 +2941,8 @@ export async function adminUnlinkKeyHandler(req: express.Request, res: express.R
 
     // 7. Clear server memory maps
     memorySessionsMap.delete(targetCode);
+    chatMemoryProfilesMap.delete(targetCode);
+    studentMemoryProfilesMap.delete(targetCode);
 
     const existingMem = memoryKeyStatusMap.get(targetCode);
     memoryKeyStatusMap.set(targetCode, {
