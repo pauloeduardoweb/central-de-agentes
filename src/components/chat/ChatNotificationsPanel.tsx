@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
+import { CHAT_LABELS } from '../../constants/chatLabels';
 
 export interface NotificationItem {
   id: number;
@@ -122,7 +123,7 @@ export const ChatNotificationsPanel: React.FC<ChatNotificationsPanelProps> = ({
             </div>
             <div>
               <h2 className="font-bold text-base text-white flex items-center gap-2">
-                Central de Notificações
+                {CHAT_LABELS.notifications}
               </h2>
               <p className="text-xs text-slate-400">Fique por dentro das novidades da comunidade</p>
             </div>

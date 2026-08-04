@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, X, Check, AlertCircle } from 'lucide-react';
+import { CHAT_LABELS } from '../../constants/chatLabels';
 
 interface CommunityRulesModalProps {
   onClose: () => void;
@@ -35,7 +36,7 @@ export const CommunityRulesModal: React.FC<CommunityRulesModalProps> = ({ onClos
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">Regras da Comunidade</h3>
+            <h3 className="text-lg font-bold text-white">{CHAT_LABELS.communityRules}</h3>
             <p className="text-xs text-slate-400">Geração Z Pro — Comunidade Exclusiva</p>
           </div>
         </div>

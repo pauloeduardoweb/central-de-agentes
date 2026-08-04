@@ -5,6 +5,7 @@ import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
 import { PollData, PollCard } from './PollCard';
 import { NotificationBell } from './NotificationBell';
+import { CHAT_LABELS } from '../../constants/chatLabels';
 
 interface CommunityHeaderProps {
   onlineCount: number;
@@ -337,7 +338,7 @@ export const CommunityHeader: React.FC<CommunityHeaderProps> = ({
           <button
             onClick={onOpenRules}
             className="p-2 rounded-xl bg-[#FFFFFF] hover:bg-[#E9EDEF] text-[#54656F] hover:text-[#111B21] transition-colors border border-[#DADDE1] cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center shrink-0"
-            title="Diretrizes da Comunidade"
+            title={CHAT_LABELS.communityRules}
           >
             <ShieldCheck className="w-4 h-4 text-[#00A884]" />
           </button>

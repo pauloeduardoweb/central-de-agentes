@@ -18,18 +18,18 @@ const OFFICIAL_STICKERS = [
 ];
 
 const CURATED_GIFS = [
-  { title: 'Comemoração Festa', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif' },
-  { title: 'Dinheiro Vendas', url: 'https://media.giphy.com/media/LdOyjZ7io5Msw/giphy.gif' },
-  { title: 'Sucesso Mindset', url: 'https://media.giphy.com/media/3o7TKP7yvT1Bvh7M2c/giphy.gif' },
-  { title: 'Motivação Fogo', url: 'https://media.giphy.com/media/l0IybQ6l8J455FuZX/giphy.gif' },
-  { title: 'Surpresa Uau', url: 'https://media.giphy.com/media/5vkx5R161nQG4/giphy.gif' },
-  { title: 'Risada KKK', url: 'https://media.giphy.com/media/10JhvoUG6Jotao/giphy.gif' },
-  { title: 'Aprovação Like', url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif' },
-  { title: 'Viral Chamas', url: 'https://media.giphy.com/media/xT0xezQGU5xCDJuCPe/giphy.gif' },
-  { title: 'Foco Trabalho', url: 'https://media.giphy.com/media/d31w24psGYeedC64/giphy.gif' },
-  { title: 'Foguete Subindo', url: 'https://media.giphy.com/media/mi6f94v6yQS5i/giphy.gif' },
-  { title: 'Vencedor Campeão', url: 'https://media.giphy.com/media/nUxC6MRNmw32E/giphy.gif' },
-  { title: 'Energia Maxima', url: 'https://media.giphy.com/media/l41YtZOb9EUwklMlt/giphy.gif' },
+  { title: 'Comemoração Festa', url: 'https://i.giphy.com/g9582DNuQppxC.gif' },
+  { title: 'Dinheiro Vendas', url: 'https://i.giphy.com/LdOyjZ7io5Msw.gif' },
+  { title: 'Aprovação Like', url: 'https://i.giphy.com/111ebonMs90YLu.gif' },
+  { title: 'Viral Chamas', url: 'https://i.giphy.com/xT0xezQGU5xCDJuCPe.gif' },
+  { title: 'Uau Impressionado', url: 'https://i.giphy.com/26ufdipQqU2lhNA4g.gif' },
+  { title: 'Foguete Decolando', url: 'https://i.giphy.com/qs6ev2pm8g9dS.gif' },
+  { title: 'Mindset Trabalho', url: 'https://i.giphy.com/l0HlBO7eyXzSZkJri.gif' },
+  { title: 'Energia MÁXIMA', url: 'https://i.giphy.com/3oKIPnAiaMCws8nOsE.gif' },
+  { title: 'Sucesso Dinheiro', url: 'https://i.giphy.com/67ThRZlYBvibtdF9JH.gif' },
+  { title: 'Robô IA', url: 'https://i.giphy.com/26tn33aiTi1jkl6H6.gif' },
+  { title: 'Mestre Mentor', url: 'https://i.giphy.com/3o7abKhOpu0NwenH3O.gif' },
+  { title: 'Foco no Objetivo', url: 'https://i.giphy.com/JIX9t2j0ZTN9S.gif' },
 ];
 
 export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({

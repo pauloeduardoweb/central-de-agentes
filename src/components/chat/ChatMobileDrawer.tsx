@@ -5,9 +5,10 @@ import {
   Bell, BarChart2, Star, Trophy, Image as ImageIcon, Users, Shield, User, Sparkles, LogOut
 } from 'lucide-react';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
+import { CHAT_LABELS } from '../../constants/chatLabels';
 
 export const mobileCommunityMenuItems = [
-  { id: 'notifications', label: 'Central de Notificações' },
+  { id: 'notifications', label: CHAT_LABELS.notifications },
   { id: 'notices', label: 'Avisos do Mentor' },
   { id: 'polls', label: 'Enquetes' },
   { id: 'favorites', label: 'Mensagens Favoritas' },
@@ -15,7 +16,7 @@ export const mobileCommunityMenuItems = [
   { id: 'gallery', label: 'Galeria de Mídia' },
   { id: 'online', label: 'Membros Online' },
   { id: 'rules', label: 'Regras da Comunidade' },
-  { id: 'edit_profile', label: 'Editar Perfil' },
+  { id: 'edit_profile', label: CHAT_LABELS.editProfile },
 ] as const;
 
 interface ChatMobileDrawerProps {
