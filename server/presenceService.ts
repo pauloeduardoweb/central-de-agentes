@@ -2778,6 +2778,207 @@ export async function adminBanKeyHandler(req: express.Request, res: express.Resp
 }
 
 /**
+ * POST /api/admin/access-keys/:id/unlink
+ * Unlinks an access key from a student: wipes profile, session, progress, etc., but preserves the access key as ACTIVE and unused (usado = 0)
+ */
+export async function adminUnlinkKeyHandler(req: express.Request, res: express.Response) {
+  try {
+    const isMaster = await verifyMasterAccess(req);
+    if (!isMaster) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Acesso negado. Apenas o Mentor Bigode (Sessão MASTER) pode desvincular chaves.',
+      });
+    }
+
+    const keyInfo = await findAccessKeyById(req.params.id, req.body);
+
+    if (!keyInfo.codigo || !keyInfo.accessKeyId) {
+      return res.status(404).json({
+        error: 'ACCESS_KEY_NOT_FOUND',
+        message: 'Chave de acesso não encontrada.',
+      });
+    }
+
+    if (isMasterKey(keyInfo.codigo)) {
+      return res.status(403).json({
+        error: 'MASTER_KEY_PROTECTED',
+        message: 'Ações administrativas sobre chaves mestras são estritamente proibidas.',
+      });
+    }
+
+    const clientIp = getClientIp(req);
+    const targetCode = keyInfo.codigo;
+    const targetKeyId = keyInfo.accessKeyId;
+    const maskedCode = maskKeyForAdmin(targetCode);
+
+    console.log('[ACCESS KEY UNLINK START]', { keyId: targetKeyId, codigo: maskedCode });
+
+    if (isDatabaseConfigured()) {
+      await ensureCodigosAcessoTable();
+      await ensureSessionsTable();
+      await ensureChatTables();
+      await ensureProfilesTable();
+      await ensureProgressTable();
+
+      const connection = await db.getConnection();
+      try {
+        await connection.beginTransaction();
+
+        // 1. Find profile_id in chat_profiles if exists
+        const [profRows]: any = await connection.query(
+          `SELECT id, nickname FROM chat_profiles WHERE codigo = ? OR access_key_id = ? LIMIT 1`,
+          [targetCode, targetKeyId]
+        );
+
+        let studentProfileId: number | null = null;
+        let studentNickname = '';
+
+        if (Array.isArray(profRows) && profRows.length > 0) {
+          studentProfileId = profRows[0].id;
+          studentNickname = profRows[0].nickname || '';
+          console.log('[ACCESS KEY UNLINK PROFILE]', { profileId: studentProfileId, nickname: studentNickname });
+        }
+
+        // 2. Ensure system profile 'Usuário Desvinculado' exists
+        let unlinkedProfileId: number | null = null;
+        const [unlinkedRows]: any = await connection.query(
+          `SELECT id FROM chat_profiles WHERE codigo = 'UNLINKED_SYSTEM_PROFILE' LIMIT 1`
+        );
+
+        if (Array.isArray(unlinkedRows) && unlinkedRows.length > 0) {
+          unlinkedProfileId = unlinkedRows[0].id;
+        } else {
+          const [insRes]: any = await connection.query(
+            `INSERT INTO chat_profiles (codigo, nickname, phone, phone_visibility, bio, chat_status)
+             VALUES ('UNLINKED_SYSTEM_PROFILE', 'Usuário Desvinculado', '00000000000', 'MENTOR_ONLY', 'Perfil de usuário desvinculado', 'ACTIVE')`
+          );
+          unlinkedProfileId = insRes.insertId;
+        }
+
+        // 3. Reassign messages and clean up user's personal chat data
+        if (studentProfileId && unlinkedProfileId) {
+          // Reassign messages so global chat history remains intact with author "Usuário Desvinculado"
+          await connection.query(
+            `UPDATE chat_messages SET profile_id = ? WHERE profile_id = ?`,
+            [unlinkedProfileId, studentProfileId]
+          );
+
+          // Clean up student personal chat records
+          await connection.query(`DELETE FROM chat_room_members WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_reactions WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_poll_votes WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_favorites WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_xp_events WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_profile_achievements WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_notifications WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_message_reads WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_mentions WHERE source_profile_id = ? OR target_profile_id = ?`, [studentProfileId, studentProfileId]);
+          await connection.query(`DELETE FROM chat_media WHERE profile_id = ?`, [studentProfileId]);
+          await connection.query(`DELETE FROM chat_user_mutes WHERE profile_id = ? OR muted_profile_id = ?`, [studentProfileId, studentProfileId]);
+          await connection.query(`DELETE FROM chat_user_blocks WHERE profile_id = ? OR blocked_profile_id = ?`, [studentProfileId, studentProfileId]);
+          await connection.query(`DELETE FROM chat_message_reports WHERE reporter_profile_id = ?`, [studentProfileId]);
+
+          // Delete student profile row
+          await connection.query(`DELETE FROM chat_profiles WHERE id = ?`, [studentProfileId]);
+          console.log('[ACCESS KEY UNLINK CLEANUP]', { profileId: studentProfileId });
+        }
+
+        // 4. Delete legacy profile and progress tables
+        await connection.query(`DELETE FROM perfis_alunos WHERE codigo = ?`, [targetCode]);
+        await connection.query(`DELETE FROM progresso_alunos WHERE codigo = ?`, [targetCode]);
+        await connection.query(`DELETE FROM interacoes_agentes WHERE codigo = ?`, [targetCode]);
+
+        // 5. Reset sessoes row
+        await connection.query(
+          `UPDATE sessoes
+           SET active = 0,
+               active_session_id = NULL,
+               device_id = NULL,
+               is_online = 0,
+               status = 'offline',
+               current_page = 'TikTok 2K',
+               disconnect_source = 'MENTOR_UNLINK',
+               disconnected_at = NOW(),
+               logout_at = NOW()
+           WHERE codigo = ?`,
+          [targetCode]
+        );
+
+        // 6. Reset codigos_acesso row to "never used"
+        await connection.query(
+          `UPDATE codigos_acesso
+           SET usado = 0,
+               usuario_id = NULL,
+               access_status = 'ACTIVE',
+               suspension_reason = NULL,
+               suspended_at = NULL,
+               suspended_by = NULL,
+               banned_reason = NULL,
+               banned_at = NULL,
+               banned_by = NULL,
+               reactivated_at = NOW(),
+               reactivated_by = 'SESSION_MASTER',
+               last_admin_action = 'UNLINK',
+               last_admin_action_at = NOW()
+           WHERE id = ?`,
+          [targetKeyId]
+        );
+
+        await connection.commit();
+      } catch (txErr) {
+        await connection.rollback().catch(() => {});
+        throw txErr;
+      } finally {
+        connection.release();
+      }
+    }
+
+    // 7. Clear server memory maps
+    memorySessionsMap.delete(targetCode);
+    memoryProfilesMap.delete(targetCode);
+    memoryChatProfilesMap.delete(targetCode);
+    memoryProgressMap.delete(targetCode);
+
+    const existingMem = memoryKeyStatusMap.get(targetCode);
+    memoryKeyStatusMap.set(targetCode, {
+      ...existingMem,
+      accessStatus: 'ACTIVE',
+      usado: 0,
+      suspensionReason: null,
+      bannedReason: null,
+      lastAdminAction: 'UNLINK',
+      lastAdminActionAt: new Date().toISOString(),
+    });
+    saveKeyStatusStore();
+
+    // 8. Record audit logs
+    await recordAdminAuditAction(targetCode, 'UNLINK', 'Chave desvinculada do aluno e resetada', clientIp);
+    await recordSessionHistoryEvent({
+      codigo: targetCode,
+      eventType: 'UNLINK',
+      ip: clientIp,
+      details: 'Chave desvinculada do aluno pelo mentor e resetada para novo cadastro',
+    });
+
+    console.log('[ACCESS KEY UNLINK SUCCESS]', { codigo: maskedCode });
+
+    return res.json({
+      success: true,
+      targetMaskedKey: maskedCode,
+      accessStatus: 'ACTIVE',
+      message: 'Chave desvinculada com sucesso. Ela foi resetada e já pode ser utilizada em um novo cadastro.',
+    });
+  } catch (err: any) {
+    console.error('[ACCESS KEY UNLINK ERROR]:', err?.message || err);
+    return res.status(500).json({
+      error: 'SERVER_ERROR',
+      message: 'Não foi possível desvincular a chave. Tente novamente.',
+    });
+  }
+}
+
+/**
  * GET /api/admin/access-keys/:id/history
  * Returns administrative history for a key
  */
