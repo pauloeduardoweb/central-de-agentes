@@ -3,6 +3,16 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+// Ensure proper language and disable auto-translation in DOM
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = 'pt-BR';
+  document.documentElement.setAttribute('translate', 'no');
+  if (document.body) {
+    document.body.classList.add('notranslate');
+    document.body.setAttribute('translate', 'no');
+  }
+}
+
 const APP_BUILD_VERSION = '2026-08-03-v3-android-fix';
 console.log('[APP BUILD VERSION]', APP_BUILD_VERSION);
 
