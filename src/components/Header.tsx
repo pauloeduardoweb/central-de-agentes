@@ -74,7 +74,16 @@ export const Header: React.FC<HeaderProps> = ({
         
         {/* Navigation Tabs for All Authenticated Users */}
         {hasApiKey && onSelectView && (
-          <div className="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-cyan-500/30 shadow-xs flex-nowrap shrink-0 max-w-full overflow-x-auto no-scrollbar">
+          <div 
+            className="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-cyan-500/30 shadow-xs flex-nowrap shrink-0 max-w-full overflow-x-auto no-scrollbar bg-cover bg-center bg-no-repeat"
+            style={
+              activeView === 'hub'
+                ? {
+                    backgroundImage: `linear-gradient(rgba(1, 10, 25, 0.72), rgba(1, 10, 25, 0.82)), url('/assets/fundo-geracao-z-pro.jpg')`,
+                  }
+                : undefined
+            }
+          >
             <button
               type="button"
               onClick={() => onSelectView('hub')}
@@ -219,7 +228,12 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* MOBILE CENTRAL DE AGENTES MINI PERFIL LIMPO */}
       {activeView === 'hub' && hasApiKey && (
-        <div className="sm:hidden max-w-7xl mx-auto bg-[#02131e] border border-cyan-500/30 rounded-xl p-2.5 space-y-2 mt-2 shadow-lg">
+        <div 
+          className="sm:hidden max-w-7xl mx-auto border border-cyan-500/30 rounded-xl p-2.5 space-y-2 mt-2 shadow-lg bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `linear-gradient(rgba(0, 14, 28, 0.78), rgba(0, 18, 38, 0.88)), url('/assets/fundo-geracao-z-pro.jpg')`,
+          }}
+        >
           {/* LINHA 1: Foto, Nome, Indicador Online, Nível & XP */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center space-x-2.5 min-w-0">
