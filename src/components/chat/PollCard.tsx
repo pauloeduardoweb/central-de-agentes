@@ -139,19 +139,24 @@ export const PollCard: React.FC<PollCardProps> = ({
             )}
           </div>
         </div>
-      ) : isMentor ? (
-        <div className="p-4 rounded-2xl bg-[#182229] border border-dashed border-teal-500/40 text-center text-xs">
-          <BarChart2 className="w-6 h-6 mx-auto mb-1 text-teal-400" />
-          <p className="font-bold text-slate-200">Nenhuma enquete ativa no momento</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="mt-2.5 px-4 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Criar Enquete Oficial</span>
-          </button>
+      ) : (
+        <div className="p-8 rounded-2xl bg-[#182229] border border-dashed border-teal-500/40 text-center text-xs space-y-2 my-6">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
+            <BarChart2 className="w-6 h-6" />
+          </div>
+          <h3 className="font-bold text-base text-slate-100">Nenhuma enquete criada.</h3>
+          <p className="text-slate-400 max-w-sm mx-auto text-xs">Acompanhe aqui as pesquisas e votações da comunidade.</p>
+          {isMentor && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="mt-3 px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Criar Enquete Oficial</span>
+            </button>
+          )}
         </div>
-      ) : null}
+      )}
 
       {/* Mentor Create Poll Modal */}
       {showCreateModal && (

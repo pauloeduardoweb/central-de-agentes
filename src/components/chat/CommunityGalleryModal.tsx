@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Image as ImageIcon, Video, FileText, Sparkles, Download, ExternalLink } from 'lucide-react';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 
-interface GalleryItem {
+export interface GalleryItem {
   id: number;
   url: string;
   type: 'IMAGE' | 'GIF' | 'VIDEO' | 'FILE';
@@ -14,18 +14,73 @@ interface GalleryItem {
 interface CommunityGalleryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  items: GalleryItem[];
+  items?: GalleryItem[];
+  messages?: any[];
 }
 
 export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
   isOpen,
   onClose,
-  items = [],
+  items: propsItems = [],
+  messages = [],
 }) => {
   const [filter, setFilter] = useState<'ALL' | 'IMAGE' | 'GIF' | 'FILE'>('ALL');
+  const [fetchedItems, setFetchedItems] = useState<GalleryItem[]>([]);
+
+  // Auto fetch gallery media on open
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+
+    fetch('/api/chat/media')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.success && Array.isArray(data.items)) {
+          setFetchedItems(data.items);
+        }
+      })
+      .catch((err) => console.error('Error fetching gallery media:', err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
+  // Extract gallery items from local messages
+  const extractedFromMessages: GalleryItem[] = (messages || [])
+    .filter((m) => !m.deleted_at && (m.image_url || m.imageUrl || m.media?.public_url || ['IMAGE', 'GIF', 'STICKER'].includes(m.message_type || m.messageType)))
+    .map((m) => {
+      const url = m.media?.public_url || m.image_url || m.imageUrl || '';
+      const msgType = m.message_type || m.messageType || 'IMAGE';
+      let type: 'IMAGE' | 'GIF' | 'VIDEO' | 'FILE' = 'IMAGE';
+      if (msgType === 'GIF' || (url && url.toLowerCase().includes('.gif'))) {
+        type = 'GIF';
+      } else if (msgType === 'AUDIO') {
+        type = 'FILE';
+      }
+      return {
+        id: m.id || Date.now(),
+        url,
+        type,
+        caption: m.caption || m.content || null,
+        authorNickname: m.author?.nickname || m.author_nickname || 'Aluno',
+        createdAt: m.created_at || new Date().toISOString(),
+      };
+    })
+    .filter((item) => Boolean(item.url));
+
+  // Merge items cleanly by URL
+  const allMap = new Map<string, GalleryItem>();
+  [...fetchedItems, ...extractedFromMessages, ...propsItems].forEach((item) => {
+    if (item.url && !allMap.has(item.url)) {
+      allMap.set(item.url, item);
+    }
+  });
+
+  const combinedItems = Array.from(allMap.values());
 
   // Lock body scroll when open
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOpen) return;
     if (typeof document !== 'undefined') {
       const orig = document.body.style.overflow;
@@ -37,7 +92,7 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
   }, [isOpen]);
 
   // Handle Escape key
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -48,7 +103,7 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
 
   if (!isOpen) return null;
 
-  const filteredItems = items.filter((item) => {
+  const filteredItems = combinedItems.filter((item) => {
     if (filter === 'ALL') return true;
     if (filter === 'IMAGE') return item.type === 'IMAGE';
     if (filter === 'GIF') return item.type === 'GIF';
@@ -94,7 +149,7 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
                 : 'bg-[#1f2c34] text-slate-300 hover:bg-[#2a3942]'
             }`}
           >
-            Tudo ({items.length})
+            Tudo ({combinedItems.length})
           </button>
           <button
             onClick={() => setFilter('IMAGE')}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Users, Shield, Search, ArrowLeft, Settings, ShieldAlert, AlertTriangle, Crown, Lock, RefreshCw, Pin, Bell, BookOpen, Smile } from 'lucide-react';
+import { MessageSquare, Users, Shield, Search, ArrowLeft, Settings, ShieldAlert, AlertTriangle, Crown, Lock, RefreshCw, Pin, Bell, BookOpen, Smile, Megaphone, BarChart2, Sparkles } from 'lucide-react';
 import { ChatProfileModal } from './ChatProfileModal';
 import { ChatMessageList, ChatMessage } from './ChatMessageList';
 import { ChatInputBar } from './ChatInputBar';
@@ -70,6 +70,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   const [showFavoritesModal, setShowFavoritesModal] = useState<boolean>(false);
   const [showGalleryModal, setShowGalleryModal] = useState<boolean>(false);
   const [externalInputText, setExternalInputText] = useState<string | undefined>(undefined);
+  const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
   const [announcement, setAnnouncement] = useState<CommunityAnnouncement | null>({
     id: 1,
     content: '🎉 Seja bem-vindo à Comunidade Geração Z Pro! Interaja diariamente e ganhe XP e posições no Ranking.',
@@ -521,13 +522,18 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   const fetchAnnouncements = async () => {
     try {
       const res = await chatApiFetch('/api/chat/announcements');
-      if (res.data?.announcements && res.data.announcements.length > 0) {
-        const top = res.data.announcements[0];
-        setAnnouncement({
-          id: top.id,
-          content: top.content,
-          badge: top.badge || '📢 COMUNICADO MENTOR',
-        });
+      if (res.data?.announcements) {
+        setAnnouncementsList(res.data.announcements);
+        if (res.data.announcements.length > 0) {
+          const top = res.data.announcements[0];
+          setAnnouncement({
+            id: top.id,
+            content: top.content,
+            badge: top.badge || '📢 AVISO OFICIAL',
+            created_by: top.createdBy || top.created_by || 'Mentor Bigode',
+            created_at: top.createdAt || top.created_at,
+          });
+        }
       }
     } catch (e) {}
   };
@@ -1298,14 +1304,21 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           <CommunityAnnouncementBar
             announcement={announcement}
             isMentor={isMentor}
-            onSaveAnnouncement={(text, badge) => {
-              setAnnouncement({
-                id: Date.now(),
-                content: text,
-                badge: badge || '📢 COMUNICADO MENTOR',
-                created_by: profile?.nickname || 'Mentor Bigode',
-                created_at: new Date().toISOString(),
-              });
+            onSaveAnnouncement={async (text, badge) => {
+              try {
+                await chatApiFetch('/api/admin/chat/announcements', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    title: text,
+                    content: text,
+                    badge: badge || '📢 AVISO OFICIAL',
+                    isPinned: true,
+                  }),
+                });
+                fetchAnnouncements();
+              } catch (err) {
+                console.error('Error saving announcement:', err);
+              }
             }}
             onCloseAnnouncement={() => setAnnouncement(null)}
           />
@@ -1341,34 +1354,107 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
             </div>
           )}
 
-          {/* Messages Stream Component with Animated Tech Background */}
+          {/* Dedicated View or Messages Stream */}
           <div className="flex-1 relative overflow-hidden flex flex-col min-h-0">
-            <ChatAnimatedBackground
-              variant="ACTIVE_ROOM"
-              isEmpty={!loadingMessages && filteredMessages.length === 0}
-              onSelectSuggestion={(suggestionText) => setExternalInputText(suggestionText)}
-            >
-              <ChatMessageList
-                messages={filteredMessages}
-                loadingMessages={loadingMessages}
-                currentProfileId={profile?.id}
-                currentProfile={profile}
-                isMentor={isMentor}
-                onReply={(msg) => setReplyToMessage(msg)}
-                onEdit={(msg) => {
-                  setEditingMessage(msg);
-                  setEditContent(msg.content);
-                }}
-                onDelete={handleDeleteMessage}
-                onReport={handleReportMessage}
-                onPinMessage={handlePinMessage}
-                onViewProfile={handleViewPublicProfile}
-                onOpenAvatar={(url, nick) => setAvatarViewerData({ url, nickname: nick })}
-                notice={notice}
-                onReact={handleReact}
-                onToggleFavorite={handleToggleFavorite}
-              />
-            </ChatAnimatedBackground>
+            {activeFilter === 'POLLS' ? (
+              <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-start bg-[#0b141a]">
+                <PollCard
+                  poll={poll}
+                  isMentor={isMentor}
+                  onVote={handleVotePoll}
+                  onCreatePoll={handleCreatePoll}
+                />
+              </div>
+            ) : activeFilter === 'NOTICES' ? (
+              <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-start bg-[#0b141a]">
+                <div className="w-full max-w-2xl mx-auto space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                        <Megaphone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h2 className="font-bold text-base text-white">Avisos do Mentor</h2>
+                        <p className="text-xs text-slate-400">Comunicados e anúncios oficiais publicados pelo Mentor Bigode</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {announcementsList.length > 0 ? (
+                    <div className="space-y-3">
+                      {announcementsList.map((ann) => (
+                        <div key={ann.id} className="p-4 rounded-2xl bg-[#182229] border border-slate-700/80 shadow-lg space-y-2 text-slate-100 relative">
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold text-[11px] inline-flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-amber-400" />
+                              {ann.badge || '📢 AVISO OFICIAL'}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-medium">
+                              {ann.createdAt ? new Date(ann.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                          </div>
+                          {ann.title && ann.title !== ann.content && (
+                            <h3 className="font-bold text-sm text-white">{ann.title}</h3>
+                          )}
+                          <p className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed">{ann.content}</p>
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                            <span className="font-semibold text-amber-400/90">Publicado por {ann.createdBy || 'Mentor Bigode'}</span>
+                            {isMentor && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await chatApiFetch(`/api/admin/chat/announcements/${ann.id}`, { method: 'DELETE' });
+                                    fetchAnnouncements();
+                                  } catch (e) {}
+                                }}
+                                className="text-rose-400 hover:text-rose-300 font-bold cursor-pointer"
+                              >
+                                Excluir Aviso
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 rounded-2xl bg-[#182229] border border-dashed border-amber-500/30 text-center text-xs space-y-2 my-6">
+                      <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                        <Megaphone className="w-6 h-6" />
+                      </div>
+                      <h3 className="font-bold text-base text-slate-100">Nenhum aviso oficial publicado.</h3>
+                      <p className="text-slate-400 max-w-sm mx-auto text-xs">Os comunicados oficiais do Mentor Bigode aparecerão aqui.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <ChatAnimatedBackground
+                variant="ACTIVE_ROOM"
+                isEmpty={!loadingMessages && filteredMessages.length === 0}
+                onSelectSuggestion={(suggestionText) => setExternalInputText(suggestionText)}
+              >
+                <ChatMessageList
+                  messages={filteredMessages}
+                  loadingMessages={loadingMessages}
+                  currentProfileId={profile?.id}
+                  currentProfile={profile}
+                  isMentor={isMentor}
+                  onReply={(msg) => setReplyToMessage(msg)}
+                  onEdit={(msg) => {
+                    setEditingMessage(msg);
+                    setEditContent(msg.content);
+                  }}
+                  onDelete={handleDeleteMessage}
+                  onReport={handleReportMessage}
+                  onPinMessage={handlePinMessage}
+                  onViewProfile={handleViewPublicProfile}
+                  onOpenAvatar={(url, nick) => setAvatarViewerData({ url, nickname: nick })}
+                  notice={notice}
+                  onReact={handleReact}
+                  onToggleFavorite={handleToggleFavorite}
+                />
+              </ChatAnimatedBackground>
+            )}
           </div>
 
           {/* Edit Message Inline Modal */}
