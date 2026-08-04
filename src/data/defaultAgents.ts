@@ -11,7 +11,7 @@ export const DEFAULT_AGENTS: Agent[] = [
     posterSlug: 'casquinha-animal',
     coverImage: 'https://i.postimg.cc/8CwDRgkR/CASQUINHA-ANIMAL.png',
     chatBackgroundImage: 'https://i.postimg.cc/ssZJX2P6/Chat-GPT-Image-24-de-jul-de-2026-20-02-59.png',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a5fc8dd0400819193cb45ce94da891c-casquinha-animal-ia',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713c57469c819196225fcc03e7a73e-casquinha-animal-ia',
     geminiUrl: 'https://gemini.google.com/gem/1xM0aaZBH4veH5H6-xGhj_mtTwRD42RvS?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212759690?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -124,7 +124,7 @@ Responder apenas:
     posterSlug: 'frutas-em-crise',
     coverImage: 'https://i.postimg.cc/mbWDGT0X/FRUTAS-EM-CRISE.png',
     chatBackgroundImage: 'https://i.postimg.cc/npQ1zLKk/Chat-GPT-Image-24-de-jul-de-2026-20-08-13.png',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a498c5217cc8191a46949d8462f7306-agente-novela-frutas-em-crise',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7139b492948191a4c7c738cf18b755-novela-frutas-em-crise',
     geminiUrl: 'https://gemini.google.com/gem/1m57sxOa4uVlY1tHJbd54Zk6uHT2u6PO8?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212759689?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -405,7 +405,7 @@ Etapa 1 — Quantas cenas serão:
     posterSlug: 'homem-da-roca',
     coverImage: 'https://i.postimg.cc/yNnBmC6X/HOMEM-DA-ROCA.png',
     chatBackgroundImage: 'https://i.postimg.cc/SkzGsKLc/Chat-GPT-Image-24-de-jul-de-2026-20-09-25.png',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a498e42171c81919bf6ab16bc608735-homem-da-roca-v2',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713ae088e88191b5a51cfb31a89ebb-homem-da-roca',
     geminiUrl: 'https://gemini.google.com/gem/1X6BgDsWCj2U02l004lHew57DpQFTBPpN?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212759751?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -982,7 +982,7 @@ Todas as imagens devem parecer um frame real de vídeo.`,
     posterSlug: 'mulher-da-roca',
     coverImage: 'https://i.postimg.cc/SQHX2Ctr/MULHER-DA-ROCA.png',
     chatBackgroundImage: 'https://i.postimg.cc/tyc5p663/Chat-GPT-Image-24-de-jul-de-2026-20-13-22.png',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a498ffc0d9c81918cc7e94a05343ab4-agente-mulher-da-roca',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713b4f8d148191832e9c2f89fa42de-mulher-da-roca',
     geminiUrl: 'https://gemini.google.com/gem/1XlBs1nPKPO8Jwe5bHyKvUzJSpcUSKCZG?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212759783?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -1373,7 +1373,7 @@ Todas as imagens devem parecer frame real de vídeo.`,
     posterSlug: 'babybola-viral',
     coverImage: 'https://i.postimg.cc/zXRJ9QpY/BABYBOLA-VIRAL.png',
     chatBackgroundImage: 'https://i.postimg.cc/TfWcwPjF/Chat-GPT-Image-24-de-jul-de-2026-19-52-02.png',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a38f2f948191a57a2bf7f2bcc1e2-babybola-viral',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713c0084dc81918a2c26b06b2c439b-babybola-viral',
     geminiUrl: 'https://gemini.google.com/gem/14u_VwvTEGzUfkejaXuGQ5j_TV_bctpRq?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212759967?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -1846,7 +1846,7 @@ Responda apenas com o número.`,
     posterSlug: 'dama-vidente',
     coverImage: 'https://i.postimg.cc/0NZxY15w/DAMA-CARTOMANTE.png',
     chatBackgroundImage: 'https://i.postimg.cc/npQ1zLK1/Chat-GPT-Image-24-de-jul-de-2026-20-05-59.png',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a498de10b8c81918c2b7c5726978cfd-agente-dama-cartomante',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713a6ccd1081918a956a05897bd9d0-dama-cartomante',
     geminiUrl: 'https://gemini.google.com/gem/1qj4jWwDX0Dj0USqwMY0KEqzFLzvCJ_B2?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212759968?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -2246,7 +2246,7 @@ Todas as imagens devem parecer **UM frame real de vídeo.**`,
     posterSlug: 'mensageiro-de-deus',
     coverImage: 'https://i.postimg.cc/L4JY8Nvf/MENSAGEIRO-DE-DEUS.png',
     chatBackgroundImage: 'https://i.postimg.cc/R9YR4ttd/Chat-GPT-Image-24-de-jul-de-2026-20-12-18.png',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a1962588819197ae40601e32efbd-agente-mensageiro-de-deus',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713bb4f54c8191adf036a10b4bed44-mensageiro-de-deus',
     geminiUrl: 'https://gemini.google.com/gem/1lkMiwd0Oz6D5I1Fss5c4Sx2cOTseXn11?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212759969?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -2943,7 +2943,7 @@ Responda sempre com passos numerados simples, sem complicação técnica desnece
     chatBackgroundImage: 'https://i.postimg.cc/VsWZL88T/Chat-GPT-Image-30-de-jul-de-2026-12-58-37.png',
     iconName: 'ShoppingBag',
     colorTheme: 'emerald',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a6b737236408191963931828a39bc8a-pov-shop-viral-ia',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7145f5fbac8191a34b723b402b9339-pov-shop-viral-ia',
     geminiUrl: 'https://gemini.google.com/gem/1WxS7rbKsBYMbFljpxPmm4cG_DM_JUKtm?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212504629?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -3289,7 +3289,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/dJDGgxhb/VITRINE-REALISTA.png',
     iconName: 'ShoppingBag',
     colorTheme: 'emerald',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a4035d0c819191678257c7b706ee-vitrine-realista',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713d387bdc8191905f709395979b19-vitrine-realista',
     geminiUrl: 'https://gemini.google.com/gem/1-ARhgkCP0lDzu5YEfdoJ_UNyzdsSwvG5?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212504629?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -3612,7 +3612,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/nZbfdXd5/ok-COPYMASTER.png',
     iconName: 'Sparkles',
     colorTheme: 'amber',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a46786508191819c4b1b47234384-copymaster',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713dbb39208191b62dec161979dc9c-copymaster',
     geminiUrl: 'https://gemini.google.com/gem/1A29lJfqxKh9JK_EUiXw3inIuV-Eee9KM?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212513930?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -3896,7 +3896,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/nZbfdXRc/ok-METODO-POV.png',
     iconName: 'Video',
     colorTheme: 'cyan',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a4acba38819199e10b29a304fd15-pov-influencer',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a71425194ac8191902ba61680c099f1-pov-influencer',
     geminiUrl: 'https://gemini.google.com/gem/1tHUMn-wmrnoaRA47QmmmW7fGJOn5ADkU?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212712056?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -4152,7 +4152,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/7D38jqdM/ok-VENDA-SEM-VENDER.png',
     iconName: 'Flame',
     colorTheme: 'rose',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a4f7d9388191b96b9e25fc44a30c-venda-sem-vender',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7142a793a88191aabcc906fd240f0b-venda-sem-vender',
     geminiUrl: 'https://gemini.google.com/gem/1QywAMG3Yb6FTzeeQWl7n88VY6QUjfi2e?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212207802?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -4529,7 +4529,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/hgLWNK6P/ok-REPORTER-E-CLIENTE.png',
     iconName: 'Mic',
     colorTheme: 'indigo',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a53c64388191b01503b429311430-reporter-cliente-shop',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7142ed4c7081919c040c7d2b224e6b-reporter-cliente-shop',
     geminiUrl: 'https://gemini.google.com/gem/194lS9oGaoDYEVrD3M-JvZe_SjT_Jv71f?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212504652?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -4905,7 +4905,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/7D8rB5sT/ok-PEGADA-VIRAL-POV.png',
     iconName: 'Zap',
     colorTheme: 'purple',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a5929588819193b3b084847e974b-pegada-viral-pov',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7143314d208191abba4481cadb7981-pegada-viral-pov',
     geminiUrl: 'https://gemini.google.com/gem/1O9SpAYz2qv0CnJTBnD7pePgEyHVA0sI1?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212513914?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -5087,7 +5087,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/V1QP7JGS/ok-MODA-PREMIUM.png',
     iconName: 'Shirt',
     colorTheme: 'fuchsia',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a5f4df388191ac69b7967102f1fc-moda-premium-ia',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a71436e7da48191a7f97aa76af47012-moda-premium-ia',
     geminiUrl: 'https://gemini.google.com/gem/1S1bg_Q2n_OHLHEAUaf7zzDRrOkA39uuo?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212644210?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -5392,7 +5392,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/GrwnM4MZ/ok-FABRICA-VIRAL.png',
     iconName: 'Factory',
     colorTheme: 'blue',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a6388ec0819195eeb13bb6e66904-fabrica-viral-shop',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7143db85848191892e86f9f4e548fb-fabrica-viral-shop',
     geminiUrl: 'https://gemini.google.com/gem/1eteylasv4NyHNISlKcicYWcFIXBJWrm9?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212504558?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -5656,7 +5656,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/2mRNH1HM/COLOR-INFLUENCER.png',
     iconName: 'Palette',
     colorTheme: 'sky',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a67e21b88191b4d221195941a1ab-colorinfluencer',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7144181098819183a29cba2326da1e-colorinfluencer',
     geminiUrl: 'https://gemini.google.com/gem/1_DJ500w9lnzRh7A1lv77qsxYSyyT3C6v?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212644272?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -5943,7 +5943,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/b8xc4qWb/ok-ROTEIRO-VIRAL.png',
     iconName: 'DollarSign',
     colorTheme: 'emerald',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a6d698008191ada941c93fa18789-roteiro-que-vende-shop',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7144535d288191ace4af83c4f2c932-roteiro-que-vende-shop',
     geminiUrl: 'https://gemini.google.com/gem/13pG_S9d6BU1aL7GWLJbN2np53998uUdn?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212732291?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -6157,7 +6157,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/4ZkR8Y8S/ok-ESTAMPA-PREMIUM.png',
     iconName: 'Sparkle',
     colorTheme: 'orange',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a902f50c819190170eee42de3465-estampa-premium-influencer',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7144aca21881919e1c082a0452d2d5-estampa-premium-influencer',
     geminiUrl: 'https://gemini.google.com/gem/1OofTwy0oNILpPdCiCMhJ7RxPTYwuzMMm?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212647605?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -6356,7 +6356,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/HHwDFTRt/ok-VITRINE-360.png',
     iconName: 'Eye',
     colorTheme: 'indigo',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a97ad4e48191bfc3fadd81b22c93-vitrine-360',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7144e48d488191930524c5e2f37ee8-vitrine-360',
     geminiUrl: 'https://gemini.google.com/gem/12wW6WBUXDiuJZhckOYE56T5I9F77IRcf?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212644240?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -6544,7 +6544,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/4Z6kjXqQ/ok-REPORTER-HIPER-REALISTA.jpg',
     iconName: 'Camera',
     colorTheme: 'teal',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a9e53f908191b4ac954fe2712d6b-reporter-hiper-realista-ugc',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a71451d61ac81918dcaaa6aebadd6fc-reporter-hiper-realista-ugc',
     geminiUrl: 'https://gemini.google.com/gem/1ytmjN-QrbLkcPzV03sfl--JL6tBF0mvL?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212710181?fl=tl&fe=ec',
     exampleVideoUrls: [
@@ -6783,7 +6783,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/Fm5XPYWh/ok-FRUTAS-EM-CRISE-SHOP.png',
     iconName: 'Smile',
     colorTheme: 'amber',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a498d9ed9cc8191b606013f7732a2b3-frutas-em-crise-na-shop',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7145b2ed1c819182eeeeb1f3b643b5-frutas-em-crise-na-shop',
     geminiUrl: 'https://gemini.google.com/gem/1BineFlXoOP3I0ZPCCamFway422dEgZUP?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212497870?share=copy&fl=sv&fe=ci',
     exampleVideoUrls: [
@@ -7036,7 +7036,7 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/nVJ8MWjq/ANTI-VIOLACAO.png',
     iconName: 'ShieldCheck',
     colorTheme: 'rose',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a49a71025688191a10f309ea479ccc7-anti-violacao-geracao-z-pro',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a713cac86bc81919b21c339024ece60-anti-violacao-geracao-z-pro',
     geminiUrl: 'https://gemini.google.com/gem/1FCvHY8TMf4OqCmHIANBn-kUeaQj3r_PF?usp=sharing',
     systemInstruction: `ETAPA 0 — ATIVAÇÃO AUTOMÁTICA
 
