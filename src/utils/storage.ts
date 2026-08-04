@@ -27,6 +27,7 @@ export function getStoredAgents(): Agent[] {
         const def = defaultMap.get(agent.id);
         if (def) {
           if (
+            (def.name !== undefined && agent.name !== def.name) ||
             (def.chatGptUrl !== undefined && agent.chatGptUrl !== def.chatGptUrl) ||
             (def.geminiUrl !== undefined && agent.geminiUrl !== def.geminiUrl) ||
             (def.exampleVideoUrl !== undefined && agent.exampleVideoUrl !== def.exampleVideoUrl) ||
@@ -41,6 +42,7 @@ export function getStoredAgents(): Agent[] {
             hasUpdates = true;
             return {
               ...agent,
+              name: def.name,
               chatGptUrl: def.chatGptUrl,
               geminiUrl: def.geminiUrl,
               exampleVideoUrl: def.exampleVideoUrl,
