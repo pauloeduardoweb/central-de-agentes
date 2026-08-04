@@ -46,51 +46,66 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className={`sticky top-0 z-30 border-b border-cyan-500/20 bg-[#020d14]/95 backdrop-blur-md transition-all ${
-      activeView === 'chat' ? 'py-1 px-2.5 min-h-[38px]' : 'px-3 sm:px-6 py-2.5 sm:py-3'
+    <header className={`sticky top-0 z-30 border-b border-cyan-500/20 bg-[#020d14]/95 backdrop-blur-md transition-all shrink-0 ${
+      activeView === 'chat' ? 'py-1 px-2 min-h-0' : 'px-3 sm:px-6 py-2 sm:py-3'
     }`}>
-      <div className="max-w-7xl mx-auto flex items-center justify-between sm:justify-center flex-wrap gap-4 sm:gap-3">
+      <div className={`max-w-7xl mx-auto flex items-center ${
+        activeView === 'chat' ? 'justify-center sm:justify-between' : 'justify-between sm:justify-center'
+      } flex-nowrap sm:flex-wrap gap-1.5 sm:gap-3`}>
         
         {/* Navigation Tabs for All Authenticated Users */}
         {hasApiKey && onSelectView && (
-          <div className="flex items-center space-x-1 bg-slate-900/90 p-0.5 sm:p-1 rounded-xl border border-cyan-500/30 shadow-xs">
+          <div className="flex items-center space-x-1 bg-slate-900/90 p-0.5 sm:p-1 rounded-xl border border-cyan-500/30 shadow-xs flex-nowrap shrink-0">
             <button
               onClick={() => onSelectView('hub')}
-              className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
+              className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
                 activeView === 'hub'
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Bot className="w-3.5 h-3.5 text-cyan-400" />
+              <Bot className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
               <span className="hidden sm:inline">Central de Agentes</span>
               <span className="sm:hidden">Agentes</span>
             </button>
 
             <button
               onClick={() => onSelectView('chat')}
-              className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
+              className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
                 activeView === 'chat'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
                   : 'text-slate-400 hover:text-emerald-400'
               }`}
             >
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>💬 Bate-papo</span>
             </button>
 
             {isMaster && (
               <button
                 onClick={() => onSelectView('mentor')}
-                className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
+                className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
                   activeView === 'mentor'
                     ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
                     : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
                 }`}
               >
-                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span className="hidden sm:inline">Painel do Mentor</span>
                 <span className="sm:hidden">Mentor</span>
+              </button>
+            )}
+
+            {/* In mobile Chat view, align Sair directly beside Bate-papo */}
+            {activeView === 'chat' && onDisconnectApiKey && (
+              <button
+                type="button"
+                onClick={onDisconnectApiKey}
+                className="sm:hidden px-2 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 border border-rose-500/40 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 transition-all shrink-0 active:scale-95 cursor-pointer whitespace-nowrap ml-0.5"
+                title="Sair"
+              >
+                <LogOut className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                <span>Sair</span>
               </button>
             )}
           </div>
@@ -98,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Status, Key & Access Actions */}
         {hasApiKey && (
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className={`items-center gap-1.5 flex-wrap ${activeView === 'chat' ? 'hidden sm:flex' : 'flex'}`}>
             {/* Online 1/1 Badge */}
             <div 
               className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold shadow-xs shrink-0"
@@ -147,12 +162,12 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Sair Button */}
+            {/* Sair Button (on Desktop in Chat mode, or on Mobile/Desktop in Hub mode) */}
             {onDisconnectApiKey && (
               <button
                 type="button"
                 onClick={onDisconnectApiKey}
-                className="px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg text-xs sm:text-[11px] font-bold flex items-center space-x-1.5 border border-rose-500/40 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 transition-all shadow-xs shrink-0 ml-4 sm:ml-2.5 active:scale-95 cursor-pointer min-h-[36px] sm:min-h-0"
+                className="px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg text-xs sm:text-[11px] font-bold flex items-center space-x-1.5 border border-rose-500/40 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 transition-all shadow-xs shrink-0 ml-1 sm:ml-2.5 active:scale-95 cursor-pointer min-h-[32px] sm:min-h-0"
                 title="Sair"
               >
                 <LogOut className="w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0 text-rose-400" />
