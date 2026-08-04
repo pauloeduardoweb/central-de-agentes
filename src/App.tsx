@@ -524,11 +524,11 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
 
   return (
     <div className={`bg-[#03131c] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white relative overflow-x-hidden ${
-      activeView === 'chat' ? 'h-screen h-[100dvh] min-h-[100dvh] overflow-hidden flex flex-col p-0' : 'min-h-screen pb-20'
+      activeView === 'chat' ? 'h-[var(--chat-viewport-height,100dvh)] min-h-[100dvh] overflow-hidden flex flex-col p-0' : 'min-h-screen pb-20'
     }`}>
       <TechGridBackground />
 
-      <div className={`relative z-10 ${activeView === 'chat' ? 'h-full h-[100dvh] min-h-0 flex flex-col overflow-hidden' : ''}`}>
+      <div className={`relative z-10 ${activeView === 'chat' ? 'h-full flex-1 min-h-0 flex flex-col overflow-hidden' : ''}`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 flex items-center space-x-2 bg-slate-900 text-white dark:bg-emerald-600 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold animate-in slide-in-from-bottom duration-200">
