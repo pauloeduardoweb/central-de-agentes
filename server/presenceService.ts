@@ -1,7 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable, ensureSessionHistoryTable, ensureAgentInteractionsTable, ensureProgressTable } from './database.js';
+import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable, ensureSessionHistoryTable, ensureAgentInteractionsTable, ensureProgressTable, ensureChatTables } from './database.js';
 import { normalizeAccessCode, lookupKeyType, STUDENT_KEYS, MASTER_KEYS } from './authKeys.js';
 import { maskStudentCode } from './rankingService.js';
 
@@ -220,7 +220,8 @@ export interface HistoryEventItem {
     | 'RENEW'
     | 'DEVICE_CHANGE'
     | 'BROWSER_CHANGE'
-    | 'IP_CHANGE';
+    | 'IP_CHANGE'
+    | 'UNLINK';
   page?: string | null;
   category?: string | null;
   device?: string | null;
@@ -252,7 +253,8 @@ export async function recordSessionHistoryEvent(params: {
     | 'RENEW'
     | 'DEVICE_CHANGE'
     | 'BROWSER_CHANGE'
-    | 'IP_CHANGE';
+    | 'IP_CHANGE'
+    | 'UNLINK';
   page?: string | null;
   category?: string | null;
   device?: string | null;
@@ -329,6 +331,7 @@ export interface KeyStatusInfo {
   reactivatedBy?: string;
   lastAdminAction?: string;
   lastAdminActionAt?: string;
+  usado?: boolean | number;
 }
 
 // Memory key status fallback store
@@ -339,7 +342,7 @@ export interface AuditLogEntry {
   id: number;
   targetAccessKeyId?: number;
   targetMaskedKey: string;
-  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS';
+  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK';
   reason?: string;
   adminIdentifier: string;
   ipAddress: string;
@@ -419,7 +422,7 @@ loadKeyStatusStore();
 
 export async function recordAdminAuditAction(
   targetKey: string,
-  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS',
+  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK',
   reason?: string,
   ipAddress?: string
 ): Promise<void> {
@@ -2936,9 +2939,6 @@ export async function adminUnlinkKeyHandler(req: express.Request, res: express.R
 
     // 7. Clear server memory maps
     memorySessionsMap.delete(targetCode);
-    memoryProfilesMap.delete(targetCode);
-    memoryChatProfilesMap.delete(targetCode);
-    memoryProgressMap.delete(targetCode);
 
     const existingMem = memoryKeyStatusMap.get(targetCode);
     memoryKeyStatusMap.set(targetCode, {
