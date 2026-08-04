@@ -602,11 +602,6 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   const executeUnlink = async () => {
     if (!selectedUser || actionLoading) return;
 
-    if (unlinkConfirmationInput !== 'DESVINCULAR') {
-      setActionError('Digite exatamente DESVINCULAR em maiúsculas para confirmar.');
-      return;
-    }
-
     setActionLoading(true);
     setActionError(null);
 
@@ -657,7 +652,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         })
       );
 
-      setActionSuccessMsg('Chave desvinculada com sucesso!');
+      setActionSuccessMsg('Chave desvinculada com sucesso.');
       setTimeout(() => {
         closeModal();
         fetchData();
@@ -1763,7 +1758,12 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
       {activeModal === 'unlink' && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="w-full max-w-md bg-zinc-900 border border-rose-500/40 rounded-2xl p-6 shadow-2xl space-y-4 relative">
-            <button onClick={closeModal} className="absolute top-4 right-4 text-zinc-400 hover:text-white cursor-pointer">
+            <button
+              type="button"
+              onClick={closeModal}
+              disabled={actionLoading}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white cursor-pointer disabled:opacity-50"
+            >
               <X className="w-5 h-5" />
             </button>
 
@@ -1772,44 +1772,40 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                 <Link2Off className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">
-                  Desvincular chave de acesso?
+                <h3 className="text-base font-bold text-white flex items-center gap-1.5">
+                  <span className="text-amber-400">⚠️</span> Desvincular chave de acesso?
                 </h3>
-                <p className="text-xs text-rose-400 font-mono font-bold mt-0.5">{selectedUser.maskedKey}</p>
+                <p className="text-xs text-rose-300 font-medium mt-0.5">
+                  Esta ação removerá permanentemente o vínculo desta chave com o aluno atual.
+                </p>
               </div>
             </div>
 
-            <p className="text-xs text-zinc-300 leading-relaxed">
-              Esta ação apagará o cadastro, perfil, sessão, progresso e demais dados pessoais vinculados a esta chave. A chave continuará existindo e poderá ser usada novamente como uma chave nova.
-            </p>
+            <div className="text-xs text-zinc-300 leading-relaxed space-y-1.5 bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800">
+              <p className="flex items-start gap-1.5"><span className="text-rose-400 font-bold select-none">•</span> <span>Perfil do chat será apagado.</span></p>
+              <p className="flex items-start gap-1.5"><span className="text-rose-400 font-bold select-none">•</span> <span>Sessão será encerrada.</span></p>
+              <p className="flex items-start gap-1.5"><span className="text-rose-400 font-bold select-none">•</span> <span>XP, favoritos, notificações e progresso serão removidos.</span></p>
+              <p className="flex items-start gap-1.5"><span className="text-rose-400 font-bold select-none">•</span> <span>A chave continuará existindo e poderá ser utilizada novamente por outro aluno.</span></p>
+            </div>
 
             <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 space-y-1.5 text-xs">
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-zinc-500 font-mono">Chave:</span>
                 <span className="text-cyan-400 font-bold font-mono">{selectedUser.maskedKey}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-500 font-mono">Usuário atual:</span>
-                <span className="text-zinc-200 font-semibold">{selectedUser.username || selectedUser.maskedName || 'Nenhum'}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500 font-mono">Aluno:</span>
+                <span className="text-zinc-200 font-semibold">{selectedUser.username || (selectedUser as any).maskedName || 'Aluno'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-500 font-mono">Status atual:</span>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500 font-mono">Status:</span>
                 <span className="text-emerald-400 font-semibold">{selectedUser.accessStatus || 'ACTIVE'}</span>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-zinc-300">
-                Para confirmar, digite <span className="text-rose-400 font-bold select-all">DESVINCULAR</span> abaixo:
-              </label>
-              <input
-                type="text"
-                value={unlinkConfirmationInput}
-                onChange={(e) => setUnlinkConfirmationInput(e.target.value)}
-                placeholder="Digite DESVINCULAR"
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3.5 py-2 text-xs text-white uppercase focus:outline-none focus:border-rose-500"
-              />
-            </div>
+            <p className="text-xs font-semibold text-zinc-200 text-center pt-1">
+              Tem certeza que deseja desvincular esta chave?
+            </p>
 
             {actionError && (
               <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">
@@ -1819,31 +1815,35 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
             )}
 
             {actionSuccessMsg && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium text-center">
                 {actionSuccessMsg}
               </div>
             )}
 
             <div className="flex items-center justify-end space-x-3 pt-2">
               <button
+                type="button"
                 onClick={closeModal}
                 disabled={actionLoading}
-                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold cursor-pointer transition-all"
+                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 text-xs font-semibold cursor-pointer transition-all"
               >
-                Cancelar
+                Não, cancelar
               </button>
 
               <button
+                type="button"
                 onClick={executeUnlink}
-                disabled={actionLoading || unlinkConfirmationInput !== 'DESVINCULAR'}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center space-x-2 cursor-pointer transition-all shadow-lg shadow-rose-950/50"
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center space-x-2 cursor-pointer transition-all shadow-lg shadow-rose-950/50"
               >
                 {actionLoading ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Desvinculando...</span>
+                  </>
                 ) : (
-                  <Link2Off className="w-3.5 h-3.5" />
+                  <span>Sim, desvincular</span>
                 )}
-                <span>Desvincular definitivamente</span>
               </button>
             </div>
           </div>
