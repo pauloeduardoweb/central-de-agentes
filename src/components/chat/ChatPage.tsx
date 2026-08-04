@@ -87,25 +87,43 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
+    if (typeof window === 'undefined') return;
 
-    const handleResize = () => {
-      if (window.visualViewport && window.innerWidth < 1024) {
-        setViewportHeight(window.visualViewport.height);
+    const updateViewportHeight = () => {
+      const height = window.visualViewport?.height || window.innerHeight;
+
+      document.documentElement.style.setProperty(
+        '--chat-viewport-height',
+        `${height}px`
+      );
+
+      if (window.innerWidth < 1024) {
+        setViewportHeight(height);
       } else {
         setViewportHeight(null);
       }
+
+      console.log('[MOBILE VIEWPORT]', {
+        innerHeight: window.innerHeight,
+        visualViewportHeight: window.visualViewport?.height,
+        visualViewportOffsetTop: window.visualViewport?.offsetTop,
+        cssViewportHeight: getComputedStyle(
+          document.documentElement
+        ).getPropertyValue('--chat-viewport-height'),
+        userAgent: navigator.userAgent,
+      });
     };
 
-    window.visualViewport.addEventListener('resize', handleResize);
-    window.visualViewport.addEventListener('scroll', handleResize);
-    handleResize();
+    updateViewportHeight();
+
+    window.visualViewport?.addEventListener('resize', updateViewportHeight);
+    window.visualViewport?.addEventListener('scroll', updateViewportHeight);
+    window.addEventListener('resize', updateViewportHeight);
 
     return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleResize);
-        window.visualViewport.removeEventListener('scroll', handleResize);
-      }
+      window.visualViewport?.removeEventListener('resize', updateViewportHeight);
+      window.visualViewport?.removeEventListener('scroll', updateViewportHeight);
+      window.removeEventListener('resize', updateViewportHeight);
     };
   }, []);
 

@@ -642,7 +642,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   };
 
   return (
-    <div className="bg-[#F0F2F5] border-t border-[#DADDE1] p-2.5 sm:p-3 relative z-20 text-[#111B21]">
+    <div className="bg-[#F0F2F5] border-t border-[#DADDE1] px-2.5 pt-2.5 pb-[max(14px,env(safe-area-inset-bottom))] sm:p-3 relative z-20 text-[#111B21]">
       {/* Error Alert Banner */}
       {errorMsg && (
         <div className="mb-2 p-2 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center justify-between">

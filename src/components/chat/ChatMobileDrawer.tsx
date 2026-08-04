@@ -6,6 +6,18 @@ import {
 } from 'lucide-react';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 
+export const mobileCommunityMenuItems = [
+  { id: 'notifications', label: 'Central de Notificações' },
+  { id: 'notices', label: 'Avisos do Mentor' },
+  { id: 'polls', label: 'Enquetes' },
+  { id: 'favorites', label: 'Mensagens Favoritas' },
+  { id: 'ranking', label: 'Ranking & Experiência XP' },
+  { id: 'gallery', label: 'Galeria de Mídia' },
+  { id: 'online', label: 'Membros Online' },
+  { id: 'rules', label: 'Regras da Comunidade' },
+  { id: 'edit_profile', label: 'Editar Perfil' },
+] as const;
+
 interface ChatMobileDrawerProps {
   isOpen: boolean;
   onClose: () => void;
