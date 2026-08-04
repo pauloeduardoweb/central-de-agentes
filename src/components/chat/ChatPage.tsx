@@ -83,6 +83,32 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   const [notificationFilter, setNotificationFilter] = useState<'ALL' | 'UNREAD'>('ALL');
   const [isNotificationsLoading, setIsNotificationsLoading] = useState<boolean>(false);
 
+  // Mobile Visual Viewport Height Tracking (for soft keyboard responsiveness)
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleResize = () => {
+      if (window.visualViewport && window.innerWidth < 1024) {
+        setViewportHeight(window.visualViewport.height);
+      } else {
+        setViewportHeight(null);
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
+    handleResize();
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
+      }
+    };
+  }, []);
+
   // Fetch Notifications List
   const fetchNotifications = async (filter: 'ALL' | 'UNREAD' = notificationFilter) => {
     try {
@@ -1096,7 +1122,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
       />
 
       {/* Outer Container */}
-      <div className="flex-1 bg-[#FFFFFF] border-0 sm:border border-[#00A884]/28 rounded-none sm:rounded-2xl overflow-hidden shadow-xl flex flex-col lg:flex-row relative w-full max-w-full text-[#111B21]">
+      <div 
+        style={viewportHeight ? { height: `${viewportHeight}px`, maxHeight: `${viewportHeight}px` } : undefined}
+        className="flex-1 min-h-0 h-full bg-[#FFFFFF] border-0 sm:border border-[#00A884]/28 rounded-none sm:rounded-2xl overflow-hidden shadow-xl flex flex-col lg:flex-row relative w-full max-w-full text-[#111B21]"
+      >
 
         {/* LEFT SIDEBAR: INLINE ON DESKTOP (>= 1024px) */}
         <div className="hidden lg:flex lg:w-80 xl:w-96 bg-[#FFFFFF] border-r border-[#DADDE1] flex-col shrink-0">
@@ -1222,7 +1251,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         </div>
 
         {/* RIGHT MAIN PANEL: ACTIVE CHAT ROOM */}
-        <div className="flex-1 flex flex-col bg-[#EFEAE2] relative w-full min-w-0 max-w-full overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col bg-[#EFEAE2] relative w-full min-w-0 max-w-full overflow-hidden">
           {/* V1.2 Premium Community Header */}
           <CommunityHeader
             onlineCount={onlineMembers.length}
@@ -1350,17 +1379,19 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           )}
 
           {/* Chat Input Bar */}
-          <ChatInputBar
-            onSendMessage={handleSendMessage}
-            onUploadImage={handleUploadImage}
-            onTyping={handleTypingEvent}
-            replyToMessage={replyToMessage}
-            onCancelReply={() => setReplyToMessage(null)}
-            disabled={profile?.chat_status === 'SUSPENDED' || profile?.chat_status === 'BANNED'}
-            members={communityMembers}
-            externalInputContent={externalInputText}
-            onClearExternalInput={() => setExternalInputText(undefined)}
-          />
+          <div className="shrink-0 relative z-20">
+            <ChatInputBar
+              onSendMessage={handleSendMessage}
+              onUploadImage={handleUploadImage}
+              onTyping={handleTypingEvent}
+              replyToMessage={replyToMessage}
+              onCancelReply={() => setReplyToMessage(null)}
+              disabled={profile?.chat_status === 'SUSPENDED' || profile?.chat_status === 'BANNED'}
+              members={communityMembers}
+              externalInputContent={externalInputText}
+              onClearExternalInput={() => setExternalInputText(undefined)}
+            />
+          </div>
         </div>
 
       </div>
