@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { db, isDatabaseConfigured } from './database.js';
-import { extractChatCredentials, getProfileBySessionCode, memoryMessagesList } from './chatService.js';
+import { extractChatCredentials, getProfileBySessionCode, memoryMessagesList, performOneTimeChatCleanup } from './chatService.js';
 import { awardXp, calculateLevelFromXp } from './chatXpService.js';
 import { processAndUploadMedia } from './chatMediaService.js';
 import { isMasterKey, normalizeAccessCode } from './authKeys.js';
@@ -554,26 +554,19 @@ chatExtraRouter.post('/admin/chat/profiles/:id/xp', async (req: Request, res: Re
   }
 });
 
-// GET /api/admin/chat/profiles/:id/xp-history
-chatExtraRouter.get('/admin/chat/profiles/:id/xp-history', async (req: Request, res: Response) => {
+// POST /api/admin/chat/clean-history (One-time administrative chat history cleanup)
+chatExtraRouter.post('/admin/chat/clean-history', async (req: Request, res: Response) => {
   try {
     const { accessCode } = extractChatCredentials(req);
     if (!accessCode || !isMasterKey(accessCode)) {
-      return res.status(403).json({ error: 'FORBIDDEN' });
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Apenas o Mentor pode executar a limpeza de histórico.' });
     }
 
-    const profileId = Number(req.params.id);
-    if (!isDatabaseConfigured()) {
-      return res.json({ history: [] });
-    }
-
-    const [rows]: any = await db.query(
-      `SELECT * FROM chat_xp_events WHERE profile_id = ? ORDER BY id DESC LIMIT 100`,
-      [profileId]
-    );
-
-    return res.json({ history: rows || [] });
+    const result = await performOneTimeChatCleanup();
+    return res.json({ success: true, ...result });
   } catch (err: any) {
-    return res.status(500).json({ error: 'SERVER_ERROR' });
+    console.error('[POST /api/admin/chat/clean-history Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: err?.message || 'Erro ao realizar limpeza' });
   }
 });
+

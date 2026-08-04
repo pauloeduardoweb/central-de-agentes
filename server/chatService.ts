@@ -2379,65 +2379,131 @@ export async function getUserFavoriteMessages(profileId: number) {
 }
 
 /**
+ * Touch profile activity timestamp
+ */
+export async function touchProfileActivity(codigoOrProfileId: string | number) {
+  const now = new Date().toISOString();
+  if (typeof codigoOrProfileId === 'number') {
+    if (isDatabaseConfigured()) {
+      await db.query(`UPDATE chat_profiles SET last_chat_activity_at = NOW() WHERE id = ?`, [codigoOrProfileId]).catch(() => {});
+    }
+    for (const p of memoryProfilesMap.values()) {
+      if (p.id === codigoOrProfileId) {
+        p.last_chat_activity_at = now;
+      }
+    }
+  } else {
+    const cleanCode = normalizeAccessCode(codigoOrProfileId);
+    if (cleanCode) {
+      if (isDatabaseConfigured()) {
+        await db.query(`UPDATE chat_profiles SET last_chat_activity_at = NOW() WHERE codigo = ?`, [cleanCode]).catch(() => {});
+      }
+      const p = memoryProfilesMap.get(cleanCode);
+      if (p) {
+        p.last_chat_activity_at = now;
+      }
+    }
+  }
+}
+
+/**
  * Get Online Members List for Drawer
+ * Deduplicates by profile_id so multiple sessions of the same account appear only once.
  * STRICTLY PROTECTS PRIVATE DATA: NEVER returns phone, IP, access key, or session ID.
  */
 export async function getOnlineMembersDrawerList() {
-  const presenceData = await getCentralPresenceData();
-  const onlineCodes = new Set(
-    (presenceData.users || [])
-      .map((u: any) => normalizeAccessCode(u.codigo))
-      .filter(Boolean)
-  );
+  const activeCodes = new Set<string>();
+  const nowMs = Date.now();
+
+  // Add active codes from memorySessionsMap (last 90 seconds)
+  for (const [rawCode, memSession] of memorySessionsMap.entries()) {
+    const norm = normalizeAccessCode(rawCode);
+    if (norm && memSession.lastHeartbeatAt && (nowMs - memSession.lastHeartbeatAt.getTime() <= 90000)) {
+      activeCodes.add(norm);
+    }
+  }
 
   if (isDatabaseConfigured()) {
     try {
+      // Fetch active codes from sessoes table (last 90s)
+      const [sessRows]: any = await db.query(
+        `SELECT DISTINCT codigo FROM sessoes WHERE is_online = 1 AND last_heartbeat_at >= NOW() - INTERVAL 90 SECOND`
+      ).catch(() => []);
+      if (Array.isArray(sessRows)) {
+        for (const r of sessRows) {
+          const norm = normalizeAccessCode(r.codigo);
+          if (norm) activeCodes.add(norm);
+        }
+      }
+
+      const activeCodesArray = Array.from(activeCodes);
+      const hasCodes = activeCodesArray.length > 0;
+
       const [rows]: any = await db.query(
         `SELECT p.id, p.nickname, p.photo_url, p.bio, p.codigo, p.created_at, p.last_chat_activity_at,
                 (SELECT COUNT(*) FROM chat_messages WHERE profile_id = p.id AND deleted_at IS NULL) AS total_messages
          FROM chat_profiles p
          WHERE p.chat_status = 'ACTIVE'
-         ORDER BY p.nickname ASC`
+           AND (p.last_chat_activity_at >= NOW() - INTERVAL 90 SECOND ${hasCodes ? 'OR p.codigo IN (?)' : ''})
+         ORDER BY p.nickname ASC`,
+        hasCodes ? [activeCodesArray] : []
       );
 
       if (Array.isArray(rows)) {
-        return rows
-          .filter((p) => onlineCodes.has(normalizeAccessCode(p.codigo)))
-          .map((p) => {
-            const isMentor = isMasterKey(p.codigo);
-            return {
+        const uniqueMembersMap = new Map<number, any>();
+        for (const p of rows) {
+          const isMentor = isMasterKey(p.codigo);
+          if (!uniqueMembersMap.has(p.id)) {
+            uniqueMembersMap.set(p.id, {
               id: p.id,
+              profile_id: p.id,
               nickname: isMentor ? 'Mentor Bigode' : p.nickname,
               photo_url: p.photo_url,
               bio: p.bio || null,
               is_mentor: isMentor,
               joined_at: p.created_at,
+              last_seen: p.last_chat_activity_at ? new Date(p.last_chat_activity_at).toISOString() : new Date().toISOString(),
+              is_online: true,
               total_messages: Number(p.total_messages) || 0,
-            };
-          });
+            });
+          }
+        }
+        return Array.from(uniqueMembersMap.values());
       }
     } catch (err) {
       console.error('[getOnlineMembersDrawerList Error]:', err);
     }
   }
 
-  const results: any[] = [];
+  // Fallback to memory store with profile deduplication
+  const uniqueMembersMap = new Map<number, any>();
   for (const p of memoryProfilesMap.values()) {
-    if (onlineCodes.has(normalizeAccessCode(p.codigo))) {
+    const normCode = normalizeAccessCode(p.codigo);
+    const lastActivityMs = p.last_chat_activity_at ? new Date(p.last_chat_activity_at).getTime() : 0;
+    const isRecentlyActive = (nowMs - lastActivityMs) <= 90000;
+    const isCodeActive = normCode ? activeCodes.has(normCode) : false;
+
+    if (isRecentlyActive || isCodeActive) {
       const isMentor = isMasterKey(p.codigo);
-      const totalMsgs = memoryMessagesList.filter((m) => m.profile_id === p.id && !m.deleted_at).length;
-      results.push({
-        id: p.id,
-        nickname: isMentor ? 'Mentor Bigode' : p.nickname,
-        photo_url: p.photo_url,
-        bio: p.bio || null,
-        is_mentor: isMentor,
-        joined_at: p.created_at,
-        total_messages: totalMsgs,
-      });
+      if (!uniqueMembersMap.has(p.id)) {
+        const totalMsgs = memoryMessagesList.filter((m) => m.profile_id === p.id && !m.deleted_at).length;
+        uniqueMembersMap.set(p.id, {
+          id: p.id,
+          profile_id: p.id,
+          nickname: isMentor ? 'Mentor Bigode' : p.nickname,
+          photo_url: p.photo_url,
+          bio: p.bio || null,
+          is_mentor: isMentor,
+          joined_at: p.created_at,
+          last_seen: p.last_chat_activity_at || new Date().toISOString(),
+          is_online: true,
+          total_messages: totalMsgs,
+        });
+      }
     }
   }
-  return results;
+
+  return Array.from(uniqueMembersMap.values());
 }
 
 /**
@@ -2551,73 +2617,123 @@ export async function getCommunityStats() {
 export let cleanupStats = {
   profilesRemoved: 0,
   messagesRemoved: 0,
+  reactionsRemoved: 0,
+  favoritesRemoved: 0,
+  mentionsRemoved: 0,
+  readsRemoved: 0,
+  reportsRemoved: 0,
+  notificationsRemoved: 0,
+  mediaRemoved: 0,
   executedAt: '',
 };
 
-export async function performEnvironmentCleanup(): Promise<{ profilesRemoved: number; messagesRemoved: number }> {
-  let profilesRemoved = 0;
+/**
+ * Perform One-Time Administrative Chat History Cleanup
+ * Uses MySQL transactions when DB is connected.
+ * Preserves valid profiles, keys, configuration, tables, and "Anderson Profeta Logado".
+ */
+export async function performOneTimeChatCleanup(): Promise<{
+  success: boolean;
+  messagesRemoved: number;
+  reactionsRemoved: number;
+  favoritesRemoved: number;
+  mentionsRemoved: number;
+  readsRemoved: number;
+  reportsRemoved: number;
+  notificationsRemoved: number;
+  mediaRemoved: number;
+}> {
+  console.log('[CHAT CLEANUP START]');
+
   let messagesRemoved = 0;
+  let reactionsRemoved = 0;
+  let favoritesRemoved = 0;
+  let mentionsRemoved = 0;
+  let readsRemoved = 0;
+  let reportsRemoved = 0;
+  let notificationsRemoved = 0;
+  let mediaRemoved = 0;
 
   if (isDatabaseConfigured()) {
-    await ensureChatTables();
     try {
-      const [allProfiles]: any = await db.query(`SELECT id, codigo, nickname FROM chat_profiles`);
+      await ensureChatTables();
+      const connection = await db.getConnection();
+      try {
+        await connection.beginTransaction();
 
-      if (Array.isArray(allProfiles)) {
-        const toDelete = allProfiles.filter((p: any) => {
-          const nick = (p.nickname || '').toLowerCase();
-          const isAnderson = nick.includes('anderson') || nick.includes('profeta');
-          const isMentor = nick.includes('mentor');
-          return !isAnderson && !isMentor;
-        });
+        // Count items before deletion
+        const [mRows]: any = await connection.query(`SELECT COUNT(*) as cnt FROM chat_messages`);
+        messagesRemoved = Number(mRows?.[0]?.cnt || 0);
 
-        for (const p of toDelete) {
-          const profId = p.id;
-          const code = p.codigo;
+        const [rRows]: any = await connection.query(`SELECT COUNT(*) as cnt FROM chat_reactions`).catch(() => []);
+        reactionsRemoved = Number(rRows?.[0]?.cnt || 0);
 
-          const [msgRows]: any = await db.query(`SELECT COUNT(*) as cnt FROM chat_messages WHERE profile_id = ?`, [profId]).catch(() => []);
-          if (Array.isArray(msgRows) && msgRows[0]?.cnt) {
-            messagesRemoved += Number(msgRows[0].cnt);
-          }
+        const [fRows]: any = await connection.query(`SELECT COUNT(*) as cnt FROM chat_favorites`).catch(() => []);
+        favoritesRemoved = Number(fRows?.[0]?.cnt || 0);
 
-          await db.query(`DELETE FROM chat_favorites WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_reactions WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_xp_events WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_profile_achievements WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_notifications WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_room_members WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_poll_votes WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_message_reads WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_user_blocks WHERE profile_id = ? OR blocked_profile_id = ?`, [profId, profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_user_mutes WHERE profile_id = ? OR muted_profile_id = ?`, [profId, profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_mentions WHERE source_profile_id = ? OR target_profile_id = ?`, [profId, profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_media WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_messages WHERE profile_id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM chat_profiles WHERE id = ?`, [profId]).catch(() => {});
-          await db.query(`DELETE FROM sessoes WHERE codigo = ?`, [code]).catch(() => {});
-          await db.query(`DELETE FROM perfis_alunos WHERE codigo = ?`, [code]).catch(() => {});
-          await db.query(`DELETE FROM progresso_alunos WHERE codigo = ?`, [code]).catch(() => {});
+        const [menRows]: any = await connection.query(`SELECT COUNT(*) as cnt FROM chat_mentions`).catch(() => []);
+        mentionsRemoved = Number(menRows?.[0]?.cnt || 0);
 
-          profilesRemoved++;
-        }
+        const [readRows]: any = await connection.query(`SELECT COUNT(*) as cnt FROM chat_message_reads`).catch(() => []);
+        readsRemoved = Number(readRows?.[0]?.cnt || 0);
+
+        const [repRows]: any = await connection.query(`SELECT COUNT(*) as cnt FROM chat_reports`).catch(() => []);
+        reportsRemoved = Number(repRows?.[0]?.cnt || 0);
+
+        const [notifRows]: any = await connection.query(`SELECT COUNT(*) as cnt FROM chat_notifications`).catch(() => []);
+        notificationsRemoved = Number(notifRows?.[0]?.cnt || 0);
+
+        const [medRows]: any = await connection.query(`SELECT COUNT(*) as cnt FROM chat_media`).catch(() => []);
+        mediaRemoved = Number(medRows?.[0]?.cnt || 0);
+
+        console.log(`[CHAT CLEANUP COUNTS] messages=${messagesRemoved}, reactions=${reactionsRemoved}, favorites=${favoritesRemoved}, mentions=${mentionsRemoved}, reads=${readsRemoved}, reports=${reportsRemoved}, notifications=${notificationsRemoved}, media=${mediaRemoved}`);
+
+        // Disable FK checks temporarily for transaction cleanup
+        await connection.query(`SET FOREIGN_KEY_CHECKS = 0`);
+
+        await connection.query(`DELETE FROM chat_favorites`);
+        await connection.query(`DELETE FROM chat_reactions`);
+        await connection.query(`DELETE FROM chat_mentions`);
+        await connection.query(`DELETE FROM chat_message_reads`);
+        await connection.query(`DELETE FROM chat_reports`);
+        await connection.query(`DELETE FROM chat_notifications`);
+        await connection.query(`DELETE FROM chat_media`);
+        await connection.query(`DELETE FROM chat_messages`);
+        await connection.query(`DELETE FROM chat_notices`).catch(() => {});
+
+        // Reset room stats
+        await connection.query(`UPDATE chat_rooms SET last_message_content = NULL, last_message_at = NULL WHERE id = 1`).catch(() => {});
+        await connection.query(`UPDATE chat_room_members SET last_read_message_id = NULL`).catch(() => {});
+
+        await connection.query(`SET FOREIGN_KEY_CHECKS = 1`);
+
+        await connection.commit();
+        connection.release();
+
+        console.log('[CHAT CLEANUP SUCCESS]');
+      } catch (txErr) {
+        await connection.query(`SET FOREIGN_KEY_CHECKS = 1`).catch(() => {});
+        await connection.rollback().catch(() => {});
+        connection.release();
+        console.error('[CHAT CLEANUP ERROR]', txErr);
       }
     } catch (dbErr) {
-      console.error('[CLEANUP DB ERROR]', dbErr);
+      console.error('[CHAT CLEANUP ERROR]', dbErr);
     }
   }
 
   // Memory cleanup
-  for (const [code, p] of memoryProfilesMap.entries()) {
-    const nick = (p.nickname || '').toLowerCase();
-    const isAnderson = nick.includes('anderson') || nick.includes('profeta');
-    const isMentor = nick.includes('mentor');
-    if (!isAnderson && !isMentor) {
-      memoryProfilesMap.delete(code);
-      profilesRemoved++;
-    }
+  if (memoryMessagesList.length > 0) {
+    messagesRemoved += memoryMessagesList.length;
+    memoryMessagesList.length = 0;
   }
+  memoryReactionsList.length = 0;
+  memoryFavoritesList.length = 0;
+  memoryMentionsList.length = 0;
+  memoryReportsList.length = 0;
+  memoryNoticesList.length = 0;
 
-  // Ensure Anderson Profeta Logado exists if no student profile remains
+  // Ensure Anderson Profeta profile exists
   const hasAnderson = Array.from(memoryProfilesMap.values()).some((p) => {
     const nick = (p.nickname || '').toLowerCase();
     return nick.includes('anderson') || nick.includes('profeta');
@@ -2639,32 +2755,40 @@ export async function performEnvironmentCleanup(): Promise<{ profilesRemoved: nu
       current_level: 2,
       current_streak: 3,
       last_participation_date: new Date().toISOString().split('T')[0],
-      message_count: 5,
-      reply_count: 2,
+      message_count: 0,
+      reply_count: 0,
     });
   }
 
-  // Filter memory messages
-  const initialMsgCount = memoryMessagesList.length;
-  const filteredMessages = memoryMessagesList.filter((m) => {
-    const nick = (m.author?.nickname || (m as any).nickname || '').toLowerCase();
-    const isAnderson = nick.includes('anderson') || nick.includes('profeta');
-    const isMentor = nick.includes('mentor');
-    return isAnderson || isMentor;
-  });
-  messagesRemoved += (initialMsgCount - filteredMessages.length);
-  memoryMessagesList.length = 0;
-  memoryMessagesList.push(...filteredMessages);
-
   cleanupStats = {
-    profilesRemoved,
+    profilesRemoved: 0,
     messagesRemoved,
+    reactionsRemoved,
+    favoritesRemoved,
+    mentionsRemoved,
+    readsRemoved,
+    reportsRemoved,
+    notificationsRemoved,
+    mediaRemoved,
     executedAt: new Date().toISOString(),
   };
 
-  console.log(`[TEST ENVIRONMENT CLEANUP COMPLETED] Profiles removed: ${profilesRemoved}, Messages removed: ${messagesRemoved}`);
+  return {
+    success: true,
+    messagesRemoved,
+    reactionsRemoved,
+    favoritesRemoved,
+    mentionsRemoved,
+    readsRemoved,
+    reportsRemoved,
+    notificationsRemoved,
+    mediaRemoved,
+  };
+}
 
-  return { profilesRemoved, messagesRemoved };
+export async function performEnvironmentCleanup(): Promise<{ profilesRemoved: number; messagesRemoved: number }> {
+  const result = await performOneTimeChatCleanup();
+  return { profilesRemoved: 0, messagesRemoved: result.messagesRemoved };
 }
 
 
