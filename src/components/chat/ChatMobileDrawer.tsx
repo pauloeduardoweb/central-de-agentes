@@ -228,6 +228,7 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
                   key={room.id}
                   onClick={() => {
                     onSelectRoom(room.id);
+                    onSelectFilter('ALL');
                     onClose();
                   }}
                   className={`w-full p-2.5 rounded-xl flex items-start space-x-3 transition-all text-left cursor-pointer min-h-[48px] ${

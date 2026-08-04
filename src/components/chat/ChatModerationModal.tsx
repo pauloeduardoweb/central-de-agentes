@@ -5,20 +5,31 @@ interface ChatModerationModalProps {
   isOpen: boolean;
   onClose: () => void;
   studentCode: string;
+  onClearGeneralChat?: () => void;
 }
 
 export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
   isOpen,
   onClose,
   studentCode,
+  onClearGeneralChat,
 }) => {
-  const [activeTab, setActiveTab] = useState<'reports' | 'members' | 'notice'>('reports');
+  const [activeTab, setActiveTab] = useState<'reports' | 'members' | 'notice' | 'clear'>('reports');
   const [reports, setReports] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [noticeContent, setNoticeContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Excluir Perfil state
+  const [deletingProfileTarget, setDeletingProfileTarget] = useState<any | null>(null);
+  const [isDeletingProfile, setIsDeletingProfile] = useState(false);
+
+  // Limpar Conversa Geral state
+  const [clearStep, setClearStep] = useState<0 | 1 | 2>(0);
+  const [preserveNotices, setPreserveNotices] = useState(true);
+  const [isClearingChat, setIsClearingChat] = useState(false);
 
   const fetchReports = async () => {
     setLoading(true);
@@ -126,6 +137,62 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
     }
   };
 
+  const handleExecuteDeleteProfile = async () => {
+    if (!deletingProfileTarget || isDeletingProfile) return;
+    setIsDeletingProfile(true);
+    try {
+      const res = await fetch(`/api/admin/chat-profiles/${deletingProfileTarget.id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-access-code': studentCode,
+        },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMsg('Perfil do Bate-papo excluído com sucesso.');
+        setDeletingProfileTarget(null);
+        fetchProfiles();
+        setTimeout(() => setActionMsg(null), 3000);
+      } else {
+        alert(data?.message || 'Erro ao excluir perfil.');
+      }
+    } catch (err: any) {
+      console.error('Error deleting chat profile:', err);
+      alert('Erro ao comunicar com o servidor.');
+    } finally {
+      setIsDeletingProfile(false);
+    }
+  };
+
+  const handleExecuteClearChat = async () => {
+    if (isClearingChat) return;
+    setIsClearingChat(true);
+    try {
+      const res = await fetch('/api/admin/chat/rooms/1/clear', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': studentCode,
+        },
+        body: JSON.stringify({ preserveNotices }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionMsg('Conversa geral limpa com sucesso.');
+        setClearStep(0);
+        if (onClearGeneralChat) onClearGeneralChat();
+        setTimeout(() => setActionMsg(null), 3000);
+      } else {
+        alert(data?.message || 'Erro ao limpar conversa geral.');
+      }
+    } catch (err: any) {
+      console.error('Error clearing chat room:', err);
+      alert('Erro ao comunicar com o servidor.');
+    } finally {
+      setIsClearingChat(false);
+    }
+  };
+
   const filteredProfiles = profiles.filter((p) =>
     p.nickname.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.phone && p.phone.includes(searchTerm))
@@ -192,6 +259,18 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
           >
             <Pin className="w-3.5 h-3.5" />
             <span>Publicar Aviso Oficial</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('clear')}
+            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+              activeTab === 'clear'
+                ? 'bg-[#0b141a] text-rose-300 border-t-2 border-x border-rose-500/50'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span>Limpar Conversa Geral</span>
           </button>
         </div>
 
@@ -295,13 +374,13 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
                         <>
                           <button
                             onClick={() => handleUpdateStatus(p.id, 'SUSPENDED', 'Ação direta do Mentor')}
-                            className="px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[11px] font-semibold hover:bg-amber-900"
+                            className="px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[11px] font-semibold hover:bg-amber-900 cursor-pointer"
                           >
                             Suspender
                           </button>
                           <button
                             onClick={() => handleUpdateStatus(p.id, 'BANNED', 'Ação direta do Mentor')}
-                            className="px-2.5 py-1 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 text-[11px] font-semibold hover:bg-rose-900"
+                            className="px-2.5 py-1 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 text-[11px] font-semibold hover:bg-rose-900 cursor-pointer"
                           >
                             Banir
                           </button>
@@ -309,12 +388,21 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
                       ) : (
                         <button
                           onClick={() => handleUpdateStatus(p.id, 'ACTIVE', 'Reativado pelo Mentor')}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold hover:bg-emerald-900 flex items-center gap-1"
+                          className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold hover:bg-emerald-900 flex items-center gap-1 cursor-pointer"
                         >
                           <RefreshCw className="w-3 h-3" />
                           Reativar
                         </button>
                       )}
+
+                      <button
+                        onClick={() => setDeletingProfileTarget(p)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-950/90 border border-rose-500/60 text-rose-200 text-[11px] font-bold hover:bg-rose-900 flex items-center gap-1 cursor-pointer"
+                        title="Excluir perfil do Bate-papo"
+                      >
+                        <Trash2 className="w-3 h-3 text-rose-400" />
+                        Excluir perfil
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -352,8 +440,235 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
             </form>
           )}
 
+          {/* TAB 4: CLEAR CHAT */}
+          {activeTab === 'clear' && (
+            <div className="space-y-4 p-4 bg-[#111b21] border border-rose-500/30 rounded-2xl">
+              <div className="flex items-center space-x-3 text-rose-400 border-b border-rose-500/20 pb-3">
+                <Trash2 className="w-6 h-6" />
+                <div>
+                  <h4 className="text-sm font-bold text-white">Área de Manutenção: Limpar Conversa Geral</h4>
+                  <p className="text-xs text-rose-300/80">Ação administrativa destrutiva para a sala principal</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Esta função remove todas as mensagens de texto, mídias (fotos, GIFs, áudios), respostas, reações, favoritos e menções da sala principal. Perfis de usuários, chaves de acesso e pontuações de XP serão preservados.
+              </p>
+
+              <div className="p-3 bg-[#0b141a] rounded-xl border border-slate-800 flex items-center space-x-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="tabPreserveNotices"
+                  checked={preserveNotices}
+                  onChange={(e) => setPreserveNotices(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                />
+                <label htmlFor="tabPreserveNotices" className="text-xs text-slate-200 cursor-pointer font-medium">
+                  Preservar Avisos Oficiais do Mentor
+                </label>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setClearStep(1)}
+                  className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-all flex items-center justify-center space-x-2 shadow-lg shadow-rose-950/50 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Iniciar Limpeza da Conversa Geral</span>
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
+
+      {/* MODAL: EXCLUIR PERFIL DO BATE-PAPO */}
+      {deletingProfileTarget && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="bg-[#111b21] border border-rose-500/50 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 text-white relative">
+            <button
+              onClick={() => !isDeletingProfile && setDeletingProfileTarget(null)}
+              disabled={isDeletingProfile}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white disabled:opacity-50"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 border-b border-rose-500/30 pb-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Excluir perfil do Bate-papo?</h3>
+                <p className="text-xs text-rose-300 font-medium mt-0.5">Operação Administrativa do Bate-papo</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed bg-[#0b141a] p-3 rounded-xl border border-slate-800">
+              O aluno perderá o perfil, foto, nickname, XP, favoritos e demais dados da comunidade. A chave de acesso continuará válida e o aluno poderá entrar novamente na plataforma, mas precisará recriar seu perfil do Bate-papo.
+            </p>
+
+            <div className="p-3 bg-[#0b141a] rounded-xl border border-slate-800 space-y-1.5 text-xs font-mono">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Nickname:</span>
+                <span className="text-emerald-400 font-bold">{deletingProfileTarget.nickname}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Chave mascarada:</span>
+                <span className="text-cyan-300 font-bold">{deletingProfileTarget.codigo || 'GZ-***'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Telefone:</span>
+                <span className="text-slate-200">{deletingProfileTarget.phone || 'Privado'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Status atual:</span>
+                <span className="text-amber-300 font-bold">
+                  {deletingProfileTarget.chat_status === 'ACTIVE' ? 'Ativo' : deletingProfileTarget.chat_status === 'SUSPENDED' ? 'Suspenso' : 'Banido'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingProfileTarget(null)}
+                disabled={isDeletingProfile}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteDeleteProfile}
+                disabled={isDeletingProfile}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs cursor-pointer flex items-center space-x-1.5"
+              >
+                {isDeletingProfile ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <span>Sim, excluir perfil</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CLEAR CHAT STEP 1 */}
+      {clearStep === 1 && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="bg-[#111b21] border border-amber-500/50 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 text-white relative">
+            <button onClick={() => setClearStep(0)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 border-b border-amber-500/30 pb-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Limpar toda a conversa geral?</h3>
+                <p className="text-xs text-amber-300 font-medium mt-0.5">Confirmação Etapa 1 de 2</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed bg-[#0b141a] p-3.5 rounded-xl border border-slate-800">
+              Todas as mensagens, fotos, GIFs, áudios e interações da sala principal serão removidos permanentemente.
+            </p>
+
+            <div className="p-3 bg-[#0b141a] rounded-xl border border-slate-800 flex items-center space-x-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                id="modal1PreserveNotices"
+                checked={preserveNotices}
+                onChange={(e) => setPreserveNotices(e.target.checked)}
+                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+              />
+              <label htmlFor="modal1PreserveNotices" className="text-xs text-slate-200 cursor-pointer font-medium">
+                Preservar Avisos Oficiais do Mentor
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setClearStep(0)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => setClearStep(2)}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CLEAR CHAT STEP 2 */}
+      {clearStep === 2 && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div className="bg-[#111b21] border border-rose-500/60 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 text-white relative">
+            <button
+              onClick={() => !isClearingChat && setClearStep(0)}
+              disabled={isClearingChat}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white disabled:opacity-50"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 border-b border-rose-500/30 pb-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                <Trash2 className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Confirmação final</h3>
+                <p className="text-xs text-rose-400 font-bold mt-0.5">Etapa Final de Segurança</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-semibold text-rose-200 bg-rose-950/40 p-3.5 rounded-xl border border-rose-500/40 leading-relaxed">
+              Esta ação não pode ser desfeita. Tem certeza que deseja apagar todo o histórico do Bate-papo Geral?
+            </p>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setClearStep(1)}
+                disabled={isClearingChat}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Não, voltar
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteClearChat}
+                disabled={isClearingChat}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-black text-xs cursor-pointer flex items-center space-x-1.5 shadow-lg shadow-rose-950/50"
+              >
+                {isClearingChat ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Limpando conversa...</span>
+                  </>
+                ) : (
+                  <span>Sim, limpar conversa</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

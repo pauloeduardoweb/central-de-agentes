@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Search, Award, Star, BarChart2, Bell, ShieldCheck, Sparkles, Plus, Menu, Eye, X } from 'lucide-react';
+import { Users, Search, Award, Star, BarChart2, Bell, ShieldCheck, Sparkles, Plus, Menu, Eye, X, ArrowLeft } from 'lucide-react';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
 import { PollData, PollCard } from './PollCard';
@@ -22,6 +22,8 @@ interface CommunityHeaderProps {
   onOpenGallery?: () => void;
   onOpenProfileSettings?: () => void;
   onToggleMobileDrawer?: () => void;
+  isSecondaryView?: boolean;
+  onReturnToGeneralChat?: () => void;
   currentProfile?: {
     id?: number;
     nickname?: string;
@@ -52,6 +54,8 @@ export const CommunityHeader: React.FC<CommunityHeaderProps> = ({
   onOpenGallery,
   onOpenProfileSettings,
   onToggleMobileDrawer,
+  isSecondaryView = false,
+  onReturnToGeneralChat,
   currentProfile,
   poll,
   isMentor = false,
@@ -108,7 +112,7 @@ export const CommunityHeader: React.FC<CommunityHeaderProps> = ({
     <div className="bg-[#F0F2F5] border-b border-[#DADDE1] p-2 sm:p-3.5 space-y-2 sticky top-0 z-30 shadow-xs max-w-full overflow-hidden text-[#111B21]">
       {/* MOBILE / TABLET COMPACT SINGLE-LINE HEADER (< 1024px) */}
       <div className="flex lg:hidden items-center justify-between h-[52px] gap-2">
-        {/* Left: Hamburger Menu Only */}
+        {/* Left: Hamburger Menu & Voltar ao Bate-papo Button */}
         <div className="flex items-center space-x-2 min-w-0">
           {onToggleMobileDrawer && (
             <button
@@ -118,6 +122,18 @@ export const CommunityHeader: React.FC<CommunityHeaderProps> = ({
               title="Central Mobile"
             >
               <Menu className="w-5 h-5 text-[#00A884]" />
+            </button>
+          )}
+
+          {/* Voltar ao Bate-papo Button - Only visible when in a secondary view */}
+          {isSecondaryView && onReturnToGeneralChat && (
+            <button
+              onClick={onReturnToGeneralChat}
+              className="flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-[#00A884] active:bg-[#008F72] text-white font-bold text-xs transition-all shadow-xs cursor-pointer shrink-0 animate-fade-in"
+              title="Voltar ao Bate-papo Geral"
+            >
+              <ArrowLeft className="w-4 h-4 text-white shrink-0" />
+              <span className="truncate">Voltar ao Bate-papo</span>
             </button>
           )}
         </div>

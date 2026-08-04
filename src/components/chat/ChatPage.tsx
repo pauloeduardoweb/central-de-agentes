@@ -1205,6 +1205,19 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
             searchQuery={searchTerm}
             onFilterChange={handleFilterChange}
             onSearchChange={setSearchTerm}
+            isSecondaryView={activeFilter !== 'ALL' || showGalleryModal || showRulesModal || showFavoritesModal || showRankingModal || showOnlineDrawer || showNotificationsPanel}
+            onReturnToGeneralChat={() => {
+              setActiveFilter('ALL');
+              setShowGalleryModal(false);
+              setShowRulesModal(false);
+              setShowFavoritesModal(false);
+              setShowRankingModal(false);
+              setShowOnlineDrawer(false);
+              setShowNotificationsPanel(false);
+              setSearchTerm('');
+              setMobileView('chat');
+              setShowMobileDrawer(false);
+            }}
             onOpenOnlineDrawer={() => {
               fetchOnlineMembers();
               setShowOnlineDrawer(true);
