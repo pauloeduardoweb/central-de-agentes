@@ -2,15 +2,23 @@ import React from 'react';
 import { getSafeImageUrl } from '../utils/imageUrl';
 
 export const TechGridBackground: React.FC = () => {
-  const localImgUrl = '/assets/fundo-geracao-z-pro.jpg';
+  const rawUrl = 'https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png';
+  const bgImageUrl = getSafeImageUrl(rawUrl);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
       {/* Background Image Layer */}
       <img
-        src={localImgUrl}
+        src={bgImageUrl}
         alt="Background Grid"
+        onError={(e) => {
+          const target = e.currentTarget;
+          if (target.src !== rawUrl) {
+            target.src = rawUrl;
+          }
+        }}
         className="absolute inset-0 w-full h-full object-cover object-center opacity-90"
+        referrerPolicy="no-referrer"
       />
 
       {/* Dark gradient vignette overlay to keep text high contrast */}

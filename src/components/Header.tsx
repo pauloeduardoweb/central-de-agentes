@@ -79,7 +79,10 @@ export const Header: React.FC<HeaderProps> = ({
             style={
               activeView === 'hub'
                 ? {
-                    backgroundImage: `linear-gradient(rgba(1, 10, 25, 0.72), rgba(1, 10, 25, 0.82)), url('/assets/fundo-geracao-z-pro.jpg')`,
+                    backgroundImage: `linear-gradient(rgba(0, 8, 28, 0.78), rgba(0, 18, 55, 0.88)), url('/assets/fundo-geracao-z-pro.jpg')`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
                   }
                 : undefined
             }
@@ -231,10 +234,13 @@ export const Header: React.FC<HeaderProps> = ({
         <div 
           className="sm:hidden max-w-7xl mx-auto border border-cyan-500/30 rounded-xl p-2.5 space-y-2 mt-2 shadow-lg bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `linear-gradient(rgba(0, 14, 28, 0.78), rgba(0, 18, 38, 0.88)), url('/assets/fundo-geracao-z-pro.jpg')`,
+            backgroundImage: `linear-gradient(rgba(0, 8, 28, 0.78), rgba(0, 18, 55, 0.88)), url('/assets/fundo-geracao-z-pro.jpg')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
           }}
         >
-          {/* LINHA 1: Foto, Nome, Indicador Online, Nível & XP */}
+          {/* LINHA 1: Foto, Nome, Nível & XP */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center space-x-2.5 min-w-0">
               {/* Foto / Avatar Circular */}
@@ -255,13 +261,8 @@ export const Header: React.FC<HeaderProps> = ({
               {/* Nome + Nível & XP */}
               <div className="min-w-0">
                 <div className="flex items-center space-x-1.5">
-                  <span className="font-extrabold text-xs text-white truncate max-w-[130px]">
+                  <span className="font-extrabold text-xs text-white truncate max-w-[160px]">
                     {profile?.nickname || 'FrutasFeliz'}
-                  </span>
-                  {/* Badge Online */}
-                  <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Online</span>
                   </span>
                 </div>
                 <div className="text-[10px] text-cyan-300/90 font-mono font-medium truncate mt-0.5">
