@@ -46,8 +46,8 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className={`sticky top-0 z-30 border-b border-cyan-500/20 bg-[#020d14]/95 backdrop-blur-md transition-all shrink-0 ${
-      activeView === 'chat' ? 'py-1 px-2 min-h-0' : 'px-3 sm:px-6 py-2 sm:py-3'
+    <header className={`relative z-50 shrink-0 border-b border-cyan-500/20 bg-[#020d14]/95 backdrop-blur-md transition-all pt-[max(6px,env(safe-area-inset-top))] ${
+      activeView === 'chat' ? 'pb-1.5 px-2 min-h-0' : 'px-3 sm:px-6 py-2 sm:py-3'
     }`}>
       <div className={`max-w-7xl mx-auto flex items-center ${
         activeView === 'chat' ? 'justify-center sm:justify-between' : 'justify-between sm:justify-center'
@@ -55,10 +55,11 @@ export const Header: React.FC<HeaderProps> = ({
         
         {/* Navigation Tabs for All Authenticated Users */}
         {hasApiKey && onSelectView && (
-          <div className="flex items-center space-x-1 bg-slate-900/90 p-0.5 sm:p-1 rounded-xl border border-cyan-500/30 shadow-xs flex-nowrap shrink-0">
+          <div className="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-cyan-500/30 shadow-xs flex-nowrap shrink-0 max-w-full overflow-x-auto no-scrollbar">
             <button
+              type="button"
               onClick={() => onSelectView('hub')}
-              className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
+              className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeView === 'hub'
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
                   : 'text-slate-400 hover:text-white'
@@ -70,21 +71,23 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={() => onSelectView('chat')}
-              className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
+              className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeView === 'chat'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
                   : 'text-slate-400 hover:text-emerald-400'
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>💬 Bate-papo</span>
+              <span>Bate-papo</span>
             </button>
 
             {isMaster && (
               <button
+                type="button"
                 onClick={() => onSelectView('mentor')}
-                className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
+                className={`px-2 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeView === 'mentor'
                     ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
                     : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
@@ -96,12 +99,12 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* In mobile Chat view, align Sair directly beside Bate-papo */}
+            {/* In mobile Chat view, align Sair directly beside Bate-papo / Mentor */}
             {activeView === 'chat' && onDisconnectApiKey && (
               <button
                 type="button"
                 onClick={onDisconnectApiKey}
-                className="sm:hidden px-2 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 border border-rose-500/40 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 transition-all shrink-0 active:scale-95 cursor-pointer whitespace-nowrap ml-0.5"
+                className="sm:hidden px-2 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 border border-rose-500/40 bg-rose-950/80 text-rose-300 hover:bg-rose-900 transition-all shrink-0 active:scale-95 cursor-pointer whitespace-nowrap ml-0.5"
                 title="Sair"
               >
                 <LogOut className="w-3.5 h-3.5 shrink-0 text-rose-400" />
