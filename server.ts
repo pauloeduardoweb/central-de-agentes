@@ -46,6 +46,7 @@ import {
   adminSuspendKeyHandler,
   adminReactivateKeyHandler,
   adminBanKeyHandler,
+  adminUnlinkKeyHandler,
   adminGetAccessHistoryHandler,
   getAdminAccessKeysHandler,
   generateAccessKeysHandler,
@@ -1247,6 +1248,8 @@ apiRouter.post(['/admin/users/:id/disconnect', '/api/admin/users/:id/disconnect'
 apiRouter.post(['/admin/access-keys/:id/suspend', '/api/admin/access-keys/:id/suspend', '/admin/access-keys/suspend', '/api/admin/access-keys/suspend'], requireMentorAuth, adminSuspendKeyHandler);
 apiRouter.post(['/admin/access-keys/:id/reactivate', '/api/admin/access-keys/:id/reactivate', '/admin/access-keys/reactivate', '/api/admin/access-keys/reactivate'], requireMentorAuth, adminReactivateKeyHandler);
 apiRouter.post(['/admin/access-keys/:id/ban', '/api/admin/access-keys/:id/ban', '/admin/access-keys/ban', '/api/admin/access-keys/ban'], requireMentorAuth, adminBanKeyHandler);
+apiRouter.post(['/admin/access-keys/:id/unlink', '/api/admin/access-keys/:id/unlink', '/admin/access-keys/unlink', '/api/admin/access-keys/unlink'], requireMentorAuth, adminUnlinkKeyHandler);
+apiRouter.delete(['/admin/access-keys/:id/unlink', '/api/admin/access-keys/:id/unlink', '/admin/access-keys/unlink', '/api/admin/access-keys/unlink'], requireMentorAuth, adminUnlinkKeyHandler);
 apiRouter.get(['/admin/access-keys/:id/history', '/api/admin/access-keys/:id/history', '/admin/access-keys/history', '/api/admin/access-keys/history'], requireMentorAuth, adminGetAccessHistoryHandler);
 apiRouter.get(['/admin/access-keys', '/api/admin/access-keys'], requireMentorAuth, getAdminAccessKeysHandler);
 apiRouter.post(['/admin/access-keys/generate', '/api/admin/access-keys/generate'], requireMentorAuth, generateAccessKeysHandler);
