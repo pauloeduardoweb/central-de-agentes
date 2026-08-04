@@ -11,6 +11,7 @@ interface CommunityDesktopSidebarProps {
   rooms: any[];
   activeRoomId: number;
   unreadNotificationCount?: number;
+  onlineCount?: number;
   activeFilter: 'ALL' | 'NOTICES' | 'POLLS' | 'FAVORITES' | 'RANKING';
   onSelectRoom: (roomId: number) => void;
   onSelectFilter: (filter: 'ALL' | 'NOTICES' | 'POLLS' | 'FAVORITES' | 'RANKING') => void;
@@ -34,6 +35,7 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
   rooms,
   activeRoomId,
   unreadNotificationCount = 0,
+  onlineCount,
   activeFilter,
   onSelectRoom,
   onSelectFilter,
@@ -280,10 +282,21 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
             {onOpenOnlineDrawer && (
               <button
                 onClick={onOpenOnlineDrawer}
-                className="w-full p-2.5 rounded-xl bg-[#FFFFFF] hover:bg-[#F0F2F5] text-[#111B21] border border-[#DADDE1] flex items-center space-x-2.5 transition-colors text-left cursor-pointer shadow-2xs"
+                className="w-full p-2.5 rounded-xl bg-[#FFFFFF] hover:bg-[#F0F2F5] text-[#111B21] border border-[#DADDE1] flex items-center justify-between transition-colors text-left cursor-pointer shadow-2xs"
               >
-                <Users className="w-4 h-4 text-[#00A884] shrink-0" />
-                <span className="font-semibold">Membros Online</span>
+                <div className="flex items-center space-x-2.5">
+                  <Users className="w-4 h-4 text-[#00A884] shrink-0" />
+                  <span className="font-semibold">Membros Online</span>
+                </div>
+                {onlineCount !== undefined && (
+                  <span className="bg-[#E7F8F3] text-[#00A884] border border-[#A7F3D0] text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00A884] opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#00A884]"></span>
+                    </span>
+                    {onlineCount}
+                  </span>
+                )}
               </button>
             )}
           </div>

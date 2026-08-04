@@ -197,151 +197,40 @@ export const CommunityHeader: React.FC<CommunityHeaderProps> = ({
       )}
 
       {/* DESKTOP HEADER (>= 1024px ONLY) */}
-      <div className="hidden lg:grid grid-cols-[minmax(200px,1fr)_auto] items-center gap-3 w-full">
-        {/* ÁREA ESQUERDA: Title + Enquete */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 overflow-hidden">
-          {/* Left: Community Title */}
-          <div className="flex items-center space-x-2.5 shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-[#00A884] flex items-center justify-center text-white font-bold shadow-xs shrink-0">
-              💬
-            </div>
-
-            <div className="min-w-0 max-w-[160px] xl:max-w-none">
-              <div className="flex items-center space-x-1.5">
-                <h1 className="font-bold text-[#111B21] text-sm xl:text-base tracking-tight truncate">
-                  Comunidade Geração Z Pro
-                </h1>
-                <span className="bg-[#E7F8F3] text-[#00A884] text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-[#A7F3D0] flex items-center gap-1 shrink-0 hidden xl:flex">
-                  <Sparkles className="w-2.5 h-2.5" /> Exclusivo
-                </span>
-              </div>
-              <p className="text-[11px] text-[#667781] truncate hidden xl:block">
-                Espaço oficial de suporte e networking
-              </p>
-            </div>
+      <div className="hidden lg:flex items-center justify-between gap-3 w-full py-0.5">
+        {/* Left: Community Icon, Title & Subtitle */}
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-[#00A884] flex items-center justify-center text-white font-bold shadow-xs shrink-0 text-base">
+            💬
           </div>
-
-          {/* Desktop Compact Poll Widget */}
-          <div className="flex items-center gap-2 bg-[#FFFFFF] border border-[#DADDE1] rounded-xl px-2.5 py-1 text-xs text-[#111B21] min-w-0 max-w-[300px] xl:max-w-[360px] flex-1 overflow-hidden shadow-xs h-[38px]">
-            <div className="p-1 rounded-md bg-[#E7F8F3] text-[#00A884] shrink-0">
-              <BarChart2 className="w-3.5 h-3.5" />
-            </div>
-            <div className="min-w-0 flex-1 overflow-hidden">
-              {poll ? (
-                <div className="truncate whitespace-nowrap text-ellipsis text-xs">
-                  <span className="text-[10px] font-bold uppercase text-[#00A884] mr-1">
-                    📊 Enquete ({poll.totalVotes})
-                  </span>
-                  <span className="font-semibold text-[#111B21]">{poll.question}</span>
-                </div>
-              ) : (
-                <span className="text-xs text-[#667781] truncate whitespace-nowrap block">
-                  <span className="hidden xl:inline">📊 Nenhuma enquete ativa</span>
-                  <span className="inline xl:hidden">📊 Sem enquete ativa</span>
-                </span>
-              )}
-            </div>
-            {poll ? (
-              <button
-                onClick={() => setShowPollDetailModal(true)}
-                className="text-[10px] font-bold bg-[#00A884] hover:bg-[#008F72] text-white px-2.5 py-1 rounded-lg transition-colors shrink-0 cursor-pointer min-h-[28px] flex items-center gap-1"
-              >
-                <Eye className="w-3 h-3" /> Ver
-              </button>
-            ) : isMentor && onCreatePoll ? (
-              <button
-                onClick={() => setShowCreatePollModal(true)}
-                className="text-[10px] font-bold bg-[#E7F8F3] hover:bg-[#A7F3D0] text-[#00A884] border border-[#A7F3D0] px-2 py-1 rounded-lg transition-colors shrink-0 cursor-pointer min-h-[28px] whitespace-nowrap"
-              >
-                + Criar
-              </button>
-            ) : null}
+          <div className="min-w-0">
+            <h1 className="font-bold text-[#111B21] text-base tracking-tight truncate">
+              Comunidade Geração Z Pro
+            </h1>
+            <p className="text-xs text-[#667781] truncate">
+              Espaço oficial de suporte e networking
+            </p>
           </div>
         </div>
 
-        {/* ÁREA DIREITA: Action Controls (flex-shrink-0) */}
-        <div className="flex items-center space-x-1.5 shrink-0 justify-end">
-          {/* User Level, XP & Ranking Compact Pill */}
-          {currentProfile && (
+        {/* Right: Message Search Field */}
+        <div className="w-72 xl:w-80 relative shrink-0">
+          <Search className="w-4 h-4 text-[#667781] absolute left-3 top-2.5" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Buscar mensagens no bate-papo..."
+            className="w-full bg-[#FFFFFF] border border-[#DADDE1] text-xs text-[#111B21] placeholder-[#667781] rounded-xl pl-9 pr-8 py-2 focus:outline-none focus:border-[#00A884] transition-colors"
+          />
+          {searchQuery && (
             <button
-              onClick={onOpenProfileSettings}
-              className="flex items-center space-x-1.5 bg-[#FFFFFF] hover:bg-[#E9EDEF] border border-[#DADDE1] rounded-xl px-2.5 py-1 text-xs text-[#8A6500] font-bold transition-all cursor-pointer min-h-[36px] shrink-0"
-              title="Meu Nível, XP e Posição no Ranking"
+              onClick={() => onSearchChange('')}
+              className="absolute right-2.5 top-2 text-[#667781] hover:text-[#111B21] p-0.5"
             >
-              <Award className="w-3.5 h-3.5 text-[#8A6500]" />
-              <span>
-                🏆 #{currentProfile.rank_position || 1} • Nível {currentProfile.level || Math.max(1, Math.floor(((currentProfile.message_count || 1) * 15 + 250) / 200))} • {(currentProfile.xp !== undefined ? currentProfile.xp : (currentProfile.message_count || 1) * 15 + 250)} XP
-              </span>
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
-
-          {/* Profile Settings Avatar Button */}
-          {currentProfile && onOpenProfileSettings && (
-            <button
-              onClick={onOpenProfileSettings}
-              className="flex items-center space-x-1.5 p-1 rounded-xl bg-[#FFFFFF] hover:bg-[#E9EDEF] border border-[#DADDE1] transition-all cursor-pointer min-h-[36px] shrink-0"
-              title="Configurações do Perfil e Foto"
-            >
-              {currentProfile.photo_url ? (
-                <img
-                  src={resolveChatMediaUrl(currentProfile.photo_url)}
-                  alt={currentProfile.nickname || 'Perfil'}
-                  className="w-7 h-7 rounded-full object-cover border border-[#00A884] shrink-0"
-                />
-              ) : (
-                <div className={`w-7 h-7 rounded-full bg-gradient-to-tr ${getAvatarGradient(currentProfile.nickname || 'Eu')} flex items-center justify-center font-bold text-[10px] text-white shrink-0`}>
-                  {getNicknameInitials(currentProfile.nickname || 'Eu')}
-                </div>
-              )}
-              <span className="text-xs font-semibold text-[#111B21] pr-1.5 hidden xl:inline max-w-[90px] truncate">
-                {currentProfile.nickname}
-              </span>
-            </button>
-          )}
-
-          {/* Online Counter Button */}
-          <button
-            onClick={onOpenOnlineDrawer}
-            className="flex items-center space-x-1.5 bg-[#FFFFFF] hover:bg-[#E9EDEF] border border-[#DADDE1] rounded-xl px-2.5 py-1.5 text-xs text-[#111B21] transition-all cursor-pointer min-h-[36px] shrink-0"
-            title="Membros online"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00A884] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00A884]"></span>
-            </span>
-            <span className="font-bold text-[#00A884] text-xs">{onlineCount}</span>
-            <span className="text-[#667781] text-[10px]">Online</span>
-            <Users className="w-3.5 h-3.5 text-[#667781] ml-0.5" />
-          </button>
-
-          {/* Gallery Button */}
-          {onOpenGallery && (
-            <button
-              onClick={onOpenGallery}
-              className="p-1.5 px-2.5 rounded-xl bg-[#FFFFFF] hover:bg-[#E9EDEF] text-[#111B21] transition-colors border border-[#DADDE1] cursor-pointer flex items-center gap-1 text-xs font-bold min-h-[36px] shrink-0"
-              title="Galeria da Comunidade"
-            >
-              <span className="text-xs">🖼️</span>
-              <span>Galeria</span>
-            </button>
-          )}
-
-          {/* Notification Bell Button */}
-          {onOpenNotifications && (
-            <NotificationBell
-              unreadCount={unreadNotificationCount}
-              onClick={onOpenNotifications}
-            />
-          )}
-
-          {/* Rules Button */}
-          <button
-            onClick={onOpenRules}
-            className="p-2 rounded-xl bg-[#FFFFFF] hover:bg-[#E9EDEF] text-[#54656F] hover:text-[#111B21] transition-colors border border-[#DADDE1] cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center shrink-0"
-            title={CHAT_LABELS.communityRules}
-          >
-            <ShieldCheck className="w-4 h-4 text-[#00A884]" />
-          </button>
         </div>
       </div>
 

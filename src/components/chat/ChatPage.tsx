@@ -550,6 +550,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     fetchFavorites();
     fetchAnnouncements();
     fetchUnreadNotificationCount();
+    fetchOnlineMembers();
   }, [studentCode, sessionId]);
 
   useEffect(() => {
@@ -1158,6 +1159,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           rooms={rooms}
           activeRoomId={activeRoomId}
           unreadNotificationCount={unreadNotificationCount}
+          onlineCount={onlineMembers.length}
           activeFilter={activeFilter}
           onSelectRoom={(roomId) => {
             setActiveRoomId(roomId);

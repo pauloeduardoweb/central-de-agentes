@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Users, Crown, MessageSquare, Calendar, ChevronRight } from 'lucide-react';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
+import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 
 export interface OnlineMemberItem {
   id: number;
@@ -72,7 +73,7 @@ export const OnlineMembersDrawer: React.FC<OnlineMembersDrawerProps> = ({
                   <div className="relative shrink-0">
                     {member.photo_url ? (
                       <img
-                        src={member.photo_url}
+                        src={resolveChatMediaUrl(member.photo_url)}
                         alt={member.nickname}
                         className="w-10 h-10 rounded-full object-cover border border-[#00A884]"
                       />

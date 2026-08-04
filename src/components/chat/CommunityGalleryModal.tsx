@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Video, FileText, Sparkles, Download, ExternalLink } from 'lucide-react';
+import { X, Image as ImageIcon, Sparkles, ExternalLink } from 'lucide-react';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 
 export interface GalleryItem {
   id: number;
   url: string;
-  type: 'IMAGE' | 'GIF' | 'VIDEO' | 'FILE';
+  type: 'IMAGE' | 'GIF';
   caption?: string | null;
   authorNickname: string;
   createdAt: string;
@@ -24,8 +24,9 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
   items: propsItems = [],
   messages = [],
 }) => {
-  const [filter, setFilter] = useState<'ALL' | 'IMAGE' | 'GIF' | 'FILE'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'IMAGE' | 'GIF'>('ALL');
   const [fetchedItems, setFetchedItems] = useState<GalleryItem[]>([]);
+  const [brokenUrls, setBrokenUrls] = useState<Set<string>>(new Set());
 
   // Auto fetch gallery media on open
   useEffect(() => {
@@ -46,38 +47,95 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
     };
   }, [isOpen]);
 
+  // Helper to validate visual URL
+  const isValidVisualUrl = (url?: string | null): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const clean = url.trim();
+    if (!clean) return false;
+    // Must start with http, https, data:, or public relative path /
+    if (!/^(https?:\/\/|\/|data:image\/)/i.test(clean)) return false;
+    // Exclude audio extensions
+    if (/\.(mp3|wav|ogg|m4a|aac|webm)(\?.*)?$/i.test(clean)) return false;
+    return true;
+  };
+
+  // Helper to classify item as IMAGE or GIF
+  const classifyMedia = (msg: any): { type: 'IMAGE' | 'GIF'; url: string } | null => {
+    if (msg.deleted_at || msg.deletedAt) return null;
+    const rawUrl = msg.media?.public_url || msg.image_url || msg.imageUrl || msg.url || '';
+    if (!isValidVisualUrl(rawUrl)) return null;
+
+    const msgType = String(msg.message_type || msg.messageType || msg.type || '').toUpperCase();
+    if (msgType === 'AUDIO' || msgType === 'TEXT' || msgType === 'POLL' || msgType === 'NOTICE' || msgType === 'SYSTEM') {
+      return null;
+    }
+
+    const lowerUrl = rawUrl.toLowerCase();
+    if (msgType === 'GIF' || lowerUrl.includes('.gif') || lowerUrl.includes('giphy') || lowerUrl.includes('tenor')) {
+      return { type: 'GIF', url: rawUrl };
+    }
+
+    if (msgType === 'IMAGE' || /\.(jpg|jpeg|png|webp|svg|bmp)(\?.*)?$/i.test(lowerUrl) || msgType === 'STICKER') {
+      return { type: 'IMAGE', url: rawUrl };
+    }
+
+    // Default if valid visual URL and not audio
+    return { type: 'IMAGE', url: rawUrl };
+  };
+
   // Extract gallery items from local messages
-  const extractedFromMessages: GalleryItem[] = (messages || [])
-    .filter((m) => !m.deleted_at && (m.image_url || m.imageUrl || m.media?.public_url || ['IMAGE', 'GIF', 'STICKER'].includes(m.message_type || m.messageType)))
-    .map((m) => {
-      const url = m.media?.public_url || m.image_url || m.imageUrl || '';
-      const msgType = m.message_type || m.messageType || 'IMAGE';
-      let type: 'IMAGE' | 'GIF' | 'VIDEO' | 'FILE' = 'IMAGE';
-      if (msgType === 'GIF' || (url && url.toLowerCase().includes('.gif'))) {
-        type = 'GIF';
-      } else if (msgType === 'AUDIO') {
-        type = 'FILE';
-      }
-      return {
+  const extractedFromMessages: GalleryItem[] = [];
+  (messages || []).forEach((m) => {
+    const classified = classifyMedia(m);
+    if (classified) {
+      extractedFromMessages.push({
         id: m.id || Date.now(),
-        url,
-        type,
+        url: classified.url,
+        type: classified.type,
         caption: m.caption || m.content || null,
         authorNickname: m.author?.nickname || m.author_nickname || 'Aluno',
         createdAt: m.created_at || new Date().toISOString(),
-      };
-    })
-    .filter((item) => Boolean(item.url));
-
-  // Merge items cleanly by URL
-  const allMap = new Map<string, GalleryItem>();
-  [...fetchedItems, ...extractedFromMessages, ...propsItems].forEach((item) => {
-    if (item.url && !allMap.has(item.url)) {
-      allMap.set(item.url, item);
+      });
     }
   });
 
-  const combinedItems = Array.from(allMap.values());
+  // Merge items cleanly by URL, excluding broken URLs
+  const allMap = new Map<string, GalleryItem>();
+  [...fetchedItems, ...extractedFromMessages, ...propsItems].forEach((item) => {
+    if (!item.url || brokenUrls.has(item.url)) return;
+    const classified = classifyMedia(item);
+    if (!classified) return;
+    if (!allMap.has(item.url)) {
+      allMap.set(item.url, {
+        id: item.id || Date.now(),
+        url: classified.url,
+        type: classified.type,
+        caption: item.caption || null,
+        authorNickname: item.authorNickname || 'Aluno',
+        createdAt: item.createdAt || new Date().toISOString(),
+      });
+    }
+  });
+
+  const validCombinedItems = Array.from(allMap.values()).filter((item) => !brokenUrls.has(item.url));
+
+  const totalPhotos = validCombinedItems.filter((i) => i.type === 'IMAGE').length;
+  const totalGifs = validCombinedItems.filter((i) => i.type === 'GIF').length;
+
+  const filteredItems = validCombinedItems.filter((item) => {
+    if (filter === 'ALL') return true;
+    if (filter === 'IMAGE') return item.type === 'IMAGE';
+    if (filter === 'GIF') return item.type === 'GIF';
+    return true;
+  });
+
+  const handleImageError = (url: string) => {
+    setBrokenUrls((prev) => {
+      const next = new Set(prev);
+      next.add(url);
+      return next;
+    });
+  };
 
   // Lock body scroll when open
   useEffect(() => {
@@ -103,14 +161,6 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
 
   if (!isOpen) return null;
 
-  const filteredItems = combinedItems.filter((item) => {
-    if (filter === 'ALL') return true;
-    if (filter === 'IMAGE') return item.type === 'IMAGE';
-    if (filter === 'GIF') return item.type === 'GIF';
-    if (filter === 'FILE') return item.type === 'FILE' || item.type === 'VIDEO';
-    return true;
-  });
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
       <div className="bg-[#0b141a] border border-emerald-500/30 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col h-[85vh]">
@@ -126,7 +176,7 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
                 Galeria da Comunidade
               </h3>
               <p className="text-xs text-slate-400">
-                Mídias, fotos, GIFs e arquivos compartilhados no chat
+                Fotos e GIFs compartilhados no bate-papo
               </p>
             </div>
           </div>
@@ -149,7 +199,7 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
                 : 'bg-[#1f2c34] text-slate-300 hover:bg-[#2a3942]'
             }`}
           >
-            Tudo ({combinedItems.length})
+            Tudo ({validCombinedItems.length})
           </button>
           <button
             onClick={() => setFilter('IMAGE')}
@@ -160,7 +210,7 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
             }`}
           >
             <ImageIcon className="w-3.5 h-3.5" />
-            Fotos
+            Fotos ({totalPhotos})
           </button>
           <button
             onClick={() => setFilter('GIF')}
@@ -171,33 +221,22 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            GIFs
-          </button>
-          <button
-            onClick={() => setFilter('FILE')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              filter === 'FILE'
-                ? 'bg-cyan-600 text-white shadow-md'
-                : 'bg-[#1f2c34] text-slate-300 hover:bg-[#2a3942]'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Arquivos
+            GIFs ({totalGifs})
           </button>
         </div>
 
         {/* Grid Display */}
         <div className="p-4 overflow-y-auto flex-1 custom-scrollbar">
           {filteredItems.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs gap-2 py-12">
-              <ImageIcon className="w-12 h-12 text-slate-700" />
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs gap-2 py-12">
+              <ImageIcon className="w-12 h-12 text-slate-600" />
               <span>Nenhuma mídia encontrada nesta categoria.</span>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {filteredItems.map((item) => (
                 <div
-                  key={item.id}
+                  key={`${item.id}-${item.url}`}
                   className="group relative rounded-2xl overflow-hidden border border-slate-700/60 bg-[#1f2c34] aspect-square flex flex-col justify-between shadow-md hover:border-emerald-500 transition-all"
                 >
                   <img
@@ -205,6 +244,7 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
                     alt={item.caption || 'Mídia'}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     loading="lazy"
+                    onError={() => handleImageError(item.url)}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2.5 flex flex-col justify-between text-white">
                     <span className="text-[10px] font-bold text-emerald-300 truncate">
@@ -230,7 +270,6 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
