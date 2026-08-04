@@ -368,79 +368,7 @@ export const CommunityHeader: React.FC<CommunityHeaderProps> = ({
         </div>
       )}
 
-      {/* Filter Tabs Row (Hidden on mobile to keep header clean) */}
-      <div className="hidden md:flex items-center space-x-1.5 overflow-x-auto pb-0.5 text-xs no-scrollbar select-none min-w-0 w-full max-w-full">
-        <button
-          onClick={() => onFilterChange('ALL')}
-          className={`px-3 py-1 rounded-lg font-medium whitespace-nowrap transition-all cursor-pointer min-h-[32px] ${
-            activeFilter === 'ALL'
-              ? 'bg-[#00A884] text-white font-bold shadow-xs'
-              : 'bg-[#FFFFFF] text-[#54656F] border border-[#DADDE1] hover:bg-[#E9EDEF]'
-          }`}
-        >
-          💬 Tudo
-        </button>
 
-        <button
-          onClick={() => onFilterChange('NOTICES')}
-          className={`px-3 py-1 rounded-lg font-medium whitespace-nowrap transition-all flex items-center space-x-1 cursor-pointer min-h-[32px] ${
-            activeFilter === 'NOTICES'
-              ? 'bg-[#00A884] text-white font-bold shadow-xs'
-              : 'bg-[#FFFFFF] text-[#54656F] border border-[#DADDE1] hover:bg-[#E9EDEF]'
-          }`}
-        >
-          <Bell className="w-3.5 h-3.5 text-[#8A6500]" />
-          <span>Avisos</span>
-        </button>
-
-        <button
-          onClick={() => onFilterChange('POLLS')}
-          className={`px-3 py-1 rounded-lg font-medium whitespace-nowrap transition-all flex items-center space-x-1 cursor-pointer min-h-[32px] ${
-            activeFilter === 'POLLS'
-              ? 'bg-[#00A884] text-white font-bold shadow-xs'
-              : 'bg-[#FFFFFF] text-[#54656F] border border-[#DADDE1] hover:bg-[#E9EDEF]'
-          }`}
-        >
-          <BarChart2 className="w-3.5 h-3.5 text-[#00A884]" />
-          <span>Enquetes</span>
-        </button>
-
-        {/* Desktop-only extra tabs */}
-        <button
-          onClick={() => onFilterChange('FAVORITES')}
-          className={`hidden lg:flex px-3 py-1 rounded-lg font-medium whitespace-nowrap transition-all items-center space-x-1 cursor-pointer min-h-[32px] ${
-            activeFilter === 'FAVORITES'
-              ? 'bg-[#00A884] text-white font-bold shadow-xs'
-              : 'bg-[#FFFFFF] text-[#54656F] border border-[#DADDE1] hover:bg-[#E9EDEF]'
-          }`}
-        >
-          <Star className="w-3.5 h-3.5 text-[#8A6500]" />
-          <span>Favoritas</span>
-        </button>
-
-        <button
-          onClick={() => onFilterChange('RANKING')}
-          className={`hidden lg:flex px-3 py-1 rounded-lg font-medium whitespace-nowrap transition-all items-center space-x-1 cursor-pointer min-h-[32px] ${
-            activeFilter === 'RANKING'
-              ? 'bg-[#00A884] text-white font-bold shadow-xs'
-              : 'bg-[#FFFFFF] text-[#54656F] border border-[#DADDE1] hover:bg-[#E9EDEF]'
-          }`}
-        >
-          <Award className="w-3.5 h-3.5 text-[#00A884]" />
-          <span>Ranking 🏆</span>
-        </button>
-
-        {/* Mobile "Mais" button opening Drawer */}
-        {onToggleMobileDrawer && (
-          <button
-            onClick={onToggleMobileDrawer}
-            className="lg:hidden px-2.5 py-1 rounded-lg font-bold text-[#54656F] bg-[#FFFFFF] border border-[#DADDE1] hover:bg-[#E9EDEF] whitespace-nowrap transition-all flex items-center space-x-1 cursor-pointer min-h-[32px]"
-          >
-            <Plus className="w-3.5 h-3.5 text-[#00A884]" />
-            <span>Mais</span>
-          </button>
-        )}
-      </div>
 
       {/* Search Bar Input Row (Desktop only - on mobile it toggles via header icon) */}
       <div className="hidden lg:block relative flex-1 w-full pt-0.5">

@@ -19,6 +19,7 @@ import { CommunityAnnouncementBar, CommunityAnnouncement } from './CommunityAnno
 import { MentionMember } from './MentionsAutocomplete';
 import { ChatAnimatedBackground } from './ChatAnimatedBackground';
 import { ChatMobileDrawer } from './ChatMobileDrawer';
+import { CommunityDesktopSidebar } from './CommunityDesktopSidebar';
 import { ChatNotificationsPanel, NotificationItem } from './ChatNotificationsPanel';
 import { chatApiFetch, setChatApiCredentials } from '../../services/chatApi';
 import { getSafeImageUrl } from '../../utils/chatMediaUrl';
@@ -1150,128 +1151,45 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         className="flex-1 min-h-0 h-full bg-[#FFFFFF] border-0 sm:border border-[#00A884]/28 rounded-none sm:rounded-2xl overflow-hidden shadow-xl flex flex-col lg:flex-row relative w-full max-w-full text-[#111B21]"
       >
 
-        {/* LEFT SIDEBAR: INLINE ON DESKTOP (>= 1024px) */}
-        <div className="hidden lg:flex lg:w-80 xl:w-96 bg-[#FFFFFF] border-r border-[#DADDE1] flex-col shrink-0">
-          {/* User Profile Header */}
-          <div className="p-3 bg-[#F0F2F5] border-b border-[#DADDE1] flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              {profile?.photo_url ? (
-                <img
-                  src={profile.photo_url}
-                  alt={profile.nickname}
-                  className="w-9 h-9 rounded-full object-cover border border-[#00A884] cursor-pointer hover:brightness-105"
-                  onClick={() => setAvatarViewerData({ url: profile.photo_url, nickname: profile.nickname })}
-                />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-[#00A884]/20 border border-[#00A884]/40 flex items-center justify-center font-bold text-[#00A884] text-sm">
-                  {profile?.nickname ? profile.nickname.charAt(0).toUpperCase() : 'Z'}
-                </div>
-              )}
-              <div>
-                <span className="font-bold text-[#111B21] text-xs block leading-tight flex items-center gap-1">
-                  {isMentor ? 'Mentor Bigode' : profile?.nickname || 'Aluno GZ Pro'}
-                  {isMentor && <Crown className="w-3 h-3 text-amber-500" />}
-                </span>
-                <span className="text-[10px] text-[#00A884] font-medium">
-                  Status: {profile?.chat_status === 'ACTIVE' ? 'Ativo' : profile?.chat_status === 'SUSPENDED' ? 'Suspenso' : profile?.chat_status === 'BANNED' ? 'Banido' : (profile?.chat_status || 'Ativo')}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-1">
-              {/* Rules Button */}
-              <button
-                onClick={() => setShowRulesModal(true)}
-                className="p-2 rounded-xl bg-[#FFFFFF] border border-[#DADDE1] text-[#54656F] hover:text-[#111B21] hover:bg-[#E9EDEF] transition-colors cursor-pointer"
-                title="Regras da Comunidade"
-              >
-                <BookOpen className="w-4 h-4" />
-              </button>
-
-              {/* Mentor Admin Button */}
-              {isMentor && (
-                <button
-                  onClick={() => setShowModModal(true)}
-                  className="p-2 rounded-xl bg-[#FEF3C7] text-amber-800 border border-amber-300 hover:bg-[#FDE68A] transition-colors cursor-pointer"
-                  title="Painel de Moderação do Mentor"
-                >
-                  <ShieldAlert className="w-4 h-4" />
-                </button>
-              )}
-
-              {/* Profile Edit Button */}
-              <button
-                onClick={() => setShowProfileModal(true)}
-                className="p-2 rounded-xl bg-[#FFFFFF] border border-[#DADDE1] text-[#54656F] hover:text-[#111B21] hover:bg-[#E9EDEF] transition-colors cursor-pointer"
-                title="Editar Perfil"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="p-2.5 bg-[#F0F2F5] border-b border-[#DADDE1]">
-            <div className="relative">
-              <Search className="w-4 h-4 text-[#667781] absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar mensagens ou membros..."
-                className="w-full bg-[#FFFFFF] text-xs text-[#111B21] placeholder-[#667781] border border-[#DADDE1] rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:border-[#00A884] transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Room List */}
-          <div className="flex-1 overflow-y-auto space-y-1 p-2 custom-scrollbar bg-[#FFFFFF]">
-            {rooms.map((room) => (
-              <button
-                key={room.id}
-                onClick={() => {
-                  setActiveRoomId(room.id);
-                  setMobileView('chat');
-                }}
-                className={`w-full p-3 rounded-xl flex items-start space-x-3 transition-all text-left cursor-pointer ${
-                  activeRoomId === room.id
-                    ? 'bg-[#E9EDEF] border-l-4 border-[#00A884] shadow-xs'
-                    : 'hover:bg-[#F0F2F5]'
-                }`}
-              >
-                <div className="w-10 h-10 rounded-2xl bg-[#00A884]/10 border border-[#00A884]/30 flex items-center justify-center text-[#00A884] shrink-0">
-                  <MessageSquare className="w-5 h-5" />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <h4 className="text-xs font-bold text-[#111B21] truncate">{room.name}</h4>
-                    {room.last_message_at && (
-                      <span className="text-[10px] text-[#667781]">
-                        {new Date(room.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-[11px] text-[#667781] truncate">
-                    {room.last_message_content || room.description || 'Nenhuma mensagem recente'}
-                  </p>
-                </div>
-
-                {room.unread_count > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#00A884] text-white text-[10px] font-bold shrink-0">
-                    {room.unread_count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Community Info Footer */}
-          <div className="p-3 bg-[#F0F2F5] border-t border-[#DADDE1] text-center text-[10px] text-[#667781] font-medium">
-            Comunidade Exclusiva Alunos Geração Z Pro
-          </div>
-        </div>
+        {/* LEFT SIDEBAR: UNIFIED DESKTOP SIDEBAR (>= 1024px) */}
+        <CommunityDesktopSidebar
+          profile={profile}
+          isMentor={isMentor}
+          rooms={rooms}
+          activeRoomId={activeRoomId}
+          unreadNotificationCount={unreadNotificationCount}
+          activeFilter={activeFilter}
+          onSelectRoom={(roomId) => {
+            setActiveRoomId(roomId);
+            setMobileView('chat');
+          }}
+          onSelectFilter={handleFilterChange}
+          onOpenNotifications={() => setShowNotificationsPanel(true)}
+          onOpenFavorites={() => {
+            fetchFavorites();
+            setShowFavoritesModal(true);
+          }}
+          onOpenRanking={() => {
+            fetchRanking();
+            setShowRankingModal(true);
+          }}
+          onOpenGallery={() => setShowGalleryModal(true)}
+          onOpenOnlineDrawer={() => {
+            fetchOnlineMembers();
+            setShowOnlineDrawer(true);
+          }}
+          onOpenRules={() => setShowRulesModal(true)}
+          onOpenModModal={() => setShowModModal(true)}
+          onOpenProfileModal={() => setShowProfileModal(true)}
+          onViewSelfProfile={() => {
+            if (profile) {
+              setViewingPublicProfile(profile);
+            }
+          }}
+          onOpenAvatar={(url, nickname) => setAvatarViewerData({ url, nickname })}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+        />
 
         {/* RIGHT MAIN PANEL: ACTIVE CHAT ROOM */}
         <div className="flex-1 min-h-0 flex flex-col bg-[#EFEAE2] relative w-full min-w-0 max-w-full overflow-hidden">
