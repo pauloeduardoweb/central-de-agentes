@@ -124,7 +124,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
 
   // Administrative Modal States
   const [selectedUser, setSelectedUser] = useState<OnlineUser | null>(null);
-  const [activeModal, setActiveModal] = useState<'disconnect' | 'suspend' | 'ban' | 'reactivate' | 'history' | 'unlink' | null>(null);
+  const [activeModal, setActiveModal] = useState<'disconnect' | 'suspend' | 'ban' | 'reactivate' | 'history' | 'unlink' | 'deleteProfile' | null>(null);
   const [unlinkConfirmationInput, setUnlinkConfirmationInput] = useState<string>('');
   const [actionReason, setActionReason] = useState<string>('Vazamento ou revenda não autorizada de acesso');
   const [customReason, setCustomReason] = useState<string>('');
@@ -303,7 +303,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     return () => clearInterval(interval);
   }, [studentCode, searchTerm]);
 
-  const openActionModal = (e: React.MouseEvent, user: OnlineUser, modalType: 'disconnect' | 'suspend' | 'ban' | 'reactivate' | 'history' | 'unlink') => {
+  const openActionModal = (e: React.MouseEvent, user: OnlineUser, modalType: 'disconnect' | 'suspend' | 'ban' | 'reactivate' | 'history' | 'unlink' | 'deleteProfile') => {
     e.stopPropagation(); // prevent opening drawer when clicking admin buttons
     setSelectedUser(user);
     setActiveModal(modalType);
@@ -664,6 +664,75 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     }
   };
 
+  const executeDeleteProfile = async () => {
+    if (!selectedUser || actionLoading) return;
+    setActionLoading(true);
+    setActionError(null);
+    setActionSuccessMsg(null);
+
+    try {
+      const profileId = (selectedUser as any).profileId || (selectedUser as any).chatProfileId || selectedUser.id;
+      const res = await fetch(`/api/admin/chat-profiles/${profileId}`, {
+        method: 'DELETE',
+        headers: {
+          'x-access-code': studentCode,
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data?.message || 'Erro ao excluir perfil do Bate-papo.');
+      }
+
+      setActionSuccessMsg('Perfil do Bate-papo excluído com sucesso.');
+      setTimeout(() => {
+        closeModal();
+        fetchData();
+      }, 800);
+    } catch (err: any) {
+      setActionError(err.message || 'Erro ao excluir perfil do Bate-papo.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Clear General Chat States
+  const [showClearChatModalStep1, setShowClearChatModalStep1] = useState(false);
+  const [showClearChatModalStep2, setShowClearChatModalStep2] = useState(false);
+  const [clearChatPreserveNotices, setClearChatPreserveNotices] = useState(true);
+  const [clearChatLoading, setClearChatLoading] = useState(false);
+  const [clearChatToast, setClearChatToast] = useState<string | null>(null);
+
+  const executeClearGeneralChat = async () => {
+    if (clearChatLoading) return;
+    setClearChatLoading(true);
+
+    try {
+      const res = await fetch('/api/admin/chat/rooms/1/clear', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': studentCode,
+        },
+        body: JSON.stringify({ preserveNotices: clearChatPreserveNotices }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data?.message || 'Erro ao limpar conversa geral.');
+      }
+
+      setShowClearChatModalStep2(false);
+      setShowClearChatModalStep1(false);
+      setClearChatToast('Conversa geral limpa com sucesso.');
+      setTimeout(() => setClearChatToast(null), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Erro ao limpar conversa geral.');
+    } finally {
+      setClearChatLoading(false);
+    }
+  };
+
   // Predicates
   const isUserActive = (u: OnlineUser) => u.accessStatus !== 'SUSPENDED' && u.accessStatus !== 'BANNED';
   const isUserDesconectado = (u: OnlineUser) =>
@@ -878,6 +947,15 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
           )}
 
           <button
+            onClick={() => setShowClearChatModalStep1(true)}
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center space-x-1.5 sm:space-x-2 transition-all cursor-pointer"
+            title="Limpar conversa geral da comunidade"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span>LIMPAR CONVERSA GERAL</span>
+          </button>
+
+          <button
             onClick={() => fetchData(true)}
             disabled={refreshing}
             className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center space-x-1.5 sm:space-x-2 transition-all disabled:opacity-50 cursor-pointer"
@@ -906,6 +984,18 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-center space-x-2">
           <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {clearChatToast && (
+        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs font-bold flex items-center justify-between space-x-2 animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{clearChatToast}</span>
+          </div>
+          <button onClick={() => setClearChatToast(null)} className="text-emerald-400 hover:text-white cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -1219,6 +1309,15 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                     </button>
 
                     <button
+                      onClick={(e) => openActionModal(e, user, 'deleteProfile')}
+                      className="py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/40 text-[10px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer"
+                      title="Excluir perfil do Bate-papo"
+                    >
+                      <Trash2 className="w-3 h-3 text-rose-400" />
+                      <span>Excluir perfil</span>
+                    </button>
+
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         openStudentDrawer(user);
@@ -1437,6 +1536,15 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                             className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all hover:scale-105 cursor-pointer"
                           >
                             <Link2Off className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Botão Excluir perfil do Bate-papo */}
+                          <button
+                            onClick={(e) => openActionModal(e, user, 'deleteProfile')}
+                            title="Excluir perfil do Bate-papo"
+                            className="p-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/40 transition-all hover:scale-105 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                           </button>
 
                           {/* Botão Histórico / Timeline Drawer */}
@@ -1919,6 +2027,216 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
         </div>
       )}
 
+      {/* Modal Delete Chat Profile */}
+      {activeModal === 'deleteProfile' && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md bg-zinc-900 border border-rose-500/50 rounded-2xl p-6 shadow-2xl space-y-4 relative">
+            <button
+              type="button"
+              onClick={closeModal}
+              disabled={actionLoading}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white cursor-pointer disabled:opacity-50"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 border-b border-zinc-800 pb-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-1.5">
+                  Excluir perfil do Bate-papo?
+                </h3>
+                <p className="text-xs text-rose-300 font-medium mt-0.5">
+                  Operação Administrativa
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800">
+              O aluno perderá o perfil, foto, nickname, XP, favoritos e demais dados da comunidade. A chave de acesso continuará válida e o aluno poderá entrar novamente na plataforma, mas precisará recriar seu perfil do Bate-papo.
+            </p>
+
+            <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 space-y-1.5 text-xs font-mono">
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500 font-mono">Chave:</span>
+                <span className="text-cyan-400 font-bold font-mono">{selectedUser.maskedKey}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500 font-mono">Aluno:</span>
+                <span className="text-zinc-200 font-semibold">{selectedUser.username || (selectedUser as any).maskedName || 'Aluno'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500 font-mono">Status:</span>
+                <span className="text-emerald-400 font-semibold">{selectedUser.accessStatus || 'ACTIVE'}</span>
+              </div>
+            </div>
+
+            {actionError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{actionError}</span>
+              </div>
+            )}
+
+            {actionSuccessMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium text-center">
+                {actionSuccessMsg}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 text-xs font-semibold cursor-pointer transition-all"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={executeDeleteProfile}
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold flex items-center space-x-2 cursor-pointer transition-all shadow-lg shadow-rose-950/50"
+              >
+                {actionLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <span>Sim, excluir perfil</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Clear General Chat Step 1 */}
+      {showClearChatModalStep1 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-zinc-900 border border-amber-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 relative text-white">
+            <button
+              onClick={() => setShowClearChatModalStep1(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 border-b border-zinc-800 pb-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Limpar toda a conversa geral?</h3>
+                <p className="text-xs text-amber-300 font-medium mt-0.5">Etapa 1 de 2</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 leading-relaxed bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800">
+              Todas as mensagens, fotos, GIFs, áudios e interações da sala principal serão removidos permanentemente.
+            </p>
+
+            <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800 flex items-center space-x-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                id="mentorClearChatPreserveNotices"
+                checked={clearChatPreserveNotices}
+                onChange={(e) => setClearChatPreserveNotices(e.target.checked)}
+                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+              />
+              <label htmlFor="mentorClearChatPreserveNotices" className="text-xs text-zinc-200 cursor-pointer font-medium">
+                Preservar Avisos Oficiais do Mentor
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearChatModalStep1(false)}
+                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowClearChatModalStep1(false);
+                  setShowClearChatModalStep2(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs cursor-pointer"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Clear General Chat Step 2 */}
+      {showClearChatModalStep2 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-zinc-900 border border-rose-500/60 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 relative text-white">
+            <button
+              onClick={() => !clearChatLoading && setShowClearChatModalStep2(false)}
+              disabled={clearChatLoading}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white disabled:opacity-50 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 border-b border-zinc-800 pb-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                <Trash2 className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Confirmação final</h3>
+                <p className="text-xs text-rose-400 font-bold mt-0.5">Etapa Final de Segurança</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-semibold text-rose-200 bg-rose-950/40 p-3.5 rounded-xl border border-rose-500/40 leading-relaxed">
+              Esta ação não pode ser desfeita. Tem certeza que deseja apagar todo o histórico do Bate-papo Geral?
+            </p>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowClearChatModalStep2(false);
+                  setShowClearChatModalStep1(true);
+                }}
+                disabled={clearChatLoading}
+                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 text-xs font-semibold cursor-pointer"
+              >
+                Não, voltar
+              </button>
+              <button
+                type="button"
+                onClick={executeClearGeneralChat}
+                disabled={clearChatLoading}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-black text-xs cursor-pointer flex items-center space-x-1.5 shadow-lg shadow-rose-950/50"
+              >
+                {clearChatLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Limpando conversa...</span>
+                  </>
+                ) : (
+                  <span>Sim, limpar conversa</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
+export default MentorOnlineMonitoring;
