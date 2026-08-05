@@ -122,8 +122,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-app.use('/gifs', express.static(path.join(process.cwd(), 'public/gifs')));
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use('/gifs', express.static(path.join(process.cwd(), 'public/gifs'), { maxAge: '7d' }));
+app.use(express.static(path.join(process.cwd(), 'public'), { maxAge: '1d' }));
 
 const PORT = 3000;
 
@@ -2563,10 +2563,6 @@ apiRouter.delete(['/chat/direct-room/:roomId', '/api/chat/direct-room/:roomId', 
     return res.status(500).json({ error: 'SERVER_ERROR', message: err?.message });
   }
 });
-
-// Static assets serving for /gifs and public directory
-app.use('/gifs', express.static(path.join(process.cwd(), 'public/gifs'), { maxAge: '1d' }));
-app.use(express.static(path.join(process.cwd(), 'public'), { maxAge: '1d' }));
 
 // Mount router on both /api and / (for Vercel rewrites compatibility)
 app.use('/api', apiRouter);
