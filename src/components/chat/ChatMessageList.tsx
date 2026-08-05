@@ -438,18 +438,11 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                       >
                         {authorNick}
                       </button>
-
-                      {isMentorAuthor && (
-                        <span className="bg-[#F5D75C] text-[#4A3900] border border-[#E5C14A] text-[9px] font-bold px-1.5 py-0.2 rounded flex items-center gap-1 shrink-0">
-                          <Crown className="w-2.5 h-2.5 text-[#8A6500]" />
-                          MENTOR
-                        </span>
-                      )}
                     </div>
 
-                    {/* Header Action Tools: Always visible Reaction Smile, Personal Favorite, Reply, Edit, Delete, Pin, Report */}
+                    {/* Header Action Tools: Reaction Smile, Personal Favorite, Reply, Edit, Delete, Pin, Report */}
                     {!isDeleted && (
-                      <div className="hidden lg:flex items-center space-x-1 shrink-0 select-none">
+                      <div className="flex items-center space-x-1 shrink-0 select-none">
                         {/* Reaction Smile Trigger Button beside author name */}
                         {onReact && (
                           <div className="relative">

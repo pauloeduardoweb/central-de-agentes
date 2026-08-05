@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Flame, ImageIcon, X, Sparkles } from 'lucide-react';
+import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 
 interface GifStickerPickerProps {
   isOpen: boolean;
@@ -279,7 +280,7 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
                       </div>
                     ) : (
                       <img
-                        src={gif.url}
+                        src={resolveChatMediaUrl(gif.url)}
                         alt={gif.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         loading="lazy"

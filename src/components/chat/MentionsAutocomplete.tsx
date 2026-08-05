@@ -62,12 +62,6 @@ export const MentionsAutocomplete: React.FC<MentionsAutocompleteProps> = ({
               <span className="font-bold text-xs text-slate-100 group-hover:text-emerald-400 transition-colors">
                 @{member.nickname}
               </span>
-              {member.is_mentor && (
-                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                  <Crown className="w-2.5 h-2.5 text-amber-400" />
-                  MENTOR
-                </span>
-              )}
             </div>
           </button>
         ))}

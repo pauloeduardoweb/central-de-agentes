@@ -1061,14 +1061,16 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   const handleStartPrivateChat = async (contactProfile: any, directRoom?: any) => {
     try {
       let room = directRoom;
-      if (!room) {
+      if (!room && contactProfile?.id) {
         const res = await chatApiFetch('/api/chat/direct-room', {
           method: 'POST',
-          body: JSON.stringify({ targetProfileId: contactProfile.id }),
+          body: { targetProfileId: contactProfile.id, contactProfileId: contactProfile.id },
         });
-        room = res.data?.room;
+        if (res.ok && res.data) {
+          room = res.data.room || res.data;
+        }
       }
-      if (room) {
+      if (room && room.id) {
         setRooms((prev) => {
           const exists = prev.some((r) => r.id === room.id);
           if (exists) {
