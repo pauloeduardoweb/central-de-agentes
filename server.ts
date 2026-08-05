@@ -123,7 +123,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use('/gifs', express.static(path.join(process.cwd(), 'public/gifs'), { maxAge: '7d' }));
+app.use('/gifs', express.static(path.join(process.cwd(), 'dist/gifs'), { maxAge: '7d' }));
 app.use(express.static(path.join(process.cwd(), 'public'), { maxAge: '1d' }));
+app.use(express.static(path.join(process.cwd(), 'dist'), { maxAge: '1d' }));
 
 const PORT = 3000;
 
