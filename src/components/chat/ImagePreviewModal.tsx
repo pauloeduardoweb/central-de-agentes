@@ -22,7 +22,36 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 }) => {
   const [caption, setCaption] = useState('');
   const [showTechDetails, setShowTechDetails] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [isLoadingImage, setIsLoadingImage] = useState(true);
+  const [hasImageError, setHasImageError] = useState(false);
   const backdropRef = useRef<HTMLDivElement | null>(null);
+
+  // Manage object URL lifecycle safely
+  useEffect(() => {
+    if (!imageResult) return;
+
+    let url = '';
+    if (imageResult.file) {
+      try {
+        url = URL.createObjectURL(imageResult.file);
+      } catch (err) {
+        url = imageResult.base64 || '';
+      }
+    } else {
+      url = imageResult.base64 || '';
+    }
+
+    setPreviewUrl(url);
+    setIsLoadingImage(true);
+    setHasImageError(false);
+
+    return () => {
+      if (url && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [imageResult]);
 
   // Lock background scroll when modal is open
   useEffect(() => {
@@ -97,12 +126,33 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center bg-[#0d161c] gap-3">
           {/* Image Display Box */}
-          <div className="relative max-w-full max-h-[300px] rounded-xl overflow-hidden border border-slate-700/60 bg-black/40 shadow-inner flex items-center justify-center">
-            <img
-              src={imageResult.base64}
-              alt="Pré-visualização"
-              className="max-w-full max-h-[300px] object-contain rounded-lg"
-            />
+          <div className="relative w-full min-h-[220px] max-h-[320px] rounded-xl overflow-hidden border border-slate-700/60 bg-black/50 shadow-inner flex items-center justify-center p-2">
+            {isLoadingImage && !hasImageError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0d161c] text-cyan-300 gap-2 z-10 animate-pulse">
+                <Loader2 className="w-7 h-7 animate-spin text-cyan-400" />
+                <span className="text-xs font-medium">Carregando imagem...</span>
+              </div>
+            )}
+
+            {hasImageError ? (
+              <div className="flex flex-col items-center justify-center p-4 text-center text-red-400 space-y-1">
+                <AlertCircle className="w-6 h-6 text-amber-500" />
+                <span className="text-xs font-semibold">Erro ao carregar pré-visualização.</span>
+              </div>
+            ) : (
+              <img
+                src={previewUrl || imageResult.base64}
+                alt="Pré-visualização"
+                onLoad={() => setIsLoadingImage(false)}
+                onError={() => {
+                  setIsLoadingImage(false);
+                  setHasImageError(true);
+                }}
+                className={`max-w-full max-h-[300px] w-auto h-auto object-contain rounded-lg transition-opacity duration-300 ${
+                  isLoadingImage ? 'opacity-0' : 'opacity-100'
+                }`}
+              />
+            )}
           </div>
 
           {/* Metadata info */}

@@ -145,38 +145,52 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
 
           {/* SECTION 1: PERFIL CARD */}
           <div className="bg-[#111B21] border border-[#263A43] rounded-2xl p-3.5 space-y-3 shadow-xs">
-            <div className="flex items-center space-x-3">
-              {profile?.photo_url ? (
-                <img
-                  src={resolveChatMediaUrl(profile.photo_url)}
-                  alt={profile.nickname}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-[#00A884] cursor-pointer hover:brightness-105 shrink-0"
-                  onClick={() => {
-                    if (onViewSelfProfile) {
-                      onViewSelfProfile();
-                    }
-                  }}
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-[#182229] border-2 border-[#00A884] flex items-center justify-center font-bold text-[#00A884] text-base shrink-0">
-                  {profile?.nickname ? profile.nickname.charAt(0).toUpperCase() : 'Z'}
+            {!profile ? (
+              <div className="flex items-center space-x-3 animate-pulse py-1">
+                <div className="w-12 h-12 rounded-full bg-slate-800 shrink-0" />
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="h-4 bg-slate-800 rounded w-28" />
+                  <div className="h-3 bg-slate-900 rounded w-16" />
                 </div>
-              )}
-
-              <div className="min-w-0 flex-1">
-                <span className="font-bold text-white text-sm block leading-tight truncate flex items-center gap-1">
-                  {isMentor ? 'Mentor Bigode' : profile?.nickname || 'Aluno Z Pro'}
-                  {isMentor && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                </span>
-                <span className="text-[11px] font-medium block truncate mt-0.5">
-                  {isMentor ? (
-                    <span className="text-amber-400 font-bold">👑 Mentor</span>
-                  ) : (
-                    <span className="text-teal-300">Aluno Z Pro</span>
-                  )}
-                </span>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center space-x-3 min-w-0">
+                {profile.photo_url ? (
+                  <img
+                    src={resolveChatMediaUrl(profile.photo_url)}
+                    alt={profile.nickname}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#00A884] cursor-pointer hover:brightness-105 shrink-0"
+                    onClick={() => {
+                      if (onViewSelfProfile) {
+                        onViewSelfProfile();
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-[#182229] border-2 border-[#00A884] flex items-center justify-center font-bold text-[#00A884] text-base shrink-0">
+                    {profile.nickname ? profile.nickname.charAt(0).toUpperCase() : 'Z'}
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    <span className="font-bold text-white text-sm truncate">
+                      {profile.nickname}
+                    </span>
+                    {isMentor && (
+                      <span className="inline-flex items-center gap-1 bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                        👑 Mentor
+                      </span>
+                    )}
+                  </div>
+                  {!isMentor && (
+                    <span className="text-[11px] font-medium text-teal-300 block truncate mt-0.5">
+                      Aluno Z Pro
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Level, XP & Ranking */}
             <div className="bg-[#182229] rounded-xl p-2 px-3 border border-[#263A43] flex items-center justify-between text-xs text-amber-300 font-bold">

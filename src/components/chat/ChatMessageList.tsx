@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Crown, Reply, Smile, Edit2, Trash2, Flag, Pin, CheckCheck, Check, Lock, Copy, ArrowDown, Star, Share2, MessageSquare } from 'lucide-react';
+import { Crown, Reply, Smile, Edit2, Trash2, Flag, CheckCheck, Check, Lock, Copy, ArrowDown, Star, Share2, MessageSquare } from 'lucide-react';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
 import { resolveChatMediaUrl, getSafeImageUrl } from '../../utils/chatMediaUrl';
 import { ReactionsBar, ReactionItem } from './ReactionsBar';
