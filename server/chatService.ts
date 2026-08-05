@@ -163,7 +163,7 @@ export const memoryMessagesList: MemoryMessage[] = [];
 export const memoryReportsList: MemoryReport[] = [];
 export const memoryAuditList: MemoryAudit[] = [];
 export const memoryNoticesList: MemoryNotice[] = [];
-export const memoryRoomMembersMap = new Map<string, { last_read_message_id: number | null; joined_at: string }>();
+export const memoryRoomMembersMap = new Map<string, { last_read_message_id: number | null; joined_at: string; is_active?: number; room_id?: number; profile_id?: number }>();
 
 export const memoryReactionsList: { id: number; message_id: number; profile_id: number; emoji: string }[] = [];
 export const memoryFavoritesList: { profile_id: number; message_id: number }[] = [];
@@ -842,6 +842,35 @@ export async function getOrCreateDirectRoom(profileIdA: number, profileIdB: numb
 }
 
 /**
+ * Hide / Delete direct room for a specific profile (non-destructive for the other participant)
+ */
+export async function hideDirectRoomForProfile(roomId: number, profileId: number) {
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureChatTables();
+      await db.query(
+        `UPDATE chat_room_members SET is_active = 0 WHERE room_id = ? AND profile_id = ?`,
+        [roomId, profileId]
+      );
+      return true;
+    } catch (err) {
+      console.error('[hideDirectRoomForProfile Error]:', err);
+      return false;
+    }
+  }
+
+  // Memory fallback
+  const key = `${roomId}_${profileId}`;
+  const member = memoryRoomMembersMap.get(key);
+  if (member) {
+    member.is_active = 0;
+  } else {
+    memoryRoomMembersMap.set(key, { last_read_message_id: null, joined_at: new Date().toISOString(), room_id: roomId, profile_id: profileId, is_active: 0 });
+  }
+  return true;
+}
+
+/**
  * Get chat rooms for profile
  */
 export async function getRooms(profileId: number) {
@@ -854,25 +883,31 @@ export async function getRooms(profileId: number) {
                 (SELECT COUNT(*) FROM chat_room_members WHERE room_id = r.id AND is_active = 1) AS member_count,
                 (SELECT id FROM chat_messages WHERE room_id = r.id ORDER BY id DESC LIMIT 1) AS latest_message_id,
                 (SELECT content FROM chat_messages WHERE room_id = r.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) AS last_message_content,
+                (SELECT message_type FROM chat_messages WHERE room_id = r.id AND deleted_at IS NULL ORDER BY id DESC LIMIT 1) AS last_message_type,
                 (SELECT created_at FROM chat_messages WHERE room_id = r.id ORDER BY id DESC LIMIT 1) AS last_message_at,
                 (SELECT COUNT(*) FROM chat_messages
                  WHERE room_id = r.id
                    AND deleted_at IS NULL
+                   AND profile_id != ?
                    AND (rm.last_read_message_id IS NULL OR id > rm.last_read_message_id)
                 ) AS unread_count,
                 cp.id AS contact_profile_id,
                 cp.nickname AS contact_nickname,
                 cp.photo_url AS contact_photo_url,
                 cp.bio AS contact_bio,
-                cp.chat_status AS contact_chat_status
+                cp.chat_status AS contact_chat_status,
+                (EXISTS(
+                  SELECT 1 FROM sessoes s
+                  WHERE s.codigo = cp.codigo AND s.is_online = 1 AND s.last_heartbeat_at >= NOW() - INTERVAL 90 SECOND
+                ) OR cp.last_chat_activity_at >= NOW() - INTERVAL 90 SECOND) AS contact_is_online
          FROM chat_rooms r
-         LEFT JOIN chat_room_members rm ON rm.room_id = r.id AND rm.profile_id = ?
+         LEFT JOIN chat_room_members rm ON rm.room_id = r.id AND rm.profile_id = ? AND rm.is_active = 1
          LEFT JOIN chat_room_members rm2 ON rm2.room_id = r.id AND rm2.profile_id != ? AND r.room_type = 'PRIVATE'
          LEFT JOIN chat_profiles cp ON cp.id = rm2.profile_id
          WHERE r.is_active = 1
-           AND (r.room_type = 'PUBLIC' OR rm.profile_id IS NOT NULL)
-         ORDER BY r.id ASC`,
-        [profileId, profileId]
+           AND (r.room_type = 'PUBLIC' OR (rm.profile_id IS NOT NULL AND rm.is_active = 1))
+         ORDER BY (r.room_type = 'PUBLIC') DESC, COALESCE((SELECT created_at FROM chat_messages WHERE room_id = r.id ORDER BY id DESC LIMIT 1), r.created_at) DESC`,
+        [profileId, profileId, profileId]
       );
       return rooms || [];
     } catch (err) {
