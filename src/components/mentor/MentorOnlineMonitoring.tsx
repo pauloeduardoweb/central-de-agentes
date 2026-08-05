@@ -24,6 +24,7 @@ import {
   ShieldAlert,
   ChevronRight,
   Link2Off,
+  Trash2,
 } from 'lucide-react';
 import { SessionDrawer } from './SessionDrawer';
 import { StatsCards } from './StatsCards';
