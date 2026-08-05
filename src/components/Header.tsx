@@ -242,34 +242,48 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {/* LINHA 1: Foto, Nome, Nível & XP */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center space-x-2.5 min-w-0">
-              {/* Foto / Avatar Circular */}
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 p-0.5 shrink-0 shadow-xs">
-                {profile?.photo_url ? (
-                  <img
-                    src={resolveChatMediaUrl(profile.photo_url)}
-                    alt={profile?.nickname || 'FrutasFeliz'}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center font-bold text-xs text-cyan-300">
-                    {getNicknameInitials(profile?.nickname || 'FrutasFeliz')}
-                  </div>
-                )}
+            {!profile ? (
+              <div className="flex items-center space-x-2.5 animate-pulse py-1">
+                <div className="w-9 h-9 rounded-full bg-cyan-900/50 border border-cyan-500/30" />
+                <div className="space-y-1">
+                  <div className="h-3 w-24 bg-cyan-900/50 rounded" />
+                  <div className="h-2.5 w-16 bg-cyan-900/30 rounded" />
+                </div>
               </div>
+            ) : (
+              <div className="flex items-center space-x-2.5 min-w-0">
+                {/* Foto / Avatar Circular */}
+                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 p-0.5 shrink-0 shadow-xs">
+                  {profile?.photo_url ? (
+                    <img
+                      src={resolveChatMediaUrl(profile.photo_url)}
+                      alt={profile?.nickname || 'Perfil'}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center font-bold text-xs text-cyan-300">
+                      {getNicknameInitials(profile?.nickname || 'Aluno')}
+                    </div>
+                  )}
+                </div>
 
-              {/* Nome + Nível & XP */}
-              <div className="min-w-0">
-                <div className="flex items-center space-x-1.5">
-                  <span className="font-extrabold text-xs text-white truncate max-w-[160px]">
-                    {profile?.nickname || 'FrutasFeliz'}
-                  </span>
-                </div>
-                <div className="text-[10px] text-cyan-300/90 font-mono font-medium truncate mt-0.5">
-                  🏆 Nível {profile?.level || 1}
+                {/* Nome + Nível & Role */}
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-extrabold text-xs text-white truncate max-w-[160px]">
+                      {profile?.nickname || 'Aluno Z Pro'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-cyan-300/90 font-mono font-medium truncate mt-0.5 flex items-center gap-1.5">
+                    <span>🏆 Nível {profile?.level || 1}</span>
+                    <span className="text-cyan-500/50">•</span>
+                    <span className={profile?.is_mentor ? "text-amber-300 font-bold" : "text-cyan-200"}>
+                      {profile?.is_mentor ? "👑 Mentor" : "Aluno Z Pro"}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* LINHA 2: Badge Online 1/1 + Chave Mascarada + Cadeado + Copiar */}
