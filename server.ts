@@ -95,6 +95,11 @@ import {
   getCommunityRanking,
   getCommunityStats,
   performEnvironmentCleanup,
+  toggleProfileModeratorByMentor,
+  addContact,
+  removeContact,
+  getUserContacts,
+  checkIsContact,
 } from './server/chatService.js';
 import { chatExtraRouter } from './server/chatExtraRoutes.js';
 import { processAndUploadMedia } from './server/chatMediaService.js';
@@ -1171,6 +1176,44 @@ async function requireMentorAuth(req: express.Request, res: express.Response, ne
       error: 'SERVER_ERROR',
       message: 'Erro interno ao validar credenciais do mentor.',
     });
+  }
+}
+
+async function requireModeratorOrMentorAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    const code =
+      req.headers['x-access-code'] ||
+      req.headers['x-student-access-code'] ||
+      req.headers['x-master-key'] ||
+      req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
+      req.body?.accessCode ||
+      req.body?.accessKey ||
+      req.query?.accessCode;
+
+    const cleanCode = normalizeAccessCode(code);
+    if (!cleanCode) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Acesso não autorizado.',
+      });
+    }
+
+    const keyType = await checkCodeKeyType(cleanCode);
+    if (keyType === 'MASTER') {
+      return next();
+    }
+
+    const { profile } = await getProfileBySessionCode(cleanCode);
+    if (profile && (profile.is_moderator === 1 || Boolean(profile.is_moderator))) {
+      return next();
+    }
+
+    return res.status(403).json({
+      error: 'FORBIDDEN',
+      message: 'Acesso restrito ao Mentor, Administrador ou Moderador.',
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
   }
 }
 
@@ -2304,7 +2347,7 @@ apiRouter.get(['/chat/stats', '/api/chat/stats'], async (_req, res) => {
 });
 
 // ADMIN MENTOR CHAT MODERATION ROUTES
-apiRouter.get(['/admin/chat/reports', '/api/admin/chat/reports'], requireMentorAuth, async (_req, res) => {
+apiRouter.get(['/admin/chat/reports', '/api/admin/chat/reports'], requireModeratorOrMentorAuth, async (_req, res) => {
   try {
     const reports = await getAdminReports();
     return res.json({ reports });
@@ -2313,12 +2356,26 @@ apiRouter.get(['/admin/chat/reports', '/api/admin/chat/reports'], requireMentorA
   }
 });
 
-apiRouter.get(['/admin/chat/profiles', '/api/admin/chat/profiles'], requireMentorAuth, async (_req, res) => {
+apiRouter.get(['/admin/chat/profiles', '/api/admin/chat/profiles'], requireModeratorOrMentorAuth, async (_req, res) => {
   try {
     const profiles = await getAdminProfilesList();
     return res.json({ profiles });
   } catch (err: any) {
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao listar perfis do chat.' });
+  }
+});
+
+apiRouter.post(['/admin/chat/profiles/:profileId/moderator', '/api/admin/chat/profiles/:profileId/moderator', '/chat/profiles/:profileId/moderator', '/api/chat/profiles/:profileId/moderator'], requireMentorAuth, async (req, res) => {
+  try {
+    const profileId = Number(req.params.profileId);
+    const { is_moderator } = req.body;
+    const { accessCode } = extractChatCredentials(req);
+    const { profile: callerProfile } = await getProfileBySessionCode(accessCode || '');
+    const result = await toggleProfileModeratorByMentor(profileId, Number(is_moderator), callerProfile?.id);
+    if (!result.success) return res.status(400).json({ error: 'ACTION_FAILED', message: result.error });
+    return res.json({ success: true, is_moderator: result.is_moderator, message: result.message });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao alterar função de moderador.' });
   }
 });
 
@@ -2378,6 +2435,68 @@ apiRouter.post(['/admin/chat/notices', '/api/admin/chat/notices'], requireMentor
     return res.json({ success: true, message: 'Aviso oficial publicado.' });
   } catch (err: any) {
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao publicar aviso.' });
+  }
+});
+
+// CONTACTS ROUTES
+apiRouter.get(['/chat/contacts', '/api/chat/contacts'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const contacts = await getUserContacts(profile.id);
+    return res.json({ contacts });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+apiRouter.get(['/chat/contacts/check/:contactProfileId', '/api/chat/contacts/check/:contactProfileId'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const contactProfileId = Number(req.params.contactProfileId);
+    const is_contact = await checkIsContact(profile.id, contactProfileId);
+    return res.json({ is_contact });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+apiRouter.post(['/chat/contacts', '/api/chat/contacts'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const contactProfileId = Number(req.body.contactProfileId || req.body.contact_profile_id);
+    const result = await addContact(profile.id, contactProfileId);
+    if (!result.success) return res.status(400).json({ error: 'ACTION_FAILED', message: result.error });
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+apiRouter.delete(['/chat/contacts/:contactProfileId', '/api/chat/contacts/:contactProfileId'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const contactProfileId = Number(req.params.contactProfileId);
+    const result = await removeContact(profile.id, contactProfileId);
+    if (!result.success) return res.status(400).json({ error: 'ACTION_FAILED', message: result.error });
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR' });
   }
 });
 
