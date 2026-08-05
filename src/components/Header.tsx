@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ExternalLink, Key, CheckCircle2, AlertTriangle, LogOut, Lock, Unlock, Copy, Check, Crown, Bot, MessageSquare } from 'lucide-react';
 import { resolveChatMediaUrl } from '../utils/chatMediaUrl';
 import { getNicknameInitials } from '../utils/avatarUtils';
+import { isMasterKey } from '../data/studentCodes';
 
 interface HeaderProps {
   onOpenCreate?: () => void;
@@ -268,20 +269,25 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 {/* Nome + Nível & Role */}
-                <div className="min-w-0">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="font-extrabold text-xs text-white truncate max-w-[160px]">
-                      {profile?.nickname || 'Aluno Z Pro'}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-cyan-300/90 font-mono font-medium truncate mt-0.5 flex items-center gap-1.5">
-                    <span>🏆 Nível {profile?.level || 1}</span>
-                    <span className="text-cyan-500/50">•</span>
-                    <span className={profile?.is_mentor ? "text-amber-300 font-bold" : "text-cyan-200"}>
-                      {profile?.is_mentor ? "👑 Mentor" : "Aluno Z Pro"}
-                    </span>
-                  </div>
-                </div>
+                {(() => {
+                  const isMentorUser = isMaster || Boolean(profile?.is_mentor) || Boolean(studentCode && isMasterKey(studentCode));
+                  return (
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-extrabold text-xs text-white truncate max-w-[160px]">
+                          {profile?.nickname || (isMentorUser ? 'Mentor Bigode' : 'Aluno Z Pro')}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-cyan-300/90 font-mono font-medium truncate mt-0.5 flex items-center gap-1.5">
+                        <span>🏆 Nível {profile?.level || 1}</span>
+                        <span className="text-cyan-500/50">•</span>
+                        <span className={isMentorUser ? "text-amber-300 font-bold" : "text-cyan-200"}>
+                          {isMentorUser ? "👑 Mentor" : "Aluno Z Pro"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
