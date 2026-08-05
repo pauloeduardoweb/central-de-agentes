@@ -33,7 +33,7 @@ export const AgentPrimaryAction: React.FC<AgentPrimaryActionProps> = ({ agent, o
           <div>
             <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2 group-hover:text-cyan-200 transition-colors">
               <Zap className="w-5 h-5 text-cyan-400 fill-cyan-400/30 animate-pulse" />
-              ABRIR NO APP
+              ABRIR NO APP (BETA)
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 font-medium mt-0.5">
               Crie seus prompts diretamente dentro da plataforma.
