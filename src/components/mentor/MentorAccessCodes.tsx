@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isMasterKey } from '../../data/studentCodes';
 import {
   Key,
   Plus,
@@ -359,7 +360,7 @@ export const MentorAccessCodes: React.FC<MentorAccessCodesProps> = ({ studentCod
                   </td>
 
                   <td className="py-3 px-4 text-slate-300 font-medium">
-                    {keyItem.username || 'Aluno Geração Z'}
+                    {keyItem.isMasterKey || isMasterKey(keyItem.codigo) ? 'Mentor Bigode (Sessão Mestra)' : (keyItem.username || 'Aluno Geração Z')}
                   </td>
 
                   <td className="py-3 px-4">
