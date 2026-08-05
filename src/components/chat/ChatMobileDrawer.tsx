@@ -165,11 +165,15 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
 
               <div className="min-w-0 flex-1">
                 <span className="font-bold text-white text-sm block leading-tight truncate flex items-center gap-1">
-                  {isMentor ? 'Mentor Bigode' : profile?.nickname || 'Aluno GZ Pro'}
+                  {isMentor ? 'Mentor Bigode' : profile?.nickname || 'Aluno Z Pro'}
                   {isMentor && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                 </span>
-                <span className="text-[11px] text-[#00A884] font-medium block truncate mt-0.5">
-                  ● Ativo agora
+                <span className="text-[11px] font-medium block truncate mt-0.5">
+                  {isMentor ? (
+                    <span className="text-amber-400 font-bold">👑 Mentor</span>
+                  ) : (
+                    <span className="text-teal-300">Aluno Z Pro</span>
+                  )}
                 </span>
               </div>
             </div>

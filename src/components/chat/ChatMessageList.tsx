@@ -593,19 +593,6 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                           </button>
                         )}
 
-                        {/* Mentor Pin button */}
-                        {isMentor && onPinMessage && (
-                          <button
-                            type="button"
-                            onClick={() => onPinMessage(msg)}
-                            className="p-1 text-slate-400 hover:text-amber-600 transition-colors cursor-pointer rounded"
-                            title="Fixar no topo"
-                            aria-label="Fixar no topo"
-                          >
-                            <Pin className="w-3 h-3" />
-                          </button>
-                        )}
-
                         {/* Owner or Mentor Delete button */}
                         {(isSelf || isMentor) && (
                           <button
