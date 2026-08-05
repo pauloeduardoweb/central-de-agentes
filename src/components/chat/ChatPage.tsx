@@ -22,6 +22,7 @@ import { ChatMobileDrawer } from './ChatMobileDrawer';
 import { CommunityDesktopSidebar } from './CommunityDesktopSidebar';
 import { ChatNotificationsPanel, NotificationItem } from './ChatNotificationsPanel';
 import { UserContactsModal } from './UserContactsModal';
+import { PrivateChatHeader } from './PrivateChatHeader';
 import { chatApiFetch, setChatApiCredentials } from '../../services/chatApi';
 import { getSafeImageUrl } from '../../utils/chatMediaUrl';
 
@@ -489,6 +490,12 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         setNotice(res.data.notice);
       }
 
+      // Automatically mark room as read when user is actively viewing it
+      if (roomId === activeRoomId) {
+        chatApiFetch(`/api/chat/rooms/${roomId}/read`, { method: 'POST' }).catch(() => {});
+        setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, unread_count: 0 } : r)));
+      }
+
       // Fetch Pinned Message
       const pinRes = await chatApiFetch(`/api/chat/rooms/${roomId}/pinned`);
       setPinnedMessage(pinRes.data?.pinnedMessage || null);
@@ -576,6 +583,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   useEffect(() => {
     if (hasValidChatProfile && activeRoomId) {
       fetchMessages(activeRoomId);
+      chatApiFetch(`/api/chat/rooms/${activeRoomId}/read`, { method: 'POST' }).catch(() => {});
+      setRooms((prev) => prev.map((r) => (r.id === activeRoomId ? { ...r, unread_count: 0 } : r)));
       fetchPoll();
 
       // Polling every 12s for real-time messages and status with visibility & concurrency guards
@@ -587,6 +596,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         try {
           await Promise.allSettled([
             fetchMessages(activeRoomId, true),
+            fetchRooms(),
             fetchTypingUsers(),
             fetchOnlineMembers(),
             fetchPoll(),
@@ -1042,6 +1052,33 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     }
   };
 
+  const handleStartPrivateChat = async (contactProfile: any, directRoom?: any) => {
+    try {
+      let room = directRoom;
+      if (!room) {
+        const res = await chatApiFetch('/api/chat/direct-room', {
+          method: 'POST',
+          body: JSON.stringify({ targetProfileId: contactProfile.id }),
+        });
+        room = res.data?.room;
+      }
+      if (room) {
+        setRooms((prev) => {
+          const exists = prev.some((r) => r.id === room.id);
+          if (exists) {
+            return prev.map((r) => (r.id === room.id ? { ...r, ...room } : r));
+          }
+          return [room, ...prev];
+        });
+        setActiveRoomId(room.id);
+        setMobileView('chat');
+        fetchMessages(room.id);
+      }
+    } catch (err) {
+      console.error('Error starting private chat:', err);
+    }
+  };
+
   const activeRoom = rooms.find((r) => r.id === activeRoomId) || {
     name: '💬 Comunidade Geração Z Pro',
     member_count: 1,
@@ -1202,66 +1239,82 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
 
         {/* RIGHT MAIN PANEL: ACTIVE CHAT ROOM */}
         <div className="flex-1 min-h-0 flex flex-col bg-[#EFEAE2] relative w-full min-w-0 max-w-full overflow-hidden">
-          {/* V1.2 Premium Community Header */}
-          <CommunityHeader
-            onlineCount={onlineMembers.length}
-            totalParticipants={activeRoom.member_count || onlineMembers.length}
-            unreadNotificationCount={unreadNotificationCount}
-            onOpenNotifications={() => setShowNotificationsPanel(true)}
-            activeFilter={activeFilter}
-            searchQuery={searchTerm}
-            onFilterChange={handleFilterChange}
-            onSearchChange={setSearchTerm}
-            isSecondaryView={activeFilter !== 'ALL' || showGalleryModal || showRulesModal || showFavoritesModal || showRankingModal || showOnlineDrawer || showNotificationsPanel}
-            onReturnToGeneralChat={() => {
-              setActiveFilter('ALL');
-              setShowGalleryModal(false);
-              setShowRulesModal(false);
-              setShowFavoritesModal(false);
-              setShowRankingModal(false);
-              setShowOnlineDrawer(false);
-              setShowNotificationsPanel(false);
-              setSearchTerm('');
-              setMobileView('chat');
-              setShowMobileDrawer(false);
-            }}
-            onOpenOnlineDrawer={() => {
-              fetchOnlineMembers();
-              setShowOnlineDrawer(true);
-            }}
-            onOpenRules={() => setShowRulesModal(true)}
-            onOpenGallery={() => setShowGalleryModal(true)}
-            onOpenProfileSettings={() => setShowProfileModal(true)}
-            onToggleMobileDrawer={() => setShowMobileDrawer(true)}
-            currentProfile={profile}
-            poll={poll}
-            isMentor={isMentor}
-            onVote={handleVotePoll}
-            onCreatePoll={handleCreatePoll}
-          />
+          {activeRoom.room_type === 'PRIVATE' ? (
+            <PrivateChatHeader
+              room={activeRoom}
+              onReturnToGeneralChat={() => {
+                setActiveRoomId(1);
+                setActiveFilter('ALL');
+              }}
+              onOpenProfile={(pid) => handleViewPublicProfile(pid)}
+              searchQuery={searchTerm}
+              onSearchChange={setSearchTerm}
+              onToggleMobileDrawer={() => setShowMobileDrawer(true)}
+            />
+          ) : (
+            <>
+              {/* V1.2 Premium Community Header */}
+              <CommunityHeader
+                onlineCount={onlineMembers.length}
+                totalParticipants={activeRoom.member_count || onlineMembers.length}
+                unreadNotificationCount={unreadNotificationCount}
+                onOpenNotifications={() => setShowNotificationsPanel(true)}
+                activeFilter={activeFilter}
+                searchQuery={searchTerm}
+                onFilterChange={handleFilterChange}
+                onSearchChange={setSearchTerm}
+                isSecondaryView={activeFilter !== 'ALL' || showGalleryModal || showRulesModal || showFavoritesModal || showRankingModal || showOnlineDrawer || showNotificationsPanel}
+                onReturnToGeneralChat={() => {
+                  setActiveFilter('ALL');
+                  setShowGalleryModal(false);
+                  setShowRulesModal(false);
+                  setShowFavoritesModal(false);
+                  setShowRankingModal(false);
+                  setShowOnlineDrawer(false);
+                  setShowNotificationsPanel(false);
+                  setSearchTerm('');
+                  setMobileView('chat');
+                  setShowMobileDrawer(false);
+                }}
+                onOpenOnlineDrawer={() => {
+                  fetchOnlineMembers();
+                  setShowOnlineDrawer(true);
+                }}
+                onOpenRules={() => setShowRulesModal(true)}
+                onOpenGallery={() => setShowGalleryModal(true)}
+                onOpenProfileSettings={() => setShowProfileModal(true)}
+                onToggleMobileDrawer={() => setShowMobileDrawer(true)}
+                currentProfile={profile}
+                poll={poll}
+                isMentor={isMentor}
+                onVote={handleVotePoll}
+                onCreatePoll={handleCreatePoll}
+              />
 
-          {/* V2.5 Community Announcement Bar */}
-          <CommunityAnnouncementBar
-            announcement={announcement}
-            isMentor={isMentor}
-            onSaveAnnouncement={async (text, badge) => {
-              try {
-                await chatApiFetch('/api/admin/chat/announcements', {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    title: text,
-                    content: text,
-                    badge: badge || '📢 AVISO OFICIAL',
-                    isPinned: true,
-                  }),
-                });
-                fetchAnnouncements();
-              } catch (err) {
-                console.error('Error saving announcement:', err);
-              }
-            }}
-            onCloseAnnouncement={() => setAnnouncement(null)}
-          />
+              {/* V2.5 Community Announcement Bar */}
+              <CommunityAnnouncementBar
+                announcement={announcement}
+                isMentor={isMentor}
+                onSaveAnnouncement={async (text, badge) => {
+                  try {
+                    await chatApiFetch('/api/admin/chat/announcements', {
+                      method: 'POST',
+                      body: JSON.stringify({
+                        title: text,
+                        content: text,
+                        badge: badge || '📢 AVISO OFICIAL',
+                        isPinned: true,
+                      }),
+                    });
+                    fetchAnnouncements();
+                  } catch (err) {
+                    console.error('Error saving announcement:', err);
+                  }
+                }}
+                onCloseAnnouncement={() => setAnnouncement(null)}
+              />
+            </>
+          )}
 
           {/* Mobile Menu Button Bar (Below Announcement, above Messages) */}
           <div className="lg:hidden px-3 py-1.5 bg-[#F0F2F5] border-b border-[#DADDE1] flex items-center justify-between shrink-0">
@@ -1518,6 +1571,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           setViewingPublicProfile(p);
           setShowContactsModal(false);
         }}
+        onStartPrivateChat={(contact, room) => {
+          handleStartPrivateChat(contact, room);
+          setShowContactsModal(false);
+        }}
       />
 
       {/* Community Rules Modal */}
@@ -1540,9 +1597,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           profile={viewingPublicProfile}
           isMentor={isMentor}
           studentCode={studentCode}
+          currentProfileId={profile?.id}
           onClose={() => setViewingPublicProfile(null)}
           onOpenAvatar={(url, nick) => setAvatarViewerData({ url, nickname: nick })}
           onWarnUser={handleWarnUser}
+          onStartPrivateChat={(p) => {
+            handleStartPrivateChat(p);
+            setViewingPublicProfile(null);
+          }}
         />
       )}
 

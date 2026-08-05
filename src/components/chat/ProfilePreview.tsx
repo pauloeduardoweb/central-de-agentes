@@ -31,20 +31,24 @@ interface ProfilePreviewProps {
   } | null;
   isMentor?: boolean;
   studentCode?: string;
+  currentProfileId?: number;
   onClose: () => void;
   onOpenAvatar?: (url: string, nickname: string) => void;
   onWarnUser?: (profileId: number, nickname: string) => void;
   onSearchUserMessages?: (nickname: string) => void;
+  onStartPrivateChat?: (profile: any) => void;
 }
 
 export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
   profile,
   isMentor,
   studentCode,
+  currentProfileId,
   onClose,
   onOpenAvatar,
   onWarnUser,
   onSearchUserMessages,
+  onStartPrivateChat,
 }) => {
   const [activeTab, setActiveTab] = React.useState<'PROFILE' | 'BADGES' | 'STATS'>('PROFILE');
   const [actionSuccessMsg, setActionSuccessMsg] = React.useState<string | null>(null);
@@ -302,6 +306,23 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
 
               {/* Action Buttons Menu */}
               <div className="space-y-1.5 pt-1">
+                {onStartPrivateChat && profile && profile.id !== currentProfileId && isContact && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onStartPrivateChat(profile);
+                      onClose();
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl bg-teal-900/60 hover:bg-teal-800/80 border border-teal-500/50 text-xs text-teal-200 font-bold flex items-center justify-between cursor-pointer transition-colors shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-teal-300" />
+                      <span>Conversar em Privado</span>
+                    </div>
+                    <span>→</span>
+                  </button>
+                )}
+
                 {studentCode && (
                   <button
                     type="button"

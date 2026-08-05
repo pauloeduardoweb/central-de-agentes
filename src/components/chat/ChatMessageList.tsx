@@ -441,7 +441,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
 
                     {/* Header Action Tools: Always visible Reaction Smile, Personal Favorite, Reply, Edit, Delete, Pin, Report */}
                     {!isDeleted && (
-                      <div className="flex items-center space-x-1 shrink-0 select-none">
+                      <div className="hidden lg:flex items-center space-x-1 shrink-0 select-none">
                         {/* Reaction Smile Trigger Button beside author name */}
                         {onReact && (
                           <div className="relative">
