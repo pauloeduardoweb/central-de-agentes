@@ -109,61 +109,9 @@ export const CommunityHeader: React.FC<CommunityHeaderProps> = ({
   };
 
   return (
-    <div className="bg-[#F0F2F5] border-b border-[#DADDE1] p-2 sm:p-3.5 space-y-2 sticky top-0 z-30 shadow-xs max-w-full overflow-hidden text-[#111B21]">
-      {/* MOBILE / TABLET COMPACT SINGLE-LINE HEADER (< 1024px) */}
-      <div className="flex lg:hidden items-center justify-between h-[44px] gap-2">
-        {/* Left: Voltar ao Bate-papo Button or Community Brand */}
-        <div className="flex items-center space-x-2 min-w-0">
-          {/* Voltar ao Bate-papo Button - Only visible when in a secondary view */}
-          {isSecondaryView && onReturnToGeneralChat ? (
-            <button
-              onClick={onReturnToGeneralChat}
-              className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-[#00A884] active:bg-[#008F72] text-white font-bold text-xs transition-all shadow-xs cursor-pointer shrink-0 animate-fade-in"
-              title="Voltar ao Bate-papo Geral"
-            >
-              <ArrowLeft className="w-4 h-4 text-white shrink-0" />
-              <span className="truncate">Voltar ao Bate-papo</span>
-            </button>
-          ) : (
-            <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 rounded-lg bg-[#00A884] flex items-center justify-center text-white font-bold text-xs shrink-0">
-                💬
-              </div>
-              <span className="font-extrabold text-sm text-[#111B21] truncate">
-                Comunidade Geração Z Pro
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Collapsible Search Input on Mobile when active */}
-      {showMobileSearch && (
-        <div className="lg:hidden animate-slide-down pb-1">
-          <div className="relative flex items-center">
-            <Search className="w-4 h-4 text-[#667781] absolute left-3" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Buscar mensagem no bate-papo..."
-              autoFocus
-              className="w-full bg-[#FFFFFF] border border-[#DADDE1] text-xs text-[#111B21] placeholder-[#667781] rounded-xl pl-9 pr-8 py-2 focus:outline-none focus:border-[#00A884]"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => onSearchChange('')}
-                className="absolute right-2 text-[#667781] hover:text-[#111B21] p-1"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
+    <div className="hidden lg:block bg-[#F0F2F5] border-b border-[#DADDE1] p-3.5 space-y-2 sticky top-0 z-30 shadow-xs max-w-full overflow-hidden text-[#111B21]">
       {/* DESKTOP HEADER (>= 1024px ONLY) */}
-      <div className="hidden lg:flex items-center justify-between gap-3 w-full py-0.5">
+      <div className="flex items-center justify-between gap-3 w-full py-0.5">
         {/* Left: Community Icon, Title & Subtitle */}
         <div className="flex items-center space-x-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-[#00A884] flex items-center justify-center text-white font-bold shadow-xs shrink-0 text-base">
