@@ -7,6 +7,7 @@ import {
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 import { formatLastMessagePreview, formatLastMessageTime } from '../../utils/chatFormatters';
 import { CHAT_LABELS } from '../../constants/chatLabels';
+import { isMasterKey } from '../../data/studentCodes';
 
 export const mobileCommunityMenuItems = [
   { id: 'notifications', label: CHAT_LABELS.notifications },
@@ -173,21 +174,28 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
                 )}
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                    <span className="font-bold text-white text-sm truncate">
-                      {profile.nickname}
-                    </span>
-                    {isMentor && (
-                      <span className="inline-flex items-center gap-1 bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
-                        👑 Mentor
-                      </span>
-                    )}
-                  </div>
-                  {!isMentor && (
-                    <span className="text-[11px] font-medium text-teal-300 block truncate mt-0.5">
-                      Aluno Z Pro
-                    </span>
-                  )}
+                  {(() => {
+                    const isMentorUser = isMentor || Boolean(profile?.is_mentor) || Boolean(profile?.codigo && isMasterKey(profile.codigo)) || Boolean(profile?.code && isMasterKey(profile.code));
+                    return (
+                      <>
+                        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                          <span className="font-bold text-white text-sm truncate">
+                            {profile.nickname || (isMentorUser ? 'Mentor Bigode' : 'Aluno Z Pro')}
+                          </span>
+                          {isMentorUser && (
+                            <span className="inline-flex items-center gap-1 bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                              👑 Mentor
+                            </span>
+                          )}
+                        </div>
+                        {!isMentorUser && (
+                          <span className="text-[11px] font-medium text-teal-300 block truncate mt-0.5">
+                            Aluno Z Pro
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}

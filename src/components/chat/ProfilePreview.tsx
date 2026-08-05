@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Calendar, MessageSquare, Shield, CheckCircle2, UserCheck, AlertTriangle, Pencil, Check } from 'lucide-react';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
+import { isMasterKey } from '../../data/studentCodes';
 
 interface ProfilePreviewProps {
   profile: {
@@ -188,7 +189,7 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
 
   if (!profile) return null;
 
-  const isMentorProfile = Boolean(profile.is_mentor) || profile.nickname === 'Mentor Bigode';
+  const isMentorProfile = Boolean(profile.is_mentor) || profile.nickname === 'Mentor Bigode' || Boolean((profile as any).codigo && isMasterKey((profile as any).codigo)) || Boolean((profile as any).code && isMasterKey((profile as any).code)) || Boolean((profile as any).access_code && isMasterKey((profile as any).access_code));
   const msgCount = profile.message_count !== undefined ? profile.message_count : 0;
   const xpCount = profile.xp !== undefined ? profile.xp : (msgCount * 15);
   const userLevel = profile.level !== undefined ? profile.level : Math.min(100, Math.max(1, Math.floor(xpCount / 200) + 1));
