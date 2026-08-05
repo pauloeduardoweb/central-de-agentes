@@ -128,10 +128,10 @@ export const PlayerStatsPanel: React.FC<PlayerStatsPanelProps> = ({
               <UserAvatar username={username || 'Aluno'} avatarUrl={avatar} size="lg" />
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-cyan-300 bg-cyan-950 px-2.5 py-0.5 rounded-full border border-cyan-400/40 shadow-[0_0_8px_rgba(34,211,238,0.3)]">
-                  PERFIL DO ALUNO
+                  {isMaster ? 'PERFIL MENTOR' : 'PERFIL DO ALUNO'}
                 </span>
                 <h3 className="text-base font-black text-white truncate max-w-[170px]">
-                  {username || 'Aluno Geração Z'}
+                  {username || (isMaster ? 'Mentor Bigode' : 'Aluno Geração Z')}
                 </h3>
               </div>
             </div>
