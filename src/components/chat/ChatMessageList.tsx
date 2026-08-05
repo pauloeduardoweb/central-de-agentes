@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Crown, Reply, Smile, Edit2, Trash2, Flag, Pin, CheckCheck, Check, Lock, Copy, ArrowDown, Star, Share2 } from 'lucide-react';
+import { Crown, Reply, Smile, Edit2, Trash2, Flag, Pin, CheckCheck, Check, Lock, Copy, ArrowDown, Star, Share2, MessageSquare } from 'lucide-react';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
 import { resolveChatMediaUrl, getSafeImageUrl } from '../../utils/chatMediaUrl';
 import { ReactionsBar, ReactionItem } from './ReactionsBar';
@@ -285,6 +285,14 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
     >
       {loadingMessages && messages.length === 0 ? (
         <MessageListSkeleton />
+      ) : sortedMessages.length === 0 ? (
+        <div className="flex flex-col items-center justify-center min-h-[220px] h-full text-center p-6 space-y-2 my-auto">
+          <div className="w-12 h-12 rounded-full bg-[#00A884]/10 border border-[#00A884]/30 flex items-center justify-center text-[#00A884]">
+            <MessageSquare className="w-6 h-6" />
+          </div>
+          <p className="text-sm font-bold text-[#111B21]">Nenhuma mensagem ainda.</p>
+          <p className="text-xs text-[#667781]">Comece a conversa.</p>
+        </div>
       ) : (
         <>
           {/* Render Grouped Messages */}

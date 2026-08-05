@@ -418,7 +418,13 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     try {
       const res = await chatApiFetch('/api/chat/rooms');
       if (res.data?.rooms) {
-        setRooms(res.data.rooms);
+        setRooms((prev) => {
+          const fetchedRooms = res.data.rooms;
+          const missingPrivate = prev.filter(
+            (p) => p.room_type === 'PRIVATE' && !fetchedRooms.some((fr: any) => fr.id === p.id)
+          );
+          return [...fetchedRooms, ...missingPrivate];
+        });
       }
     } catch (err) {
       console.error('[ChatPage fetchRooms Error]:', err);
@@ -1072,6 +1078,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         });
         setActiveRoomId(room.id);
         setMobileView('chat');
+        setViewingPublicProfile(null);
         fetchMessages(room.id);
       }
     } catch (err) {
@@ -1316,29 +1323,33 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
             </>
           )}
 
-          {/* Mobile Menu Button Bar (Below Announcement, above Messages) */}
-          <div className="lg:hidden px-3 py-1.5 bg-[#F0F2F5] border-b border-[#DADDE1] flex items-center justify-between shrink-0">
-            <button
-              onClick={() => setShowMobileDrawer(true)}
-              className="p-2 rounded-xl bg-white text-[#111B21] border border-[#DADDE1] font-bold text-xs flex items-center gap-2 cursor-pointer active:bg-[#E9EDEF] shadow-2xs"
-              title="Menu da Comunidade"
-              aria-label="Abrir Menu da Comunidade"
-            >
-              <Menu className="w-4 h-4 text-[#00A884]" />
-              <span>Menu da Comunidade</span>
-            </button>
-          </div>
+          {/* Mobile Menu Button Bar (Below Announcement, above Messages) - Hide in Private Chat */}
+          {activeRoom.room_type !== 'PRIVATE' && (
+            <div className="lg:hidden px-3 py-1.5 bg-[#F0F2F5] border-b border-[#DADDE1] flex items-center justify-between shrink-0">
+              <button
+                onClick={() => setShowMobileDrawer(true)}
+                className="p-2 rounded-xl bg-white text-[#111B21] border border-[#DADDE1] font-bold text-xs flex items-center gap-2 cursor-pointer active:bg-[#E9EDEF] shadow-2xs"
+                title="Menu da Comunidade"
+                aria-label="Abrir Menu da Comunidade"
+              >
+                <Menu className="w-4 h-4 text-[#00A884]" />
+                <span>Menu da Comunidade</span>
+              </button>
+            </div>
+          )}
 
-          {/* Pinned Message Sticky Bar */}
-          <PinnedMessage
-            pinnedMessage={pinnedMessage}
-            isMentor={isMentor}
-            onUnpin={handleUnpinMessage}
-            onClickMessage={(id) => {
-              const el = document.getElementById(`msg-${id}`);
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
-          />
+          {/* Pinned Message Sticky Bar - Hide in Private Chat */}
+          {activeRoom.room_type !== 'PRIVATE' && (
+            <PinnedMessage
+              pinnedMessage={pinnedMessage}
+              isMentor={isMentor}
+              onUnpin={handleUnpinMessage}
+              onClickMessage={(id) => {
+                const el = document.getElementById(`msg-${id}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+          )}
 
           {/* Typing Indicator Bar */}
           <div className="px-4">

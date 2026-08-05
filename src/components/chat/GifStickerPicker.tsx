@@ -121,6 +121,7 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
   if (!isOpen) return null;
 
   const handleGifError = (url: string) => {
+    console.warn('[GIF Load Error]:', url);
     setFailedGifs((prev) => {
       const next = new Set(prev);
       next.add(url);
@@ -135,7 +136,6 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
   );
 
   const filteredGifs = CURATED_GIFS.filter((g) => {
-    if (failedGifs.has(g.url)) return false;
     const matchesCategory =
       selectedGifCategory === 'Tudo' || g.category === selectedGifCategory;
     const matchesSearch =
@@ -178,7 +178,7 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
             }`}
           >
             <ImageIcon className="w-3.5 h-3.5 text-cyan-300" />
-            <span>GIFs ({CURATED_GIFS.length - failedGifs.size})</span>
+            <span>GIFs ({CURATED_GIFS.length})</span>
           </button>
         </div>
 
@@ -269,15 +269,23 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
                       onSelectGif(gif.url);
                       onClose();
                     }}
-                    className="relative rounded-xl overflow-hidden border border-slate-700/60 hover:border-emerald-500 transition-all group cursor-pointer aspect-video bg-black/40"
+                    className="relative rounded-xl overflow-hidden border border-slate-700/60 hover:border-emerald-500 transition-all group cursor-pointer aspect-video bg-black/40 flex flex-col justify-center items-center"
                   >
-                    <img
-                      src={gif.url}
-                      alt={gif.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      loading="lazy"
-                      onError={() => handleGifError(gif.url)}
-                    />
+                    {failedGifs.has(gif.url) ? (
+                      <div className="flex flex-col items-center justify-center p-2 text-center text-slate-400 space-y-1">
+                        <ImageIcon className="w-5 h-5 text-teal-400 opacity-60" />
+                        <span className="text-[10px] font-semibold truncate max-w-[100px]">{gif.title}</span>
+                        <span className="text-[9px] text-slate-400">GIF indisponível</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={gif.url}
+                        alt={gif.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                        onError={() => handleGifError(gif.url)}
+                      />
+                    )}
                     <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 to-transparent text-[10px] text-slate-200 truncate font-semibold">
                       {gif.title}
                     </div>
