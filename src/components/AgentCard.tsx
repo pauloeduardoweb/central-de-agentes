@@ -199,7 +199,7 @@ export const AgentCard: React.FC<AgentCardProps> = ({
             className="flex-1 py-2.5 px-3 rounded-xl text-xs font-black bg-gradient-to-r from-white via-slate-50 to-white hover:from-slate-100 hover:to-white text-slate-950 flex items-center justify-center space-x-1.5 shadow-md shadow-white/20 transition-all active:scale-95 border border-white/90 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-cyan-600 animate-pulse" />
-            <span>Abrir no App</span>
+            <span>Abrir no App (Beta)</span>
           </button>
 
           {agent.chatGptUrl && (
