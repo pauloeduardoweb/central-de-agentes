@@ -10,7 +10,12 @@ interface PrivateChatHeaderProps {
     contact_nickname?: string;
     contact_photo_url?: string | null;
     contact_chat_status?: string;
+    contact_is_online?: boolean | number;
+    contact_presence_status?: string;
+    is_online?: boolean | number;
+    presence_status?: string;
   };
+  onlineMembers?: { id: number; nickname?: string }[];
   onReturnToGeneralChat: () => void;
   onOpenProfile?: (profileId: number) => void;
   searchQuery?: string;
@@ -20,6 +25,7 @@ interface PrivateChatHeaderProps {
 
 export const PrivateChatHeader: React.FC<PrivateChatHeaderProps> = ({
   room,
+  onlineMembers = [],
   onReturnToGeneralChat,
   onOpenProfile,
   searchQuery = '',
@@ -37,11 +43,33 @@ export const PrivateChatHeader: React.FC<PrivateChatHeaderProps> = ({
     }
   };
 
+  const getPresenceInfo = () => {
+    const isOnlineInList = Boolean(
+      room.contact_profile_id &&
+      onlineMembers.some((m) => Number(m.id) === Number(room.contact_profile_id))
+    );
+
+    const isOnline = Boolean(room.contact_is_online ?? room.is_online ?? isOnlineInList);
+    const rawStatus = (room.contact_presence_status || room.presence_status || '').toUpperCase();
+
+    if (rawStatus === 'AWAY' || rawStatus === 'AUSENTE') {
+      return { label: 'Ausente', colorClass: 'bg-amber-500' };
+    }
+
+    if (isOnline || rawStatus === 'ONLINE' || rawStatus === 'ATIVO' || rawStatus === 'ACTIVE') {
+      return { label: 'Ativo', colorClass: 'bg-[#00A884]' };
+    }
+
+    return { label: 'Offline', colorClass: 'bg-slate-400' };
+  };
+
+  const presence = getPresenceInfo();
+
   return (
-    <div className="bg-[#F0F2F5] border-b border-[#DADDE1] px-3 py-2.5 sticky top-0 z-30 shadow-xs max-w-full overflow-hidden text-[#111B21]">
+    <div className="bg-[#F0F2F5] border-b border-[#DADDE1] px-3 py-2 sticky top-0 z-30 shadow-xs max-w-full overflow-hidden text-[#111B21]">
       <div className="flex items-center justify-between gap-2 w-full">
         {/* Left: Back button + Contact Info */}
-        <div className="flex items-center space-x-2 min-w-0 flex-1">
+        <div className="flex items-center space-x-2.5 min-w-0 flex-1">
           {onToggleMobileDrawer && (
             <button
               onClick={onToggleMobileDrawer}
@@ -55,10 +83,10 @@ export const PrivateChatHeader: React.FC<PrivateChatHeaderProps> = ({
           <button
             onClick={onReturnToGeneralChat}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#00A884]/10 border border-[#00A884]/30 text-[#00A884] hover:bg-[#00A884]/20 text-xs font-bold transition-colors cursor-pointer shrink-0"
-            title="Voltar ao Bate-papo Geral"
+            title="Voltar ao Chat Geral"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Voltar ao Chat Geral</span>
+            <span className="hidden sm:inline">Voltar</span>
           </button>
 
           <div
@@ -78,18 +106,16 @@ export const PrivateChatHeader: React.FC<PrivateChatHeaderProps> = ({
               </div>
             )}
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h3 className="font-bold text-[#111B21] text-sm truncate leading-tight">
-                  {contactName}
-                </h3>
-                <span className="text-[10px] font-semibold bg-teal-100 text-teal-800 border border-teal-300 px-1.5 py-0.2 rounded-full flex items-center gap-0.5 shrink-0">
-                  <Lock className="w-2.5 h-2.5" /> Conversa privada
+            <div className="min-w-0 flex flex-col justify-center">
+              <h3 className="font-bold text-[#111B21] text-sm truncate leading-tight">
+                {contactName}
+              </h3>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${presence.colorClass}`} />
+                <span className="text-[11px] text-[#667781] font-medium leading-none">
+                  {presence.label}
                 </span>
               </div>
-              <p className="text-[11px] text-[#667781] truncate leading-tight mt-0.5">
-                {room.contact_chat_status || 'Clique para ver o perfil'}
-              </p>
             </div>
           </div>
         </div>

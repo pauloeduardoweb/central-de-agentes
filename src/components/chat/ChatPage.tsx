@@ -1251,6 +1251,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           {activeRoom.room_type === 'PRIVATE' ? (
             <PrivateChatHeader
               room={activeRoom}
+              onlineMembers={onlineMembers}
               onReturnToGeneralChat={() => {
                 setActiveRoomId(1);
                 setActiveFilter('ALL');
@@ -1450,6 +1451,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
               <ChatAnimatedBackground
                 variant="ACTIVE_ROOM"
                 isEmpty={!loadingMessages && filteredMessages.length === 0}
+                isPrivate={activeRoom.room_type === 'PRIVATE'}
                 onSelectSuggestion={(suggestionText) => setExternalInputText(suggestionText)}
               >
                 <ChatMessageList

@@ -5,12 +5,14 @@ interface ChatAnimatedBackgroundProps {
   children?: React.ReactNode;
   variant?: 'ROOM_LIST' | 'ACTIVE_ROOM';
   isEmpty?: boolean;
+  isPrivate?: boolean;
   onSelectSuggestion?: (text: string) => void;
 }
 
 export const ChatAnimatedBackground: React.FC<ChatAnimatedBackgroundProps> = ({
   children,
   isEmpty = false,
+  isPrivate = false,
   onSelectSuggestion,
 }) => {
   const suggestions = [
@@ -49,41 +51,54 @@ export const ChatAnimatedBackground: React.FC<ChatAnimatedBackgroundProps> = ({
       {/* Main Container */}
       <div className="relative z-10 flex-1 flex flex-col h-full overflow-hidden">
         {isEmpty ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
-            <div className="max-w-md w-full bg-[#FFFFFF]/90 backdrop-blur-md border border-[#DADDE1] rounded-3xl p-6 shadow-lg space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-[#E7F8F3] border border-[#A7F3D0] flex items-center justify-center text-[#006D5B] text-2xl shadow-xs">
-                💬
-              </div>
-
-              <div>
-                <h3 className="font-bold text-lg text-[#111B21]">
-                  Seja o primeiro a conversar!
+          isPrivate ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
+              <div className="max-w-sm w-full bg-[#FFFFFF]/95 backdrop-blur-md border border-[#DADDE1] rounded-2xl p-5 shadow-sm space-y-1">
+                <h3 className="font-bold text-sm text-[#111B21]">
+                  Nenhuma mensagem ainda.
                 </h3>
-                <p className="text-xs text-[#667781] mt-1 leading-relaxed">
-                  Esta sala está silenciosa no momento. Envie uma dúvida ou selecione uma das sugestões abaixo para iniciar o papo com a comunidade.
+                <p className="text-xs text-[#667781] leading-relaxed">
+                  Envie uma mensagem para iniciar a conversa.
                 </p>
               </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
+              <div className="max-w-md w-full bg-[#FFFFFF]/90 backdrop-blur-md border border-[#DADDE1] rounded-3xl p-6 shadow-lg space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#E7F8F3] border border-[#A7F3D0] flex items-center justify-center text-[#006D5B] text-2xl shadow-xs">
+                  💬
+                </div>
 
-              <div className="pt-2 space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#667781] block">
-                  Sugestões Rápidas:
-                </span>
-                {suggestions.map((item, idx) => {
-                  const IconComp = item.icon;
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => onSelectSuggestion && onSelectSuggestion(item.text.replace(/^[^\s]+\s*/, ''))}
-                      className={`w-full text-left text-xs p-3 rounded-xl border ${item.color} transition-all duration-200 active:scale-95 hover:shadow-xs flex items-center gap-2.5 group cursor-pointer font-medium`}
-                    >
-                      <IconComp className="w-4 h-4 shrink-0 opacity-80 group-hover:scale-110 transition-transform" />
-                      <span className="truncate">{item.text}</span>
-                    </button>
-                  );
-                })}
+                <div>
+                  <h3 className="font-bold text-lg text-[#111B21]">
+                    Seja o primeiro a conversar!
+                  </h3>
+                  <p className="text-xs text-[#667781] mt-1 leading-relaxed">
+                    Esta sala está silenciosa no momento. Envie uma dúvida ou selecione uma das sugestões abaixo para iniciar o papo com a comunidade.
+                  </p>
+                </div>
+
+                <div className="pt-2 space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#667781] block">
+                    Sugestões Rápidas:
+                  </span>
+                  {suggestions.map((item, idx) => {
+                    const IconComp = item.icon;
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => onSelectSuggestion && onSelectSuggestion(item.text.replace(/^[^\s]+\s*/, ''))}
+                        className={`w-full text-left text-xs p-3 rounded-xl border ${item.color} transition-all duration-200 active:scale-95 hover:shadow-xs flex items-center gap-2.5 group cursor-pointer font-medium`}
+                      >
+                        <IconComp className="w-4 h-4 shrink-0 opacity-80 group-hover:scale-110 transition-transform" />
+                        <span className="truncate">{item.text}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          )
         ) : (
           children
         )}
