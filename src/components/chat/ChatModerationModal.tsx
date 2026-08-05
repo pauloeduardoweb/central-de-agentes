@@ -224,10 +224,10 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-[#111b21] px-4 pt-3 flex space-x-2 border-b border-slate-800">
+        <div className="bg-[#111b21] px-2 sm:px-4 pt-2.5 sm:pt-3 flex space-x-1.5 sm:space-x-2 border-b border-slate-800 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap shrink-0">
           <button
             onClick={() => setActiveTab('reports')}
-            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'reports'
                 ? 'bg-[#0b141a] text-amber-300 border-t-2 border-x border-amber-500/50'
                 : 'text-slate-400 hover:text-white'
@@ -239,38 +239,38 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
 
           <button
             onClick={() => setActiveTab('members')}
-            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'members'
                 ? 'bg-[#0b141a] text-emerald-300 border-t-2 border-x border-emerald-500/50'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Alunos do Chat ({profiles.length})</span>
+            <span>Alunos ({profiles.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('notice')}
-            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'notice'
                 ? 'bg-[#0b141a] text-cyan-300 border-t-2 border-x border-cyan-500/50'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Pin className="w-3.5 h-3.5" />
-            <span>Publicar Aviso Oficial</span>
+            <span>Publicar Aviso</span>
           </button>
 
           <button
             onClick={() => setActiveTab('clear')}
-            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
               activeTab === 'clear'
                 ? 'bg-[#0b141a] text-rose-300 border-t-2 border-x border-rose-500/50'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>Limpar Conversa Geral</span>
+            <span>Limpar Conversa</span>
           </button>
         </div>
 
@@ -318,17 +318,10 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
                     <div className="flex items-center justify-end space-x-2 pt-1">
                       <button
                         onClick={() => handleDeleteMessage(rep.message_id)}
-                        className="px-2.5 py-1.5 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 hover:bg-rose-900 text-[11px] font-semibold flex items-center gap-1"
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 hover:bg-rose-900 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 className="w-3 h-3" />
                         Apagar Mensagem
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus(rep.author_profile_id, 'SUSPENDED', rep.reason)}
-                        className="px-2.5 py-1.5 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 hover:bg-amber-900 text-[11px] font-semibold flex items-center gap-1"
-                      >
-                        <AlertTriangle className="w-3 h-3" />
-                        Suspender Aluno
                       </button>
                     </div>
                   </div>
@@ -372,12 +365,6 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
                     <div className="flex items-center space-x-1.5">
                       {p.chat_status === 'ACTIVE' ? (
                         <>
-                          <button
-                            onClick={() => handleUpdateStatus(p.id, 'SUSPENDED', 'Ação direta do Mentor')}
-                            className="px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[11px] font-semibold hover:bg-amber-900 cursor-pointer"
-                          >
-                            Suspender
-                          </button>
                           <button
                             onClick={() => handleUpdateStatus(p.id, 'BANNED', 'Ação direta do Mentor')}
                             className="px-2.5 py-1 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 text-[11px] font-semibold hover:bg-rose-900 cursor-pointer"

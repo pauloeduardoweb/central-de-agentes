@@ -146,8 +146,8 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
                   alt={profile.nickname}
                   className="w-12 h-12 rounded-full object-cover border-2 border-[#00A884] cursor-pointer hover:brightness-105 shrink-0"
                   onClick={() => {
-                    if (onOpenAvatar && profile?.photo_url) {
-                      onOpenAvatar(profile.photo_url, profile.nickname);
+                    if (onViewSelfProfile) {
+                      onViewSelfProfile();
                     }
                   }}
                 />

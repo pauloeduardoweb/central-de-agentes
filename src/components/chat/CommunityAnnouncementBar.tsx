@@ -72,14 +72,14 @@ export const CommunityAnnouncementBar: React.FC<CommunityAnnouncementBarProps> =
             <div className="flex items-center gap-1 shrink-0">
               <button
                 type="submit"
-                className="px-2.5 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] transition-colors cursor-pointer"
+                className="px-2.5 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 Publicar
               </button>
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition-colors cursor-pointer"
+                className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 Cancelar
               </button>
@@ -124,17 +124,6 @@ export const CommunityAnnouncementBar: React.FC<CommunityAnnouncementBarProps> =
                   <span className="hidden sm:inline">Editar</span>
                 </button>
               )}
-
-              <button
-                onClick={() => {
-                  setDismissed(true);
-                  if (onCloseAnnouncement) onCloseAnnouncement();
-                }}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Fechar alerta"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
             </div>
           </div>
         )}

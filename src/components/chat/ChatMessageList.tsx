@@ -369,15 +369,13 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (authorPhoto && onOpenAvatar) {
-                        onOpenAvatar(authorPhoto, authorNick);
-                      } else if (authorId) {
+                      if (authorId) {
                         onViewProfile(authorId);
                       }
                     }}
                     className="shrink-0 transition-transform active:scale-95 focus:outline-none cursor-pointer"
-                    title={`Ver foto de ${authorNick}`}
-                    aria-label={`Ver foto de ${authorNick}`}
+                    title={`Ver perfil de ${authorNick}`}
+                    aria-label={`Ver perfil de ${authorNick}`}
                   >
                     {authorPhoto ? (
                       <img
@@ -704,15 +702,13 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (authorPhoto && onOpenAvatar) {
-                        onOpenAvatar(authorPhoto, authorNick);
-                      } else if (authorId) {
+                      if (authorId) {
                         onViewProfile(authorId);
                       }
                     }}
                     className="shrink-0 transition-transform active:scale-95 focus:outline-none cursor-pointer"
-                    title={`Ver foto de ${authorNick}`}
-                    aria-label={`Ver foto de ${authorNick}`}
+                    title={`Ver perfil de ${authorNick}`}
+                    aria-label={`Ver perfil de ${authorNick}`}
                   >
                     {authorPhoto ? (
                       <img

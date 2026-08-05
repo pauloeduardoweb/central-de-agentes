@@ -111,79 +111,29 @@ export const CommunityHeader: React.FC<CommunityHeaderProps> = ({
   return (
     <div className="bg-[#F0F2F5] border-b border-[#DADDE1] p-2 sm:p-3.5 space-y-2 sticky top-0 z-30 shadow-xs max-w-full overflow-hidden text-[#111B21]">
       {/* MOBILE / TABLET COMPACT SINGLE-LINE HEADER (< 1024px) */}
-      <div className="flex lg:hidden items-center justify-between h-[52px] gap-2">
-        {/* Left: Hamburger Menu & Voltar ao Bate-papo Button */}
+      <div className="flex lg:hidden items-center justify-between h-[44px] gap-2">
+        {/* Left: Voltar ao Bate-papo Button or Community Brand */}
         <div className="flex items-center space-x-2 min-w-0">
-          {onToggleMobileDrawer && (
-            <button
-              onClick={onToggleMobileDrawer}
-              aria-label="Abrir Menu de Navegação"
-              className="p-2 rounded-xl bg-[#FFFFFF] active:bg-[#E9EDEF] text-[#111B21] border border-[#DADDE1] transition-colors cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center shrink-0"
-              title="Central Mobile"
-            >
-              <Menu className="w-5 h-5 text-[#00A884]" />
-            </button>
-          )}
-
           {/* Voltar ao Bate-papo Button - Only visible when in a secondary view */}
-          {isSecondaryView && onReturnToGeneralChat && (
+          {isSecondaryView && onReturnToGeneralChat ? (
             <button
               onClick={onReturnToGeneralChat}
-              className="flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-[#00A884] active:bg-[#008F72] text-white font-bold text-xs transition-all shadow-xs cursor-pointer shrink-0 animate-fade-in"
+              className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-[#00A884] active:bg-[#008F72] text-white font-bold text-xs transition-all shadow-xs cursor-pointer shrink-0 animate-fade-in"
               title="Voltar ao Bate-papo Geral"
             >
               <ArrowLeft className="w-4 h-4 text-white shrink-0" />
               <span className="truncate">Voltar ao Bate-papo</span>
             </button>
+          ) : (
+            <div className="flex items-center space-x-2">
+              <div className="w-7 h-7 rounded-lg bg-[#00A884] flex items-center justify-center text-white font-bold text-xs shrink-0">
+                💬
+              </div>
+              <span className="font-extrabold text-sm text-[#111B21] truncate">
+                Comunidade Geração Z Pro
+              </span>
+            </div>
           )}
-        </div>
-
-        {/* Right: Compact Online Badge, Notifications & Search Toggle */}
-        <div className="flex items-center space-x-1.5 shrink-0">
-          {/* Compact Online Counter Badge */}
-          <button
-            onClick={onOpenOnlineDrawer}
-            className="flex items-center space-x-1 bg-[#FFFFFF] active:bg-[#E9EDEF] border border-[#DADDE1] rounded-xl px-2 py-1 text-xs text-[#00A884] font-bold transition-all cursor-pointer min-h-[36px]"
-            title="Membros Online"
-            aria-label={`${onlineCount} membros online`}
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00A884] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00A884]"></span>
-            </span>
-            <span className="text-xs">{onlineCount}</span>
-          </button>
-
-          {/* Notifications Button */}
-          {onOpenNotifications && (
-            <button
-              onClick={onOpenNotifications}
-              className="p-2 rounded-xl bg-[#FFFFFF] active:bg-[#E9EDEF] text-[#54656F] border border-[#DADDE1] transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center relative shrink-0"
-              title="Notificações"
-              aria-label="Notificações"
-            >
-              <Bell className="w-4 h-4 text-[#54656F]" />
-              {unreadNotificationCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border border-[#FFFFFF] animate-pulse">
-                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
-                </span>
-              )}
-            </button>
-          )}
-
-          {/* Search Toggle Button */}
-          <button
-            onClick={() => setShowMobileSearch(!showMobileSearch)}
-            aria-label="Buscar no Bate-papo"
-            className={`p-2 rounded-xl transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center border ${
-              showMobileSearch || searchQuery
-                ? 'bg-[#00A884] text-white border-[#00A884]'
-                : 'bg-[#FFFFFF] text-[#54656F] border-[#DADDE1]'
-            }`}
-            title="Buscar"
-          >
-            <Search className="w-4 h-4" />
-          </button>
         </div>
       </div>
 

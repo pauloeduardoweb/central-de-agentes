@@ -43,54 +43,54 @@ export const OFFICIAL_STICKERS = [
 
 export const CURATED_GIFS = [
   // Comemoração
-  { category: 'Comemoração', title: 'Festa Celebração', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif' },
-  { category: 'Comemoração', title: 'Confetes e Alegria', url: 'https://media.giphy.com/media/3oKIPnAiaMCws8nOsE/giphy.gif' },
-  { category: 'Comemoração', title: 'Dança da Vitória', url: 'https://media.giphy.com/media/26n6R5HOYPbekK0YE/giphy.gif' },
+  { category: 'Comemoração', title: 'Festa Celebração', url: 'https://i.giphy.com/g9582DNuQppxC.gif' },
+  { category: 'Comemoração', title: 'Confetes e Alegria', url: 'https://i.giphy.com/3oKIPnAiaMCws8nOsE.gif' },
+  { category: 'Comemoração', title: 'Dança da Vitória', url: 'https://i.giphy.com/26n6R5HOYPbekK0YE.gif' },
 
   // Dinheiro
-  { category: 'Dinheiro', title: 'Chuva de Dinheiro', url: 'https://media.giphy.com/media/LdOyjZ7io5Msw/giphy.gif' },
-  { category: 'Dinheiro', title: 'Contando Notas', url: 'https://media.giphy.com/media/67ThRZlYBvibtdF9JH/giphy.gif' },
-  { category: 'Dinheiro', title: 'Rico em Vendas', url: 'https://media.giphy.com/media/xT0xezQGU5xCDJuCPe/giphy.gif' },
+  { category: 'Dinheiro', title: 'Chuva de Dinheiro', url: 'https://i.giphy.com/LdOyjZ7io5Msw.gif' },
+  { category: 'Dinheiro', title: 'Contando Notas', url: 'https://i.giphy.com/67ThRZlYBvibtdF9JH.gif' },
+  { category: 'Dinheiro', title: 'Rico em Vendas', url: 'https://i.giphy.com/xT0xezQGU5xCDJuCPe.gif' },
 
   // Vendas
-  { category: 'Vendas', title: 'Notificação caindo', url: 'https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif' },
-  { category: 'Vendas', title: 'Meta Batida', url: 'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif' },
-  { category: 'Vendas', title: 'Lucro Garantido', url: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif' },
+  { category: 'Vendas', title: 'Notificação caindo', url: 'https://i.giphy.com/3o7abKhOpu0NwenH3O.gif' },
+  { category: 'Vendas', title: 'Meta Batida', url: 'https://i.giphy.com/JIX9t2j0ZTN9S.gif' },
+  { category: 'Vendas', title: 'Lucro Garantido', url: 'https://i.giphy.com/26ufdipQqU2lhNA4g.gif' },
 
   // Viral
-  { category: 'Viral', title: 'Explosão de Views', url: 'https://media.giphy.com/media/qs6ev2pm8g9dS/giphy.gif' },
-  { category: 'Viral', title: 'Fogo e Chamas', url: 'https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif' },
-  { category: 'Viral', title: 'Bombando nas Redes', url: 'https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif' },
+  { category: 'Viral', title: 'Explosão de Views', url: 'https://i.giphy.com/qs6ev2pm8g9dS.gif' },
+  { category: 'Viral', title: 'Fogo e Chamas', url: 'https://i.giphy.com/l0HlBO7eyXzSZkJri.gif' },
+  { category: 'Viral', title: 'Bombando nas Redes', url: 'https://i.giphy.com/26tn33aiTi1jkl6H6.gif' },
 
   // Motivação
-  { category: 'Motivação', title: 'Foco no Trabalho', url: 'https://media.giphy.com/media/11ebonMs90YLu/giphy.gif' },
-  { category: 'Motivação', title: 'Determinação Total', url: 'https://media.giphy.com/media/d31w24psGYeekCXY/giphy.gif' },
-  { category: 'Motivação', title: 'Foguete decolando', url: 'https://media.giphy.com/media/tXL4FHPSnVJ0A/giphy.gif' },
+  { category: 'Motivação', title: 'Foco no Trabalho', url: 'https://i.giphy.com/11ebonMs90YLu.gif' },
+  { category: 'Motivação', title: 'Determinação Total', url: 'https://i.giphy.com/d31w24psGYeekCXY.gif' },
+  { category: 'Motivação', title: 'Foguete decolando', url: 'https://i.giphy.com/tXL4FHPSnVJ0A.gif' },
 
   // Sucesso
-  { category: 'Sucesso', title: 'Troféu Campeão', url: 'https://media.giphy.com/media/l41YtZOb9EUwkiqT6/giphy.gif' },
-  { category: 'Sucesso', title: 'Mestre nos Negócios', url: 'https://media.giphy.com/media/xT5LMHxhOfscxPfIfm/giphy.gif' },
-  { category: 'Sucesso', title: 'Topo do Ranking', url: 'https://media.giphy.com/media/3o7TKMt1VVNkHV2PaE/giphy.gif' },
+  { category: 'Sucesso', title: 'Troféu Campeão', url: 'https://i.giphy.com/l41YtZOb9EUwkiqT6.gif' },
+  { category: 'Sucesso', title: 'Mestre nos Negócios', url: 'https://i.giphy.com/xT5LMHxhOfscxPfIfm.gif' },
+  { category: 'Sucesso', title: 'Topo do Ranking', url: 'https://i.giphy.com/3o7TKMt1VVNkHV2PaE.gif' },
 
   // IA
-  { category: 'IA', title: 'Robô Inteligente', url: 'https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif' },
-  { category: 'IA', title: 'Automação Ativa', url: 'https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif' },
-  { category: 'IA', title: 'Futuro da IA', url: 'https://media.giphy.com/media/l3tJ3ytpD9wOqA3cI/giphy.gif' },
+  { category: 'IA', title: 'Robô Inteligente', url: 'https://i.giphy.com/3o7TKSjRrfIPjeiVyM.gif' },
+  { category: 'IA', title: 'Automação Ativa', url: 'https://i.giphy.com/26tn33aiTi1jkl6H6.gif' },
+  { category: 'IA', title: 'Futuro da IA', url: 'https://i.giphy.com/l3tJ3ytpD9wOqA3cI.gif' },
 
   // TikTok
-  { category: 'TikTok', title: 'Vídeo na For You', url: 'https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif' },
-  { category: 'TikTok', title: 'Tendência Viral', url: 'https://media.giphy.com/media/3o7TKP9ln2Dr6ze6f6/giphy.gif' },
-  { category: 'TikTok', title: 'Dancinha do Sucesso', url: 'https://media.giphy.com/media/l0AMJL97Jv2Lw1f3y/giphy.gif' },
+  { category: 'TikTok', title: 'Vídeo na For You', url: 'https://i.giphy.com/xT9IgzoKnwFNmISR8I.gif' },
+  { category: 'TikTok', title: 'Tendência Viral', url: 'https://i.giphy.com/3o7TKP9ln2Dr6ze6f6.gif' },
+  { category: 'TikTok', title: 'Dancinha do Sucesso', url: 'https://i.giphy.com/l0AMJL97Jv2Lw1f3y.gif' },
 
   // Risada
-  { category: 'Risada', title: 'Risadas em Grupo', url: 'https://media.giphy.com/media/10JhvtGP90VHEQ/giphy.gif' },
-  { category: 'Risada', title: 'Gargalhada de Alegria', url: 'https://media.giphy.com/media/COYGe9rZvfR0Q/giphy.gif' },
-  { category: 'Risada', title: 'Meme Engraçado', url: 'https://media.giphy.com/media/l1J9u3TZnp283vG76/giphy.gif' },
+  { category: 'Risada', title: 'Risadas em Grupo', url: 'https://i.giphy.com/10JhvtGP90VHEQ.gif' },
+  { category: 'Risada', title: 'Gargalhada de Alegria', url: 'https://i.giphy.com/COYGe9rZvfR0Q.gif' },
+  { category: 'Risada', title: 'Meme Engraçado', url: 'https://i.giphy.com/l1J9u3TZnp283vG76.gif' },
 
   // Aprovação
-  { category: 'Aprovação', title: 'Joinha e Like', url: 'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif' },
-  { category: 'Aprovação', title: 'Mindset Aprovado', url: 'https://media.giphy.com/media/3o7qDYEeUybWOv5msE/giphy.gif' },
-  { category: 'Aprovação', title: 'Nota 10', url: 'https://media.giphy.com/media/26u4cqiYI30juCOGY/giphy.gif' },
+  { category: 'Aprovação', title: 'Joinha e Like', url: 'https://i.giphy.com/111ebonMs90YLu.gif' },
+  { category: 'Aprovação', title: 'Mindset Aprovado', url: 'https://i.giphy.com/3o7qDYEeUybWOv5msE.gif' },
+  { category: 'Aprovação', title: 'Nota 10', url: 'https://i.giphy.com/26u4cqiYI30juCOGY.gif' },
 ];
 
 export const GIF_CATEGORIES = [

@@ -70,7 +70,7 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
 
   if (!profile) return null;
 
-  const isMentorProfile = profile.nickname === 'Mentor Bigode' || isMentor;
+  const isMentorProfile = Boolean(profile.is_mentor) || profile.nickname === 'Mentor Bigode';
   const msgCount = profile.message_count !== undefined ? profile.message_count : 0;
   const xpCount = profile.xp !== undefined ? profile.xp : (msgCount * 15);
   const userLevel = profile.level !== undefined ? profile.level : Math.min(100, Math.max(1, Math.floor(xpCount / 200) + 1));
@@ -135,32 +135,24 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
         <div className="px-6 py-4 flex-1 overflow-y-auto dark-panel-scrollbar space-y-4">
           {/* Avatar and Nickname Info */}
           <div className="flex items-center space-x-4">
-            <button
-              type="button"
-              onClick={() => {
-                if (profile.photo_url && onOpenAvatar) {
-                  onOpenAvatar(profile.photo_url, profile.nickname);
-                }
-              }}
-              className="relative group focus:outline-none cursor-pointer shrink-0"
-            >
+            <div className="relative shrink-0">
               <div className="p-0.5 rounded-full bg-[#111B21]">
                 {profile.photo_url ? (
                   <img
                     src={resolveChatMediaUrl(profile.photo_url)}
                     alt={profile.nickname}
-                    className="w-16 h-16 rounded-full object-cover border-2 border-[#00A884] shadow-xs group-hover:scale-105 transition-transform"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-[#00A884] shadow-md"
                   />
                 ) : (
-                  <div className="w-16 h-16 rounded-full border-2 border-[#00A884] shadow-xs bg-[#182229] flex items-center justify-center font-bold text-xl text-[#00A884] group-hover:scale-105 transition-transform">
+                  <div className="w-24 h-24 rounded-full border-2 border-[#00A884] shadow-md bg-[#182229] flex items-center justify-center font-bold text-2xl text-[#00A884]">
                     {getNicknameInitials(profile.nickname)}
                   </div>
                 )}
               </div>
 
               {/* Online indicator dot */}
-              <span className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-[#111B21] ${isOnline ? 'bg-[#00A884]' : 'bg-[#AEBAC1]'}`} />
-            </button>
+              <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-[#111B21] ${isOnline ? 'bg-[#00A884]' : 'bg-[#AEBAC1]'}`} />
+            </div>
 
             <div className="min-w-0 flex-1">
               <h3 className="text-lg font-bold text-white flex items-center gap-1.5 truncate">

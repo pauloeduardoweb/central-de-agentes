@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Users, Shield, Search, ArrowLeft, Settings, ShieldAlert, AlertTriangle, Crown, Lock, RefreshCw, Pin, Bell, BookOpen, Smile, Megaphone, BarChart2, Sparkles } from 'lucide-react';
+import { MessageSquare, Users, Shield, Search, ArrowLeft, Settings, ShieldAlert, AlertTriangle, Crown, Lock, RefreshCw, Pin, Bell, BookOpen, Smile, Megaphone, BarChart2, Sparkles, Menu } from 'lucide-react';
 import { ChatProfileModal } from './ChatProfileModal';
 import { ChatMessageList, ChatMessage } from './ChatMessageList';
 import { ChatInputBar } from './ChatInputBar';
@@ -1255,6 +1255,19 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
             }}
             onCloseAnnouncement={() => setAnnouncement(null)}
           />
+
+          {/* Mobile Menu Button Bar (Below Announcement, above Messages) */}
+          <div className="lg:hidden px-3 py-1.5 bg-[#F0F2F5] border-b border-[#DADDE1] flex items-center justify-between shrink-0">
+            <button
+              onClick={() => setShowMobileDrawer(true)}
+              className="p-2 rounded-xl bg-white text-[#111B21] border border-[#DADDE1] font-bold text-xs flex items-center gap-2 cursor-pointer active:bg-[#E9EDEF] shadow-2xs"
+              title="Menu da Comunidade"
+              aria-label="Abrir Menu da Comunidade"
+            >
+              <Menu className="w-4 h-4 text-[#00A884]" />
+              <span>Menu da Comunidade</span>
+            </button>
+          </div>
 
           {/* Pinned Message Sticky Bar */}
           <PinnedMessage
