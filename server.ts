@@ -100,6 +100,8 @@ import {
   removeContact,
   getUserContacts,
   checkIsContact,
+  getOrCreateDirectRoom,
+  canProfileAccessRoom,
 } from './server/chatService.js';
 import { chatExtraRouter } from './server/chatExtraRoutes.js';
 import { processAndUploadMedia } from './server/chatMediaService.js';
@@ -1660,6 +1662,11 @@ apiRouter.get(['/chat/rooms/:roomId/messages', '/api/chat/rooms/:roomId/messages
     }
 
     const roomId = Number(req.params.roomId);
+    const hasAccess = await canProfileAccessRoom(roomId, profile.id);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Você não tem permissão para acessar esta conversa privada.' });
+    }
+
     const beforeId = req.query.beforeId ? Number(req.query.beforeId) : undefined;
     const afterId = req.query.afterId ? Number(req.query.afterId) : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 50;
@@ -1687,6 +1694,11 @@ apiRouter.post(['/chat/rooms/:roomId/messages', '/api/chat/rooms/:roomId/message
     }
 
     const roomId = Number(req.params.roomId);
+    const hasAccess = await canProfileAccessRoom(roomId, profile.id);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Você não tem permissão para enviar mensagens nesta conversa privada.' });
+    }
+
     const result = await sendMessage(roomId, profile, req.body);
     if (!result.success) {
       return res.status(400).json({ error: 'SEND_FAILED', message: result.error });
@@ -1695,6 +1707,31 @@ apiRouter.post(['/chat/rooms/:roomId/messages', '/api/chat/rooms/:roomId/message
   } catch (err: any) {
     console.error('[POST /api/chat/rooms/:roomId/messages Error]:', err);
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao enviar mensagem.' });
+  }
+});
+
+// POST /api/chat/direct-room
+apiRouter.post(['/chat/direct-room', '/api/chat/direct-room'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sessão não identificada.' });
+    }
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) {
+      return res.status(400).json({ error: 'NO_PROFILE', message: 'Perfil do chat não cadastrado.' });
+    }
+
+    const targetProfileId = Number(req.body.targetProfileId || req.body.contactProfileId);
+    if (!targetProfileId || isNaN(targetProfileId) || targetProfileId === profile.id) {
+      return res.status(400).json({ error: 'INVALID_TARGET', message: 'Perfil de destino inválido.' });
+    }
+
+    const result = await getOrCreateDirectRoom(profile.id, targetProfileId);
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[POST /api/chat/direct-room Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: err?.message || 'Erro ao abrir conversa privada.' });
   }
 });
 
