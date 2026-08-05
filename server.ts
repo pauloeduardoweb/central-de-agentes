@@ -101,6 +101,7 @@ import {
   getUserContacts,
   checkIsContact,
   getOrCreateDirectRoom,
+  hideDirectRoomForProfile,
   canProfileAccessRoom,
 } from './server/chatService.js';
 import { chatExtraRouter } from './server/chatExtraRoutes.js';
@@ -2540,6 +2541,26 @@ apiRouter.delete(['/chat/contacts/:contactProfileId', '/api/chat/contacts/:conta
     return res.json(result);
   } catch (err: any) {
     return res.status(500).json({ error: 'SERVER_ERROR' });
+  }
+});
+
+// DELETE /api/chat/direct-room/:roomId or /api/chat/rooms/:roomId
+apiRouter.delete(['/chat/direct-room/:roomId', '/api/chat/direct-room/:roomId', '/chat/rooms/:roomId', '/api/chat/rooms/:roomId'], async (req, res) => {
+  try {
+    const { accessCode } = extractChatCredentials(req);
+    if (!accessCode) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { profile } = await getProfileBySessionCode(accessCode);
+    if (!profile) return res.status(400).json({ error: 'NO_PROFILE' });
+
+    const roomId = Number(req.params.roomId);
+    if (!roomId || isNaN(roomId)) {
+      return res.status(400).json({ error: 'ID da sala inválido' });
+    }
+
+    const success = await hideDirectRoomForProfile(roomId, profile.id);
+    return res.json({ success, message: 'Conversa privada excluída com sucesso da sua lista.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: err?.message });
   }
 });
 
