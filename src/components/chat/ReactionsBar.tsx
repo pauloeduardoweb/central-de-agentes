@@ -43,11 +43,6 @@ export const ReactionsBar: React.FC<ReactionsBarProps> = ({
         >
           <span>{r.emoji}</span>
           <span className="text-[10px] font-bold">{r.count}</span>
-          {r.hasMentor && (
-            <span className="text-[9px] bg-amber-500/30 text-amber-800 font-extrabold px-1 rounded ml-0.5">
-              Mentor
-            </span>
-          )}
         </button>
       ))}
 

@@ -14,6 +14,16 @@ interface ProfilePreviewProps {
     phone_visibility?: string | null;
     created_at?: string;
     message_count?: number;
+    photos_count?: number;
+    gifs_count?: number;
+    audio_count?: number;
+    stickers_count?: number;
+    reply_count?: number;
+    reactions_received_count?: number;
+    reactions_given_count?: number;
+    favorites_count?: number;
+    xp?: number;
+    level?: number;
     chat_status?: string;
     online_status?: 'ONLINE' | 'AWAY' | 'OFFLINE';
     last_seen?: string;
@@ -61,9 +71,9 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
   if (!profile) return null;
 
   const isMentorProfile = profile.nickname === 'Mentor Bigode' || isMentor;
-  const msgCount = profile.message_count !== undefined ? profile.message_count : 124;
-  const xpCount = msgCount * 15 + 250;
-  const userLevel = Math.min(100, Math.max(1, Math.floor(xpCount / 200)));
+  const msgCount = profile.message_count !== undefined ? profile.message_count : 0;
+  const xpCount = profile.xp !== undefined ? profile.xp : (msgCount * 15);
+  const userLevel = profile.level !== undefined ? profile.level : Math.min(100, Math.max(1, Math.floor(xpCount / 200) + 1));
   const currentLevelXp = xpCount % 200;
   const levelProgressPercent = Math.min(100, Math.round((currentLevelXp / 200) * 100));
 
@@ -73,11 +83,11 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
     { icon: '🔥', title: 'Primeira Mensagem', desc: 'Mandou a primeira mensagem na comunidade', unlocked: msgCount >= 1 },
     { icon: '💎', title: '100 Mensagens', desc: 'Superou 100 contribuições no grupo', unlocked: msgCount >= 100 },
     { icon: '🚀', title: '500 Mensagens', desc: 'Membro com engajamento altíssimo', unlocked: msgCount >= 500 },
-    { icon: '🏆', title: 'Top 10', desc: 'Está entre os melhores do Ranking', unlocked: true },
+    { icon: '🏆', title: 'Top 10', desc: 'Está entre os melhores do Ranking', unlocked: userLevel >= 3 || msgCount >= 50 },
     { icon: '👑', title: 'Mentor Oficial', desc: 'Equipe oficial de mentoria Z Pro', unlocked: isMentorProfile },
-    { icon: '⭐', title: 'Membro Ativo', desc: 'Acessa e participa frequentemente', unlocked: true },
+    { icon: '⭐', title: 'Membro Ativo', desc: 'Acessa e participa frequentemente', unlocked: msgCount >= 5 },
     { icon: '💬', title: 'Conversador', desc: 'Inicia debates e tira dúvidas de alunos', unlocked: msgCount >= 20 },
-    { icon: '🎯', title: 'Respondeu 100 Pessoas', desc: 'Ajudou outros alunos em dúvidas', unlocked: msgCount >= 50 },
+    { icon: '🎯', title: 'Respondeu 100 Pessoas', desc: 'Ajudou outros alunos em dúvidas', unlocked: (profile.reply_count ?? 0) >= 10 },
   ];
 
   const handleActionClick = (msg: string) => {
@@ -227,13 +237,13 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-[#111B21] border border-[#263A43] flex flex-col">
-                  <span className="text-[10px] text-[#AEBAC1]">Dias Consecutivos</span>
-                  <span className="text-sm font-bold text-amber-400">⚡ {Math.max(3, (profile.id * 2) % 15 + 1)} dias</span>
+                  <span className="text-[10px] text-[#AEBAC1]">Nível Atual</span>
+                  <span className="text-sm font-bold text-emerald-400">⚡ Nível {userLevel}</span>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-[#111B21] border border-[#263A43] flex flex-col">
-                  <span className="text-[10px] text-[#AEBAC1]">Posição Ranking</span>
-                  <span className="text-sm font-bold text-sky-400">🏆 #{Math.max(1, 12 - (profile.id % 10))}</span>
+                  <span className="text-[10px] text-[#AEBAC1]">Reações Recebidas</span>
+                  <span className="text-sm font-bold text-sky-400">❤️ {profile.reactions_received_count ?? 0}</span>
                 </div>
               </div>
 
@@ -302,20 +312,40 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
           {activeTab === 'STATS' && (
             <div className="space-y-2 text-xs">
               <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
+                <span className="text-[#AEBAC1]">✉️ Mensagens Enviadas</span>
+                <span className="font-bold text-[#00A884]">{msgCount}</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
+                <span className="text-[#AEBAC1]">💬 Respostas</span>
+                <span className="font-bold text-sky-400">{profile.reply_count ?? 0}</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
                 <span className="text-[#AEBAC1]">🖼️ Fotos Compartilhadas</span>
-                <span className="font-bold text-[#00A884]">{Math.floor(msgCount / 5)}</span>
+                <span className="font-bold text-[#00A884]">{profile.photos_count ?? 0}</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
+                <span className="text-[#AEBAC1]">👾 GIFs Enviados</span>
+                <span className="font-bold text-[#00A884]">{profile.gifs_count ?? 0}</span>
               </div>
               <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
                 <span className="text-[#AEBAC1]">🎙️ Áudios Enviados</span>
-                <span className="font-bold text-[#00A884]">{Math.floor(msgCount / 8)}</span>
+                <span className="font-bold text-[#00A884]">{profile.audio_count ?? 0}</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
+                <span className="text-[#AEBAC1]">🏷️ Stickers Enviados</span>
+                <span className="font-bold text-[#00A884]">{profile.stickers_count ?? 0}</span>
               </div>
               <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
                 <span className="text-[#AEBAC1]">❤️ Reações Recebidas</span>
-                <span className="font-bold text-amber-300">{msgCount * 3 + 12}</span>
+                <span className="font-bold text-amber-300">{profile.reactions_received_count ?? 0}</span>
               </div>
               <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
-                <span className="text-[#AEBAC1]">💬 Mensagens Respondidas</span>
-                <span className="font-bold text-sky-400">{Math.floor(msgCount / 3)}</span>
+                <span className="text-[#AEBAC1]">👍 Reações Realizadas</span>
+                <span className="font-bold text-amber-300">{profile.reactions_given_count ?? 0}</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-[#111B21] border border-[#263A43] flex items-center justify-between">
+                <span className="text-[#AEBAC1]">⭐ Favoritos</span>
+                <span className="font-bold text-yellow-400">{profile.favorites_count ?? 0}</span>
               </div>
             </div>
           )}
