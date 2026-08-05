@@ -1,9 +1,10 @@
 import React from 'react';
 import {
   MessageSquare, Search, Settings, ShieldAlert, Award,
-  Bell, BarChart2, Star, Trophy, Image as ImageIcon, Users, BookOpen, User, Crown, Sparkles
+  Bell, BarChart2, Star, Trophy, Image as ImageIcon, Users, BookOpen, User, Crown, Sparkles, Trash2
 } from 'lucide-react';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
+import { formatLastMessagePreview, formatLastMessageTime } from '../../utils/chatFormatters';
 
 interface CommunityDesktopSidebarProps {
   profile: any;
@@ -15,6 +16,7 @@ interface CommunityDesktopSidebarProps {
   activeFilter: 'ALL' | 'NOTICES' | 'POLLS' | 'FAVORITES' | 'RANKING';
   onSelectRoom: (roomId: number) => void;
   onSelectFilter: (filter: 'ALL' | 'NOTICES' | 'POLLS' | 'FAVORITES' | 'RANKING') => void;
+  onDeleteRoom?: (roomId: number) => void;
   onOpenNotifications?: () => void;
   onOpenFavorites?: () => void;
   onOpenRanking?: () => void;
@@ -40,6 +42,7 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
   activeFilter,
   onSelectRoom,
   onSelectFilter,
+  onDeleteRoom,
   onOpenNotifications,
   onOpenFavorites,
   onOpenRanking,
@@ -57,6 +60,7 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
   const userLevel = profile?.level || Math.max(1, Math.floor(((profile?.message_count || 1) * 15 + 250) / 200));
   const userXp = profile?.xp !== undefined ? profile.xp : (profile?.message_count || 1) * 15 + 250;
   const rankPos = profile?.rank_position || 1;
+  const [deleteConfirmRoom, setDeleteConfirmRoom] = React.useState<any | null>(null);
 
   return (
     <div className="hidden lg:flex flex-col w-[300px] xl:w-[330px] bg-[#FFFFFF] border-r border-[#DADDE1] min-h-0 shrink-0 text-[#111B21] select-none shadow-xs">
@@ -137,54 +141,184 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
           />
         </div>
 
-        {/* SECTION 2: SALAS DA COMUNIDADE */}
-        <div className="space-y-1.5">
-          <div className="px-1 text-[11px] font-extrabold uppercase tracking-wider text-[#667781]">
-            Salas da Comunidade
-          </div>
+        {/* SECTION 2: SALAS DA COMUNIDADE & CONVERSAS PRIVADAS */}
+        {(() => {
+          const uniqueRoomsMap = new Map<number, any>();
+          rooms.forEach((r) => {
+            if (r && r.id && !uniqueRoomsMap.has(r.id)) {
+              uniqueRoomsMap.set(r.id, r);
+            }
+          });
+          const uniqueRoomsList = Array.from(uniqueRoomsMap.values());
+          const communityRooms = uniqueRoomsList.filter((r) => r.room_type !== 'PRIVATE');
+          const privateRooms = uniqueRoomsList.filter((r) => r.room_type === 'PRIVATE');
 
-          <div className="space-y-1">
-            {rooms.map((room) => (
-              <button
-                key={room.id}
-                onClick={() => {
-                  onSelectRoom(room.id);
-                  onSelectFilter('ALL');
-                }}
-                className={`w-full p-2.5 rounded-xl flex items-start space-x-3 transition-all text-left cursor-pointer min-h-[48px] ${
-                  activeRoomId === room.id && activeFilter === 'ALL'
-                    ? 'bg-[#E9EDEF] border-l-4 border-[#00A884] font-bold shadow-2xs'
-                    : 'hover:bg-[#F0F2F5]'
-                }`}
-              >
-                <div className="w-9 h-9 rounded-xl bg-[#00A884]/10 border border-[#00A884]/30 flex items-center justify-center text-[#00A884] shrink-0 mt-0.5">
-                  <MessageSquare className="w-4 h-4" />
+          return (
+            <>
+              {/* SALAS DA COMUNIDADE */}
+              <div className="space-y-1.5">
+                <div className="px-1 text-[11px] font-extrabold uppercase tracking-wider text-[#667781]">
+                  SALAS DA COMUNIDADE
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <h4 className="text-xs font-bold text-[#111B21] truncate">{room.name}</h4>
-                    {room.last_message_at && (
-                      <span className="text-[10px] text-[#667781]">
-                        {new Date(room.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    )}
-                  </div>
+                <div className="space-y-1">
+                  {communityRooms.map((room) => {
+                    const previewText = room.last_message_content || room.description || 'Nenhuma mensagem recente';
+                    const timeFormatted = formatLastMessageTime(room.last_message_at);
 
-                  <p className="text-[11px] text-[#667781] truncate">
-                    {room.last_message_content || room.description || 'Nenhuma mensagem recente'}
-                  </p>
+                    return (
+                      <button
+                        key={room.id}
+                        onClick={() => {
+                          onSelectRoom(room.id);
+                          onSelectFilter('ALL');
+                        }}
+                        className={`w-full p-2.5 rounded-xl flex items-start space-x-3 transition-all text-left cursor-pointer min-h-[48px] ${
+                          activeRoomId === room.id && activeFilter === 'ALL'
+                            ? 'bg-[#E9EDEF] border-l-4 border-[#00A884] font-bold shadow-2xs'
+                            : 'hover:bg-[#F0F2F5]'
+                        }`}
+                      >
+                        <div className="relative shrink-0 mt-0.5">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold bg-[#00A884]/10 text-[#00A884] border border-[#00A884]/30">
+                            <MessageSquare className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <h4 className="text-xs font-bold text-[#111B21] truncate">
+                              {room.name}
+                            </h4>
+                            {timeFormatted && (
+                              <span className="text-[10px] text-[#667781] shrink-0 ml-1">
+                                {timeFormatted}
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-[11px] text-[#667781] truncate">
+                            {previewText}
+                          </p>
+                        </div>
+
+                        {room.unread_count > 0 && (
+                          <span className="px-2 py-0.5 rounded-full bg-[#00A884] text-white text-[10px] font-bold shrink-0 self-center">
+                            {room.unread_count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* CONVERSAS PRIVADAS */}
+              <div className="space-y-1.5 pt-2 border-t border-[#DADDE1]">
+                <div className="px-1 text-[11px] font-extrabold uppercase tracking-wider text-teal-700 flex items-center justify-between">
+                  <span>CONVERSAS PRIVADAS</span>
+                  {privateRooms.length > 0 && (
+                    <span className="text-[10px] bg-teal-100 text-teal-800 border border-teal-300 px-1.5 py-0.2 rounded-full font-bold">
+                      {privateRooms.length}
+                    </span>
+                  )}
                 </div>
 
-                {room.unread_count > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-[#00A884] text-white text-[10px] font-bold shrink-0">
-                    {room.unread_count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+                <div className="space-y-1">
+                  {privateRooms.length === 0 ? (
+                    <div className="p-3 text-xs text-[#667781] italic text-center bg-[#F0F2F5] rounded-xl border border-[#DADDE1]/60">
+                      Nenhuma conversa privada.
+                    </div>
+                  ) : (
+                    privateRooms.map((room) => {
+                      const displayName = room.contact_nickname || room.name || 'Contato';
+                      const previewText = formatLastMessagePreview(room.last_message_content, room.last_message_type);
+                      const timeFormatted = formatLastMessageTime(room.last_message_at);
+
+                      return (
+                        <div
+                          key={room.id}
+                          onClick={() => {
+                            onSelectRoom(room.id);
+                            onSelectFilter('ALL');
+                          }}
+                          className={`w-full p-2.5 rounded-xl flex items-center justify-between transition-all text-left cursor-pointer min-h-[52px] group ${
+                            activeRoomId === room.id && activeFilter === 'ALL'
+                              ? 'bg-[#E9EDEF] border-l-4 border-[#00A884] font-bold shadow-2xs'
+                              : 'hover:bg-[#F0F2F5]'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3 min-w-0 flex-1">
+                            <div className="relative shrink-0">
+                              {room.contact_photo_url ? (
+                                <img
+                                  src={resolveChatMediaUrl(room.contact_photo_url)}
+                                  alt={displayName}
+                                  className="w-9 h-9 rounded-full object-cover border border-[#00A884]/40"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold bg-teal-600/10 text-teal-600 border border-teal-500/30">
+                                  <User className="w-4 h-4" />
+                                </div>
+                              )}
+                              {Boolean(room.contact_is_online) && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white absolute bottom-0 right-0" title="Online" />
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <h4 className="text-xs font-bold text-[#111B21] truncate flex items-center gap-1">
+                                  {displayName}
+                                  <span className="text-[9px] font-semibold text-teal-700 bg-teal-50 px-1 rounded border border-teal-200 shrink-0">Privado</span>
+                                </h4>
+                                {timeFormatted && (
+                                  <span className="text-[10px] text-[#667781] shrink-0 ml-1">
+                                    {timeFormatted}
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-[11px] text-[#667781] truncate">
+                                {previewText}
+                              </p>
+
+                              {room.unread_count > 0 && (
+                                <div className="text-[10px] font-semibold text-[#00A884] mt-0.5">
+                                  {room.unread_count === 1 ? '1 mensagem não lida' : `${room.unread_count} mensagens não lidas`}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-1 shrink-0 ml-2">
+                            {room.unread_count > 0 && (
+                              <span className="px-2 py-0.5 rounded-full bg-[#00A884] text-white text-[10px] font-bold">
+                                {room.unread_count}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirmRoom(room);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Excluir conversa"
+                              aria-label="Excluir conversa"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
         {/* SECTION 3: COMUNIDADE */}
         <div className="space-y-1.5">
@@ -359,6 +493,42 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
       <div className="p-3 bg-[#F0F2F5] border-t border-[#DADDE1] text-center text-[10px] text-[#667781] font-semibold shrink-0">
         Comunidade Exclusiva Alunos Geração Z Pro
       </div>
+
+      {/* Confirmation Modal for Deleting Private Room */}
+      {deleteConfirmRoom && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[#FFFFFF] border border-[#DADDE1] rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-[#111B21]">
+            <div className="flex items-center space-x-3 text-rose-600">
+              <Trash2 className="w-6 h-6 shrink-0" />
+              <h3 className="text-base font-bold text-[#111B21]">Excluir conversa privada?</h3>
+            </div>
+            <p className="text-xs text-[#667781] leading-relaxed">
+              Deseja excluir esta conversa privada com <strong className="text-[#111B21]">{deleteConfirmRoom.contact_nickname || deleteConfirmRoom.name || 'este contato'}</strong>? Esta ação removerá a conversa da sua lista.
+            </p>
+            <div className="flex items-center justify-end space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmRoom(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#667781] hover:bg-[#F0F2F5] transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (deleteConfirmRoom && onDeleteRoom) {
+                    onDeleteRoom(deleteConfirmRoom.id);
+                  }
+                  setDeleteConfirmRoom(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors cursor-pointer shadow-md"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

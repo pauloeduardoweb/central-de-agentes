@@ -1088,6 +1088,21 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
     }
   };
 
+  const handleDeleteRoom = async (roomIdToDelete: number) => {
+    try {
+      await chatApiFetch(`/api/chat/direct-room/${roomIdToDelete}`, {
+        method: 'DELETE',
+      });
+      await fetchRooms();
+      if (activeRoomId === roomIdToDelete) {
+        setActiveRoomId(1);
+        setActiveFilter('ALL');
+      }
+    } catch (err) {
+      console.error('Error deleting room:', err);
+    }
+  };
+
   const activeRoom = rooms.find((r) => r.id === activeRoomId) || {
     name: '💬 Comunidade Geração Z Pro',
     member_count: 1,
@@ -1194,6 +1209,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           setShowContactsModal(true);
         }}
         onSelectFilter={handleFilterChange}
+        onDeleteRoom={handleDeleteRoom}
         onLogout={onLogout}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
@@ -1218,6 +1234,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
             setMobileView('chat');
           }}
           onSelectFilter={handleFilterChange}
+          onDeleteRoom={handleDeleteRoom}
           onOpenNotifications={() => setShowNotificationsPanel(true)}
           onOpenFavorites={() => {
             fetchFavorites();
