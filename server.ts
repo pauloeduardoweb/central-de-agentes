@@ -2148,6 +2148,10 @@ apiRouter.post(['/chat/rooms/:roomId/read', '/api/chat/rooms/:roomId/read'], asy
     }
 
     const roomId = Number(req.params.roomId);
+    const hasAccess = await canProfileAccessRoom(roomId, profile.id);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Você não tem acesso a esta conversa.' });
+    }
     const result = await markRoomAsRead(roomId, profile.id);
     return res.json(result);
   } catch (err: any) {
@@ -2538,6 +2542,10 @@ apiRouter.delete(['/chat/contacts/:contactProfileId', '/api/chat/contacts/:conta
     return res.status(500).json({ error: 'SERVER_ERROR' });
   }
 });
+
+// Static assets serving for /gifs and public directory
+app.use('/gifs', express.static(path.join(process.cwd(), 'public/gifs'), { maxAge: '1d' }));
+app.use(express.static(path.join(process.cwd(), 'public'), { maxAge: '1d' }));
 
 // Mount router on both /api and / (for Vercel rewrites compatibility)
 app.use('/api', apiRouter);
