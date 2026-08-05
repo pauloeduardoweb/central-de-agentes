@@ -377,7 +377,7 @@ chatExtraRouter.get('/chat/messages/:id/readers', async (req: Request, res: Resp
 
     return res.json({
       readers: (rows || []).map((r: any) => ({
-        nickname: isMasterKey(r.codigo) ? 'Mentor Bigode' : r.nickname,
+        nickname: r.nickname,
         photo_url: r.photo_url,
         readAt: r.read_at,
       })),
@@ -491,7 +491,7 @@ chatExtraRouter.get('/chat/media', async (_req: Request, res: Response) => {
           url,
           type,
           caption: r.caption || r.content || null,
-          authorNickname: isMasterKey(r.codigo) ? 'Mentor Bigode' : (r.author_nickname || 'Aluno'),
+          authorNickname: r.author_nickname || 'Aluno',
           createdAt: r.created_at,
         };
       }).filter((item: any) => Boolean(item.url));

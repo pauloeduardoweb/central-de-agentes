@@ -574,6 +574,68 @@ export async function getPublicProfile(
       const isSelf = reqProfile && reqProfile.id === p.id;
       const canSeePhone = isMentor || isSelf || p.phone_visibility === 'MEMBERS';
 
+      const [msgRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_messages WHERE profile_id = ? AND deleted_at IS NULL`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [photosRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_messages WHERE profile_id = ? AND message_type = 'IMAGE' AND deleted_at IS NULL`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [gifsRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_messages WHERE profile_id = ? AND message_type = 'GIF' AND deleted_at IS NULL`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [audioRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_messages WHERE profile_id = ? AND message_type = 'AUDIO' AND deleted_at IS NULL`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [stickersRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_messages WHERE profile_id = ? AND message_type = 'STICKER' AND deleted_at IS NULL`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [replyRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_messages WHERE profile_id = ? AND reply_to_message_id IS NOT NULL AND deleted_at IS NULL`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [reactReceivedRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_reactions r JOIN chat_messages m ON r.message_id = m.id WHERE m.profile_id = ? AND m.deleted_at IS NULL`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [reactGivenRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_reactions WHERE profile_id = ?`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [favRows]: any = await db.query(
+        `SELECT COUNT(*) AS total FROM chat_favorites WHERE profile_id = ?`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const [xpRows]: any = await db.query(
+        `SELECT COALESCE(SUM(points), 0) AS total FROM chat_xp_history WHERE profile_id = ?`,
+        [targetProfileId]
+      ).catch(() => [[{ total: 0 }]]);
+
+      const message_count = Number(msgRows?.[0]?.total || 0);
+      const photos_count = Number(photosRows?.[0]?.total || 0);
+      const gifs_count = Number(gifsRows?.[0]?.total || 0);
+      const audio_count = Number(audioRows?.[0]?.total || 0);
+      const stickers_count = Number(stickersRows?.[0]?.total || 0);
+      const reply_count = Number(replyRows?.[0]?.total || 0);
+      const reactions_received_count = Number(reactReceivedRows?.[0]?.total || 0);
+      const reactions_given_count = Number(reactGivenRows?.[0]?.total || 0);
+      const favorites_count = Number(favRows?.[0]?.total || 0);
+      const xp = Number(xpRows?.[0]?.total || 0);
+      const level = Math.floor(xp / 200) + 1;
+
       return {
         id: p.id,
         nickname: p.nickname,
@@ -584,6 +646,17 @@ export async function getPublicProfile(
         is_mentor: isMasterKey(p.codigo),
         phone: canSeePhone ? p.phone : undefined,
         phone_visibility: p.phone_visibility,
+        message_count,
+        photos_count,
+        gifs_count,
+        audio_count,
+        stickers_count,
+        reply_count,
+        reactions_received_count,
+        reactions_given_count,
+        favorites_count,
+        xp,
+        level,
       };
     } catch (err) {
       console.error('[getPublicProfile Error]:', err);
@@ -594,6 +667,22 @@ export async function getPublicProfile(
     if (p.id === targetProfileId) {
       const isSelf = reqProfile && reqProfile.id === p.id;
       const canSeePhone = isMentor || isSelf || p.phone_visibility === 'MEMBERS';
+
+      const message_count = memoryMessagesList.filter(m => m.profile_id === targetProfileId && !m.deleted_at).length;
+      const photos_count = memoryMessagesList.filter(m => m.profile_id === targetProfileId && !m.deleted_at && m.message_type === 'IMAGE').length;
+      const gifs_count = memoryMessagesList.filter(m => m.profile_id === targetProfileId && !m.deleted_at && m.message_type === 'GIF').length;
+      const audio_count = memoryMessagesList.filter(m => m.profile_id === targetProfileId && !m.deleted_at && m.message_type === 'AUDIO').length;
+      const stickers_count = memoryMessagesList.filter(m => m.profile_id === targetProfileId && !m.deleted_at && m.message_type === 'STICKER').length;
+      const reply_count = memoryMessagesList.filter(m => m.profile_id === targetProfileId && !m.deleted_at && Boolean(m.reply_to_message_id)).length;
+      const reactions_received_count = memoryReactionsList.filter(r => {
+        const msg = memoryMessagesList.find(m => m.id === r.message_id);
+        return msg && msg.profile_id === targetProfileId && !msg.deleted_at;
+      }).length;
+      const reactions_given_count = memoryReactionsList.filter(r => r.profile_id === targetProfileId).length;
+      const favorites_count = memoryFavoritesList.filter(f => f.profile_id === targetProfileId).length;
+      const xp = p.xp_total || (message_count * 15 + reactions_received_count * 5);
+      const level = Math.floor(xp / 200) + 1;
+
       return {
         id: p.id,
         nickname: p.nickname,
@@ -604,6 +693,17 @@ export async function getPublicProfile(
         is_mentor: isMasterKey(p.codigo),
         phone: canSeePhone ? p.phone : undefined,
         phone_visibility: p.phone_visibility,
+        message_count,
+        photos_count,
+        gifs_count,
+        audio_count,
+        stickers_count,
+        reply_count,
+        reactions_received_count,
+        reactions_given_count,
+        favorites_count,
+        xp,
+        level,
       };
     }
   }
@@ -857,7 +957,7 @@ export async function getRoomMessages(
           created_at: msg.created_at,
           author: {
             id: msg.profile_id,
-            nickname: isMentor ? 'Mentor Bigode' : (msg.nickname || 'Aluno'),
+            nickname: msg.nickname || 'Aluno',
             photo_url: msg.photo_url || null,
             photoUrl: msg.photo_url || null,
             is_mentor: isMentor,
@@ -865,9 +965,9 @@ export async function getRoomMessages(
             chat_status: msg.chat_status || 'ACTIVE',
             status: msg.chat_status || 'ACTIVE',
           },
-          author_nickname: isMentor ? 'Mentor Bigode' : (msg.nickname || 'Aluno'),
+          author_nickname: msg.nickname || 'Aluno',
           author_photo_url: msg.photo_url || null,
-          nickname: isMentor ? 'Mentor Bigode' : (msg.nickname || 'Aluno'),
+          nickname: msg.nickname || 'Aluno',
           photo_url: msg.photo_url || null,
           reply_to: msg.reply_to_message_id ? {
             id: msg.reply_to_message_id,
@@ -945,7 +1045,7 @@ export async function getRoomMessages(
       created_at: m.created_at,
       author: {
         id: m.profile_id,
-        nickname: isMentor ? 'Mentor Bigode' : (authorProfile?.nickname || 'Aluno'),
+        nickname: authorProfile?.nickname || 'Aluno',
         photo_url: authorProfile?.photo_url || null,
         is_mentor: isMentor,
         chat_status: authorProfile?.chat_status || 'ACTIVE',
@@ -1130,7 +1230,7 @@ export async function sendMessage(
             }
 
             if (targetProfileId && targetProfileId !== profileId) {
-              const senderNickname = isMentor ? 'Mentor Bigode' : profile.nickname;
+              const senderNickname = profile.nickname;
               await createNotification({
                 profileId: targetProfileId,
                 notificationType: 'REPLY_RECEIVED',
@@ -1172,7 +1272,7 @@ export async function sendMessage(
         created_at: new Date().toISOString(),
         author: {
           id: profileId,
-          nickname: isMentor ? 'Mentor Bigode' : (profile.nickname || 'Aluno'),
+          nickname: profile.nickname || 'Aluno',
           photo_url: profile.photo_url || null,
           photoUrl: profile.photo_url || null,
           is_mentor: isMentor,
@@ -1180,9 +1280,9 @@ export async function sendMessage(
           chat_status: profile.chat_status || 'ACTIVE',
           status: profile.chat_status || 'ACTIVE',
         },
-        author_nickname: isMentor ? 'Mentor Bigode' : (profile.nickname || 'Aluno'),
+        author_nickname: profile.nickname || 'Aluno',
         author_photo_url: profile.photo_url || null,
-        nickname: isMentor ? 'Mentor Bigode' : (profile.nickname || 'Aluno'),
+        nickname: profile.nickname || 'Aluno',
         photo_url: profile.photo_url || null,
         reply_to: null,
         reactions: [],
@@ -1258,7 +1358,7 @@ export async function sendMessage(
       created_at: memMsg.created_at,
       author: {
         id: profile.id,
-        nickname: isMentor ? 'Mentor Bigode' : profile.nickname,
+        nickname: profile.nickname,
         photo_url: profile.photo_url,
         is_mentor: isMentor,
         chat_status: profile.chat_status,
@@ -1884,14 +1984,22 @@ export async function getUnreadCountForProfile(profileId: number) {
 export async function toggleReaction(messageId: number, profileId: number, emoji: string) {
   if (isDatabaseConfigured()) {
     try {
-      const [existing]: any = await db.query(
-        `SELECT id FROM chat_reactions WHERE message_id = ? AND profile_id = ? AND emoji = ? LIMIT 1`,
-        [messageId, profileId, emoji]
+      const [existingRows]: any = await db.query(
+        `SELECT id, emoji FROM chat_reactions WHERE message_id = ? AND profile_id = ?`,
+        [messageId, profileId]
       );
 
-      if (Array.isArray(existing) && existing.length > 0) {
-        await db.query(`DELETE FROM chat_reactions WHERE id = ?`, [existing[0].id]);
+      const existingSameEmoji = Array.isArray(existingRows) && existingRows.find((r: any) => r.emoji === emoji);
+
+      if (existingSameEmoji) {
+        // Remove reaction (toggle off)
+        await db.query(`DELETE FROM chat_reactions WHERE id = ?`, [existingSameEmoji.id]);
       } else {
+        // If user had a different reaction, remove it first (switch reaction)
+        if (Array.isArray(existingRows) && existingRows.length > 0) {
+          await db.query(`DELETE FROM chat_reactions WHERE message_id = ? AND profile_id = ?`, [messageId, profileId]);
+        }
+
         await db.query(
           `INSERT INTO chat_reactions (message_id, profile_id, emoji) VALUES (?, ?, ?)`,
           [messageId, profileId, emoji]
@@ -1899,7 +2007,7 @@ export async function toggleReaction(messageId: number, profileId: number, emoji
 
         // Find message author
         const [mRows]: any = await db.query(
-          `SELECT profile_id FROM chat_messages WHERE id = ? LIMIT 1`,
+          `SELECT profile_id, room_id, content FROM chat_messages WHERE id = ? LIMIT 1`,
           [messageId]
         );
 
@@ -1908,7 +2016,6 @@ export async function toggleReaction(messageId: number, profileId: number, emoji
           const msgRoomId = Number(mRows[0].room_id || 1);
           const msgContent = String(mRows[0].content || '');
 
-          // Only award XP and notify if reaction is not from author themselves
           if (authorId !== profileId) {
             await awardXp(
               authorId,
@@ -1919,12 +2026,11 @@ export async function toggleReaction(messageId: number, profileId: number, emoji
               messageId
             );
 
-            // Fetch reactor nickname
             const [pRows]: any = await db.query(
-              `SELECT nickname, codigo FROM chat_profiles WHERE id = ? LIMIT 1`,
+              `SELECT nickname FROM chat_profiles WHERE id = ? LIMIT 1`,
               [profileId]
             ).catch(() => []);
-            const reactorNickname = (pRows && pRows.length > 0 && isMasterKey(pRows[0].codigo)) ? 'Mentor Bigode' : (pRows?.[0]?.nickname || 'Um membro');
+            const reactorNickname = pRows?.[0]?.nickname || 'Um membro';
 
             createNotification({
               profileId: authorId,
@@ -1949,11 +2055,23 @@ export async function toggleReaction(messageId: number, profileId: number, emoji
   }
 
   // Memory fallback
-  const index = memoryReactionsList.findIndex(
-    (r) => r.message_id === messageId && r.profile_id === profileId && r.emoji === emoji
+  const existingIndex = memoryReactionsList.findIndex(
+    (r) => r.message_id === messageId && r.profile_id === profileId
   );
-  if (index >= 0) {
-    memoryReactionsList.splice(index, 1);
+
+  if (existingIndex >= 0) {
+    const existing = memoryReactionsList[existingIndex];
+    if (existing.emoji === emoji) {
+      memoryReactionsList.splice(existingIndex, 1);
+    } else {
+      memoryReactionsList.splice(existingIndex, 1);
+      memoryReactionsList.push({
+        id: memoryReactionIdCounter++,
+        message_id: messageId,
+        profile_id: profileId,
+        emoji,
+      });
+    }
   } else {
     memoryReactionsList.push({
       id: memoryReactionIdCounter++,
@@ -1981,7 +2099,7 @@ export async function parseAndSaveMentions(messageId: number, sourceProfileId: n
         `SELECT nickname, codigo FROM chat_profiles WHERE id = ? LIMIT 1`,
         [sourceProfileId]
       ).catch(() => []);
-      const senderNickname = (sRows && sRows.length > 0 && isMasterKey(sRows[0].codigo)) ? 'Mentor Bigode' : (sRows?.[0]?.nickname || 'Um membro');
+      const senderNickname = sRows?.[0]?.nickname || 'Um membro';
 
       for (const rawName of rawNames) {
         const [pRows]: any = await db.query(
@@ -2079,7 +2197,7 @@ export async function getCommunityMembersListForAutocomplete() {
       if (Array.isArray(rows)) {
         return rows.map((r) => ({
           id: r.id,
-          nickname: isMasterKey(r.codigo) ? 'Mentor Bigode' : r.nickname,
+          nickname: r.nickname,
           photo_url: r.photo_url,
           is_mentor: isMasterKey(r.codigo),
         }));
@@ -2091,7 +2209,7 @@ export async function getCommunityMembersListForAutocomplete() {
 
   return Array.from(memoryProfilesMap.values()).map((p) => ({
     id: p.id,
-    nickname: isMasterKey(p.codigo) ? 'Mentor Bigode' : p.nickname,
+    nickname: p.nickname,
     photo_url: p.photo_url,
     is_mentor: isMasterKey(p.codigo),
   }));
@@ -2349,7 +2467,7 @@ export async function getUserFavoriteMessages(profileId: number) {
             id: r.id,
             content: r.content,
             created_at: r.created_at,
-            author_nickname: isMentor ? 'Mentor Bigode' : r.nickname,
+            author_nickname: r.nickname,
             author_photo: r.photo_url,
           };
         });
@@ -2372,7 +2490,7 @@ export async function getUserFavoriteMessages(profileId: number) {
       id: m.id,
       content: m.content,
       created_at: m.created_at,
-      author_nickname: isMentor ? 'Mentor Bigode' : (authorP?.nickname || 'Aluno'),
+      author_nickname: authorP?.nickname || 'Aluno',
       author_photo: authorP?.photo_url || null,
     };
   });
@@ -2457,7 +2575,7 @@ export async function getOnlineMembersDrawerList() {
             uniqueMembersMap.set(p.id, {
               id: p.id,
               profile_id: p.id,
-              nickname: isMentor ? 'Mentor Bigode' : p.nickname,
+              nickname: p.nickname,
               photo_url: p.photo_url,
               bio: p.bio || null,
               is_mentor: isMentor,
@@ -2490,7 +2608,7 @@ export async function getOnlineMembersDrawerList() {
         uniqueMembersMap.set(p.id, {
           id: p.id,
           profile_id: p.id,
-          nickname: isMentor ? 'Mentor Bigode' : p.nickname,
+          nickname: p.nickname,
           photo_url: p.photo_url,
           bio: p.bio || null,
           is_mentor: isMentor,
@@ -2530,7 +2648,7 @@ export async function getCommunityRanking() {
             position: index + 1,
             id: r.id,
             profileId: r.id,
-            nickname: isMentor ? 'Mentor Bigode' : r.nickname,
+            nickname: r.nickname,
             photo_url: r.photo_url,
             photoUrl: r.photo_url,
             is_mentor: isMentor,
@@ -2563,7 +2681,7 @@ export async function getCommunityRanking() {
       position: 1,
       id: p.id,
       profileId: p.id,
-      nickname: isMentor ? 'Mentor Bigode' : p.nickname,
+      nickname: p.nickname,
       photo_url: p.photo_url,
       photoUrl: p.photo_url,
       is_mentor: isMentor,
@@ -2967,7 +3085,7 @@ export async function clearChatRoom(
   for (let i = memoryMessagesList.length - 1; i >= 0; i--) {
     const m = memoryMessagesList[i];
     if (m.room_id === roomId) {
-      if (!preserveNotices || (m.message_type !== 'NOTICE' && m.message_type !== 'ANNOUNCEMENT' && m.message_type !== 'SYSTEM')) {
+      if (!preserveNotices || ((m.message_type as string) !== 'NOTICE' && (m.message_type as string) !== 'ANNOUNCEMENT' && (m.message_type as string) !== 'SYSTEM')) {
         memoryMessagesList.splice(i, 1);
       }
     }
