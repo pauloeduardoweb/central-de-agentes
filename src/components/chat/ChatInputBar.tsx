@@ -799,23 +799,20 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                 onClick={() => { setShowMobileToolsMenu(false); setShowEmojiPicker(true); }}
                 className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-[#111B21] hover:bg-[#F0F2F5] rounded-xl transition-colors font-medium cursor-pointer"
               >
-                <Smile className="w-4 h-4 text-[#8A6500]" />
-                <span>😃 Emoji</span>
+                <span>😀 Emoji</span>
               </button>
               <button
                 type="button"
                 onClick={() => { setShowMobileToolsMenu(false); setShowGifStickerPicker(true); }}
                 className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-[#111B21] hover:bg-[#F0F2F5] rounded-xl transition-colors font-medium cursor-pointer"
               >
-                <Flame className="w-4 h-4 text-[#00A884]" />
-                <span>🎬 GIF & 🏷️ Sticker</span>
+                <span>🎬 GIF & Sticker</span>
               </button>
               <button
                 type="button"
                 onClick={handleMobileFileClick}
                 className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-[#111B21] hover:bg-[#F0F2F5] rounded-xl transition-colors font-medium cursor-pointer"
               >
-                <ImageIcon className="w-4 h-4 text-[#00A884]" />
                 <span>📷 Foto / Imagem</span>
               </button>
               <button
@@ -823,8 +820,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
                 onClick={() => { setShowMobileToolsMenu(false); startRecordingAudio(); }}
                 className="w-full flex items-center space-x-2.5 px-3 py-2 text-xs text-[#111B21] hover:bg-[#F0F2F5] rounded-xl transition-colors font-medium cursor-pointer"
               >
-                <Mic className="w-4 h-4 text-[#00A884]" />
-                <span>🎙️ Áudio</span>
+                <span>🎤 Áudio</span>
               </button>
             </div>
           )}
