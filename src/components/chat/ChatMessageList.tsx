@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Crown, Reply, Smile, Edit2, Trash2, Flag, Pin, CheckCheck, Check, Lock, Copy, ArrowDown, Star, Share2, MessageSquare } from 'lucide-react';
 import { getAvatarGradient, getNicknameInitials } from '../../utils/avatarUtils';
 import { resolveChatMediaUrl, getSafeImageUrl } from '../../utils/chatMediaUrl';
@@ -87,6 +87,72 @@ interface ChatMessageListProps {
   onToggleFavorite?: (messageId: number) => void;
   onHashtagClick?: (hashtag: string) => void;
 }
+
+interface ChatGifMessageProps {
+  gifUrl: string;
+}
+
+const ChatGifMessage: React.FC<ChatGifMessageProps> = ({ gifUrl }) => {
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [retryCount, setRetryCount] = useState(0);
+
+  const currentSrc = useMemo(() => {
+    if (retryCount > 0) {
+      return `${gifUrl}${gifUrl.includes('?') ? '&' : '?'}retry=${retryCount}`;
+    }
+    return gifUrl;
+  }, [gifUrl, retryCount]);
+
+  const handleError = () => {
+    if (retryCount < 1) {
+      setRetryCount((prev) => prev + 1);
+    } else {
+      setStatus('error');
+    }
+  };
+
+  const handleManualRetry = () => {
+    setStatus('loading');
+    setRetryCount((prev) => prev + 1);
+  };
+
+  if (status === 'error') {
+    return (
+      <div className="p-3 bg-[#F0F2F5] border border-[#DADDE1] rounded-xl text-center my-0.5 space-y-1">
+        <span className="text-xs text-[#54656F] italic block">🎬 GIF indisponível</span>
+        <button
+          type="button"
+          onClick={handleManualRetry}
+          className="text-[10px] text-[#00A884] hover:underline font-semibold cursor-pointer"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-[#DADDE1] max-w-xs my-0.5 relative bg-black/5 min-h-[100px] flex items-center justify-center">
+      {status === 'loading' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#F0F2F5] text-xs text-[#54656F] animate-pulse">
+          🎬 Carregando GIF...
+        </div>
+      )}
+      <img
+        src={currentSrc}
+        alt="GIF"
+        className={`w-full h-auto object-cover min-h-[100px] transition-opacity duration-200 ${
+          status === 'loaded' ? 'opacity-100' : 'opacity-0'
+        }`}
+        onLoad={() => setStatus('loaded')}
+        onError={handleError}
+      />
+      <span className="bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded absolute bottom-1 right-1 pointer-events-none z-10">
+        GIF
+      </span>
+    </div>
+  );
+};
 
 export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   messages,
@@ -613,26 +679,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                       (() => {
                         const gifUrl = getSafeImageUrl(msg) || resolveChatMediaUrl(msg.image_url);
                         if (gifUrl) {
-                          return (
-                            <div className="rounded-xl overflow-hidden border border-[#DADDE1] max-w-xs my-0.5 relative bg-black/5">
-                              <img
-                                src={gifUrl}
-                                alt="GIF"
-                                className="w-full h-auto object-cover min-h-[100px]"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  const parent = e.currentTarget.parentElement;
-                                  if (parent) {
-                                    parent.classList.add('p-3', 'bg-[#F0F2F5]', 'text-center');
-                                    parent.innerHTML = '<span class="text-xs text-[#54656F] italic">🎬 GIF indisponível</span>';
-                                  }
-                                }}
-                              />
-                              <span className="bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded absolute bottom-1 right-1 pointer-events-none">
-                                GIF
-                              </span>
-                            </div>
-                          );
+                          return <ChatGifMessage gifUrl={gifUrl} />;
                         }
                         return (
                           <div className="p-2 bg-[#F0F2F5] rounded-xl text-center border border-[#DADDE1] my-0.5">

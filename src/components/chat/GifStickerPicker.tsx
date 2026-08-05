@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, Flame, ImageIcon, X, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Flame, ImageIcon, X, Sparkles, RefreshCw } from 'lucide-react';
 import { resolveChatMediaUrl } from '../../utils/chatMediaUrl';
 
 interface GifStickerPickerProps {
@@ -114,20 +114,52 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
   onSelectSticker,
   onSelectGif,
 }) => {
+  const BATCH_SIZE = 6;
   const [activeTab, setActiveTab] = useState<'STICKERS' | 'GIFS'>('STICKERS');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGifCategory, setSelectedGifCategory] = useState('Tudo');
+  const [visibleCount, setVisibleCount] = useState<number>(BATCH_SIZE);
   const [failedGifs, setFailedGifs] = useState<Set<string>>(new Set());
+  const [retryCounts, setRetryCounts] = useState<Record<string, number>>({});
+  const [loadedGifs, setLoadedGifs] = useState<Set<string>>(new Set());
+
+  // Reset visibleCount whenever category or search query changes
+  useEffect(() => {
+    setVisibleCount(BATCH_SIZE);
+  }, [selectedGifCategory, searchQuery]);
 
   if (!isOpen) return null;
 
   const handleGifError = (url: string) => {
-    console.warn('[GIF Load Error]:', url);
-    setFailedGifs((prev) => {
+    const currentRetries = retryCounts[url] || 0;
+    if (currentRetries < 1) {
+      console.warn('[GIF Retry Attempt 1]:', url);
+      setRetryCounts((prev) => ({ ...prev, [url]: currentRetries + 1 }));
+    } else {
+      console.warn('[GIF Final Error]:', url);
+      setFailedGifs((prev) => {
+        const next = new Set(prev);
+        next.add(url);
+        return next;
+      });
+    }
+  };
+
+  const handleGifLoad = (url: string) => {
+    setLoadedGifs((prev) => {
       const next = new Set(prev);
       next.add(url);
       return next;
     });
+  };
+
+  const getGifSrc = (url: string) => {
+    const baseUrl = resolveChatMediaUrl(url);
+    const retries = retryCounts[url] || 0;
+    if (retries > 0) {
+      return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}retry=${retries}`;
+    }
+    return baseUrl;
   };
 
   const filteredStickers = OFFICIAL_STICKERS.filter(
@@ -144,6 +176,9 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
       g.category.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const visibleGifs = filteredGifs.slice(0, visibleCount);
+  const hasMoreGifs = visibleCount < filteredGifs.length;
 
   return (
     <div className="absolute bottom-full left-2 right-2 sm:left-4 sm:right-auto sm:w-[420px] mb-2 bg-[#111b21] border border-slate-700/80 rounded-2xl shadow-2xl z-40 overflow-hidden flex flex-col max-h-[440px] animate-fade-in select-none">
@@ -261,38 +296,68 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
         {activeTab === 'GIFS' && (
           <div>
             {filteredGifs.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {filteredGifs.map((gif, idx) => (
-                  <button
-                    key={`${gif.url}-${idx}`}
-                    type="button"
-                    onClick={() => {
-                      onSelectGif(gif.url);
-                      onClose();
-                    }}
-                    className="relative rounded-xl overflow-hidden border border-slate-700/60 hover:border-emerald-500 transition-all group cursor-pointer aspect-video bg-black/40 flex flex-col justify-center items-center"
-                  >
-                    {failedGifs.has(gif.url) ? (
-                      <div className="flex flex-col items-center justify-center p-2 text-center text-slate-400 space-y-1">
-                        <ImageIcon className="w-5 h-5 text-teal-400 opacity-60" />
-                        <span className="text-[10px] font-semibold truncate max-w-[100px]">{gif.title}</span>
-                        <span className="text-[9px] text-slate-400">GIF indisponível</span>
-                      </div>
-                    ) : (
-                      <img
-                        src={resolveChatMediaUrl(gif.url)}
-                        alt={gif.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        loading="lazy"
-                        onError={() => handleGifError(gif.url)}
-                      />
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 to-transparent text-[10px] text-slate-200 truncate font-semibold">
-                      {gif.title}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {visibleGifs.map((gif, idx) => {
+                    const isFailed = failedGifs.has(gif.url);
+                    const isLoaded = loadedGifs.has(gif.url);
+                    const imgSrc = getGifSrc(gif.url);
+
+                    return (
+                      <button
+                        key={`${gif.url}-${idx}`}
+                        type="button"
+                        onClick={() => {
+                          onSelectGif(gif.url);
+                          onClose();
+                        }}
+                        className="relative rounded-xl overflow-hidden border border-slate-700/60 hover:border-emerald-500 transition-all group cursor-pointer aspect-video bg-[#182229] flex flex-col justify-center items-center"
+                      >
+                        {isFailed ? (
+                          <div className="flex flex-col items-center justify-center p-2 text-center text-slate-400 space-y-1">
+                            <ImageIcon className="w-5 h-5 text-teal-400 opacity-60" />
+                            <span className="text-[10px] font-semibold truncate max-w-[100px]">{gif.title}</span>
+                            <span className="text-[9px] text-slate-400">GIF indisponível</span>
+                          </div>
+                        ) : (
+                          <>
+                            {!isLoaded && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#182229] text-slate-400 space-y-1 z-10 animate-pulse">
+                                <span className="text-[10px] font-medium text-slate-400">Carregando GIF...</span>
+                              </div>
+                            )}
+                            <img
+                              src={imgSrc}
+                              alt={gif.title}
+                              className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-300 ${
+                                isLoaded ? 'opacity-100' : 'opacity-0'
+                              }`}
+                              loading="lazy"
+                              onLoad={() => handleGifLoad(gif.url)}
+                              onError={() => handleGifError(gif.url)}
+                            />
+                          </>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 to-transparent text-[10px] text-slate-200 truncate font-semibold z-20">
+                          {gif.title}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {hasMoreGifs && (
+                  <div className="mt-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((prev) => prev + BATCH_SIZE)}
+                      className="px-4 py-1.5 bg-[#1f2c34] hover:bg-slate-700 text-teal-400 hover:text-white text-xs font-bold rounded-xl border border-teal-500/30 transition-colors cursor-pointer"
+                    >
+                      Carregar mais GIFs ({visibleGifs.length} de {filteredGifs.length})
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="p-6 text-center text-xs text-slate-400">
                 Nenhum GIF encontrado para essa pesquisa.
