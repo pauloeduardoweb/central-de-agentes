@@ -712,6 +712,135 @@ export async function getPublicProfile(
   return null;
 }
 
+export async function canProfileAccessRoom(roomId: number, profileId: number): Promise<boolean> {
+  if (roomId === 1) return true;
+  if (!isDatabaseConfigured()) return true;
+
+  try {
+    const [rows]: any = await db.query(
+      `SELECT room_type FROM chat_rooms WHERE id = ? AND is_active = 1 LIMIT 1`,
+      [roomId]
+    );
+    if (!rows || rows.length === 0) return false;
+    const room = rows[0];
+    if (room.room_type === 'PUBLIC') return true;
+
+    const [mRows]: any = await db.query(
+      `SELECT id FROM chat_room_members WHERE room_id = ? AND profile_id = ? AND is_active = 1 LIMIT 1`,
+      [roomId, profileId]
+    );
+    return Boolean(mRows && mRows.length > 0);
+  } catch (err) {
+    console.error('[canProfileAccessRoom Error]:', err);
+    return false;
+  }
+}
+
+export async function getOrCreateDirectRoom(profileIdA: number, profileIdB: number) {
+  const p1 = Math.min(profileIdA, profileIdB);
+  const p2 = Math.max(profileIdA, profileIdB);
+  const slug = `dm_${p1}_${p2}`;
+
+  if (isDatabaseConfigured()) {
+    await ensureChatTables();
+    let room: any = null;
+
+    const [existingRooms]: any = await db.query(
+      `SELECT * FROM chat_rooms WHERE slug = ? LIMIT 1`,
+      [slug]
+    );
+
+    if (existingRooms && existingRooms.length > 0) {
+      room = existingRooms[0];
+    } else {
+      try {
+        const [insertRes]: any = await db.query(
+          `INSERT IGNORE INTO chat_rooms (name, slug, description, room_type, is_active, created_by)
+           VALUES ('Conversa Privada', ?, 'Conversa direta entre alunos', 'PRIVATE', 1, ?)`,
+          [slug, profileIdA]
+        );
+        if (insertRes?.insertId) {
+          const [newRooms]: any = await db.query(
+            `SELECT * FROM chat_rooms WHERE id = ? LIMIT 1`,
+            [insertRes.insertId]
+          );
+          room = newRooms?.[0];
+        } else {
+          const [retryRooms]: any = await db.query(
+            `SELECT * FROM chat_rooms WHERE slug = ? LIMIT 1`,
+            [slug]
+          );
+          room = retryRooms?.[0];
+        }
+      } catch (e) {
+        const [retryRooms]: any = await db.query(
+          `SELECT * FROM chat_rooms WHERE slug = ? LIMIT 1`,
+          [slug]
+        );
+        room = retryRooms?.[0];
+      }
+    }
+
+    if (!room) {
+      throw new Error('Não foi possível criar ou localizar a sala privada.');
+    }
+
+    await db.query(
+      `INSERT IGNORE INTO chat_room_members (room_id, profile_id, member_role, is_active)
+       VALUES (?, ?, 'MEMBER', 1), (?, ?, 'MEMBER', 1)`,
+      [room.id, profileIdA, room.id, profileIdB]
+    ).catch(() => {});
+
+    await db.query(
+      `UPDATE chat_room_members SET is_active = 1 WHERE room_id = ? AND profile_id IN (?, ?)`,
+      [room.id, profileIdA, profileIdB]
+    ).catch(() => {});
+
+    const [contactProfiles]: any = await db.query(
+      `SELECT id, nickname, photo_url, bio, chat_status, is_moderator
+       FROM chat_profiles WHERE id = ? LIMIT 1`,
+      [profileIdB]
+    );
+    const contactProfile = contactProfiles?.[0] || null;
+
+    return {
+      room: {
+        ...room,
+        contact_profile_id: contactProfile?.id,
+        contact_nickname: contactProfile?.nickname,
+        contact_photo_url: contactProfile?.photo_url,
+        contact_bio: contactProfile?.bio,
+        contact_chat_status: contactProfile?.chat_status,
+      },
+      contactProfile,
+    };
+  }
+
+  // Memory fallback
+  const contactProfile = Array.from(memoryProfilesMap.values()).find((p) => p.id === profileIdB) || null;
+  const memoryRoom = {
+    id: 999900 + Math.min(profileIdA, profileIdB) * 100 + Math.max(profileIdA, profileIdB),
+    name: 'Conversa Privada',
+    slug,
+    description: 'Conversa direta',
+    room_type: 'PRIVATE',
+    is_active: 1,
+    created_by: profileIdA,
+    created_at: new Date().toISOString(),
+  };
+
+  return {
+    room: {
+      ...memoryRoom,
+      contact_profile_id: contactProfile?.id,
+      contact_nickname: contactProfile?.nickname,
+      contact_photo_url: contactProfile?.photo_url,
+      contact_bio: contactProfile?.bio,
+    },
+    contactProfile,
+  };
+}
+
 /**
  * Get chat rooms for profile
  */
@@ -730,12 +859,20 @@ export async function getRooms(profileId: number) {
                  WHERE room_id = r.id
                    AND deleted_at IS NULL
                    AND (rm.last_read_message_id IS NULL OR id > rm.last_read_message_id)
-                ) AS unread_count
+                ) AS unread_count,
+                cp.id AS contact_profile_id,
+                cp.nickname AS contact_nickname,
+                cp.photo_url AS contact_photo_url,
+                cp.bio AS contact_bio,
+                cp.chat_status AS contact_chat_status
          FROM chat_rooms r
          LEFT JOIN chat_room_members rm ON rm.room_id = r.id AND rm.profile_id = ?
+         LEFT JOIN chat_room_members rm2 ON rm2.room_id = r.id AND rm2.profile_id != ? AND r.room_type = 'PRIVATE'
+         LEFT JOIN chat_profiles cp ON cp.id = rm2.profile_id
          WHERE r.is_active = 1
+           AND (r.room_type = 'PUBLIC' OR rm.profile_id IS NOT NULL)
          ORDER BY r.id ASC`,
-        [profileId]
+        [profileId, profileId]
       );
       return rooms || [];
     } catch (err) {
