@@ -1276,16 +1276,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
                         <PlayCircle className="w-3 h-3" />
                         <span>Ativar</span>
                       </button>
-                    ) : (
-                      <button
-                        onClick={(e) => openActionModal(e, user, 'suspend')}
-                        className="py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 text-[10px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer"
-                        title="Suspender"
-                      >
-                        <PauseCircle className="w-3 h-3" />
-                        <span>Susp.</span>
-                      </button>
-                    )}
+                    ) : null}
 
                     {!isBanned ? (
                       <button
