@@ -74,6 +74,7 @@ interface MemoryProfile {
   phone_visibility: 'MENTOR_ONLY' | 'MEMBERS';
   bio: string | null;
   chat_status: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
+  is_moderator?: number;
   community_rules_accepted_at?: string | null;
   last_chat_activity_at?: string | null;
   created_at: string;
@@ -563,7 +564,7 @@ export async function getPublicProfile(
   if (isDatabaseConfigured()) {
     try {
       const [rows]: any = await db.query(
-        `SELECT id, nickname, photo_url, phone, phone_visibility, bio, chat_status, created_at
+        `SELECT id, nickname, photo_url, phone, phone_visibility, bio, is_moderator, cidade, instagram, tiktok, xp, current_level, chat_status, created_at
          FROM chat_profiles
          WHERE id = ? LIMIT 1`,
         [targetProfileId]
@@ -3114,6 +3115,221 @@ export async function clearChatRoom(
     notificationsRemoved,
     mediaRemoved,
   };
+}
+
+// ==================== MODERATOR FUNCTIONS ====================
+
+export async function toggleProfileModeratorByMentor(
+  targetProfileId: number,
+  isModerator: number,
+  callerProfileId?: number
+): Promise<{ success: boolean; is_moderator?: number; message?: string; error?: string }> {
+  if (callerProfileId && callerProfileId === targetProfileId) {
+    return { success: false, error: 'O mentor não pode alterar a própria função de moderador em si mesmo.' };
+  }
+
+  if (isDatabaseConfigured()) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [targetRows]: any = await connection.query(`SELECT id, nickname, codigo FROM chat_profiles WHERE id = ? LIMIT 1`, [targetProfileId]);
+      if (!Array.isArray(targetRows) || targetRows.length === 0) {
+        await connection.rollback();
+        connection.release();
+        return { success: false, error: 'Perfil não encontrado.' };
+      }
+
+      const target = targetRows[0];
+      if (isMasterKey(target.codigo) || target.nickname === 'Mentor Bigode') {
+        await connection.rollback();
+        connection.release();
+        return { success: false, error: 'Não é possível alterar a função de Mentor ou Administrador.' };
+      }
+
+      const newIsModerator = isModerator === 1 ? 1 : 0;
+      await connection.query(`UPDATE chat_profiles SET is_moderator = ? WHERE id = ?`, [newIsModerator, targetProfileId]);
+
+      // Log moderation action if table exists
+      await connection.query(
+        `INSERT INTO admin_access_actions (performed_by_profile_id, target_profile_id, action_type, details)
+         VALUES (?, ?, ?, ?)`,
+        [
+          callerProfileId || null,
+          targetProfileId,
+          newIsModerator === 1 ? 'PROMOTE_MODERATOR' : 'REMOVE_MODERATOR',
+          `Função de moderador ${newIsModerator === 1 ? 'concedida' : 'removida'} por Mentor/Admin`
+        ]
+      ).catch(() => {});
+
+      await connection.commit();
+      connection.release();
+
+      return {
+        success: true,
+        is_moderator: newIsModerator,
+        message: newIsModerator === 1 ? 'Membro promovido a Moderador.' : 'Função de Moderador removida.',
+      };
+    } catch (err: any) {
+      await connection.rollback();
+      connection.release();
+      return { success: false, error: 'Erro de banco de dados ao atualizar moderador.' };
+    }
+  }
+
+  // Memory mode
+  for (const p of memoryProfilesMap.values()) {
+    if (p.id === targetProfileId) {
+      p.is_moderator = isModerator === 1 ? 1 : 0;
+      return {
+        success: true,
+        is_moderator: p.is_moderator,
+        message: isModerator === 1 ? 'Membro promovido a Moderador.' : 'Função de Moderador removida.',
+      };
+    }
+  }
+
+  return { success: false, error: 'Perfil não encontrado.' };
+}
+
+// ==================== CONTACTS FUNCTIONS ====================
+
+export const memoryContactsList: { id: number; owner_profile_id: number; contact_profile_id: number; created_at: string }[] = [];
+let memoryContactIdSeq = 1;
+
+export async function addContact(
+  ownerProfileId: number,
+  contactProfileId: number
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  if (ownerProfileId === contactProfileId) {
+    return { success: false, error: 'Você não pode adicionar a si mesmo como contato.' };
+  }
+
+  if (isDatabaseConfigured()) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [targetRows]: any = await connection.query(`SELECT id FROM chat_profiles WHERE id = ? LIMIT 1`, [contactProfileId]);
+      if (!Array.isArray(targetRows) || targetRows.length === 0) {
+        await connection.rollback();
+        connection.release();
+        return { success: false, error: 'Perfil de contato não encontrado.' };
+      }
+
+      await connection.query(
+        `INSERT INTO chat_contacts (owner_profile_id, contact_profile_id) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE id = id`,
+        [ownerProfileId, contactProfileId]
+      );
+
+      await connection.commit();
+      connection.release();
+      return { success: true, message: 'Contato adicionado com sucesso.' };
+    } catch (err: any) {
+      await connection.rollback();
+      connection.release();
+      return { success: false, error: 'Erro ao adicionar contato.' };
+    }
+  }
+
+  const exists = memoryContactsList.some(
+    (c) => c.owner_profile_id === ownerProfileId && c.contact_profile_id === contactProfileId
+  );
+  if (!exists) {
+    memoryContactsList.push({
+      id: memoryContactIdSeq++,
+      owner_profile_id: ownerProfileId,
+      contact_profile_id: contactProfileId,
+      created_at: new Date().toISOString(),
+    });
+  }
+  return { success: true, message: 'Contato adicionado com sucesso.' };
+}
+
+export async function removeContact(
+  ownerProfileId: number,
+  contactProfileId: number
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  if (isDatabaseConfigured()) {
+    try {
+      await db.query(
+        `DELETE FROM chat_contacts WHERE owner_profile_id = ? AND contact_profile_id = ?`,
+        [ownerProfileId, contactProfileId]
+      );
+      return { success: true, message: 'Contato removido com sucesso.' };
+    } catch (err: any) {
+      return { success: false, error: 'Erro ao remover contato.' };
+    }
+  }
+
+  const idx = memoryContactsList.findIndex(
+    (c) => c.owner_profile_id === ownerProfileId && c.contact_profile_id === contactProfileId
+  );
+  if (idx !== -1) {
+    memoryContactsList.splice(idx, 1);
+  }
+  return { success: true, message: 'Contato removido com sucesso.' };
+}
+
+export async function getUserContacts(ownerProfileId: number): Promise<any[]> {
+  if (isDatabaseConfigured()) {
+    try {
+      const [rows]: any = await db.query(
+        `SELECT p.id, p.nickname, p.photo_url, p.bio, p.is_moderator, p.chat_status, c.created_at
+         FROM chat_contacts c
+         JOIN chat_profiles p ON p.id = c.contact_profile_id
+         WHERE c.owner_profile_id = ?
+         ORDER BY p.nickname ASC`,
+        [ownerProfileId]
+      );
+      return rows || [];
+    } catch (err: any) {
+      console.error('[getUserContacts Error]:', err);
+      return [];
+    }
+  }
+
+  const contactIds = memoryContactsList
+    .filter((c) => c.owner_profile_id === ownerProfileId)
+    .map((c) => c.contact_profile_id);
+
+  const list: any[] = [];
+  for (const p of memoryProfilesMap.values()) {
+    if (contactIds.includes(p.id)) {
+      list.push({
+        id: p.id,
+        nickname: p.nickname,
+        photo_url: p.photo_url,
+        bio: p.bio,
+        is_moderator: p.is_moderator || 0,
+        chat_status: p.chat_status,
+        created_at: new Date().toISOString(),
+      });
+    }
+  }
+  return list;
+}
+
+export async function checkIsContact(
+  ownerProfileId: number,
+  contactProfileId: number
+): Promise<boolean> {
+  if (isDatabaseConfigured()) {
+    try {
+      const [rows]: any = await db.query(
+        `SELECT id FROM chat_contacts WHERE owner_profile_id = ? AND contact_profile_id = ? LIMIT 1`,
+        [ownerProfileId, contactProfileId]
+      );
+      return Array.isArray(rows) && rows.length > 0;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  return memoryContactsList.some(
+    (c) => c.owner_profile_id === ownerProfileId && c.contact_profile_id === contactProfileId
+  );
 }
 
 

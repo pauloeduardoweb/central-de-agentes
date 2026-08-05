@@ -572,6 +572,7 @@ async function runChatTablesSetup(): Promise<void> {
       `ALTER TABLE chat_profiles ADD COLUMN last_participation_date DATE DEFAULT NULL`,
       `ALTER TABLE chat_profiles ADD COLUMN last_xp_event_at DATETIME DEFAULT NULL`,
       `ALTER TABLE chat_profiles ADD COLUMN profile_rank INT UNSIGNED DEFAULT NULL`,
+      `ALTER TABLE chat_profiles ADD COLUMN is_moderator TINYINT(1) NOT NULL DEFAULT 0`,
     ];
     for (const q of profColQueries) {
       await db.query(q).catch(() => {});
@@ -948,6 +949,19 @@ async function runChatTablesSetup(): Promise<void> {
         blocked_profile_id BIGINT UNSIGNED NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uk_prof_blocked (profile_id, blocked_profile_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 23. chat_contacts
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS chat_contacts (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        owner_profile_id BIGINT UNSIGNED NOT NULL,
+        contact_profile_id BIGINT UNSIGNED NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_owner_contact (owner_profile_id, contact_profile_id),
+        INDEX idx_owner (owner_profile_id),
+        INDEX idx_contact (contact_profile_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 }
