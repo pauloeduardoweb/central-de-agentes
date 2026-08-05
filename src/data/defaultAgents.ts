@@ -3302,6 +3302,7 @@ Responder apenas:
       'Como criar ganchos de movimento viral em POV para produtos?',
       'Ideias de movimentos POV para demonstrar produtos no TikTok'
     ],
+    systemInstruction: 'Você é o especialista POV Viral Motion da Mentoria Geração Z Pro. Sua missão é criar roteiros em POV (Point of View), técnicas de câmera em primeira pessoa, dinâmicas visuais de movimento e ganchos nos primeiros 3 segundos para alavancar produtos no TikTok Shop.',
     capabilities: {
       codeInterpreter: true,
       webSearch: true,
