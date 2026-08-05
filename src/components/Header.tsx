@@ -266,7 +266,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
                 <div className="text-[10px] text-cyan-300/90 font-mono font-medium truncate mt-0.5">
-                  🏆 Nível {profile?.level || 1} • {profile?.xp || 61} XP
+                  🏆 Nível {profile?.level || 1}
                 </div>
               </div>
             </div>
