@@ -203,7 +203,11 @@ export async function getProfileBySessionCode(
         [cleanCode]
       );
       if (Array.isArray(rows) && rows.length > 0) {
-        return { profile: rows[0], isMentor };
+        const p = rows[0];
+        if (isMentor) {
+          p.is_mentor = 1;
+        }
+        return { profile: p, isMentor };
       }
 
       // If mentor and profile doesn't exist, auto-create Mentor Bigode profile
@@ -564,7 +568,7 @@ export async function getPublicProfile(
   if (isDatabaseConfigured()) {
     try {
       const [rows]: any = await db.query(
-        `SELECT id, nickname, photo_url, phone, phone_visibility, bio, is_moderator, cidade, instagram, tiktok, xp, current_level, chat_status, created_at
+        `SELECT id, codigo, nickname, photo_url, phone, phone_visibility, bio, is_moderator, cidade, instagram, tiktok, xp, current_level, chat_status, created_at
          FROM chat_profiles
          WHERE id = ? LIMIT 1`,
         [targetProfileId]
