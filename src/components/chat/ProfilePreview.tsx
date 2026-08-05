@@ -12,6 +12,7 @@ interface ProfilePreviewProps {
     bio: string | null;
     phone?: string | null;
     phone_visibility?: string | null;
+    is_moderator?: boolean | number;
     created_at?: string;
     message_count?: number;
     photos_count?: number;
@@ -29,6 +30,7 @@ interface ProfilePreviewProps {
     last_seen?: string;
   } | null;
   isMentor?: boolean;
+  studentCode?: string;
   onClose: () => void;
   onOpenAvatar?: (url: string, nickname: string) => void;
   onWarnUser?: (profileId: number, nickname: string) => void;
@@ -38,6 +40,7 @@ interface ProfilePreviewProps {
 export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
   profile,
   isMentor,
+  studentCode,
   onClose,
   onOpenAvatar,
   onWarnUser,
@@ -45,6 +48,64 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = React.useState<'PROFILE' | 'BADGES' | 'STATS'>('PROFILE');
   const [actionSuccessMsg, setActionSuccessMsg] = React.useState<string | null>(null);
+  const [isContact, setIsContact] = React.useState<boolean>(false);
+  const [loadingContact, setLoadingContact] = React.useState<boolean>(false);
+
+  // Check contact status on profile change
+  React.useEffect(() => {
+    if (!profile || !studentCode) return;
+    let isMounted = true;
+    fetch(`/api/chat/contacts/check/${profile.id}`, {
+      headers: { 'x-access-code': studentCode },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data && typeof data.is_contact === 'boolean') {
+          setIsContact(data.is_contact);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [profile?.id, studentCode]);
+
+  const handleToggleContact = async () => {
+    if (!profile || !studentCode || loadingContact) return;
+    setLoadingContact(true);
+    try {
+      if (isContact) {
+        const res = await fetch(`/api/chat/contacts/${profile.id}`, {
+          method: 'DELETE',
+          headers: { 'x-access-code': studentCode },
+        });
+        const data = await res.json();
+        if (data.success) {
+          setIsContact(false);
+          setActionSuccessMsg('Contato removido.');
+        }
+      } else {
+        const res = await fetch('/api/chat/contacts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-access-code': studentCode,
+          },
+          body: JSON.stringify({ contactProfileId: profile.id }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setIsContact(true);
+          setActionSuccessMsg('Contato adicionado!');
+        } else if (data.message) {
+          setActionSuccessMsg(data.message);
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling contact:', err);
+    } finally {
+      setLoadingContact(false);
+      setTimeout(() => setActionSuccessMsg(null), 3000);
+    }
+  };
 
   // Lock body scroll when open
   React.useEffect(() => {
@@ -241,6 +302,22 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
 
               {/* Action Buttons Menu */}
               <div className="space-y-1.5 pt-1">
+                {studentCode && (
+                  <button
+                    type="button"
+                    onClick={handleToggleContact}
+                    disabled={loadingContact}
+                    className={`w-full p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                      isContact
+                        ? 'bg-amber-950/60 border-amber-600/50 text-amber-300 hover:bg-amber-900/60'
+                        : 'bg-[#182F2A] border-[#00A884]/40 text-[#00A884] hover:bg-[#1E3B34]'
+                    }`}
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>{isContact ? 'Remover dos Meus Contatos' : 'Adicionar aos Meus Contatos'}</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {

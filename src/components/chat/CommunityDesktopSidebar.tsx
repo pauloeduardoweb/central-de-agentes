@@ -20,6 +20,7 @@ interface CommunityDesktopSidebarProps {
   onOpenRanking?: () => void;
   onOpenGallery?: () => void;
   onOpenOnlineDrawer?: () => void;
+  onOpenContacts?: () => void;
   onOpenRules: () => void;
   onOpenModModal?: () => void;
   onOpenProfileModal: () => void;
@@ -44,6 +45,7 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
   onOpenRanking,
   onOpenGallery,
   onOpenOnlineDrawer,
+  onOpenContacts,
   onOpenRules,
   onOpenModModal,
   onOpenProfileModal,
@@ -299,6 +301,17 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
                 )}
               </button>
             )}
+
+            {/* 8. Meus Contatos */}
+            {onOpenContacts && (
+              <button
+                onClick={onOpenContacts}
+                className="w-full p-2.5 rounded-xl bg-[#FFFFFF] hover:bg-[#F0F2F5] text-[#111B21] border border-[#DADDE1] flex items-center space-x-2.5 transition-colors text-left cursor-pointer shadow-2xs"
+              >
+                <Users className="w-4 h-4 text-[#00A884] shrink-0" />
+                <span className="font-semibold">Meus Contatos</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -319,11 +332,11 @@ export const CommunityDesktopSidebar: React.FC<CommunityDesktopSidebarProps> = (
           </div>
         </div>
 
-        {/* SECTION 5: ADMINISTRAÇÃO (somente Mentor) */}
-        {isMentor && (
+        {/* SECTION 5: ADMINISTRAÇÃO E MODERAÇÃO */}
+        {(isMentor || Boolean(profile?.is_moderator)) && (
           <div className="space-y-1.5 pt-1">
             <div className="px-1 text-[11px] font-extrabold uppercase tracking-wider text-amber-600 flex items-center gap-1">
-              <Crown className="w-3.5 h-3.5" /> Administração
+              <Crown className="w-3.5 h-3.5" /> Moderação
             </div>
 
             <div className="space-y-1 text-xs font-medium">

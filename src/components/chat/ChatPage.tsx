@@ -21,6 +21,7 @@ import { ChatAnimatedBackground } from './ChatAnimatedBackground';
 import { ChatMobileDrawer } from './ChatMobileDrawer';
 import { CommunityDesktopSidebar } from './CommunityDesktopSidebar';
 import { ChatNotificationsPanel, NotificationItem } from './ChatNotificationsPanel';
+import { UserContactsModal } from './UserContactsModal';
 import { chatApiFetch, setChatApiCredentials } from '../../services/chatApi';
 import { getSafeImageUrl } from '../../utils/chatMediaUrl';
 
@@ -70,6 +71,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
   const [rankingLoading, setRankingLoading] = useState<boolean>(false);
   const [showFavoritesModal, setShowFavoritesModal] = useState<boolean>(false);
   const [showGalleryModal, setShowGalleryModal] = useState<boolean>(false);
+  const [showContactsModal, setShowContactsModal] = useState<boolean>(false);
   const [externalInputText, setExternalInputText] = useState<string | undefined>(undefined);
   const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
   const [announcement, setAnnouncement] = useState<CommunityAnnouncement | null>({
@@ -1141,6 +1143,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
           fetchOnlineMembers();
           setShowOnlineDrawer(true);
         }}
+        onOpenContacts={() => {
+          setShowMobileDrawer(false);
+          setShowContactsModal(true);
+        }}
         onSelectFilter={handleFilterChange}
         onLogout={onLogout}
         searchTerm={searchTerm}
@@ -1180,6 +1186,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
             fetchOnlineMembers();
             setShowOnlineDrawer(true);
           }}
+          onOpenContacts={() => setShowContactsModal(true)}
           onOpenRules={() => setShowRulesModal(true)}
           onOpenModModal={() => setShowModModal(true)}
           onOpenProfileModal={() => setShowProfileModal(true)}
@@ -1492,14 +1499,26 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         isRequiredOnboarding={!hasValidChatProfile}
       />
 
-      {/* Mentor Moderation Modal */}
-      {isMentor && (
+      {/* Moderation Modal (Mentor or Moderator) */}
+      {(isMentor || Boolean(profile?.is_moderator)) && (
         <ChatModerationModal
           isOpen={showModModal}
           onClose={() => setShowModModal(false)}
           studentCode={studentCode}
+          isMentor={isMentor}
         />
       )}
+
+      {/* User Contacts Modal */}
+      <UserContactsModal
+        isOpen={showContactsModal}
+        onClose={() => setShowContactsModal(false)}
+        studentCode={studentCode}
+        onSelectProfile={(p) => {
+          setViewingPublicProfile(p);
+          setShowContactsModal(false);
+        }}
+      />
 
       {/* Community Rules Modal */}
       {showRulesModal && (
@@ -1520,6 +1539,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
         <ProfilePreview
           profile={viewingPublicProfile}
           isMentor={isMentor}
+          studentCode={studentCode}
           onClose={() => setViewingPublicProfile(null)}
           onOpenAvatar={(url, nick) => setAvatarViewerData({ url, nickname: nick })}
           onWarnUser={handleWarnUser}

@@ -32,6 +32,7 @@ interface ChatMobileDrawerProps {
   onOpenRules: () => void;
   onOpenProfileModal: () => void;
   onOpenModModal?: () => void;
+  onOpenContacts?: () => void;
   onOpenAvatar?: (url: string, nickname: string) => void;
   onOpenGallery?: () => void;
   onOpenRanking?: () => void;
@@ -57,6 +58,7 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
   onOpenRules,
   onOpenProfileModal,
   onOpenModModal,
+  onOpenContacts,
   onOpenAvatar,
   onOpenGallery,
   onOpenRanking,
@@ -362,6 +364,19 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
                   <span>Membros Online</span>
                 </button>
               )}
+
+              {onOpenContacts && (
+                <button
+                  onClick={() => {
+                    onOpenContacts();
+                    onClose();
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-[#111B21] hover:bg-[#182229] text-white border border-[#263A43] flex items-center space-x-2.5 transition-colors text-left cursor-pointer"
+                >
+                  <Users className="w-4 h-4 text-[#00A884] shrink-0" />
+                  <span>Meus Contatos</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -399,11 +414,11 @@ export const ChatMobileDrawer: React.FC<ChatMobileDrawerProps> = ({
             </div>
           </div>
 
-          {/* SECTION 5: ADMINISTRAÇÃO MENTOR (Only if isMentor) */}
-          {isMentor && (
+          {/* SECTION 5: ADMINISTRAÇÃO MENTOR / MODERADOR */}
+          {(isMentor || Boolean(profile?.is_moderator)) && (
             <div className="space-y-1.5 pt-1">
               <div className="px-1 text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                <Crown className="w-3.5 h-3.5" /> Administração
+                <Crown className="w-3.5 h-3.5" /> Moderação
               </div>
 
               <div className="space-y-1 text-xs font-medium">

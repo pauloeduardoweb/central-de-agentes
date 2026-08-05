@@ -6,6 +6,7 @@ interface ChatModerationModalProps {
   onClose: () => void;
   studentCode: string;
   onClearGeneralChat?: () => void;
+  isMentor?: boolean;
 }
 
 export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
@@ -13,6 +14,7 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
   onClose,
   studentCode,
   onClearGeneralChat,
+  isMentor = true,
 }) => {
   const [activeTab, setActiveTab] = useState<'reports' | 'members' | 'notice' | 'clear'>('reports');
   const [reports, setReports] = useState<any[]>([]);
@@ -89,6 +91,30 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
       }
     } catch (err) {
       console.error('Error updating status:', err);
+    }
+  };
+
+  const handleToggleModerator = async (profileId: number, currentIsModerator: boolean | number) => {
+    try {
+      const nextVal = currentIsModerator ? 0 : 1;
+      const res = await fetch(`/api/admin/chat/profiles/${profileId}/moderator`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-access-code': studentCode,
+        },
+        body: JSON.stringify({ is_moderator: nextVal }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMsg(data.message || 'Função de moderador atualizada.');
+        fetchProfiles();
+        setTimeout(() => setActionMsg(null), 3000);
+      } else {
+        alert(data.message || 'Erro ao alterar função de moderador.');
+      }
+    } catch (err) {
+      console.error('Error toggling moderator:', err);
     }
   };
 
@@ -249,29 +275,33 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
             <span>Alunos ({profiles.length})</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('notice')}
-            className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
-              activeTab === 'notice'
-                ? 'bg-[#0b141a] text-cyan-300 border-t-2 border-x border-cyan-500/50'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Pin className="w-3.5 h-3.5" />
-            <span>Publicar Aviso</span>
-          </button>
+          {isMentor && (
+            <>
+              <button
+                onClick={() => setActiveTab('notice')}
+                className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
+                  activeTab === 'notice'
+                    ? 'bg-[#0b141a] text-cyan-300 border-t-2 border-x border-cyan-500/50'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Pin className="w-3.5 h-3.5" />
+                <span>Publicar Aviso</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('clear')}
-            className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
-              activeTab === 'clear'
-                ? 'bg-[#0b141a] text-rose-300 border-t-2 border-x border-rose-500/50'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>Limpar Conversa</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('clear')}
+                className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
+                  activeTab === 'clear'
+                    ? 'bg-[#0b141a] text-rose-300 border-t-2 border-x border-rose-500/50'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Trash2 className="w-3 h-3.5 text-rose-400" />
+                <span>Limpar Conversa</span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Action feedback */}
@@ -345,8 +375,14 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
                 {filteredProfiles.map((p) => (
                   <div key={p.id} className="p-3 bg-[#111b21] border border-slate-800 rounded-xl flex items-center justify-between">
                     <div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                         <span className="font-bold text-white text-sm">{p.nickname}</span>
+                        {Boolean(p.is_moderator) && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-500/40 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-purple-400" />
+                            Moderador
+                          </span>
+                        )}
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           p.chat_status === 'ACTIVE'
                             ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40'
@@ -362,34 +398,51 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-1.5">
-                      {p.chat_status === 'ACTIVE' ? (
-                        <>
+                    <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                      {isMentor && (
+                        <button
+                          onClick={() => handleToggleModerator(p.id, p.is_moderator)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+                            p.is_moderator
+                              ? 'bg-purple-950/80 border border-purple-500/50 text-purple-300 hover:bg-purple-900'
+                              : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-purple-950 hover:text-purple-300 hover:border-purple-500/40'
+                          }`}
+                          title={p.is_moderator ? 'Remover função de Moderador' : 'Tornar Moderador do Bate-papo'}
+                        >
+                          <ShieldCheck className="w-3 h-3" />
+                          {p.is_moderator ? 'Remover Moderador' : 'Promover Moderador'}
+                        </button>
+                      )}
+
+                      {isMentor && (
+                        p.chat_status === 'ACTIVE' ? (
                           <button
                             onClick={() => handleUpdateStatus(p.id, 'BANNED', 'Ação direta do Mentor')}
                             className="px-2.5 py-1 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 text-[11px] font-semibold hover:bg-rose-900 cursor-pointer"
                           >
                             Banir
                           </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => handleUpdateStatus(p.id, 'ACTIVE', 'Reativado pelo Mentor')}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold hover:bg-emerald-900 flex items-center gap-1 cursor-pointer"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          Reativar
-                        </button>
+                        ) : (
+                          <button
+                            onClick={() => handleUpdateStatus(p.id, 'ACTIVE', 'Reativado pelo Mentor')}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-semibold hover:bg-emerald-900 flex items-center gap-1 cursor-pointer"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            Reativar
+                          </button>
+                        )
                       )}
 
-                      <button
-                        onClick={() => setDeletingProfileTarget(p)}
-                        className="px-2.5 py-1 rounded-lg bg-rose-950/90 border border-rose-500/60 text-rose-200 text-[11px] font-bold hover:bg-rose-900 flex items-center gap-1 cursor-pointer"
-                        title="Excluir perfil do Bate-papo"
-                      >
-                        <Trash2 className="w-3 h-3 text-rose-400" />
-                        Excluir perfil
-                      </button>
+                      {isMentor && (
+                        <button
+                          onClick={() => setDeletingProfileTarget(p)}
+                          className="px-2.5 py-1 rounded-lg bg-rose-950/90 border border-rose-500/60 text-rose-200 text-[11px] font-bold hover:bg-rose-900 flex items-center gap-1 cursor-pointer"
+                          title="Excluir perfil do Bate-papo"
+                        >
+                          <Trash2 className="w-3 h-3 text-rose-400" />
+                          Excluir perfil
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
