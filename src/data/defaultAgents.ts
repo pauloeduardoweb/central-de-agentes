@@ -3290,7 +3290,6 @@ Responder apenas:
     chatBackgroundImage: 'https://i.postimg.cc/NMcmc3Lx/Chat-GPT-Image-4-de-ago-de-2026-19-15-57.png',
     iconName: 'ShoppingBag',
     colorTheme: 'emerald',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a7145f5fbac8191a34b723b402b9339-pov-shop-viral-ia',
     geminiUrl: 'https://gemini.google.com/gem/1G4A92x1IqbuWuDZOOjNef1ZLj3bHFnL4?usp=sharing',
     exampleVideoUrl: 'https://vimeo.com/1212504629?fl=tl&fe=ec',
     exampleVideoUrls: [
