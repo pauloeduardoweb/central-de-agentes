@@ -1,6 +1,50 @@
 import crypto from 'crypto';
 import { db, isDatabaseConfigured, ensureTikTokConnectionsTable } from './database.js';
 
+/**
+ * Normalizes environment variable strings removing surrounding quotes, newlines, and whitespace.
+ */
+export function normalizeEnvVar(val: string | undefined, defaultValue: string = ''): string {
+  if (!val) return defaultValue;
+  let clean = String(val).trim();
+  clean = clean.replace(/^["']|["']$/g, '').trim();
+  clean = clean.replace(/[\r\n]+/g, '');
+  return clean || defaultValue;
+}
+
+/**
+ * Gets normalized TikTok Redirect URI without trailing slash.
+ */
+export function getTikTokRedirectUri(): string {
+  const raw = process.env.TIKTOK_REDIRECT_URI;
+  let uri = normalizeEnvVar(raw, 'https://app.geracaozpro.com/api/tiktok/oauth/callback');
+  if (uri.endsWith('/') && uri.length > 8) {
+    uri = uri.slice(0, -1);
+  }
+  return uri;
+}
+
+/**
+ * Gets normalized TikTok Client Key.
+ */
+export function getTikTokClientKey(): string {
+  return normalizeEnvVar(process.env.TIKTOK_CLIENT_KEY, '');
+}
+
+/**
+ * Gets normalized TikTok Client Secret.
+ */
+export function getTikTokClientSecret(): string {
+  return normalizeEnvVar(process.env.TIKTOK_CLIENT_SECRET, '');
+}
+
+export function getTikTokApiBaseUrl(): string {
+  const env = normalizeEnvVar(process.env.TIKTOK_ENVIRONMENT, '').toLowerCase();
+  return env === 'sandbox'
+    ? 'https://open-sandbox.tiktokapis.com'
+    : 'https://open.tiktokapis.com';
+}
+
 const ALGORITHM = 'aes-256-gcm';
 
 // Encryption key derivation

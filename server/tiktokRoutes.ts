@@ -5,6 +5,10 @@ import {
   saveTikTokConnection,
   getSafeTikTokConnection,
   revokeTikTokConnection,
+  getTikTokApiBaseUrl,
+  getTikTokRedirectUri,
+  getTikTokClientKey,
+  getTikTokClientSecret,
 } from './tiktokService.js';
 import { extractChatCredentials } from './chatService.js';
 import { lookupKeyType, normalizeAccessCode } from './authKeys.js';
@@ -41,10 +45,8 @@ tiktokRouter.get('/oauth/start', (req: express.Request, res: express.Response) =
 
     const { state, codeChallenge } = createOAuthSession(userCode);
 
-    const clientKey = process.env.TIKTOK_CLIENT_KEY || '';
-    const redirectUri =
-      process.env.TIKTOK_REDIRECT_URI ||
-      'https://app.geracaozpro.com/api/tiktok/oauth/callback';
+    const clientKey = getTikTokClientKey();
+    const redirectUri = getTikTokRedirectUri();
     const scope = 'user.info.basic';
 
     const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
@@ -96,14 +98,13 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
       return res.redirect('/mentor/integracoes/tiktok?status=error&message=State_Invalido_ou_Expirado');
     }
 
-    const clientKey = process.env.TIKTOK_CLIENT_KEY || '';
-    const clientSecret = process.env.TIKTOK_CLIENT_SECRET || '';
-    const redirectUri =
-      process.env.TIKTOK_REDIRECT_URI ||
-      'https://app.geracaozpro.com/api/tiktok/oauth/callback';
+    const clientKey = getTikTokClientKey();
+    const clientSecret = getTikTokClientSecret();
+    const redirectUri = getTikTokRedirectUri();
 
-    // 1. Exchange authorization code for access token (TikTok OAuth v2)
-    const tokenUrl = 'https://open.tiktokapis.com/v2/oauth/token/';
+    // 1. Exchange authorization code for access token (TikTok OAuth v2 - Sandbox or Production)
+    const apiBaseUrl = getTikTokApiBaseUrl();
+    const tokenUrl = `${apiBaseUrl}/v2/oauth/token/`;
     const bodyParams = new URLSearchParams();
     bodyParams.append('client_key', clientKey);
     bodyParams.append('client_secret', clientSecret);
@@ -126,7 +127,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     // Support both direct object or tokenJson.data (TikTok API v2 response wrapper)
     const payload = tokenJson.data || tokenJson;
 
-    if (!tokenRes.ok || tokenJson.error?.code !== 'ok' && !payload.access_token) {
+    if (!tokenRes.ok || (tokenJson.error?.code !== 'ok' && !payload.access_token)) {
       const errMsg =
         tokenJson.error?.message ||
         tokenJson.message ||
@@ -143,7 +144,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     const openId = payload.open_id;
     const scope = payload.scope || 'user.info.basic';
 
-    // 2. Fetch basic profile info from TikTok User Info API v2
+    // 2. Fetch basic profile info from TikTok User Info API v2 (Sandbox or Production)
     let displayName = 'Conta TikTok';
     let avatarUrl = '';
     let unionId = payload.union_id || '';
@@ -151,7 +152,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     if (accessToken) {
       try {
         const userInfoRes = await fetch(
-          'https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name',
+          `${apiBaseUrl}/v2/user/info/?fields=open_id,union_id,avatar_url,display_name`,
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
