@@ -5,12 +5,12 @@ export function resolveChatMediaUrl(url?: string | null): string {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
 
-  // Rule for local /gifs/ paths: return exact clean relative path directly
+  // Rule for /gifs/ paths: resolve to the media server domain
   if (trimmed.startsWith('/gifs/')) {
-    return trimmed;
+    return `https://midia.geracaozpro.com${trimmed}`;
   }
   if (trimmed.startsWith('gifs/')) {
-    return `/${trimmed}`;
+    return `https://midia.geracaozpro.com/${trimmed}`;
   }
 
   // Reject hazardous protocols
@@ -70,22 +70,13 @@ export function getSafeImageUrl(msg: {
 }): string {
   if (!msg) return '';
 
-  const directImgUrl = msg.image_url || msg.imageUrl;
-  if (directImgUrl && typeof directImgUrl === 'string' && directImgUrl.trim()) {
-    const trimmed = directImgUrl.trim();
-    if (trimmed.startsWith('/gifs/')) return trimmed;
-    if (trimmed.startsWith('gifs/')) return `/${trimmed}`;
-  }
-
   const mediaUrl = msg.media?.public_url || msg.media?.url;
   if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.trim()) {
-    const trimmed = mediaUrl.trim();
-    if (trimmed.startsWith('/gifs/')) return trimmed;
-    if (trimmed.startsWith('gifs/')) return `/${trimmed}`;
     const resolved = resolveChatMediaUrl(mediaUrl);
     if (resolved) return resolved;
   }
 
+  const directImgUrl = msg.image_url || msg.imageUrl;
   if (directImgUrl && typeof directImgUrl === 'string' && directImgUrl.trim()) {
     const resolved = resolveChatMediaUrl(directImgUrl);
     if (resolved) return resolved;
@@ -96,8 +87,6 @@ export function getSafeImageUrl(msg: {
 
   if (isMediaMsg && msg.content && typeof msg.content === 'string') {
     const trimmed = msg.content.trim();
-    if (trimmed.startsWith('/gifs/')) return trimmed;
-    if (trimmed.startsWith('gifs/')) return `/${trimmed}`;
     if (
       trimmed.startsWith('javascript:') ||
       trimmed.startsWith('file:') ||
