@@ -966,7 +966,7 @@ export async function getRoomMessages(
                m.reply_to_message_id,
                m.message_type,
                m.content,
-               COALESCE(cm.public_url, m.image_url) AS image_url,
+               COALESCE(NULLIF(cm.public_url, ''), m.image_url) AS image_url,
                COALESCE(cm.width, m.image_width) AS image_width,
                COALESCE(cm.height, m.image_height) AS image_height,
                COALESCE(cm.file_size, m.image_size) AS image_size,
