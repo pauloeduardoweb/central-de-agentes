@@ -106,7 +106,6 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
   const [visibleCount, setVisibleCount] = useState<number>(BATCH_SIZE);
   const [failedGifs, setFailedGifs] = useState<Set<string>>(new Set());
   const [retryCounts, setRetryCounts] = useState<Record<string, number>>({});
-  const [loadedGifs, setLoadedGifs] = useState<Set<string>>(new Set());
 
   // Reset visibleCount whenever category or search query changes
   useEffect(() => {
@@ -128,14 +127,6 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
         return next;
       });
     }
-  };
-
-  const handleGifLoad = (url: string) => {
-    setLoadedGifs((prev) => {
-      const next = new Set(prev);
-      next.add(url);
-      return next;
-    });
   };
 
   const getGifSrc = (url: string) => {
@@ -285,7 +276,6 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {visibleGifs.map((gif, idx) => {
                     const isFailed = failedGifs.has(gif.url);
-                    const isLoaded = loadedGifs.has(gif.url);
                     const imgSrc = getGifSrc(gif.url);
 
                     return (
@@ -305,25 +295,13 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
                             <span className="text-[9px] text-slate-400">GIF indisponível</span>
                           </div>
                         ) : (
-                          <>
-                            {!isLoaded && (
-                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#182229] text-slate-400 space-y-1 z-10 animate-pulse">
-                                <span className="text-[10px] font-medium text-slate-400">Carregando GIF...</span>
-                              </div>
-                            )}
-                            <img
-                              src={imgSrc}
-                              alt={gif.title}
-                              loading="eager"
-                              className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-300 ${
-                                isLoaded ? 'opacity-100' : 'opacity-0'
-                              }`}
-                              onLoad={(e) => {
-                                handleGifLoad(gif.url);
-                              }}
-                              onError={() => handleGifError(gif.url)}
-                            />
-                          </>
+                          <img
+                            src={imgSrc}
+                            alt={gif.title}
+                            loading="eager"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                            onError={() => handleGifError(gif.url)}
+                          />
                         )}
                         <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 to-transparent text-[10px] text-slate-200 truncate font-semibold z-20">
                           {gif.title}

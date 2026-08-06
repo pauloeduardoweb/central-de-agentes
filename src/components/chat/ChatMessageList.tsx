@@ -134,26 +134,17 @@ const ChatGifMessage: React.FC<ChatGifMessageProps> = ({ gifUrl }) => {
 
   return (
     <div className="relative rounded-xl overflow-hidden my-0.5 border border-[#DADDE1]/60 bg-black/5 inline-block">
-      {status === 'loading' && (
-        <div className="w-[220px] h-[140px] max-w-full flex items-center justify-center bg-[#F0F2F5] text-xs text-[#54656F] animate-pulse rounded-xl">
-          🎬 Carregando GIF...
-        </div>
-      )}
       <img
         src={currentSrc}
         alt="GIF"
         loading="eager"
-        className={`block max-w-[280px] max-h-[280px] sm:max-w-[360px] sm:max-h-[360px] w-auto h-auto object-contain rounded-xl transition-opacity duration-200 ${
-          status === 'loaded' ? 'opacity-100' : 'hidden'
-        }`}
+        className="block max-w-[280px] max-h-[280px] sm:max-w-[360px] sm:max-h-[360px] w-auto h-auto object-contain rounded-xl"
         onLoad={() => setStatus('loaded')}
         onError={handleError}
       />
-      {status === 'loaded' && (
-        <span className="bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded absolute bottom-1 right-1 pointer-events-none z-10 shadow-xs">
-          GIF
-        </span>
-      )}
+      <span className="bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded absolute bottom-1 right-1 pointer-events-none z-10 shadow-xs">
+        GIF
+      </span>
     </div>
   );
 };
