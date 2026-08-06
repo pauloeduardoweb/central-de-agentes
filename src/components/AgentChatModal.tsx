@@ -81,6 +81,7 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
       if (nameLower.includes('colorinfluencer') || agent.id === 'agent-shop-colorinfluencer') return 'https://i.postimg.cc/GHyHfgGJ/image.png';
       if (nameLower.includes('anti-violação') || agent.id === 'agent-anti-violacao-gzpro') return 'https://i.postimg.cc/233qQS6D/image.png';
       if (nameLower.includes('babybola') || agent.id === 'agent-tiktok2k-babybola-viral') return 'https://i.postimg.cc/w74378H1/image.png';
+      if (nameLower.includes('babypet') || agent.id === 'agent-tiktok2k-babypet-viral') return 'https://i.postimg.cc/t4XHYNmQ/babypet.png';
       if (nameLower.includes('casquinha animal') || agent.id === 'agent-tiktok2k-casquinha-animal') return 'https://i.postimg.cc/KRp4RSF8/image.png';
       if (nameLower.includes('dama') || agent.id === 'agent-tiktok2k-dama-vidente') return 'https://i.postimg.cc/HVvjVDHH/image.png';
       if (nameLower.includes('novela frutas') || agent.id === 'agent-tiktok2k-frutas-em-crise') return 'https://i.postimg.cc/ykpWk4Bs/image.png';
