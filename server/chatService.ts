@@ -2997,7 +2997,6 @@ export async function performOneTimeChatCleanup(): Promise<{
         await connection.query(`DELETE FROM chat_notices`).catch(() => {});
 
         // Reset room stats
-        await connection.query(`UPDATE chat_rooms SET last_message_content = NULL, last_message_at = NULL WHERE id = 1`).catch(() => {});
         await connection.query(`UPDATE chat_room_members SET last_read_message_id = NULL`).catch(() => {});
 
         await connection.query(`SET FOREIGN_KEY_CHECKS = 1`);
@@ -3225,28 +3224,10 @@ export async function clearChatRoom(
         messagesRemoved = msgDel?.affectedRows || 0;
       }
 
-      // Reset room preview
-      const [lastMsgRows]: any = await connection.query(
-        `SELECT content, created_at FROM chat_messages WHERE room_id = ? ORDER BY id DESC LIMIT 1`,
-        [roomId]
-      );
-
-      let lastMsgContent = null;
-      let lastMsgAt = null;
-      if (Array.isArray(lastMsgRows) && lastMsgRows.length > 0) {
-        lastMsgContent = lastMsgRows[0].content;
-        lastMsgAt = lastMsgRows[0].created_at;
-      }
-
-      await connection.query(
-        `UPDATE chat_rooms SET last_message_content = ?, last_message_at = ? WHERE id = ?`,
-        [lastMsgContent, lastMsgAt, roomId]
-      );
-
       await connection.query(
         `UPDATE chat_room_members SET last_read_message_id = 0 WHERE room_id = ?`,
         [roomId]
-      );
+      ).catch(() => {});
 
       await connection.commit();
       connection.release();
