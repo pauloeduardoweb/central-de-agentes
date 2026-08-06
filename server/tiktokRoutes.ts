@@ -79,32 +79,44 @@ tiktokRouter.get('/oauth/start', (req: express.Request, res: express.Response) =
  * URL: https://app.geracaozpro.com/api/tiktok/oauth/callback
  */
 tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Response) => {
+  console.log('[TikTok Callback] Step 1: Callback route hit. Query params:', req.query);
   try {
     const { code, state, error, error_description } = req.query;
 
     if (error) {
-      console.warn('[TikTok OAuth Error Callback]:', error, error_description);
+      console.warn('[TikTok Callback] Error param present:', error, error_description);
       const errReason = String(error_description || error || 'Autorizacao_Negada');
       return res.redirect(`/mentor/integracoes/tiktok?status=error&message=${encodeURIComponent(errReason)}`);
     }
 
     if (!code || !state) {
+      console.warn('[TikTok Callback] Missing code or state:', { code: !!code, state: !!state });
       return res.redirect('/mentor/integracoes/tiktok?status=error&message=Parametros_Ausentes');
     }
 
     // Validate CSRF state and consume PKCE session
+    console.log('[TikTok Callback] Step 2: Validating CSRF state token:', state);
     const session = validateAndConsumeOAuthState(String(state));
     if (!session) {
+      console.warn('[TikTok Callback] Invalid or expired state session for state:', state);
       return res.redirect('/mentor/integracoes/tiktok?status=error&message=State_Invalido_ou_Expirado');
     }
+    console.log('[TikTok Callback] Session validated for user code:', session.codigo);
 
     const clientKey = getTikTokClientKey();
     const clientSecret = getTikTokClientSecret();
     const redirectUri = getTikTokRedirectUri();
-
-    // 1. Exchange authorization code for access token (TikTok OAuth v2 - Sandbox or Production)
     const apiBaseUrl = getTikTokApiBaseUrl();
     const tokenUrl = `${apiBaseUrl}/v2/oauth/token/`;
+
+    console.log('[TikTok Callback] Step 3: Preparing token exchange request:', {
+      apiBaseUrl,
+      tokenUrl,
+      clientKeyPrefix: clientKey ? clientKey.substring(0, 4) + '***' : 'EMPTY',
+      redirectUri,
+      hasCodeVerifier: !!session.codeVerifier,
+    });
+
     const bodyParams = new URLSearchParams();
     bodyParams.append('client_key', clientKey);
     bodyParams.append('client_secret', clientSecret);
@@ -113,6 +125,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     bodyParams.append('redirect_uri', redirectUri);
     bodyParams.append('code_verifier', session.codeVerifier);
 
+    console.log('[TikTok Callback] Step 4: Sending POST request to TikTok token endpoint...');
     const tokenRes = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
@@ -122,7 +135,17 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
       body: bodyParams.toString(),
     });
 
-    const tokenJson = await tokenRes.json();
+    console.log('[TikTok Callback] Step 5: Token endpoint response received. Status:', tokenRes.status, tokenRes.statusText);
+    const rawText = await tokenRes.text();
+    console.log('[TikTok Callback] Raw token response body:', rawText);
+
+    let tokenJson: any = {};
+    try {
+      tokenJson = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.error('[TikTok Callback] Failed to parse JSON from token response:', parseErr);
+      return res.redirect('/mentor/integracoes/tiktok?status=error&message=Resposta_Invalida_TikTok');
+    }
 
     // Support both direct object or tokenJson.data (TikTok API v2 response wrapper)
     const payload = tokenJson.data || tokenJson;
@@ -144,12 +167,15 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     const openId = payload.open_id;
     const scope = payload.scope || 'user.info.basic';
 
+    console.log('[TikTok Callback] Step 6: Access token obtained successfully. OpenID:', openId);
+
     // 2. Fetch basic profile info from TikTok User Info API v2 (Sandbox or Production)
     let displayName = 'Conta TikTok';
     let avatarUrl = '';
     let unionId = payload.union_id || '';
 
     if (accessToken) {
+      console.log('[TikTok Callback] Step 7: Fetching user profile info from UserInfo API...');
       try {
         const userInfoRes = await fetch(
           `${apiBaseUrl}/v2/user/info/?fields=open_id,union_id,avatar_url,display_name`,
@@ -159,7 +185,10 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
             },
           }
         );
+        console.log('[TikTok Callback] UserInfo HTTP status:', userInfoRes.status);
         const userInfoJson = await userInfoRes.json();
+        console.log('[TikTok Callback] UserInfo response json:', userInfoJson);
+
         const userData = userInfoJson.data?.user || userInfoJson.data || userInfoJson.user;
         if (userData) {
           if (userData.display_name) displayName = userData.display_name;
@@ -172,6 +201,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     }
 
     // 3. Save connection to database
+    console.log('[TikTok Callback] Step 8: Saving TikTok connection to database for user:', session.codigo);
     await saveTikTokConnection({
       codigo: session.codigo,
       open_id: openId || 'unknown_openid',
@@ -185,9 +215,10 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
       scope,
     });
 
+    console.log('[TikTok Callback] Step 9: Connection saved successfully. Redirecting to success.');
     return res.redirect('/mentor/integracoes/tiktok?status=success');
   } catch (err: any) {
-    console.error('[TikTok OAuth Callback Fatal Error]:', err);
+    console.error('[TikTok OAuth Callback Fatal Error]:', err?.stack || err);
     return res.redirect('/mentor/integracoes/tiktok?status=error&message=Erro_Interno_Callback');
   }
 });
