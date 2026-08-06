@@ -29,6 +29,10 @@ export function resolveChatMediaUrl(url?: string | null): string {
 
   // Absolute HTTP/HTTPS URLs
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    // Force HTTPS for midia.geracaozpro.com or any insecure http URL to prevent Mixed Content blocking in browsers
+    if (trimmed.startsWith('http://')) {
+      return trimmed.replace(/^http:\/\//i, 'https://');
+    }
     return trimmed;
   }
 
@@ -65,12 +69,21 @@ export function getSafeImageUrl(msg: {
   messageType?: string | null;
   image_url?: string | null;
   imageUrl?: string | null;
+  media_url?: string | null;
+  public_url?: string | null;
+  attachment?: string | null;
   media?: { public_url?: string | null; url?: string | null } | null;
   content?: string | null;
 }): string {
   if (!msg) return '';
 
-  const mediaUrl = msg.media?.public_url || msg.media?.url;
+  const mediaUrl =
+    msg.media?.public_url ||
+    msg.media?.url ||
+    msg.media_url ||
+    msg.public_url ||
+    msg.attachment;
+
   if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.trim()) {
     const resolved = resolveChatMediaUrl(mediaUrl);
     if (resolved) return resolved;
