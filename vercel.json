@@ -2,9 +2,18 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "public/gifs/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/gifs/(.*)",
       "destination": "/api/index.ts"
     },
     {
