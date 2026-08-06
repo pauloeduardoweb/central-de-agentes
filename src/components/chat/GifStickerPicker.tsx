@@ -296,7 +296,7 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
                           onSelectGif(gif.url);
                           onClose();
                         }}
-                        className="relative rounded-xl overflow-hidden border border-slate-700/60 hover:border-emerald-500 transition-all group cursor-pointer aspect-video bg-[#182229] flex flex-col justify-center items-center"
+                        className="relative h-28 sm:h-32 w-full rounded-xl overflow-hidden border border-slate-700/60 hover:border-emerald-500 transition-all group cursor-pointer bg-[#182229] flex flex-col justify-center items-center"
                       >
                         {isFailed ? (
                           <div className="flex flex-col items-center justify-center p-2 text-center text-slate-400 space-y-1">
@@ -314,11 +314,13 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
                             <img
                               src={imgSrc}
                               alt={gif.title}
+                              loading="eager"
                               className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-300 ${
                                 isLoaded ? 'opacity-100' : 'opacity-0'
                               }`}
-                              loading="lazy"
-                              onLoad={() => handleGifLoad(gif.url)}
+                              onLoad={(e) => {
+                                handleGifLoad(gif.url);
+                              }}
                               onError={() => handleGifError(gif.url)}
                             />
                           </>

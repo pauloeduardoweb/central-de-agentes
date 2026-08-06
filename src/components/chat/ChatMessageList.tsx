@@ -97,10 +97,11 @@ const ChatGifMessage: React.FC<ChatGifMessageProps> = ({ gifUrl }) => {
   const [retryCount, setRetryCount] = useState(0);
 
   const currentSrc = useMemo(() => {
+    const resolved = resolveChatMediaUrl(gifUrl);
     if (retryCount > 0) {
-      return `${gifUrl}${gifUrl.includes('?') ? '&' : '?'}retry=${retryCount}`;
+      return `${resolved}${resolved.includes('?') ? '&' : '?'}retry=${retryCount}`;
     }
-    return gifUrl;
+    return resolved;
   }, [gifUrl, retryCount]);
 
   const handleError = () => {
@@ -118,7 +119,7 @@ const ChatGifMessage: React.FC<ChatGifMessageProps> = ({ gifUrl }) => {
 
   if (status === 'error') {
     return (
-      <div className="p-3 bg-[#F0F2F5] border border-[#DADDE1] rounded-xl text-center my-0.5 space-y-1">
+      <div className="p-3 bg-[#F0F2F5] border border-[#DADDE1] rounded-xl text-center my-0.5 space-y-1 max-w-[220px]">
         <span className="text-xs text-[#54656F] italic block">🎬 GIF indisponível</span>
         <button
           type="button"
@@ -132,24 +133,27 @@ const ChatGifMessage: React.FC<ChatGifMessageProps> = ({ gifUrl }) => {
   }
 
   return (
-    <div className="rounded-xl overflow-hidden border border-[#DADDE1] max-w-xs my-0.5 relative bg-black/5 min-h-[100px] flex items-center justify-center">
+    <div className="relative rounded-xl overflow-hidden my-0.5 border border-[#DADDE1]/60 bg-black/5 inline-block">
       {status === 'loading' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#F0F2F5] text-xs text-[#54656F] animate-pulse">
+        <div className="w-[220px] h-[140px] max-w-full flex items-center justify-center bg-[#F0F2F5] text-xs text-[#54656F] animate-pulse rounded-xl">
           🎬 Carregando GIF...
         </div>
       )}
       <img
         src={currentSrc}
         alt="GIF"
-        className={`w-full h-auto object-cover min-h-[100px] transition-opacity duration-200 ${
-          status === 'loaded' ? 'opacity-100' : 'opacity-0'
+        loading="eager"
+        className={`block max-w-[280px] max-h-[280px] sm:max-w-[360px] sm:max-h-[360px] w-auto h-auto object-contain rounded-xl transition-opacity duration-200 ${
+          status === 'loaded' ? 'opacity-100' : 'hidden'
         }`}
         onLoad={() => setStatus('loaded')}
         onError={handleError}
       />
-      <span className="bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded absolute bottom-1 right-1 pointer-events-none z-10">
-        GIF
-      </span>
+      {status === 'loaded' && (
+        <span className="bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded absolute bottom-1 right-1 pointer-events-none z-10 shadow-xs">
+          GIF
+        </span>
+      )}
     </div>
   );
 };
@@ -662,7 +666,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                           </div>
                         );
                       })()
-                    ) : msg.message_type === 'GIF' ? (
+                    ) : (msg.message_type === 'GIF' || (msg.message_type === 'IMAGE' && (getSafeImageUrl(msg).endsWith('.gif') || getSafeImageUrl(msg).includes('/gifs/')))) ? (
                       (() => {
                         const gifUrl = getSafeImageUrl(msg) || resolveChatMediaUrl(msg.image_url);
                         if (gifUrl) {
