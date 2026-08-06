@@ -15,6 +15,7 @@ import { ApiKeyModal } from './components/ApiKeyModal';
 import { MentorPanel } from './components/mentor/MentorPanel';
 import { ChatPage } from './components/chat/ChatPage';
 import { TechGridBackground } from './components/TechGridBackground';
+import { TermsPage } from './pages/TermsPage';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
 import { getDeviceId, unbindCurrentDevice } from './utils/deviceId';
@@ -36,6 +37,19 @@ export default function App() {
   });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [activeView, setActiveView] = useState<'hub' | 'mentor' | 'chat'>('hub');
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    return typeof window !== 'undefined' ? window.location.pathname : '/';
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        setCurrentPath(window.location.pathname);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const isMaster = isMasterKey(studentCode);
   const userIdentifier = studentCode
@@ -497,6 +511,19 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
       triggerToast('Agentes restaurados para o padrão.');
     }
   };
+
+  if (currentPath === '/termos' || currentPath === '/termos/') {
+    return (
+      <TermsPage
+        onNavigateHome={() => {
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', '/');
+          }
+          setCurrentPath('/');
+        }}
+      />
+    );
+  }
 
   const isAuthenticated = Boolean(userApiKey && studentCode && sessionId);
 
