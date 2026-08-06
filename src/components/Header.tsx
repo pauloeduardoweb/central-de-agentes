@@ -33,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isKeyHidden, setIsKeyHidden] = useState(true);
   const [copied, setCopied] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const isMasterUser = Boolean(isMaster || isMasterKey(studentCode));
 
   useEffect(() => {
     if (!studentCode) return;
@@ -116,20 +117,22 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Bate-papo</span>
               </button>
 
-              {/* Mentor Button - Opens Mentor Panel directly */}
-              <button
-                type="button"
-                onClick={() => onSelectView('mentor')}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                  activeView === 'mentor'
-                    ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
-                    : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
-                }`}
-              >
-                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="hidden sm:inline">Painel do Mentor</span>
-                <span className="sm:hidden">Mentor</span>
-              </button>
+              {/* Mentor Button - Opens Mentor Panel directly (SOMENTE PARA CHAVES MASTER) */}
+              {isMasterUser && (
+                <button
+                  type="button"
+                  onClick={() => onSelectView('mentor')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    activeView === 'mentor'
+                      ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
+                      : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
+                  }`}
+                >
+                  <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="hidden sm:inline">Painel do Mentor</span>
+                  <span className="sm:hidden">Mentor</span>
+                </button>
+              )}
             </div>
           </div>
         )}
