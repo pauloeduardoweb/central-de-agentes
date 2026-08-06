@@ -19,7 +19,9 @@ import {
   ensureProgressTable,
   ensureProfilesTable,
   ensureChatTables,
+  ensureTikTokConnectionsTable,
 } from './server/database.js';
+import { tiktokRouter } from './server/tiktokRoutes.js';
 import {
   getGlobalRankingHandler,
   getUserRankingStatsHandler,
@@ -140,6 +142,8 @@ function getGeminiClient(customApiKey?: string) {
 
 const apiRouter = express.Router();
 apiRouter.use(chatExtraRouter);
+apiRouter.use('/tiktok', tiktokRouter);
+apiRouter.use(tiktokRouter);
 
 // Health check endpoint
 apiRouter.get(['/health', '/api/health'], (_req, res) => {
@@ -2586,6 +2590,7 @@ async function startServer() {
         ensureProductsTable(),
         ensureProgressTable(),
         ensureProfilesTable(),
+        ensureTikTokConnectionsTable(),
       ]);
       console.log('[MySQL] All database schemas verified');
     } catch (e: any) {
