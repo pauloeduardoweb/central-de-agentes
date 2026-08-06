@@ -52,16 +52,26 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  useEffect(() => {
-    if (currentPath.startsWith('/mentor/integracoes/tiktok')) {
-      setActiveView('mentor');
-      setMentorTab('tiktok');
-    } else if (currentPath.startsWith('/mentor')) {
-      setActiveView('mentor');
-    }
-  }, [currentPath]);
-
   const isMaster = isMasterKey(studentCode);
+
+  useEffect(() => {
+    if (currentPath.startsWith('/mentor')) {
+      if (isMaster) {
+        setActiveView('mentor');
+        if (currentPath.startsWith('/mentor/integracoes/tiktok')) {
+          setMentorTab('tiktok');
+        }
+      } else {
+        // Redirect non-master keys away from /mentor URLs to Central de Agentes
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
+          window.history.replaceState({}, '', '/');
+        }
+        setCurrentPath('/');
+        setActiveView('hub');
+      }
+    }
+  }, [currentPath, isMaster]);
+
   const userIdentifier = studentCode
     ? (isMaster ? 'MASTER' : normalizeAccessCode(studentCode))
     : '';
@@ -604,7 +614,13 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         agentCount={agents.filter((a) => a.category !== 'Suporte').length}
         isMaster={isMaster}
         activeView={activeView}
-        onSelectView={(view) => setActiveView(view)}
+        onSelectView={(view) => {
+          if (view === 'mentor' && !isMaster) {
+            setActiveView('hub');
+            return;
+          }
+          setActiveView(view);
+        }}
       />
 
       {/* Container */}
