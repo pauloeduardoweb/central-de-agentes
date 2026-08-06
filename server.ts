@@ -143,7 +143,6 @@ function getGeminiClient(customApiKey?: string) {
 const apiRouter = express.Router();
 apiRouter.use(chatExtraRouter);
 apiRouter.use('/tiktok', tiktokRouter);
-apiRouter.use(tiktokRouter);
 
 // Health check endpoint
 apiRouter.get(['/health', '/api/health'], (_req, res) => {
