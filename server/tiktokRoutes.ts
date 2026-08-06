@@ -35,7 +35,7 @@ function getSessionUserCode(req: express.Request): string | null {
  * Initiates TikTok OAuth 2.0 PKCE flow.
  * Requires user authentication via x-student-access-code header or code query param.
  */
-tiktokRouter.get('/oauth/start', (req: express.Request, res: express.Response) => {
+tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Response) => {
   try {
     const userCode = getSessionUserCode(req) || normalizeAccessCode(req.query.code || req.query.accessCode);
 
@@ -43,7 +43,7 @@ tiktokRouter.get('/oauth/start', (req: express.Request, res: express.Response) =
       return res.status(401).redirect('/mentor/integracoes/tiktok?status=error&message=Autenticacao_Necessaria');
     }
 
-    const { state, codeChallenge } = createOAuthSession(userCode);
+    const { state, codeChallenge } = await createOAuthSession(userCode);
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
@@ -96,7 +96,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
 
     // Validate CSRF state and consume PKCE session
     console.log('[TikTok Callback] Step 2: Validating CSRF state token:', state);
-    const session = validateAndConsumeOAuthState(String(state));
+    const session = await validateAndConsumeOAuthState(String(state));
     if (!session) {
       console.warn('[TikTok Callback] Invalid or expired state session for state:', state);
       return res.redirect('/mentor/integracoes/tiktok?status=error&message=State_Invalido_ou_Expirado');

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { db, isDatabaseConfigured, ensureTikTokConnectionsTable } from './database.js';
+import { db, isDatabaseConfigured, ensureTikTokConnectionsTable, ensureTikTokOAuthStatesTable } from './database.js';
 
 /**
  * Normalizes environment variable strings removing surrounding quotes, newlines, and whitespace.
@@ -93,8 +93,7 @@ export function decryptToken(encryptedData: string): string {
   }
 }
 
-// In-memory OAuth State & PKCE Cache (Expires after 10 minutes)
-interface OAuthStateSession {
+export interface OAuthStateSession {
   codigo: string;
   codeVerifier: string;
   createdAt: number;
@@ -102,7 +101,7 @@ interface OAuthStateSession {
 
 const oauthStateMap = new Map<string, OAuthStateSession>();
 
-// Periodic cleanup of expired states
+// Periodic cleanup of expired states from memory fallback
 setInterval(() => {
   const now = Date.now();
   for (const [state, session] of oauthStateMap.entries()) {
@@ -114,12 +113,13 @@ setInterval(() => {
 
 /**
  * Creates a CSRF state & PKCE pair for TikTok OAuth initiation.
+ * Stores state session shared in MySQL (with memory fallback).
  */
-export function createOAuthSession(codigo: string): {
+export async function createOAuthSession(codigo: string): Promise<{
   state: string;
   codeVerifier: string;
   codeChallenge: string;
-} {
+}> {
   const state = crypto.randomBytes(24).toString('hex');
   const codeVerifier = crypto.randomBytes(32).toString('base64url');
   const codeChallenge = crypto
@@ -127,31 +127,70 @@ export function createOAuthSession(codigo: string): {
     .update(codeVerifier)
     .digest('base64url');
 
-  oauthStateMap.set(state, {
-    codigo,
-    codeVerifier,
-    createdAt: Date.now(),
-  });
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureTikTokOAuthStatesTable();
+      await db.query(`DELETE FROM tiktok_oauth_states WHERE created_at < NOW() - INTERVAL 10 MINUTE`).catch(() => {});
+      await db.query(
+        `INSERT INTO tiktok_oauth_states (state, codigo, code_verifier, created_at) VALUES (?, ?, ?, NOW())`,
+        [state, codigo, codeVerifier]
+      );
+    } catch (err) {
+      console.error('[MySQL Save OAuth State Error]:', err);
+      oauthStateMap.set(state, { codigo, codeVerifier, createdAt: Date.now() });
+    }
+  } else {
+    oauthStateMap.set(state, {
+      codigo,
+      codeVerifier,
+      createdAt: Date.now(),
+    });
+  }
 
   return { state, codeVerifier, codeChallenge };
 }
 
 /**
  * Validates and consumes the state token to prevent CSRF and state reuse.
+ * Queries MySQL shared table (or memory fallback), enforcing 10-min TTL and single-use deletion.
  */
-export function validateAndConsumeOAuthState(state: string): OAuthStateSession | null {
+export async function validateAndConsumeOAuthState(state: string): Promise<OAuthStateSession | null> {
   if (!state) return null;
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureTikTokOAuthStatesTable();
+      const [rows]: any = await db.query(
+        `SELECT state, codigo, code_verifier AS codeVerifier, UNIX_TIMESTAMP(created_at) * 1000 AS createdAt
+         FROM tiktok_oauth_states
+         WHERE state = ? AND created_at >= NOW() - INTERVAL 10 MINUTE`,
+        [state]
+      );
+
+      // Consume state immediately (single use)
+      await db.query(`DELETE FROM tiktok_oauth_states WHERE state = ?`, [state]).catch(() => {});
+
+      if (Array.isArray(rows) && rows.length > 0) {
+        return {
+          codigo: rows[0].codigo,
+          codeVerifier: rows[0].codeVerifier,
+          createdAt: Number(rows[0].createdAt),
+        };
+      }
+    } catch (err) {
+      console.error('[MySQL Validate OAuth State Error]:', err);
+    }
+  }
+
+  // Memory fallback check
   const session = oauthStateMap.get(state);
   if (!session) return null;
 
-  // Max 10 minutes lifespan
+  oauthStateMap.delete(state);
   if (Date.now() - session.createdAt > 10 * 60 * 1000) {
-    oauthStateMap.delete(state);
     return null;
   }
 
-  // Delete state after single use
-  oauthStateMap.delete(state);
   return session;
 }
 

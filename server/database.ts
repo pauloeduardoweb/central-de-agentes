@@ -1012,6 +1012,29 @@ export function ensureTikTokConnectionsTable(): Promise<void> {
   return tiktokConnectionsPromise;
 }
 
+let tiktokOAuthStatesPromise: Promise<void> | null = null;
+export function ensureTikTokOAuthStatesTable(): Promise<void> {
+  if (!isDatabaseConfigured()) return Promise.resolve();
+  if (!tiktokOAuthStatesPromise) {
+    tiktokOAuthStatesPromise = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS tiktok_oauth_states (
+          state VARCHAR(100) PRIMARY KEY,
+          codigo VARCHAR(100) NOT NULL,
+          code_verifier VARCHAR(255) NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_created_at (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    })().catch((err: any) => {
+      tiktokOAuthStatesPromise = null;
+      console.warn('[MySQL ensureTikTokOAuthStatesTable Error]:', err?.message || err);
+      throw err;
+    });
+  }
+  return tiktokOAuthStatesPromise;
+}
+
 
 
 
