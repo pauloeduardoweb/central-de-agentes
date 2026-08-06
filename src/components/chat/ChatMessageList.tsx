@@ -669,16 +669,16 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                           </div>
                         );
                       })()
-                    ) : ((msg.message_type === 'IMAGE' || Boolean(getSafeImageUrl(msg))) && Boolean(getSafeImageUrl(msg))) ? (
+                    ) : (msg.message_type === 'IMAGE' || Boolean(getSafeImageUrl(msg))) ? (
                       <ChatImageMessage
-                        imageUrl={getSafeImageUrl(msg)}
+                        imageUrl={getSafeImageUrl(msg) || resolveChatMediaUrl(msg.image_url || msg.imageUrl)}
                         caption={msg.caption || (msg.content !== '[Imagem]' && !msg.content?.startsWith('http') && !msg.content?.startsWith('/') ? msg.content : null)}
                         width={msg.image_width || msg.media?.width || undefined}
                         height={msg.image_height || msg.media?.height || undefined}
                         isOwn={isSelf}
                         onOpenViewer={() =>
                           setViewerImage({
-                            url: getSafeImageUrl(msg),
+                            url: getSafeImageUrl(msg) || resolveChatMediaUrl(msg.image_url || msg.imageUrl),
                             caption: msg.caption || (msg.content !== '[Imagem]' && !msg.content?.startsWith('http') && !msg.content?.startsWith('/') ? msg.content : null),
                             authorName: msg.author.nickname,
                             createdAt: msg.created_at,
