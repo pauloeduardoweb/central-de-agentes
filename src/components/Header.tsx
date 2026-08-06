@@ -159,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
             backgroundRepeat: 'no-repeat',
           }}
         >
-          {/* Linha 1: (Foto) Nickname 👑 Mentor */}
+          {/* Linha 1: (Foto) Bigode 👑 Mentor    🔑 ***-*** */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center space-x-2.5 min-w-0">
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 p-0.5 shrink-0 shadow-xs">
@@ -180,8 +180,8 @@ export const Header: React.FC<HeaderProps> = ({
                 const isMentorUser = isMaster || Boolean(profile?.is_mentor) || Boolean(studentCode && isMasterKey(studentCode));
                 const userNickname = profile?.nickname || (isMentorUser ? 'Mentor Bigode' : 'Aluno Z Pro');
                 return (
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <span className="font-extrabold text-xs sm:text-sm text-white truncate max-w-[180px]">
+                  <div className="flex items-center space-x-1.5 min-w-0">
+                    <span className="font-extrabold text-xs sm:text-sm text-white truncate max-w-[130px] sm:max-w-[200px]">
                       {userNickname}
                     </span>
                     {isMentorUser && (
@@ -193,26 +193,6 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 );
               })()}
-            </div>
-          </div>
-
-          {/* Linha 2: 🏆 Nível 1   🟢 Online 1/1   🔑 ***-*** */}
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-cyan-500/20 text-xs flex-wrap">
-            {/* Nível */}
-            <div className="text-[11px] text-cyan-300 font-mono font-medium shrink-0 flex items-center space-x-1">
-              <span>🏆 Nível {profile?.level || 1}</span>
-            </div>
-
-            {/* Online 1/1 */}
-            <div 
-              className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[10px] font-semibold shrink-0"
-              title="Online 1/1"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-              </span>
-              <span>Online 1/1</span>
             </div>
 
             {/* Chave de Acesso */}
@@ -249,6 +229,26 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Linha 2: 🏆 Nível 1    🟢 Online 1/1 */}
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-cyan-500/20 text-xs">
+            {/* Nível */}
+            <div className="text-[11px] text-cyan-300 font-mono font-medium shrink-0 flex items-center space-x-1">
+              <span>🏆 Nível {profile?.level || 1}</span>
+            </div>
+
+            {/* Online 1/1 */}
+            <div 
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[10px] font-semibold shrink-0"
+              title="Online 1/1"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
+              <span>Online 1/1</span>
+            </div>
           </div>
         </div>
       )}
