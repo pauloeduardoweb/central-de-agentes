@@ -39,10 +39,7 @@ export function getTikTokClientSecret(): string {
 }
 
 export function getTikTokApiBaseUrl(): string {
-  const env = normalizeEnvVar(process.env.TIKTOK_ENVIRONMENT, '').toLowerCase();
-  return env === 'sandbox'
-    ? 'https://open-sandbox.tiktokapis.com'
-    : 'https://open.tiktokapis.com';
+  return 'https://open.tiktokapis.com';
 }
 
 const ALGORITHM = 'aes-256-gcm';
