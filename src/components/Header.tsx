@@ -127,28 +127,32 @@ export const Header: React.FC<HeaderProps> = ({
               }}
               className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeView === 'chat'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
-                  : 'text-slate-400 hover:text-emerald-400'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <MessageSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
               <span>Bate-papo</span>
             </button>
 
-            {/* Mentor ▼ Dropdown Trigger */}
+            {/* Mentor Dropdown Trigger */}
             <div className="relative inline-block text-left shrink-0" ref={mentorMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsMentorMenuOpen(!isMentorMenuOpen)}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                  activeView === 'mentor' || isMentorMenuOpen
+                className={`w-[84px] sm:w-[96px] px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold flex items-center justify-between transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                  activeView === 'mentor'
                     ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
-                    : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
+                    : isMentorMenuOpen
+                      ? 'bg-cyan-950/80 text-cyan-200 border border-cyan-500/40'
+                      : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
                 }`}
               >
-                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>Mentor</span>
-                <ChevronDown className={`w-3 h-3 transition-transform duration-200 text-cyan-300 ${isMentorMenuOpen ? 'rotate-180' : ''}`} />
+                <div className="flex items-center space-x-1">
+                  <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Mentor</span>
+                </div>
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 text-cyan-400/80 shrink-0 ${isMentorMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Dropdown Menu Mentor */}
@@ -165,6 +169,8 @@ export const Header: React.FC<HeaderProps> = ({
                     <Crown className="w-4 h-4 text-amber-400 shrink-0" />
                     <span>Painel do Mentor</span>
                   </button>
+
+                  <div className="my-1 border-t border-cyan-500/20" />
 
                   {onDisconnectApiKey && (
                     <button
