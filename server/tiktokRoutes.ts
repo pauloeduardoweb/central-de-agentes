@@ -79,37 +79,45 @@ tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Respo
  * URL: https://app.geracaozpro.com/api/tiktok/oauth/callback
  */
 tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Response) => {
-  console.log('[TikTok Callback] Step 1: Callback route hit. Query params:', req.query);
+  let currentStage = '[CALLBACK 01] Callback iniciado';
+  let lastHttpResponseInfo: any = null;
+  let lastHttpResponseRawBody: string | null = null;
+
+  console.log(currentStage);
+
   try {
+    currentStage = '[CALLBACK 02] Query recebida';
     const { code, state, error, error_description } = req.query;
+    console.log(currentStage, { code: code ? 'PRESENT' : 'MISSING', state: state ? String(state) : 'MISSING', error, error_description });
 
     if (error) {
-      console.warn('[TikTok Callback] Error param present:', error, error_description);
+      console.warn('[CALLBACK 02.1] Parametro error retornado pelo TikTok:', error, error_description);
       const errReason = String(error_description || error || 'Autorizacao_Negada');
       return res.redirect(`/mentor/integracoes/tiktok?status=error&message=${encodeURIComponent(errReason)}`);
     }
 
     if (!code || !state) {
-      console.warn('[TikTok Callback] Missing code or state:', { code: !!code, state: !!state });
+      console.warn('[CALLBACK 02.2] Parametros obrigatorios ausentes:', { code: !!code, state: !!state });
       return res.redirect('/mentor/integracoes/tiktok?status=error&message=Parametros_Ausentes');
     }
 
-    // Validate CSRF state and consume PKCE session
-    console.log('[TikTok Callback] Step 2: Validating CSRF state token:', state);
+    currentStage = '[CALLBACK 03] State validado';
+    console.log('[CALLBACK 03] Validando CSRF state no banco/memoria...');
     const session = await validateAndConsumeOAuthState(String(state));
     if (!session) {
-      console.warn('[TikTok Callback] Invalid or expired state session for state:', state);
+      console.warn('[CALLBACK 03.1] State invalido ou expirado:', state);
       return res.redirect('/mentor/integracoes/tiktok?status=error&message=State_Invalido_ou_Expirado');
     }
-    console.log('[TikTok Callback] Session validated for user code:', session.codigo);
+    console.log('[CALLBACK 03.2] State validado com sucesso. Usuario:', session.codigo);
 
+    currentStage = '[CALLBACK 04] Iniciando troca de token';
     const clientKey = getTikTokClientKey();
     const clientSecret = getTikTokClientSecret();
     const redirectUri = getTikTokRedirectUri();
     const apiBaseUrl = getTikTokApiBaseUrl();
     const tokenUrl = `${apiBaseUrl}/v2/oauth/token/`;
 
-    console.log('[TikTok Callback] Step 3: Preparing token exchange request:', {
+    console.log(currentStage, {
       apiBaseUrl,
       tokenUrl,
       clientKeyPrefix: clientKey ? clientKey.substring(0, 4) + '***' : 'EMPTY',
@@ -125,7 +133,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     bodyParams.append('redirect_uri', redirectUri);
     bodyParams.append('code_verifier', session.codeVerifier);
 
-    console.log('[TikTok Callback] Step 4: Sending POST request to TikTok token endpoint...');
+    console.log('[CALLBACK 04.1] Enviando POST para o endpoint de token do TikTok...');
     const tokenRes = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
@@ -135,15 +143,26 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
       body: bodyParams.toString(),
     });
 
-    console.log('[TikTok Callback] Step 5: Token endpoint response received. Status:', tokenRes.status, tokenRes.statusText);
-    const rawText = await tokenRes.text();
-    console.log('[TikTok Callback] Raw token response body:', rawText);
+    currentStage = '[CALLBACK 05] Resposta HTTP recebida';
+    lastHttpResponseInfo = {
+      status: tokenRes.status,
+      statusText: tokenRes.statusText,
+      headers: Object.fromEntries(tokenRes.headers.entries()),
+    };
+    console.log(currentStage, lastHttpResponseInfo);
 
+    currentStage = '[CALLBACK 06] Corpo bruto da resposta';
+    const rawText = await tokenRes.text();
+    lastHttpResponseRawBody = rawText;
+    console.log(currentStage, rawText);
+
+    currentStage = '[CALLBACK 07] JSON convertido';
     let tokenJson: any = {};
     try {
       tokenJson = JSON.parse(rawText);
-    } catch (parseErr) {
-      console.error('[TikTok Callback] Failed to parse JSON from token response:', parseErr);
+      console.log(currentStage, tokenJson);
+    } catch (parseErr: any) {
+      console.error('[CALLBACK 07.1] Erro ao fazer parse do JSON do token:', parseErr);
       return res.redirect('/mentor/integracoes/tiktok?status=error&message=Resposta_Invalida_TikTok');
     }
 
@@ -156,7 +175,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
         tokenJson.message ||
         tokenJson.error_description ||
         'Falha_Troca_Token';
-      console.error('[TikTok Token Exchange Error]:', tokenJson);
+      console.error('[CALLBACK 07.2] Erro na resposta da troca de token TikTok:', tokenJson);
       return res.redirect(`/mentor/integracoes/tiktok?status=error&message=${encodeURIComponent(errMsg)}`);
     }
 
@@ -167,15 +186,17 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     const openId = payload.open_id;
     const scope = payload.scope || 'user.info.basic';
 
-    console.log('[TikTok Callback] Step 6: Access token obtained successfully. OpenID:', openId);
+    console.log('[CALLBACK 07.3] Token de acesso obtido com sucesso. OpenID:', openId);
 
     // 2. Fetch basic profile info from TikTok User Info API v2 (Sandbox or Production)
+    currentStage = '[CALLBACK 08] Iniciando User Info';
+    console.log(currentStage);
+
     let displayName = 'Conta TikTok';
     let avatarUrl = '';
     let unionId = payload.union_id || '';
 
     if (accessToken) {
-      console.log('[TikTok Callback] Step 7: Fetching user profile info from UserInfo API...');
       try {
         const userInfoRes = await fetch(
           `${apiBaseUrl}/v2/user/info/?fields=open_id,union_id,avatar_url,display_name`,
@@ -185,9 +206,9 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
             },
           }
         );
-        console.log('[TikTok Callback] UserInfo HTTP status:', userInfoRes.status);
+        console.log('[CALLBACK 08.1] UserInfo HTTP status:', userInfoRes.status);
         const userInfoJson = await userInfoRes.json();
-        console.log('[TikTok Callback] UserInfo response json:', userInfoJson);
+        console.log('[CALLBACK 08.2] UserInfo JSON:', userInfoJson);
 
         const userData = userInfoJson.data?.user || userInfoJson.data || userInfoJson.user;
         if (userData) {
@@ -195,13 +216,15 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
           if (userData.avatar_url) avatarUrl = userData.avatar_url;
           if (userData.union_id) unionId = userData.union_id;
         }
-      } catch (err) {
-        console.warn('[TikTok UserInfo Fetch Warning]:', err);
+      } catch (userInfoErr) {
+        console.warn('[CALLBACK 08.3] Aviso ao buscar dados do usuario TikTok:', userInfoErr);
       }
     }
 
     // 3. Save connection to database
-    console.log('[TikTok Callback] Step 8: Saving TikTok connection to database for user:', session.codigo);
+    currentStage = '[CALLBACK 09] Salvando conexão';
+    console.log(currentStage, 'para o codigo:', session.codigo);
+
     await saveTikTokConnection({
       codigo: session.codigo,
       open_id: openId || 'unknown_openid',
@@ -215,10 +238,17 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
       scope,
     });
 
-    console.log('[TikTok Callback] Step 9: Connection saved successfully. Redirecting to success.');
+    currentStage = '[CALLBACK 10] Finalizado com sucesso';
+    console.log(currentStage, 'Redirecionando para status=success');
     return res.redirect('/mentor/integracoes/tiktok?status=success');
   } catch (err: any) {
-    console.error('[TikTok OAuth Callback Fatal Error]:', err?.stack || err);
+    console.error(`[CALLBACK ERROR] Erro fatal capturado na etapa [${currentStage}]:`);
+    console.error('Mensagem:', err?.message || String(err));
+    console.error('Stack completo:', err?.stack || 'Sem stack trace');
+    console.error('Objeto do erro:', JSON.stringify(err, Object.getOwnPropertyNames(err || {})));
+    console.error('Ultima Resposta HTTP registrada:', lastHttpResponseInfo);
+    console.error('Corpo bruto retornado pelo TikTok:', lastHttpResponseRawBody);
+
     return res.redirect('/mentor/integracoes/tiktok?status=error&message=Erro_Interno_Callback');
   }
 });
