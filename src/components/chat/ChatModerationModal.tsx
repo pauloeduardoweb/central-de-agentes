@@ -289,17 +289,7 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
                 <span>Publicar Aviso</span>
               </button>
 
-              <button
-                onClick={() => setActiveTab('clear')}
-                className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-t-xl text-[11px] sm:text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 ${
-                  activeTab === 'clear'
-                    ? 'bg-[#0b141a] text-rose-300 border-t-2 border-x border-rose-500/50'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Trash2 className="w-3 h-3.5 text-rose-400" />
-                <span>Limpar Conversa</span>
-              </button>
+
             </>
           )}
         </div>
@@ -480,46 +470,7 @@ export const ChatModerationModal: React.FC<ChatModerationModalProps> = ({
             </form>
           )}
 
-          {/* TAB 4: CLEAR CHAT */}
-          {activeTab === 'clear' && (
-            <div className="space-y-4 p-4 bg-[#111b21] border border-rose-500/30 rounded-2xl">
-              <div className="flex items-center space-x-3 text-rose-400 border-b border-rose-500/20 pb-3">
-                <Trash2 className="w-6 h-6" />
-                <div>
-                  <h4 className="text-sm font-bold text-white">Área de Manutenção: Limpar Conversa Geral</h4>
-                  <p className="text-xs text-rose-300/80">Ação administrativa destrutiva para a sala principal</p>
-                </div>
-              </div>
 
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Esta função remove todas as mensagens de texto, mídias (fotos, GIFs, áudios), respostas, reações, favoritos e menções da sala principal. Perfis de usuários, chaves de acesso e pontuações de XP serão preservados.
-              </p>
-
-              <div className="p-3 bg-[#0b141a] rounded-xl border border-slate-800 flex items-center space-x-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  id="tabPreserveNotices"
-                  checked={preserveNotices}
-                  onChange={(e) => setPreserveNotices(e.target.checked)}
-                  className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
-                />
-                <label htmlFor="tabPreserveNotices" className="text-xs text-slate-200 cursor-pointer font-medium">
-                  Preservar Avisos Oficiais do Mentor
-                </label>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setClearStep(1)}
-                  className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-all flex items-center justify-center space-x-2 shadow-lg shadow-rose-950/50 cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Iniciar Limpeza da Conversa Geral</span>
-                </button>
-              </div>
-            </div>
-          )}
 
         </div>
       </div>

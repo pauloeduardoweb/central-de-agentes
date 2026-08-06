@@ -13,6 +13,8 @@ interface ChatImageMessageProps {
 export const ChatImageMessage: React.FC<ChatImageMessageProps> = ({
   imageUrl,
   caption,
+  width,
+  height,
   onOpenViewer,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -20,22 +22,26 @@ export const ChatImageMessage: React.FC<ChatImageMessageProps> = ({
 
   const cleanCaption = caption && caption.trim() ? caption.trim() : null;
 
+  // Compute aspect ratio if dimensions available
+  const aspectRatio = width && height && width > 0 && height > 0 ? `${width} / ${height}` : undefined;
+
   return (
-    <div className="flex flex-col gap-1 w-auto max-w-[72vw] sm:max-w-[280px] md:max-w-[420px]">
+    <div className="flex flex-col gap-1 w-full max-w-[72vw] sm:max-w-[280px] md:max-w-[380px]">
       <div
         onClick={onOpenViewer}
-        className="relative overflow-hidden rounded-xl border border-slate-700/30 bg-black/5 group cursor-pointer transition-all hover:brightness-105 active:scale-[0.99] w-auto max-w-full max-h-[45vh] flex items-center justify-center"
+        style={{ aspectRatio }}
+        className="relative overflow-hidden rounded-xl border border-slate-700/30 bg-slate-900/40 group cursor-pointer transition-all hover:brightness-105 active:scale-[0.99] w-full min-w-[150px] min-h-[150px] max-h-[45vh] flex items-center justify-center"
       >
         {/* Skeleton loading state */}
-        {isLoading && (
-          <div className="absolute inset-0 min-h-[120px] bg-slate-800/80 animate-pulse flex items-center justify-center rounded-xl">
+        {isLoading && !hasError && (
+          <div className="absolute inset-0 bg-slate-800/80 animate-pulse flex items-center justify-center rounded-xl z-10 min-h-[150px]">
             <ImageIcon className="w-7 h-7 text-slate-500 animate-bounce" />
           </div>
         )}
 
         {/* Image Error state */}
         {hasError ? (
-          <div className="min-h-[100px] w-full bg-slate-900/90 flex flex-col items-center justify-center text-slate-400 p-3 text-center gap-1.5 rounded-xl">
+          <div className="min-h-[120px] w-full bg-slate-900/90 flex flex-col items-center justify-center text-slate-400 p-3 text-center gap-1.5 rounded-xl">
             <AlertCircle className="w-5 h-5 text-amber-500" />
             <span className="text-xs">Não foi possível carregar a imagem.</span>
           </div>
@@ -49,7 +55,7 @@ export const ChatImageMessage: React.FC<ChatImageMessageProps> = ({
               setIsLoading(false);
               setHasError(true);
             }}
-            className={`w-auto h-auto max-w-full max-h-[45vh] object-contain rounded-xl transition-opacity duration-300 ${
+            className={`w-full h-auto max-w-full max-h-[45vh] object-cover rounded-xl transition-opacity duration-300 ${
               isLoading ? 'opacity-0' : 'opacity-100'
             }`}
           />
@@ -57,7 +63,7 @@ export const ChatImageMessage: React.FC<ChatImageMessageProps> = ({
 
         {/* Hover zoom icon badge */}
         {!isLoading && !hasError && (
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none rounded-xl">
+          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none rounded-xl z-20">
             <span className="bg-black/60 backdrop-blur-md text-white text-[11px] px-2.5 py-1 rounded-full font-medium">
               Clique para ampliar
             </span>

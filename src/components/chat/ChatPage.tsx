@@ -785,13 +785,15 @@ export const ChatPage: React.FC<ChatPageProps> = ({ studentCode, sessionId, onLo
       }
 
       if (res.ok && res.data?.success) {
+        const mediaObj = res.data.media || {};
+        const url = res.data.imageUrl || mediaObj.url || res.data.audioUrl || '';
         return {
           success: true,
-          imageUrl: res.data.imageUrl,
-          width: res.data.imageWidth,
-          height: res.data.imageHeight,
-          size: res.data.imageSize,
-          mime: res.data.imageMime,
+          imageUrl: url,
+          width: res.data.imageWidth || mediaObj.width || fileData.width,
+          height: res.data.imageHeight || mediaObj.height || fileData.height,
+          size: res.data.imageSize || mediaObj.size,
+          mime: res.data.imageMime || mediaObj.mime || fileData.mime,
         };
       }
       return { success: false, error: res.error || res.data?.message || 'Erro ao realizar upload da foto.' };
