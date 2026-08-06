@@ -99,9 +99,7 @@ export const ChatImageMessage: React.FC<ChatImageMessageProps> = ({
               setIsLoading(false);
               setHasError(true);
             }}
-            className={`w-full h-auto max-w-full max-h-[45vh] object-cover rounded-xl transition-opacity duration-300 ${
-              isLoading ? 'opacity-0' : 'opacity-100'
-            }`}
+            className="w-full h-auto max-w-full max-h-[45vh] object-cover rounded-xl"
           />
         )}
 
