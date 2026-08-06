@@ -240,11 +240,47 @@ export const CommunityGalleryModal: React.FC<CommunityGalleryModalProps> = ({
                   className="group relative rounded-2xl overflow-hidden border border-slate-700/60 bg-[#1f2c34] aspect-square flex flex-col justify-between shadow-md hover:border-emerald-500 transition-all"
                 >
                   <img
-                    src={resolveChatMediaUrl(item.url)}
+                    src={(() => {
+                      const resolved = resolveChatMediaUrl(item.url);
+                      console.log('[GIF GALERIA SRC]', { originalUrl: item.url, resolvedUrl: resolved });
+                      fetch(resolved)
+                        .then(async (response) => {
+                          console.log('[GIF FETCH GALERIA]', {
+                            url: resolved,
+                            status: response.status,
+                            contentType: response.headers.get('content-type'),
+                            contentLength: response.headers.get('content-length'),
+                            redirected: response.redirected,
+                            finalUrl: response.url
+                          });
+                        })
+                        .catch((error) => console.error('[GIF FETCH GALERIA ERROR]', error));
+                      return resolved;
+                    })()}
                     alt={item.caption || 'Mídia'}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     loading="lazy"
-                    onError={() => handleImageError(item.url)}
+                    onLoad={(event) => {
+                      console.log('[GIF GALERIA LOAD]', {
+                        url: item.url,
+                        src: event.currentTarget.src,
+                        currentSrc: event.currentTarget.currentSrc,
+                        naturalWidth: event.currentTarget.naturalWidth,
+                        naturalHeight: event.currentTarget.naturalHeight,
+                        complete: event.currentTarget.complete,
+                      });
+                    }}
+                    onError={(event) => {
+                      console.error('[GIF GALERIA ERROR]', {
+                        url: item.url,
+                        src: event.currentTarget.src,
+                        currentSrc: event.currentTarget.currentSrc,
+                        naturalWidth: event.currentTarget.naturalWidth,
+                        naturalHeight: event.currentTarget.naturalHeight,
+                        complete: event.currentTarget.complete,
+                      });
+                      handleImageError(item.url);
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2.5 flex flex-col justify-between text-white">
                     <span className="text-[10px] font-bold text-emerald-300 truncate">

@@ -98,10 +98,24 @@ const ChatGifMessage: React.FC<ChatGifMessageProps> = ({ gifUrl }) => {
 
   const currentSrc = useMemo(() => {
     const resolved = resolveChatMediaUrl(gifUrl);
-    if (retryCount > 0) {
-      return `${resolved}${resolved.includes('?') ? '&' : '?'}retry=${retryCount}`;
-    }
-    return resolved;
+    const finalSrc = retryCount > 0 ? `${resolved}${resolved.includes('?') ? '&' : '?'}retry=${retryCount}` : resolved;
+    console.log('[GIF CHAT SRC]', { rawUrl: gifUrl, resolvedUrl: resolved, finalSrc });
+
+    // Diagnostic fetch check
+    fetch(finalSrc)
+      .then(async (response) => {
+        console.log('[GIF FETCH CHAT]', {
+          url: finalSrc,
+          status: response.status,
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length'),
+          redirected: response.redirected,
+          finalUrl: response.url
+        });
+      })
+      .catch((error) => console.error('[GIF FETCH CHAT ERROR]', error));
+
+    return finalSrc;
   }, [gifUrl, retryCount]);
 
   const handleError = () => {
@@ -139,8 +153,26 @@ const ChatGifMessage: React.FC<ChatGifMessageProps> = ({ gifUrl }) => {
         alt="GIF"
         loading="eager"
         className="block max-w-[280px] max-h-[280px] sm:max-w-[360px] sm:max-h-[360px] w-auto h-auto object-contain rounded-xl"
-        onLoad={() => setStatus('loaded')}
-        onError={handleError}
+        onLoad={(event) => {
+          console.log('[GIF CHAT LOAD]', {
+            src: event.currentTarget.src,
+            currentSrc: event.currentTarget.currentSrc,
+            naturalWidth: event.currentTarget.naturalWidth,
+            naturalHeight: event.currentTarget.naturalHeight,
+            complete: event.currentTarget.complete,
+          });
+          setStatus('loaded');
+        }}
+        onError={(event) => {
+          console.error('[GIF CHAT ERROR]', {
+            src: event.currentTarget.src,
+            currentSrc: event.currentTarget.currentSrc,
+            naturalWidth: event.currentTarget.naturalWidth,
+            naturalHeight: event.currentTarget.naturalHeight,
+            complete: event.currentTarget.complete,
+          });
+          handleError();
+        }}
       />
       <span className="bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded absolute bottom-1 right-1 pointer-events-none z-10 shadow-xs">
         GIF
