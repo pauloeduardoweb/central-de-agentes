@@ -52,6 +52,15 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  useEffect(() => {
+    if (currentPath.startsWith('/mentor/integracoes/tiktok')) {
+      setActiveView('mentor');
+      setMentorTab('tiktok');
+    } else if (currentPath.startsWith('/mentor')) {
+      setActiveView('mentor');
+    }
+  }, [currentPath]);
+
   const isMaster = isMasterKey(studentCode);
   const userIdentifier = studentCode
     ? (isMaster ? 'MASTER' : normalizeAccessCode(studentCode))
@@ -611,10 +620,17 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
             sessionId={sessionId}
             onLogout={handleDisconnectApiKey}
           />
-        ) : isMaster && activeView === 'mentor' ? (
+        ) : isMaster && (activeView === 'mentor' || currentPath.startsWith('/mentor')) ? (
           <MentorPanel
             studentCode={studentCode}
-            onBackToHub={() => setActiveView('hub')}
+            initialTab={currentPath.startsWith('/mentor/integracoes/tiktok') ? 'tiktok' : mentorTab}
+            onBackToHub={() => {
+              if (typeof window !== 'undefined') {
+                window.history.pushState({}, '', '/');
+              }
+              setCurrentPath('/');
+              setActiveView('hub');
+            }}
             onTabChange={(tab) => setMentorTab(tab)}
           />
         ) : (
