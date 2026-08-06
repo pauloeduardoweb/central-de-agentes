@@ -16,6 +16,7 @@ import { MentorPanel } from './components/mentor/MentorPanel';
 import { ChatPage } from './components/chat/ChatPage';
 import { TechGridBackground } from './components/TechGridBackground';
 import { TermsPage } from './pages/TermsPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
 import { getDeviceId, unbindCurrentDevice } from './utils/deviceId';
@@ -515,6 +516,19 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
   if (currentPath === '/termos' || currentPath === '/termos/') {
     return (
       <TermsPage
+        onNavigateHome={() => {
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', '/');
+          }
+          setCurrentPath('/');
+        }}
+      />
+    );
+  }
+
+  if (currentPath === '/privacidade' || currentPath === '/privacidade/') {
+    return (
+      <PrivacyPage
         onNavigateHome={() => {
           if (typeof window !== 'undefined') {
             window.history.pushState({}, '', '/');
