@@ -11,6 +11,7 @@ import {
   Sparkles,
   ArrowLeft,
   Crown,
+  Video,
 } from 'lucide-react';
 import { ProductLibrary } from './ProductLibrary';
 import { MentorStudentsList } from './MentorStudentsList';
@@ -18,15 +19,17 @@ import { MentorOnlineMonitoring } from './MentorOnlineMonitoring';
 import { MentorChallenges } from './MentorChallenges';
 import { MentorAccessCodes } from './MentorAccessCodes';
 import { MentorStats } from './MentorStats';
+import { TikTokIntegration } from './TikTokIntegration';
 
 interface MentorPanelProps {
   studentCode: string;
   onBackToHub?: () => void;
   onTabChange?: (tab: string) => void;
+  initialTab?: string;
 }
 
-export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToHub, onTabChange }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'challenges' | 'students' | 'codes' | 'sessions' | 'stats'>('products');
+export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToHub, onTabChange, initialTab }) => {
+  const [activeTab, setActiveTab] = useState<string>(initialTab || 'products');
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -106,6 +109,15 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
       icon: BarChart3,
       badge: 'Ativo',
       badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
+      isAvailable: true,
+    },
+    {
+      id: 'tiktok',
+      title: 'Integração TikTok',
+      description: 'Conexão oficial via Login Kit OAuth 2.0.',
+      icon: Video,
+      badge: 'Novo',
+      badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40',
       isAvailable: true,
     },
   ];
@@ -234,6 +246,9 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
         )}
         {activeTab === 'stats' && (
           <MentorStats studentCode={studentCode} />
+        )}
+        {activeTab === 'tiktok' && (
+          <TikTokIntegration studentCode={studentCode} />
         )}
       </div>
 
