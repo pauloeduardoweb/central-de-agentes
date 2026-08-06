@@ -44,7 +44,6 @@ export const OFFICIAL_STICKERS = [
 
 export const CURATED_GIFS = [
   // Comemoração
-  { category: 'Comemoração', title: 'Festa Celebração', url: '/gifs/festa-celebracao.gif' },
   { category: 'Comemoração', title: 'Dança da Vitória', url: '/gifs/danca-vitoria.gif' },
 
   // Dinheiro
@@ -132,24 +131,10 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
   const getGifSrc = (url: string) => {
     const baseUrl = resolveChatMediaUrl(url);
     const retries = retryCounts[url] || 0;
-    const finalSrc = retries > 0 ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}retry=${retries}` : baseUrl;
-    console.log('[GIF PICKER SRC]', { originalUrl: url, resolvedUrl: baseUrl, finalSrc });
-    
-    // Diagnostic fetch check
-    fetch(finalSrc)
-      .then(async (response) => {
-        console.log('[GIF FETCH PICKER]', {
-          url: finalSrc,
-          status: response.status,
-          contentType: response.headers.get('content-type'),
-          contentLength: response.headers.get('content-length'),
-          redirected: response.redirected,
-          finalUrl: response.url
-        });
-      })
-      .catch((error) => console.error('[GIF FETCH PICKER ERROR]', error));
-
-    return finalSrc;
+    if (retries > 0) {
+      return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}retry=${retries}`;
+    }
+    return baseUrl;
   };
 
   const filteredStickers = OFFICIAL_STICKERS.filter(
@@ -314,27 +299,7 @@ export const GifStickerPicker: React.FC<GifStickerPickerProps> = ({
                             alt={gif.title}
                             loading="eager"
                             className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-                            onLoad={(event) => {
-                              console.log('[GIF PICKER LOAD]', {
-                                title: gif.title,
-                                src: event.currentTarget.src,
-                                currentSrc: event.currentTarget.currentSrc,
-                                naturalWidth: event.currentTarget.naturalWidth,
-                                naturalHeight: event.currentTarget.naturalHeight,
-                                complete: event.currentTarget.complete,
-                              });
-                            }}
-                            onError={(event) => {
-                              console.error('[GIF PICKER ERROR]', {
-                                title: gif.title,
-                                src: event.currentTarget.src,
-                                currentSrc: event.currentTarget.currentSrc,
-                                naturalWidth: event.currentTarget.naturalWidth,
-                                naturalHeight: event.currentTarget.naturalHeight,
-                                complete: event.currentTarget.complete,
-                              });
-                              handleGifError(gif.url);
-                            }}
+                            onError={() => handleGifError(gif.url)}
                           />
                         )}
                         <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/80 to-transparent text-[10px] text-slate-200 truncate font-semibold z-20">
