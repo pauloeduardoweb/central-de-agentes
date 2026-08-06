@@ -22,8 +22,13 @@ export function resolveChatMediaUrl(url?: string | null): string {
     return '';
   }
 
-  // Support base64 image data URLs directly for preview
-  if (trimmed.startsWith('data:image/') || trimmed.startsWith('data:audio/')) {
+  // Support base64 image data URLs and browser blob: URLs directly for preview
+  if (
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('data:image/') ||
+    trimmed.startsWith('data:audio/') ||
+    trimmed.startsWith('data:video/')
+  ) {
     return trimmed;
   }
 
@@ -77,6 +82,14 @@ export function getSafeImageUrl(msg: {
 }): string {
   if (!msg) return '';
 
+  // 1. Direct image_url property (primary field for IMAGE/GIF messages)
+  const directImgUrl = msg.image_url || msg.imageUrl;
+  if (directImgUrl && typeof directImgUrl === 'string' && directImgUrl.trim()) {
+    const resolved = resolveChatMediaUrl(directImgUrl);
+    if (resolved) return resolved;
+  }
+
+  // 2. Media object and public_url aliases
   const mediaUrl =
     msg.media?.public_url ||
     msg.media?.url ||
@@ -86,12 +99,6 @@ export function getSafeImageUrl(msg: {
 
   if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.trim()) {
     const resolved = resolveChatMediaUrl(mediaUrl);
-    if (resolved) return resolved;
-  }
-
-  const directImgUrl = msg.image_url || msg.imageUrl;
-  if (directImgUrl && typeof directImgUrl === 'string' && directImgUrl.trim()) {
-    const resolved = resolveChatMediaUrl(directImgUrl);
     if (resolved) return resolved;
   }
 
