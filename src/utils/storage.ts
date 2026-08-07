@@ -14,6 +14,7 @@ export function getStoredAgents(): Agent[] {
     }
     const parsed: Agent[] = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
+      const defaultIds = new Set(DEFAULT_AGENTS.map((d) => d.id));
       const defaultMap = new Map(DEFAULT_AGENTS.map((d) => [d.id, d]));
       const storedMap = new Map(parsed.map((a) => [a.id, a]));
 
@@ -31,10 +32,19 @@ export function getStoredAgents(): Agent[] {
         return def;
       });
 
-      // Preserve user created custom agents
-      const customAgents = parsed.filter((agent) => agent.isCustom);
+      // Preserve user created custom agents (excluding any that match a default agent ID)
+      const customAgents = parsed.filter((agent) => agent.isCustom && !defaultIds.has(agent.id));
 
-      const finalList = [...updatedDefaults, ...customAgents];
+      // Strictly deduplicate by ID to guarantee single entry per agent
+      const seenIds = new Set<string>();
+      const finalList: Agent[] = [];
+      for (const agent of [...updatedDefaults, ...customAgents]) {
+        if (!seenIds.has(agent.id)) {
+          seenIds.add(agent.id);
+          finalList.push(agent);
+        }
+      }
+
       localStorage.setItem(AGENTS_STORAGE_KEY, JSON.stringify(finalList));
       return finalList;
     }
