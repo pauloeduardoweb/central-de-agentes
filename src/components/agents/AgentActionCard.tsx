@@ -22,40 +22,40 @@ export const AgentActionCard: React.FC<AgentActionCardProps> = ({
 }) => {
   const variantStyles = {
     amber: {
-      cardBg: 'bg-white hover:bg-amber-50/50',
-      border: 'border-amber-200 hover:border-amber-300',
-      glow: 'shadow-2xs hover:shadow-[0_4px_16px_rgba(245,158,11,0.15)]',
-      iconBg: 'bg-amber-50 text-amber-600 border-amber-200/90',
-      title: 'text-slate-900 group-hover:text-amber-900',
-      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
-      externalBtn: 'bg-slate-100 text-slate-500 group-hover:bg-amber-100 group-hover:text-amber-700',
+      cardBg: 'bg-[#0a192e]/80 hover:bg-[#0c203b]',
+      border: 'border-amber-500/35 hover:border-amber-400/70',
+      glow: 'shadow-sm hover:shadow-[0_0_20px_rgba(245,158,11,0.2)]',
+      iconBg: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+      title: 'text-white group-hover:text-amber-300',
+      badgeBg: 'bg-amber-950/80 text-amber-300 border-amber-500/40',
+      externalBtn: 'bg-slate-800/80 text-slate-400 group-hover:bg-amber-950/80 group-hover:text-amber-300',
     },
     emerald: {
-      cardBg: 'bg-white hover:bg-emerald-50/50',
-      border: 'border-emerald-200 hover:border-emerald-300',
-      glow: 'shadow-2xs hover:shadow-[0_4px_16px_rgba(16,185,129,0.15)]',
-      iconBg: 'bg-emerald-50 text-emerald-600 border-emerald-200/90',
-      title: 'text-slate-900 group-hover:text-emerald-900',
-      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      externalBtn: 'bg-slate-100 text-slate-500 group-hover:bg-emerald-100 group-hover:text-emerald-700',
+      cardBg: 'bg-[#0a192e]/80 hover:bg-[#0c203b]',
+      border: 'border-emerald-500/35 hover:border-emerald-400/70',
+      glow: 'shadow-sm hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]',
+      iconBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+      title: 'text-white group-hover:text-emerald-300',
+      badgeBg: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
+      externalBtn: 'bg-slate-800/80 text-slate-400 group-hover:bg-emerald-950/80 group-hover:text-emerald-300',
     },
     indigo: {
-      cardBg: 'bg-white hover:bg-indigo-50/50',
-      border: 'border-indigo-200 hover:border-indigo-300',
-      glow: 'shadow-2xs hover:shadow-[0_4px_16px_rgba(99,102,241,0.15)]',
-      iconBg: 'bg-indigo-50 text-indigo-600 border-indigo-200/90',
-      title: 'text-slate-900 group-hover:text-indigo-900',
-      badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      externalBtn: 'bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-700',
+      cardBg: 'bg-[#0a192e]/80 hover:bg-[#0c203b]',
+      border: 'border-indigo-500/35 hover:border-indigo-400/70',
+      glow: 'shadow-sm hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]',
+      iconBg: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
+      title: 'text-white group-hover:text-indigo-300',
+      badgeBg: 'bg-indigo-950/80 text-indigo-300 border-indigo-500/40',
+      externalBtn: 'bg-slate-800/80 text-slate-400 group-hover:bg-indigo-950/80 group-hover:text-indigo-300',
     },
     purple: {
-      cardBg: 'bg-white hover:bg-purple-50/50',
-      border: 'border-purple-200 hover:border-purple-300',
-      glow: 'shadow-2xs hover:shadow-[0_4px_16px_rgba(168,85,247,0.15)]',
-      iconBg: 'bg-purple-50 text-purple-600 border-purple-200/90',
-      title: 'text-slate-900 group-hover:text-purple-900',
-      badgeBg: 'bg-purple-50 text-purple-700 border-purple-200',
-      externalBtn: 'bg-slate-100 text-slate-500 group-hover:bg-purple-100 group-hover:text-purple-700',
+      cardBg: 'bg-[#0a192e]/80 hover:bg-[#0c203b]',
+      border: 'border-purple-500/35 hover:border-purple-400/70',
+      glow: 'shadow-sm hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]',
+      iconBg: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+      title: 'text-white group-hover:text-purple-300',
+      badgeBg: 'bg-purple-950/80 text-purple-300 border-purple-500/40',
+      externalBtn: 'bg-slate-800/80 text-slate-400 group-hover:bg-purple-950/80 group-hover:text-purple-300',
     },
   }[variant];
 
@@ -80,7 +80,7 @@ export const AgentActionCard: React.FC<AgentActionCardProps> = ({
               </span>
             )}
           </div>
-          <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium leading-tight truncate">
+          <p className="text-[10px] sm:text-[11px] text-slate-300/80 font-medium leading-tight truncate">
             {description}
           </p>
         </div>
