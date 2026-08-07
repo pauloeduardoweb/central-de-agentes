@@ -68,12 +68,12 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className={`relative z-50 shrink-0 bg-transparent transition-all pt-[max(6px,env(safe-area-inset-top))] ${
-      activeView === 'chat' ? 'pb-1.5 px-2 min-h-0' : 'px-3 sm:px-6 py-2 sm:py-3'
+    <header className={`relative z-50 shrink-0 bg-transparent transition-all ${
+      activeView === 'chat' ? 'pb-1.5 px-2 min-h-0 pt-[max(6px,env(safe-area-inset-top))]' : 'pt-[max(6px,env(safe-area-inset-top))] py-2 sm:py-3'
     }`}>
       {/* BLOCO 1 (NAVEGAÇÃO INDEPENDENTE - APENAS MOBILE < 768px) */}
       {hasApiKey && onSelectView && (
-        <div className="md:hidden max-w-7xl mx-auto mb-2">
+        <div className="md:hidden max-w-7xl mx-auto px-4 lg:px-8 mb-2">
           <div 
             className="relative p-1 rounded-xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 shrink-0 w-full overflow-hidden backdrop-blur-md"
           >
@@ -140,7 +140,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Botão Digitar Código (Exibido apenas se não logado) */}
       {!hasApiKey && (
-        <div className="max-w-7xl mx-auto mb-2 flex justify-end">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 mb-2 flex justify-end">
           <button
             type="button"
             onClick={onOpenApiKeyModal}
@@ -157,10 +157,11 @@ export const Header: React.FC<HeaderProps> = ({
       {/* CARD ÚNICO DE PERFIL / NAVEGAÇÃO */}
       {hasApiKey && (
         <div 
-          className={`relative max-w-7xl mx-auto border border-cyan-500/40 rounded-xl p-2.5 bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 shadow-xl shadow-cyan-950/40 backdrop-blur-md overflow-hidden ${
+          className={`max-w-7xl mx-auto px-4 lg:px-8 ${
             activeView === 'hub' ? 'block' : 'hidden md:block'
           }`}
         >
+          <div className="relative border border-cyan-500/40 rounded-xl p-2.5 bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 shadow-xl shadow-cyan-950/40 backdrop-blur-md overflow-hidden">
           <div 
             className="absolute inset-0 opacity-15 pointer-events-none"
             style={{
@@ -434,6 +435,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
         </div>
+      </div>
       )}
     </header>
   );
