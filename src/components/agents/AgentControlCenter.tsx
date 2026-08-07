@@ -89,40 +89,40 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
         aria-modal="true"
         aria-label={`Central de Controle do Agente - ${agent.name}`}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-[calc(100vw-20px)] sm:w-full max-w-[415px] my-auto bg-gradient-to-b from-[#0b192e] via-[#081526] to-[#040c17] border-[2.5px] border-slate-700/80 hover:border-cyan-500/70 rounded-[32px] sm:rounded-[36px] p-4 sm:p-5 shadow-[0_0_50px_rgba(0,0,0,0.85),0_0_25px_rgba(6,182,212,0.25)] ring-1 ring-cyan-500/30 text-white outline-none transform animate-in zoom-in-95 fade-in duration-250 max-h-[calc(100vh-32px)] overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-900 scrollbar-track-slate-950 flex flex-col justify-between"
+        className="relative w-[calc(100vw-16px)] sm:w-full max-w-[400px] my-auto bg-gradient-to-b from-[#0b192e] via-[#081526] to-[#040c17] border-[2px] border-slate-700/80 hover:border-cyan-500/70 rounded-[28px] sm:rounded-[32px] p-3.5 sm:p-4 shadow-[0_0_40px_rgba(0,0,0,0.85),0_0_20px_rgba(6,182,212,0.2)] ring-1 ring-cyan-500/30 text-white outline-none transform animate-in zoom-in-95 fade-in duration-200 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent flex flex-col justify-between"
       >
         {/* Mobile Smartphone Top Notch / Speaker Line Indicator */}
-        <div className="w-16 h-1 rounded-full bg-slate-700/80 border border-slate-600/40 mx-auto mb-2 shrink-0 opacity-80" />
+        <div className="w-12 h-1 rounded-full bg-slate-700/80 border border-slate-600/40 mx-auto mb-1.5 shrink-0 opacity-70" />
 
         {/* Ambient Subtle Glow Backdrop behind Modal Header */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-24 bg-cyan-500/10 blur-2xl pointer-events-none rounded-full" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-20 bg-cyan-500/10 blur-2xl pointer-events-none rounded-full" />
 
-        <div className="relative z-10 space-y-3">
+        <div className="relative z-10 space-y-2 sm:space-y-2.5">
           {/* Header Section */}
           <div className="animate-in fade-in slide-in-from-top-1 duration-200">
             <AgentControlHeader agent={agent} onClose={onClose} />
           </div>
 
           {/* Agent Status Block */}
-          <div className="animate-in fade-in slide-in-from-top-2 duration-250 delay-50">
+          <div className="animate-in fade-in slide-in-from-top-2 duration-200">
             <AgentStatusBlock agent={agent} />
           </div>
 
           {/* Primary Action Block - ABRIR NO APP (Chat Local) */}
-          <div className="animate-in fade-in slide-in-from-top-2 duration-300 delay-100">
+          <div className="animate-in fade-in slide-in-from-top-2 duration-200">
             <AgentPrimaryAction agent={agent} onOpenLocal={onOpenLocal} />
           </div>
 
           {/* Secondary Action Cards Stack */}
-          <div className="space-y-2 animate-in fade-in slide-in-from-top-3 duration-300 delay-150">
+          <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
             {/* Assistir Exemplo Card (Shown ONLY when available) */}
             {hasExample && onWatchExample && (
               <AgentActionCard
                 title="ASSISTIR EXEMPLO"
-                description="Veja uma demonstração completa antes de utilizar este agente."
-                icon={<Play className="w-4 h-4 text-amber-300 fill-amber-300/30" />}
+                description="Veja uma demonstração completa antes de utilizar."
+                icon={<Play className="w-3.5 h-3.5 text-amber-300 fill-amber-300/30" />}
                 variant="amber"
-                badge="VÍDEO DEMO"
+                badge="DEMO"
                 onClick={() => {
                   onWatchExample();
                 }}
@@ -136,13 +136,13 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
                 description={
                   isWhatsApp
                     ? 'Conecte-se diretamente com o suporte via WhatsApp.'
-                    : 'Use a estrutura oficial deste agente diretamente no ChatGPT.'
+                    : 'Use a estrutura oficial deste agente no ChatGPT.'
                 }
                 icon={
                   isWhatsApp ? (
-                    <MessageCircle className="w-4 h-4 text-emerald-300 fill-emerald-300/30" />
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300/30" />
                   ) : (
-                    <ExternalLink className="w-4 h-4 text-emerald-300" />
+                    <ExternalLink className="w-3.5 h-3.5 text-emerald-300" />
                   )
                 }
                 variant="emerald"
@@ -156,10 +156,10 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
             {(agent.geminiUrl || onOpenGemini) && (
               <AgentActionCard
                 title="ABRIR NO GEMINI"
-                description="Execute este agente utilizando a plataforma Gemini."
-                icon={<Sparkles className="w-4 h-4 text-indigo-300" />}
+                description="Execute este agente na plataforma Gemini."
+                icon={<Sparkles className="w-3.5 h-3.5 text-indigo-300" />}
                 variant="indigo"
-                badge="IA GEMINI"
+                badge="GEMINI"
                 isExternal={true}
                 onClick={(e) => {
                   if (onOpenGemini) {
@@ -173,7 +173,7 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
           </div>
 
           {/* Organization Section: Fixar & Favoritar */}
-          <div className="animate-in fade-in slide-in-from-top-3 duration-300 delay-200">
+          <div className="animate-in fade-in slide-in-from-top-2 duration-200">
             <AgentOrganizationActions
               agent={agent}
               isPinned={isPinned}
@@ -184,12 +184,12 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
           </div>
 
           {/* Footer Section */}
-          <div className="animate-in fade-in duration-300 delay-250">
+          <div className="animate-in fade-in duration-200">
             <AgentControlFooter onClose={onClose} />
           </div>
 
           {/* Bottom Smartphone Home Indicator Bar */}
-          <div className="w-24 h-1 rounded-full bg-slate-700/60 mx-auto pt-1 opacity-70 shrink-0" />
+          <div className="w-16 h-0.5 rounded-full bg-slate-700/50 mx-auto pt-0.5 opacity-60 shrink-0" />
         </div>
       </div>
     </div>

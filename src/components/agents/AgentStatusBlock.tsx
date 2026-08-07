@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Zap, CheckCircle2 } from 'lucide-react';
+import { Zap, CheckCircle2 } from 'lucide-react';
 import { Agent } from '../../types';
 
 interface AgentStatusBlockProps {
@@ -8,28 +8,27 @@ interface AgentStatusBlockProps {
 
 export const AgentStatusBlock: React.FC<AgentStatusBlockProps> = ({ agent }) => {
   return (
-    <div className="p-3 sm:p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/90 text-slate-200">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400/90 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          STATUS DO AGENTE
-        </span>
-        <span className="text-[10px] font-semibold text-slate-400">
-          Geração Z Pro
+    <div className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-900/60 border border-slate-800/80 text-slate-200 flex items-center justify-between gap-1.5">
+      <div className="flex items-center space-x-1.5 min-w-0">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+        <span className="text-[10px] sm:text-[11px] font-bold text-slate-300 truncate">
+          Status do Agente:
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-semibold text-slate-300">
-        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-500/30 text-emerald-300">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+      <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-emerald-950/70 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold">
+          <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
           <span>Pronto para usar</span>
         </div>
 
-        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/30 text-cyan-300">
-          <Zap className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Chat Local disponível</span>
+        <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-cyan-950/70 border border-cyan-500/30 text-cyan-300 text-[10px] font-bold">
+          <Zap className="w-3 h-3 text-cyan-400 shrink-0" />
+          <span className="hidden xs:inline">Chat Local</span>
+          <span className="xs:hidden">Local</span>
         </div>
       </div>
     </div>
   );
 };
+
