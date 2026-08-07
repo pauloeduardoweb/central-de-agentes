@@ -207,5 +207,4 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
       </div>
     </div>
   );
-  );
 };
