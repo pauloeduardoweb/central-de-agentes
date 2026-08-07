@@ -54,6 +54,37 @@ export default function App() {
 
   const isMaster = isMasterKey(studentCode);
 
+  const handleSelectView = (view: 'hub' | 'mentor' | 'chat') => {
+    if (view === 'mentor' && !isMaster) {
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
+        window.history.replaceState({}, '', '/');
+      }
+      setCurrentPath('/');
+      setActiveView('hub');
+      return;
+    }
+
+    if (view === 'hub') {
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
+        window.history.pushState({}, '', '/');
+      }
+      setCurrentPath('/');
+      setActiveView('hub');
+    } else if (view === 'mentor') {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/mentor')) {
+        window.history.pushState({}, '', '/mentor');
+      }
+      setCurrentPath('/mentor');
+      setActiveView('mentor');
+    } else if (view === 'chat') {
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
+        window.history.pushState({}, '', '/');
+        setCurrentPath('/');
+      }
+      setActiveView('chat');
+    }
+  };
+
   useEffect(() => {
     if (currentPath.startsWith('/mentor')) {
       if (isMaster) {
@@ -69,6 +100,10 @@ export default function App() {
           window.history.replaceState({}, '', '/');
         }
         setCurrentPath('/');
+        setActiveView('hub');
+      }
+    } else {
+      if (activeView === 'mentor') {
         setActiveView('hub');
       }
     }
@@ -616,13 +651,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         agentCount={agents.filter((a) => a.category !== 'Suporte').length}
         isMaster={isMaster}
         activeView={activeView}
-        onSelectView={(view) => {
-          if (view === 'mentor' && !isMaster) {
-            setActiveView('hub');
-            return;
-          }
-          setActiveView(view);
-        }}
+        onSelectView={handleSelectView}
       />
 
       {/* Container */}
@@ -638,17 +667,11 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
             sessionId={sessionId}
             onLogout={handleDisconnectApiKey}
           />
-        ) : isMaster && (activeView === 'mentor' || currentPath.startsWith('/mentor')) ? (
+        ) : isMaster && activeView === 'mentor' ? (
           <MentorPanel
             studentCode={studentCode}
             initialTab={currentPath.startsWith('/mentor/integracoes/tiktok') ? 'tiktok' : (mentorTab === 'tiktok' ? 'products' : mentorTab)}
-            onBackToHub={() => {
-              if (typeof window !== 'undefined') {
-                window.history.pushState({}, '', '/');
-              }
-              setCurrentPath('/');
-              setActiveView('hub');
-            }}
+            onBackToHub={() => handleSelectView('hub')}
             onTabChange={(tab) => {
               setMentorTab(tab);
               if (tab === 'tiktok') {
