@@ -78,10 +78,10 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto bg-slate-950/35 transition-all animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto bg-slate-900/50 backdrop-blur-sm transition-all animate-in fade-in duration-200"
       onClick={onClose}
     >
-      {/* Central Modal Container (Sleek 9:16 Smartphone Portrait Frame Aesthetic) */}
+      {/* Central Modal Container (Sleek Smartphone Light Frame Aesthetic) */}
       <div
         ref={modalRef}
         tabIndex={-1}
@@ -89,13 +89,13 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
         aria-modal="true"
         aria-label={`Central de Controle do Agente - ${agent.name}`}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-[calc(100vw-16px)] sm:w-full max-w-[400px] my-auto bg-gradient-to-b from-[#0b192e] via-[#081526] to-[#040c17] border-[2px] border-slate-700/80 hover:border-cyan-500/70 rounded-[28px] sm:rounded-[32px] p-3.5 sm:p-4 shadow-[0_0_40px_rgba(0,0,0,0.85),0_0_20px_rgba(6,182,212,0.2)] ring-1 ring-cyan-500/30 text-white outline-none transform animate-in zoom-in-95 fade-in duration-200 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent flex flex-col justify-between"
+        className="relative w-[calc(100vw-16px)] sm:w-full max-w-[400px] my-auto bg-gradient-to-b from-white via-slate-50 to-slate-100 border-[2px] border-cyan-300 hover:border-cyan-400 rounded-[28px] sm:rounded-[32px] p-3.5 sm:p-4 shadow-[0_20px_50px_rgba(6,182,212,0.2),0_10px_25px_rgba(0,0,0,0.1)] ring-1 ring-cyan-400/40 text-slate-900 outline-none transform animate-in zoom-in-95 fade-in duration-200 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent flex flex-col justify-between"
       >
         {/* Mobile Smartphone Top Notch / Speaker Line Indicator */}
-        <div className="w-12 h-1 rounded-full bg-slate-700/80 border border-slate-600/40 mx-auto mb-1.5 shrink-0 opacity-70" />
+        <div className="w-12 h-1 rounded-full bg-slate-300 border border-slate-200 mx-auto mb-1.5 shrink-0 opacity-80" />
 
-        {/* Ambient Subtle Glow Backdrop behind Modal Header */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-20 bg-cyan-500/10 blur-2xl pointer-events-none rounded-full" />
+        {/* Ambient Subtle Cyan Glow Backdrop behind Modal Header */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-20 bg-cyan-400/15 blur-2xl pointer-events-none rounded-full" />
 
         <div className="relative z-10 space-y-2 sm:space-y-2.5">
           {/* Header Section */}
@@ -189,7 +189,7 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
           </div>
 
           {/* Bottom Smartphone Home Indicator Bar */}
-          <div className="w-16 h-0.5 rounded-full bg-slate-700/50 mx-auto pt-0.5 opacity-60 shrink-0" />
+          <div className="w-16 h-0.5 rounded-full bg-slate-300 mx-auto pt-0.5 opacity-60 shrink-0" />
         </div>
       </div>
     </div>
