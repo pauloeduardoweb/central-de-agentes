@@ -198,8 +198,8 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
         </div>
       </div>
 
-      {/* Mentor Cards Navigation Grid - Compact Layout (Matching StatsBar) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3.5">
+      {/* Mentor Cards Navigation Grid - Premium Minimalist Layout */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4 md:gap-5">
         {mentorCards.map((card) => {
           const Icon = card.icon;
           const isSelected = activeTab === card.id;
@@ -213,15 +213,15 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
                   setActiveTab(card.id as any);
                 }
               }}
-              className={`p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] border shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full ${
+              className={`relative group p-5 sm:p-6 min-h-[140px] sm:min-h-[155px] rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] border shadow-xl flex flex-col items-center justify-center text-center transition-all duration-200 cursor-pointer w-full overflow-hidden hover:scale-[1.03] active:scale-95 ${
                 isSelected
-                  ? 'border-cyan-400 bg-gradient-to-br from-[#0c2242] via-[#091b33] to-[#051326] ring-1 ring-cyan-400/80 shadow-cyan-500/20'
-                  : 'border-cyan-500/40 hover:border-cyan-300'
+                  ? 'border-cyan-400 bg-gradient-to-br from-[#0c2242] via-[#091b33] to-[#051326] ring-1 ring-cyan-400/80 shadow-[0_0_25px_rgba(6,182,212,0.3)]'
+                  : 'border-cyan-500/40 hover:border-cyan-300/90 shadow-cyan-950/40 hover:shadow-[0_0_20px_rgba(6,182,212,0.25)]'
               }`}
             >
               {/* Futuristic Background Texture */}
               <div 
-                className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
+                className="absolute inset-0 w-full h-full opacity-15 group-hover:opacity-25 pointer-events-none transition-opacity"
                 style={{
                   backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
                   backgroundSize: 'cover',
@@ -229,41 +229,39 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
                 }}
               />
 
-              {/* Icon Container */}
-              <div
-                className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                  isSelected
-                    ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 border-cyan-200 text-white shadow-md shadow-cyan-500/40'
-                    : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
-                }`}
-              >
-                <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+              {/* Status Badge in Top Right Corner */}
+              <div className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 z-10">
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider border flex items-center gap-1 ${
+                    isSelected
+                      ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400/80 shadow-[0_0_10px_rgba(6,182,212,0.3)]'
+                      : card.id === 'tiktok'
+                      ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/50'
+                      : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-cyan-400 animate-pulse' : 'bg-emerald-400'}`} />
+                  <span>{isSelected ? 'ATIVO' : card.badge || 'ATIVO'}</span>
+                </span>
               </div>
 
-              {/* Text Info */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-1">
-                  <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate ${
-                    isSelected ? 'text-cyan-300 font-extrabold' : 'text-cyan-400'
-                  }`}>
-                    {card.title}
-                  </p>
-                  {card.badge && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase shrink-0 border ${
-                      card.id === 'tiktok'
-                        ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50'
-                        : isSelected
-                          ? 'bg-cyan-950 text-cyan-200 border-cyan-400/60'
-                          : 'bg-emerald-950 text-emerald-300 border-emerald-500/50'
-                    }`}>
-                      {isSelected ? '✓ ATIVO' : card.badge}
-                    </span>
-                  )}
-                </div>
-                <h3 className="text-xs sm:text-sm font-black text-white truncate mt-0.5">
-                  {card.shortDescription}
-                </h3>
+              {/* Large Icon Container */}
+              <div
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border flex items-center justify-center shrink-0 mb-2.5 sm:mb-3 transition-transform duration-200 group-hover:scale-110 ${
+                  isSelected
+                    ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 border-cyan-200 text-white shadow-lg shadow-cyan-500/50'
+                    : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 group-hover:border-cyan-300 group-hover:text-cyan-200 group-hover:bg-cyan-500/20'
+                }`}
+              >
+                <Icon className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]" />
               </div>
+
+              {/* Title Only - Clean & Large */}
+              <h3 className={`text-xs sm:text-sm md:text-base font-black tracking-tight leading-tight max-w-[95%] transition-colors ${
+                isSelected ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.4)]' : 'text-white group-hover:text-cyan-200'
+              }`}>
+                {card.title}
+              </h3>
             </button>
           );
         })}
