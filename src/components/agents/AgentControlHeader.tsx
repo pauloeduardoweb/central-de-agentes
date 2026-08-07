@@ -2,6 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { Agent } from '../../types';
 import { AgentIcon } from '../AgentIcon';
+import { getSafeImageUrl } from '../../utils/imageUrl';
 
 interface AgentControlHeaderProps {
   agent: Agent;
@@ -10,7 +11,7 @@ interface AgentControlHeaderProps {
 
 export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, onClose }) => {
   const isTikTokCategory = !agent.category || agent.category.toLowerCase().includes('tiktok');
-  const displayImage = agent.coverImage || agent.avatarUrl;
+  const displayImage = getSafeImageUrl(agent.coverImage || agent.avatarUrl);
 
   return (
     <div className="relative pb-3 border-b border-cyan-500/20">
