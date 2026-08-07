@@ -67,13 +67,6 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const blockBgStyle: React.CSSProperties = {
-    backgroundImage: `linear-gradient(rgba(2, 11, 24, 0.42), rgba(2, 11, 24, 0.60)), url('/assets/fundo-geracao-z-pro.jpg')`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-  };
-
   return (
     <header className={`relative z-50 shrink-0 bg-transparent transition-all pt-[max(6px,env(safe-area-inset-top))] ${
       activeView === 'chat' ? 'pb-1.5 px-2 min-h-0' : 'px-3 sm:px-6 py-2 sm:py-3'
@@ -83,55 +76,64 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Navigation Tabs (Agentes | Bate-papo | Mentor) */}
         {hasApiKey && onSelectView && (
           <div 
-            className="flex items-center justify-start gap-1 p-1 rounded-xl border border-cyan-500/30 shadow-xs shrink-0 w-full sm:w-auto overflow-hidden bg-cover bg-center bg-no-repeat backdrop-blur-md"
-            style={blockBgStyle}
+            className="relative p-1 rounded-xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 shrink-0 w-full sm:w-auto overflow-hidden backdrop-blur-md"
           >
-            <div className="flex items-center space-x-1 shrink-0">
-              {/* Agentes */}
-              <button
-                type="button"
-                onClick={() => onSelectView('hub')}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                  activeView === 'hub'
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Bot className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span className="hidden sm:inline">Central de Agentes</span>
-                <span className="sm:hidden">Agentes</span>
-              </button>
-
-              {/* Bate-papo */}
-              <button
-                type="button"
-                onClick={() => onSelectView('chat')}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                  activeView === 'chat'
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span>Bate-papo</span>
-              </button>
-
-              {/* Mentor Button - Opens Mentor Panel directly (SOMENTE PARA CHAVES MASTER) */}
-              {isMasterUser && (
+            <div 
+              className="absolute inset-0 opacity-15 pointer-events-none"
+              style={{
+                backgroundImage: `url('/assets/fundo-geracao-z-pro.jpg')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            />
+            <div className="relative z-10 flex items-center justify-start gap-1 overflow-x-auto no-scrollbar">
+              <div className="flex items-center space-x-1 shrink-0">
+                {/* Agentes */}
                 <button
                   type="button"
-                  onClick={() => onSelectView('mentor')}
+                  onClick={() => onSelectView('hub')}
                   className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                    activeView === 'mentor'
-                      ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
-                      : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
+                    activeView === 'hub'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="hidden sm:inline">Painel do Mentor</span>
-                  <span className="sm:hidden">Mentor</span>
+                  <Bot className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span className="hidden sm:inline">Central de Agentes</span>
+                  <span className="sm:hidden">Agentes</span>
                 </button>
-              )}
+
+                {/* Bate-papo */}
+                <button
+                  type="button"
+                  onClick={() => onSelectView('chat')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    activeView === 'chat'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Bate-papo</span>
+                </button>
+
+                {/* Mentor Button - Opens Mentor Panel directly (SOMENTE PARA CHAVES MASTER) */}
+                {isMasterUser && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectView('mentor')}
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                      activeView === 'mentor'
+                        ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
+                        : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
+                    }`}
+                  >
+                    <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="hidden sm:inline">Painel do Mentor</span>
+                    <span className="sm:hidden">Mentor</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -155,9 +157,17 @@ export const Header: React.FC<HeaderProps> = ({
       {/* CARD DE PERFIL AZUL (NO PAINEL PRINCIPAL) */}
       {activeView === 'hub' && hasApiKey && (
         <div 
-          className="max-w-7xl mx-auto border border-cyan-500/30 rounded-xl p-2.5 mt-2 shadow-lg bg-cover bg-center bg-no-repeat backdrop-blur-md overflow-hidden"
-          style={blockBgStyle}
+          className="relative max-w-7xl mx-auto border border-cyan-500/40 rounded-xl p-2.5 mt-2 bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 shadow-xl shadow-cyan-950/40 backdrop-blur-md overflow-hidden"
         >
+          <div 
+            className="absolute inset-0 opacity-15 pointer-events-none"
+            style={{
+              backgroundImage: `url('/assets/fundo-geracao-z-pro.jpg')`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          />
+          <div className="relative z-10">
           {/* LAYOUT DESKTOP (lg:flex) - Linha única horizontal original */}
           <div className="hidden lg:flex items-center justify-between gap-4 py-1 px-2">
             {/* Lado Esquerdo: Perfil, Nickname, Badge, Nível */}
@@ -372,6 +382,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
         </div>
+      </div>
       )}
     </header>
   );
