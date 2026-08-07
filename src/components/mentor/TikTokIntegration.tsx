@@ -16,6 +16,11 @@ import {
   Globe2,
   KeyRound,
   X,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert,
+  Check,
+  Zap,
 } from 'lucide-react';
 
 interface TikTokIntegrationProps {
@@ -37,6 +42,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
   const [connection, setConnection] = useState<ConnectionData>({ connected: false });
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   // Check query params for status parameter from OAuth callback redirect
   useEffect(() => {
@@ -153,40 +159,140 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
     }
   };
 
+  const toggleFaq = (index: number) => {
+    setOpenFaq(openFaq === index ? null : index);
+  };
+
+  const faqItems = [
+    {
+      q: 'A conexão é segura?',
+      a: 'Sim, totalmente segura. Utilizamos a API oficial TikTok Login Kit v2 baseada no protocolo OAuth 2.0 padrão da indústria com verificação PKCE. Suas credenciais e dados são protegidos por criptografia de ponta.',
+    },
+    {
+      q: 'Posso desconectar quando quiser?',
+      a: 'Com certeza. Ao clicar no botão "Desconectar TikTok", sua conta é desvinculada instantaneamente e os tokens de acesso associados à sua chave são revogados do nosso servidor.',
+    },
+    {
+      q: 'Meus dados ficam protegidos?',
+      a: 'Sim. Solicitamos estritamente a autorização mínima necessária para identificação do perfil (user.info.basic). Nós nunca solicitamos, temos acesso ou armazenamos sua senha do TikTok.',
+    },
+  ];
+
+  const steps = [
+    { num: '1', title: 'Conectar conta', desc: 'Iniciar fluxo OAuth' },
+    { num: '2', title: 'Autorizar TikTok', desc: 'Permissão oficial' },
+    { num: '3', title: 'Conta protegida', desc: 'Criptografia AES-256' },
+    { num: '4', title: 'Integração ativa', desc: 'Acesso liberado' },
+  ];
+
   return (
     <div className="space-y-6 w-full animate-fade-in transition-all duration-300">
-      {/* Header Banner */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-[#031d2e] via-[#02131c] to-[#042133] border border-cyan-500/30 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* 1. HERO HEADER PREMIUM */}
+      <div className="p-6 sm:p-7 rounded-2xl bg-gradient-to-r from-[#031d2e] via-[#02131c] to-[#042133] border border-cyan-500/30 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-xl bg-gradient-to-tr from-cyan-500/20 to-teal-500/20 border border-cyan-500/40 text-cyan-400 shrink-0 shadow-lg shadow-cyan-500/10">
-              <Video className="w-6 h-6" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="p-3.5 rounded-2xl bg-gradient-to-tr from-cyan-500/20 via-teal-500/20 to-blue-500/20 border border-cyan-400/40 text-cyan-400 shrink-0 shadow-xl shadow-cyan-500/10">
+              <Video className="w-8 h-8" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-black text-white tracking-tight">
-                  Integração com TikTok
-                </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950 border border-cyan-500/40 text-cyan-300 tracking-wide">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  Integração Oficial TikTok
+                </h1>
+                <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-cyan-950 border border-cyan-500/40 text-cyan-300 tracking-wider shadow-sm">
                   Login Kit v2
                 </span>
               </div>
-              <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
-                Conecte sua conta do TikTok para vincular seu perfil externo, autenticar via OAuth 2.0 oficial e utilizar recursos do ecossistema Geração Z Pro.
+              <p className="text-xs sm:text-sm text-slate-300 mt-1.5 max-w-2xl leading-relaxed">
+                Conecte sua conta do TikTok com segurança utilizando OAuth 2.0 oficial para vincular seu perfil e utilizar recursos exclusivos no ecossistema Geração Z Pro.
               </p>
+
+              {/* 3. Indicadores Visuais (Badges Status) */}
+              <div className="flex items-center gap-2.5 flex-wrap mt-3.5 text-[11px] font-medium text-slate-300">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700/80" title="Autenticação padrão da indústria">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-slate-200">OAuth 2.0 Oficial</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700/80" title="Proteção de canal de comunicação">
+                  <span className="w-2 h-2 rounded-full bg-teal-400" />
+                  <span className="text-slate-200">Conexão Segura</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700/80" title="Tráfego encriptado com certificado SSL">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                  <span className="text-slate-200">SSL</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700/80" title="Armazenamento seguro de tokens com AES-256">
+                  <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                  <span className="text-slate-200">Dados Criptografados</span>
+                </span>
+              </div>
             </div>
           </div>
 
           <button
             onClick={fetchConnection}
             disabled={loading}
-            className="self-start md:self-center px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700 text-xs font-semibold text-slate-200 hover:text-white transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95 shadow-md"
+            className="self-start md:self-center px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95 shadow-lg shrink-0"
+            title="Atualizar informações da conexão"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
             <span>{loading ? 'Atualizando...' : 'Atualizar status'}</span>
           </button>
+        </div>
+      </div>
+
+      {/* 2. TIMELINE VISUAL DE ETAPAS */}
+      <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-md">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <Zap className="w-4 h-4 text-cyan-400" />
+            <span>Progresso da Integração</span>
+          </h3>
+          {lastChecked && (
+            <span className="text-[11px] text-slate-400">Última checagem: {lastChecked}</span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 relative">
+          {steps.map((step, idx) => {
+            const isCompleted = connection.connected;
+            const isFirstActive = idx === 0;
+            const isActive = isCompleted || isFirstActive;
+
+            return (
+              <div
+                key={step.num}
+                className={`p-3.5 rounded-xl border transition-all duration-300 flex items-center gap-3 relative ${
+                  isCompleted
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                    : isFirstActive
+                    ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300'
+                    : 'bg-slate-950/40 border-slate-800/80 text-slate-500'
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 shadow-md ${
+                    isCompleted
+                      ? 'bg-emerald-500 text-slate-950'
+                      : isFirstActive
+                      ? 'bg-cyan-500 text-slate-950'
+                      : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {isCompleted ? <Check className="w-4 h-4 stroke-[3]" /> : step.num}
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-xs font-bold truncate ${isActive ? 'text-white' : 'text-slate-400'}`}>
+                    {step.title}
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate">{step.desc}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -275,14 +381,14 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
         </div>
       )}
 
-      {/* Main Connection Card */}
+      {/* 4. CARD CONECTADO PREMIUM / DISCONNECTED CARD */}
       <div className="p-6 rounded-2xl bg-[#020d14]/90 border border-cyan-500/30 backdrop-blur-md shadow-2xl relative overflow-hidden transition-all duration-300">
         {loading ? (
           /* SKELETON LOADING STATE */
           <div className="animate-pulse space-y-6 py-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
               <div className="flex items-center gap-4 w-full">
-                <div className="w-16 h-16 rounded-full bg-slate-800 shrink-0" />
+                <div className="w-20 h-20 rounded-full bg-slate-800 shrink-0" />
                 <div className="space-y-2 flex-1">
                   <div className="h-5 bg-slate-800 rounded w-48" />
                   <div className="h-3 bg-slate-800/80 rounded w-32" />
@@ -304,49 +410,53 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
             </div>
           </div>
         ) : connection.connected ? (
-          /* State 1: CONNECTED */
+          /* State 1: CONNECTED PREMIUM CARD */
           <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-900/90 border border-emerald-500/40 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 p-6 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/95 border border-emerald-500/40 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/15 transition-all" />
 
-              <div className="flex items-center gap-4 relative z-10">
-                <div className="relative">
+              <div className="flex items-center gap-5 relative z-10">
+                <div className="relative shrink-0">
                   {connection.avatar_url ? (
                     <img
                       src={connection.avatar_url}
                       alt={connection.display_name}
-                      className="w-16 h-16 rounded-full border-2 border-emerald-400 object-cover shadow-lg shadow-emerald-500/20"
+                      className="w-20 h-20 rounded-full border-2 border-emerald-400 object-cover shadow-xl shadow-emerald-500/20"
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/20">
-                      <User className="w-8 h-8" />
+                    <div className="w-20 h-20 rounded-full bg-slate-800 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/20">
+                      <User className="w-10 h-10" />
                     </div>
                   )}
-                  <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-emerald-500 border-2 border-slate-900 shadow-md" />
+                  <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-slate-900 flex items-center justify-center shadow-md">
+                    <Check className="w-3 h-3 text-slate-950 stroke-[3]" />
+                  </span>
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg font-bold text-white tracking-tight">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="text-xl font-black text-white tracking-tight">
                       {connection.display_name || 'Usuário TikTok'}
                     </h3>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-500/50 flex items-center gap-1 shadow-sm">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      CONECTADO
+
+                    {/* Selo Conta Verificada */}
+                    <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 flex items-center gap-1.5 shadow-sm">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      Conta verificada
                     </span>
                   </div>
 
                   {connection.open_id_masked && (
-                    <p className="text-xs text-slate-300 mt-1 font-mono flex items-center gap-1.5">
-                      <span className="text-slate-400">ID TikTok:</span>
-                      <span className="bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-slate-200">
+                    <p className="text-xs text-slate-300 mt-1.5 font-mono flex items-center gap-2">
+                      <span className="text-slate-400 font-sans">ID do TikTok:</span>
+                      <span className="bg-slate-950 px-2.5 py-0.5 rounded border border-slate-800 text-slate-200">
                         {connection.open_id_masked}
                       </span>
                     </p>
                   )}
 
                   {connection.connected_at && (
-                    <p className="text-[11px] text-slate-400 mt-1">
+                    <p className="text-xs text-slate-400 mt-1">
                       Conectado em: {new Date(connection.connected_at).toLocaleString('pt-BR')}
                     </p>
                   )}
@@ -390,7 +500,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
             </div>
           </div>
         ) : (
-          /* State 2: DISCONNECTED */
+          /* State 2: DISCONNECTED CARD */
           <div className="text-center py-8 px-2 space-y-6 animate-fade-in">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/20 via-teal-500/20 to-blue-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 mx-auto shadow-xl shadow-cyan-500/10">
               <Video className="w-8 h-8" />
@@ -415,33 +525,87 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
                 <ExternalLink className="w-4 h-4 text-cyan-200" />
               </button>
             </div>
-
-            <div className="pt-5 border-t border-slate-800/80 max-w-lg mx-auto text-left">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-200 mb-2.5">
-                <HelpCircle className="w-4 h-4 text-cyan-400" />
-                <span>Como funciona a integração?</span>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-300">
-                <li className="flex items-start gap-2">
-                  <span className="text-cyan-400 shrink-0">•</span>
-                  <span>Você será redirecionado para a página oficial de autorização do TikTok.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-cyan-400 shrink-0">•</span>
-                  <span>O escopo solicitado é exclusivamente <strong className="text-cyan-300 font-mono">user.info.basic</strong>.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-cyan-400 shrink-0">•</span>
-                  <span>Nenhum dado de senha é compartilhado com nossa plataforma.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-cyan-400 shrink-0">•</span>
-                  <span>Você pode revogar a autorização a qualquer momento neste painel.</span>
-                </li>
-              </ul>
-            </div>
           </div>
         )}
+      </div>
+
+      {/* 6. SEÇÃO: SOBRE ESTA INTEGRAÇÃO */}
+      <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md space-y-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-white tracking-tight">
+          <Info className="w-4 h-4 text-cyan-400" />
+          <span>Sobre esta Integração</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-300 leading-relaxed">
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
+            <p className="font-bold text-cyan-300 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+              Protocolo OAuth 2.0
+            </p>
+            <p className="text-slate-400">
+              A autenticação é feita diretamente na infraestrutura segura do TikTok. Você concede permissão e retorna com segurança para a nossa plataforma.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
+            <p className="font-bold text-teal-300 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-teal-400" />
+              Privacidade Garantida
+            </p>
+            <p className="text-slate-400">
+              Solicitamos apenas informações públicas básicas de perfil (<code className="text-teal-300">user.info.basic</code>). Sua senha nunca é acessada ou gravada.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
+            <p className="font-bold text-indigo-300 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+              Isolamento por Aluno
+            </p>
+            <p className="text-slate-400">
+              Cada chave de acesso possui sua própria conexão TikTok independente e encriptada com chave exclusiva no servidor.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. SEÇÃO: PERGUNTAS FREQUENTES (FAQ ACCORDION) */}
+      <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md space-y-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-white tracking-tight">
+          <HelpCircle className="w-4 h-4 text-cyan-400" />
+          <span>Perguntas Frequentes (FAQ)</span>
+        </div>
+
+        <div className="space-y-2.5">
+          {faqItems.map((item, index) => {
+            const isOpen = openFaq === index;
+            return (
+              <div
+                key={index}
+                className="rounded-xl border border-slate-800/80 bg-slate-950/50 overflow-hidden transition-all duration-200"
+              >
+                <button
+                  onClick={() => toggleFaq(index)}
+                  className="w-full px-4 py-3 text-left font-semibold text-xs text-slate-200 hover:text-white flex items-center justify-between gap-3 cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
+                    {item.q}
+                  </span>
+                  {isOpen ? (
+                    <ChevronUp className="w-4 h-4 text-cyan-400 shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                  )}
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-3.5 pt-1 text-xs text-slate-300 border-t border-slate-800/50 leading-relaxed bg-slate-900/30 animate-fade-in">
+                    {item.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
