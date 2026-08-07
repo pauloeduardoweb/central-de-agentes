@@ -15,59 +15,28 @@ export function getStoredAgents(): Agent[] {
     const parsed: Agent[] = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
       const defaultMap = new Map(DEFAULT_AGENTS.map((d) => [d.id, d]));
-      let hasUpdates = false;
+      const storedMap = new Map(parsed.map((a) => [a.id, a]));
 
-      // Filter out deleted non-custom default agents
-      const validParsed = parsed.filter((agent) => agent.isCustom || defaultMap.has(agent.id));
-      if (validParsed.length !== parsed.length) {
-        hasUpdates = true;
-      }
-
-      const mergedList = validParsed.map((agent) => {
-        const def = defaultMap.get(agent.id);
-        if (def) {
-          if (
-            (def.name !== undefined && agent.name !== def.name) ||
-            (def.chatGptUrl !== undefined && agent.chatGptUrl !== def.chatGptUrl) ||
-            (def.geminiUrl !== undefined && agent.geminiUrl !== def.geminiUrl) ||
-            (def.exampleVideoUrl !== undefined && agent.exampleVideoUrl !== def.exampleVideoUrl) ||
-            (def.exampleVideoUrls !== undefined && JSON.stringify(agent.exampleVideoUrls) !== JSON.stringify(def.exampleVideoUrls)) ||
-            (def.posterSlug !== undefined && agent.posterSlug !== def.posterSlug) ||
-            (def.coverImage !== undefined && agent.coverImage !== def.coverImage) ||
-            (def.chatBackgroundImage !== undefined && agent.chatBackgroundImage !== def.chatBackgroundImage) ||
-            (def.tagline !== undefined && agent.tagline !== def.tagline) ||
-            (def.description !== undefined && agent.description !== def.description) ||
-            (def.systemInstruction !== undefined && agent.systemInstruction !== def.systemInstruction)
-          ) {
-            hasUpdates = true;
-            return {
-              ...agent,
-              name: def.name,
-              chatGptUrl: def.chatGptUrl,
-              geminiUrl: def.geminiUrl,
-              exampleVideoUrl: def.exampleVideoUrl,
-              exampleVideoUrls: def.exampleVideoUrls,
-              posterSlug: def.posterSlug,
-              coverImage: def.coverImage,
-              chatBackgroundImage: def.chatBackgroundImage,
-              tagline: def.tagline,
-              description: def.description,
-              systemInstruction: def.systemInstruction,
-              conversationStarters: def.conversationStarters || agent.conversationStarters,
-            };
-          }
+      // Preserve default agent order and ensure all properties are updated to match DEFAULT_AGENTS
+      const updatedDefaults = DEFAULT_AGENTS.map((def) => {
+        const stored = storedMap.get(def.id);
+        if (stored) {
+          return {
+            ...def,
+            isFavorite: Boolean(stored.isFavorite),
+            usageCount: stored.usageCount || def.usageCount,
+            lastUsedAt: stored.lastUsedAt || def.lastUsedAt,
+          };
         }
-        return agent;
+        return def;
       });
 
-      const existingIds = new Set(mergedList.map((a) => a.id));
-      const missingDefaults = DEFAULT_AGENTS.filter((def) => !existingIds.has(def.id));
-      if (missingDefaults.length > 0 || hasUpdates) {
-        const finalList = [...missingDefaults, ...mergedList];
-        localStorage.setItem(AGENTS_STORAGE_KEY, JSON.stringify(finalList));
-        return finalList;
-      }
-      return mergedList;
+      // Preserve user created custom agents
+      const customAgents = parsed.filter((agent) => agent.isCustom);
+
+      const finalList = [...updatedDefaults, ...customAgents];
+      localStorage.setItem(AGENTS_STORAGE_KEY, JSON.stringify(finalList));
+      return finalList;
     }
     return DEFAULT_AGENTS;
   } catch (err) {
