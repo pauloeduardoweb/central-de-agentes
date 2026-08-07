@@ -648,7 +648,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         onDisconnectApiKey={handleDisconnectApiKey}
         hasApiKey={Boolean(userApiKey)}
         studentCode={studentCode}
-        agentCount={agents.filter((a) => a.category !== 'Suporte').length}
+        agentCount={agents.filter((a) => a.category !== 'Suporte' && !a.isCustom).length}
         isMaster={isMaster}
         activeView={activeView}
         onSelectView={handleSelectView}
