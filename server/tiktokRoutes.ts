@@ -92,6 +92,24 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
 
     if (error) {
       console.warn('[CALLBACK 02.1] Parametro error retornado pelo TikTok:', error, error_description);
+      const errStr = String(error).toLowerCase();
+      const descStr = String(error_description || '').toLowerCase();
+
+      const isCanceled =
+        errStr.includes('cancel') ||
+        errStr.includes('access_denied') ||
+        errStr.includes('user_cancelled') ||
+        errStr.includes('denied') ||
+        descStr.includes('cancel') ||
+        descStr.includes('denied') ||
+        descStr.includes('recus') ||
+        descStr.includes('user_cancelled');
+
+      if (isCanceled) {
+        console.log('[CALLBACK 02.2] Cancelamento/recusa de autorizacao detectado.');
+        return res.redirect('/mentor/integracoes/tiktok?status=canceled&message=Conexao_Cancelada');
+      }
+
       const errReason = String(error_description || error || 'Autorizacao_Negada');
       return res.redirect(`/mentor/integracoes/tiktok?status=error&message=${encodeURIComponent(errReason)}`);
     }
