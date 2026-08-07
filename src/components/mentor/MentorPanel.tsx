@@ -49,10 +49,28 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
   }, [studentCode]);
 
   useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
     if (onTabChange) {
       onTabChange(activeTab);
     }
   }, [activeTab, onTabChange]);
+
+  // If viewing TikTok Integration, completely unmount the Dashboard header & grid
+  if (activeTab === 'tiktok') {
+    return (
+      <div className="animate-in fade-in duration-300 w-full">
+        <TikTokIntegration
+          studentCode={studentCode}
+          onBackToMentor={() => setActiveTab('products')}
+        />
+      </div>
+    );
+  }
 
   const adminName = profile?.nickname ? `${profile.nickname} — ADM` : 'Bigode — ADM';
 
@@ -246,9 +264,6 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
         )}
         {activeTab === 'stats' && (
           <MentorStats studentCode={studentCode} />
-        )}
-        {activeTab === 'tiktok' && (
-          <TikTokIntegration studentCode={studentCode} />
         )}
       </div>
 

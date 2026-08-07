@@ -21,10 +21,12 @@ import {
   ShieldAlert,
   Check,
   Zap,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface TikTokIntegrationProps {
   studentCode: string;
+  onBackToMentor?: () => void;
 }
 
 interface ConnectionData {
@@ -36,7 +38,7 @@ interface ConnectionData {
   connected_at?: string;
 }
 
-export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCode }) => {
+export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCode, onBackToMentor }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [disconnecting, setDisconnecting] = useState<boolean>(false);
   const [connection, setConnection] = useState<ConnectionData>({ connected: false });
@@ -232,15 +234,27 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
             </div>
           </div>
 
-          <button
-            onClick={fetchConnection}
-            disabled={loading}
-            className="self-start md:self-center px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95 shadow-lg shrink-0"
-            title="Atualizar informações da conexão"
-          >
-            <RefreshCw className={`w-4 h-4 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
-            <span>{loading ? 'Atualizando...' : 'Atualizar status'}</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 self-start md:self-center shrink-0">
+            {onBackToMentor && (
+              <button
+                onClick={onBackToMentor}
+                className="px-4 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/30 text-xs font-bold text-cyan-300 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Voltar ao Painel do Mentor</span>
+              </button>
+            )}
+
+            <button
+              onClick={fetchConnection}
+              disabled={loading}
+              className="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95 shadow-lg"
+              title="Atualizar informações da conexão"
+            >
+              <RefreshCw className={`w-4 h-4 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
+              <span>{loading ? 'Atualizando...' : 'Atualizar status'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
