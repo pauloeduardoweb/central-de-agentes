@@ -11,7 +11,14 @@ interface AgentControlHeaderProps {
 
 export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, onClose }) => {
   const isTikTokCategory = !agent.category || agent.category.toLowerCase().includes('tiktok');
-  const displayImage = getSafeImageUrl(agent.coverImage || agent.avatarUrl);
+  const originalImage = agent.coverImage || agent.avatarUrl;
+  const displayImage = getSafeImageUrl(originalImage);
+
+  console.log('[AGENT MODAL IMAGE]', {
+    agent: agent.name,
+    originalImage,
+    resolvedImage: displayImage,
+  });
 
   return (
     <div className="relative pb-3 border-b border-cyan-500/20">
@@ -23,6 +30,15 @@ export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, o
               <img
                 src={displayImage}
                 alt={agent.name}
+                onError={(e) => {
+                  console.error('[IMAGE LOAD ERROR]', {
+                    agent: agent.name,
+                    src: e.currentTarget.src,
+                  });
+                  if (originalImage && e.currentTarget.src !== originalImage) {
+                    e.currentTarget.src = originalImage;
+                  }
+                }}
                 className="w-full h-full object-cover rounded-[13px]"
                 referrerPolicy="no-referrer"
               />
