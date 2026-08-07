@@ -3,14 +3,7 @@ import { MessageSquare, Sparkles, Heart, Copy, Zap, Flame, Play, ExternalLink, M
 import { Agent } from '../types';
 import { PinAgentButton } from './agents/PinAgentButton';
 import { AgentControlCenter } from './agents/AgentControlCenter';
-
-function getSafeImageUrl(url?: string): string {
-  if (!url) return '';
-  if (url.includes('postimg.cc') || url.includes('postimg.org')) {
-    return `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-}
+import { getSafeImageUrl } from '../utils/imageUrl';
 
 interface TikTokPosterCardProps {
   agent: Agent;
