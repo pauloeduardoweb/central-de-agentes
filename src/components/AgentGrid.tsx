@@ -434,7 +434,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             </div>
             <div className="shrink-0 flex items-center space-x-2">
               <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 text-xs font-bold shadow-md shadow-emerald-500/20">
-                {categoryCounts['Tiktok Shop'] || 18} Agentes de Vendas
+                {categoryCounts['Tiktok Shop']} Agentes de Vendas
               </span>
             </div>
           </div>
