@@ -36,7 +36,7 @@ const CATEGORY_MENU: CategoryMenuItem[] = [
   {
     id: 'Tiktok 2K',
     label: 'TIKTOK 2K',
-    tag: 'Conteúdos Dark Virais',
+    tag: 'Conteúdo Dark & Crescimento',
     icon: Flame,
     gradient: 'from-cyan-500 via-blue-600 to-indigo-600',
     activeBorder: 'border-cyan-400/80 shadow-cyan-500/20',
@@ -45,7 +45,7 @@ const CATEGORY_MENU: CategoryMenuItem[] = [
   {
     id: 'Tiktok Shop',
     label: 'TIKTOK SHOP',
-    tag: 'Formatos Virais',
+    tag: 'Vídeos que Vendem',
     icon: ShoppingBag,
     gradient: 'from-emerald-500 via-teal-600 to-green-600',
     activeBorder: 'border-emerald-400/80 shadow-emerald-500/20',
@@ -54,7 +54,7 @@ const CATEGORY_MENU: CategoryMenuItem[] = [
   {
     id: 'Recurso Anti-Violação',
     label: 'RECURSO ANTI-VIOLAÇÃO',
-    tag: 'Proteção & Defesa',
+    tag: 'Recursos & Apelações',
     icon: ShieldAlert,
     gradient: 'from-rose-500 via-red-600 to-amber-600',
     activeBorder: 'border-rose-400/80 shadow-rose-500/20',
@@ -391,18 +391,18 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             <div>
               <div className="flex items-center space-x-2 text-cyan-400 text-xs font-black uppercase tracking-wider mb-1">
                 <Zap className="w-4 h-4 fill-cyan-400" />
-                <span>Aba Exclusiva • Agentes de Alta Retenção</span>
+                <span>TIKTOK 2K • CONTEÚDO DARK & CRESCIMENTO</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-cyan-400">
-                Agentes Virais Tiktok 2K
+                Viralize e alcance seus primeiros 2 mil seguidores
               </h2>
               <p className="text-xs text-cyan-100/90 mt-1 max-w-2xl leading-relaxed font-medium">
-                Estes agentes foram projetados com os ganchos visuais, frases de retenção e capas estilizadas do método Tiktok 2K para alavancar suas publicações!
+                Agentes criados para desenvolver conteúdos dark com alto potencial de retenção e viralização. Use estratégias, roteiros, ganchos e formatos pensados para crescer no TikTok e atingir os 2 mil seguidores necessários para avançar na ativação da vitrine do TikTok Shop.
               </p>
             </div>
             <div className="shrink-0 flex items-center space-x-2">
               <span className="px-3 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 text-xs font-bold shadow-md shadow-cyan-500/20">
-                {categoryCounts['Tiktok 2K']} Agentes Exclusivos
+                8 Agentes de Crescimento
               </span>
             </div>
           </div>
@@ -423,18 +423,18 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             <div>
               <div className="flex items-center space-x-2 text-emerald-400 text-xs font-black uppercase tracking-wider mb-1">
                 <ShoppingBag className="w-4 h-4" />
-                <span>Menu Oficial • Conversão & Carrinho Amarelo</span>
+                <span>TIKTOK SHOP • FORMATOS DE VÍDEOS QUE VENDEM</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-100 to-emerald-400">
-                Agentes Especialistas em TikTok Shop
+                Crie vídeos de vendas em diversos estilos
               </h2>
               <p className="text-xs text-emerald-100/90 mt-1 max-w-2xl leading-relaxed font-medium">
-                Roteiros de unboxing, reviews persuasivos, mineração de produtos campeões e técnicas para direcionar os espectadores diretamente ao Carrinho Amarelo.
+                Agentes especializados na criação de vídeos para TikTok Shop em diferentes formatos, como POV, UGC, review, unboxing, demonstração de produto, storytelling, oferta, CTA e outros estilos de conteúdo voltados para conversão.
               </p>
             </div>
             <div className="shrink-0 flex items-center space-x-2">
               <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 text-xs font-bold shadow-md shadow-emerald-500/20">
-                {categoryCounts['Tiktok Shop']} Agentes de Vendas
+                16 Agentes de Vendas
               </span>
             </div>
           </div>
@@ -455,18 +455,18 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             <div>
               <div className="flex items-center space-x-2 text-rose-400 text-xs font-black uppercase tracking-wider mb-1">
                 <ShieldAlert className="w-4 h-4" />
-                <span>Menu Oficial • Defesa de Conta & Shadowban</span>
+                <span>DEFESA DE CONTA • RECURSOS E APELAÇÕES</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-rose-100 to-rose-400">
-                Recursos e Proteção Anti-Violação
+                Crie recursos para violações com orientação do agente
               </h2>
               <p className="text-xs text-rose-100/90 mt-1 max-w-2xl leading-relaxed font-medium">
-                Elabore apelações formais com o agente oficial Anti-Violação Geração Z Pro. Audite seus roteiros antes de publicar para evitar shadowban e restrições.
+                Envie as informações da violação, escreva seu relato e, quando necessário, anexe imagens. O agente orientará exatamente quais informações precisam ser apresentadas e ajudará a criar um recurso objetivo com até 500 caracteres para contestar a violação.
               </p>
             </div>
             <div className="shrink-0 flex items-center space-x-2">
               <span className="px-3 py-1.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-400/50 text-xs font-bold shadow-md shadow-rose-500/20">
-                Agente Exclusivo
+                Agente de Defesa
               </span>
             </div>
           </div>
