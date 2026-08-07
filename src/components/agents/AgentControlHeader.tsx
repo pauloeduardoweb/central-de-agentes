@@ -12,11 +12,11 @@ export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, o
   const isTikTokCategory = !agent.category || agent.category.toLowerCase().includes('tiktok');
 
   return (
-    <div className="relative pb-2.5 sm:pb-3 border-b border-slate-200/90">
-      <div className="flex items-start justify-between gap-2.5 pr-7">
+    <div className="relative pb-3 border-b border-slate-200/80">
+      <div className="flex items-start justify-between gap-3 pr-8">
         {/* Agent Avatar / Graphic & Title Info */}
-        <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
-          <div className="relative shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-cyan-100 via-slate-100 to-white border border-cyan-400/80 flex items-center justify-center p-0.5 shadow-[0_0_15px_rgba(6,182,212,0.25)] overflow-hidden">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="relative shrink-0 w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-br from-cyan-100 via-slate-50 to-white border border-cyan-300/80 flex items-center justify-center p-0.5 shadow-sm overflow-hidden">
             {agent.avatarUrl ? (
               <img
                 src={agent.avatarUrl}
@@ -25,8 +25,8 @@ export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, o
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-full h-full rounded-[13px] bg-slate-100 flex items-center justify-center text-cyan-600">
-                <AgentIcon name={agent.iconName || 'Bot'} className="w-5 h-5 sm:w-6 sm:h-6" />
+              <div className="w-full h-full rounded-[13px] bg-cyan-50/80 flex items-center justify-center text-cyan-600">
+                <AgentIcon name={agent.iconName || 'Bot'} className="w-6 h-6" />
               </div>
             )}
           </div>
@@ -34,7 +34,7 @@ export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, o
           <div className="min-w-0 flex-1 space-y-0.5">
             <div className="flex items-center flex-wrap gap-1">
               {/* TikTok Shop Badge */}
-              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.2 rounded-full bg-slate-900 text-cyan-300 border border-slate-700 flex items-center gap-1 shadow-sm shrink-0">
+              <span className="text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-900 text-cyan-300 border border-slate-700/80 flex items-center gap-1 shadow-xs shrink-0">
                 <svg className="w-2.5 h-2.5 fill-current text-cyan-400" viewBox="0 0 24 24">
                   <path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 0 1-5.201 1.743l-.002-.001.002.001a2.895 2.895 0 0 1 3.183-4.51v-3.5a6.329 6.329 0 0 0-5.394 2.593 6.29 6.29 0 0 0 .19 7.42 6.335 6.335 0 0 0 8.016 1.764c2.518-1.282 3.824-3.84 3.824-6.684V8.6a8.214 8.214 0 0 0 4.597 1.588V6.743a4.832 4.832 0 0 1-2.002-.057z"/>
                 </svg>
@@ -42,17 +42,17 @@ export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, o
               </span>
 
               {!isTikTokCategory && agent.category && (
-                <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 border border-slate-300 shrink-0">
+                <span className="text-[8.5px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
                   {agent.category}
                 </span>
               )}
             </div>
 
-            <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-snug truncate">
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug truncate">
               {agent.name}
             </h2>
 
-            <p className="text-[10px] sm:text-[11px] text-slate-600 line-clamp-2 leading-tight font-normal">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 line-clamp-2 leading-snug font-normal">
               {agent.tagline || agent.description}
             </p>
           </div>
@@ -62,7 +62,7 @@ export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, o
         <button
           onClick={onClose}
           aria-label="Fechar painel do agente"
-          className="absolute top-0 right-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 border border-slate-200 flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 z-10"
+          className="absolute top-0 right-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 hover:bg-slate-200/90 text-slate-500 hover:text-slate-800 border border-slate-200 flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 z-10"
         >
           <X className="w-3.5 h-3.5 text-slate-600" />
         </button>

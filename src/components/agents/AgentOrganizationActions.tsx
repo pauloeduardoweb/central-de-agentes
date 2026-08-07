@@ -18,8 +18,8 @@ export const AgentOrganizationActions: React.FC<AgentOrganizationActionsProps> =
   onToggleFavorite,
 }) => {
   return (
-    <div className="space-y-1.5 pt-2 border-t border-slate-200/90">
-      <h4 className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 px-0.5">
+    <div className="space-y-1.5 pt-2 border-t border-slate-200/80">
+      <h4 className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400 px-0.5">
         ORGANIZAR AGENTE
       </h4>
 
@@ -32,14 +32,14 @@ export const AgentOrganizationActions: React.FC<AgentOrganizationActionsProps> =
               onTogglePin(agent.id);
             }}
             aria-pressed={isPinned}
-            className={`w-full text-left p-2.5 rounded-xl border transition-all duration-200 cursor-pointer flex items-center space-x-2 active:scale-[0.98] ${
+            className={`w-full text-left p-2.5 rounded-2xl border transition-all duration-200 cursor-pointer flex items-center space-x-2.5 hover:scale-[1.01] active:scale-[0.98] ${
               isPinned
-                ? 'bg-amber-50/90 border-amber-300 text-amber-950 shadow-xs'
-                : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-800 shadow-xs'
+                ? 'bg-amber-50/90 border-amber-300 text-amber-950 shadow-2xs'
+                : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-slate-300 text-slate-800 shadow-2xs'
             }`}
           >
             <div
-              className={`p-1.5 rounded-lg border shrink-0 flex items-center justify-center ${
+              className={`w-8 h-8 rounded-xl border shrink-0 flex items-center justify-center ${
                 isPinned
                   ? 'bg-amber-100 border-amber-300 text-amber-600'
                   : 'bg-slate-100 border-slate-200 text-slate-500'
@@ -66,14 +66,14 @@ export const AgentOrganizationActions: React.FC<AgentOrganizationActionsProps> =
             onToggleFavorite(agent.id);
           }}
           aria-pressed={isFavorite}
-          className={`w-full text-left p-2.5 rounded-xl border transition-all duration-200 cursor-pointer flex items-center space-x-2 active:scale-[0.98] ${
+          className={`w-full text-left p-2.5 rounded-2xl border transition-all duration-200 cursor-pointer flex items-center space-x-2.5 hover:scale-[1.01] active:scale-[0.98] ${
             isFavorite
-              ? 'bg-rose-50/90 border-rose-300 text-rose-950 shadow-xs'
-              : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-800 shadow-xs'
+              ? 'bg-rose-50/90 border-rose-300 text-rose-950 shadow-2xs'
+              : 'bg-white hover:bg-slate-50 border-slate-200/90 hover:border-slate-300 text-slate-800 shadow-2xs'
           }`}
         >
           <div
-            className={`p-1.5 rounded-lg border shrink-0 flex items-center justify-center ${
+            className={`w-8 h-8 rounded-xl border shrink-0 flex items-center justify-center ${
               isFavorite
                 ? 'bg-rose-100 border-rose-300 text-rose-600'
                 : 'bg-slate-100 border-slate-200 text-slate-500'
