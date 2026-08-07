@@ -169,7 +169,6 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
                   description="Veja uma demonstração completa antes de utilizar."
                   icon={<Play className="w-3.5 h-3.5 text-amber-300 fill-amber-300/30" />}
                   variant="amber"
-                  badge="DEMO"
                   onClick={handleWatchExample}
                 />
 
@@ -193,7 +192,7 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
                       )
                     }
                     variant="emerald"
-                    badge={isWhatsApp ? 'WHATSAPP' : 'OFICIAL'}
+                    badge={isWhatsApp ? 'WHATSAPP' : undefined}
                     isExternal={true}
                     onClick={handleOpenChatGPT}
                   />
@@ -206,7 +205,6 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
                     description="Execute este agente na plataforma Gemini."
                     icon={<Sparkles className="w-3.5 h-3.5 text-purple-300" />}
                     variant="purple"
-                    badge="GEMINI"
                     isExternal={true}
                     onClick={handleOpenGemini}
                   />
@@ -235,7 +233,6 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
                     description="Veja uma demonstração completa antes de utilizar."
                     icon={<Play className="w-3.5 h-3.5 text-amber-300 fill-amber-300/30" />}
                     variant="amber"
-                    badge="DEMO"
                     onClick={handleWatchExample}
                   />
                 )}
@@ -257,7 +254,7 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
                       )
                     }
                     variant="emerald"
-                    badge={isWhatsApp ? 'WHATSAPP' : 'OFICIAL'}
+                    badge={isWhatsApp ? 'WHATSAPP' : undefined}
                     isExternal={true}
                     onClick={handleOpenChatGPT}
                   />
@@ -270,7 +267,6 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
                     description="Execute este agente na plataforma Gemini."
                     icon={<Sparkles className="w-3.5 h-3.5 text-indigo-300" />}
                     variant="indigo"
-                    badge="GEMINI"
                     isExternal={true}
                     onClick={handleOpenGemini}
                   />
