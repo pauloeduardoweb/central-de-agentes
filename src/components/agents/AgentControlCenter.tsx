@@ -49,9 +49,11 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
       }
     };
 
-    // Lock body scroll
-    const previousOverflow = document.body.style.overflow;
+    // Lock body and html scroll to prevent background scroll on mobile
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
 
     window.addEventListener('keydown', handleKeyDown);
 
@@ -61,7 +63,8 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
     }
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, onClose]);
@@ -78,10 +81,10 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto bg-slate-900/50 backdrop-blur-sm transition-all animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 overflow-hidden md:overflow-y-auto bg-slate-950/80 md:bg-slate-900/60 backdrop-blur-md md:backdrop-blur-sm transition-all animate-in fade-in duration-200"
       onClick={onClose}
     >
-      {/* Central Modal Container (Sleek Smartphone Dark Cyber Frame Aesthetic) */}
+      {/* Central Modal Container (Fullscreen Mobile < md | Sleek Smartphone Frame >= md) */}
       <div
         ref={modalRef}
         tabIndex={-1}
@@ -89,7 +92,7 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
         aria-modal="true"
         aria-label={`Central de Controle do Agente - ${agent.name}`}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-[calc(100vw-16px)] sm:w-full max-w-[400px] my-auto bg-gradient-to-b from-[#081423] via-[#0b1b2d] to-[#081321] border border-cyan-500/40 hover:border-cyan-400/80 rounded-[28px] sm:rounded-[32px] p-3.5 sm:p-4.5 shadow-[0_0_40px_rgba(6,182,212,0.25),0_20px_50px_rgba(0,0,0,0.8)] ring-1 ring-cyan-500/30 text-white outline-none transform animate-in zoom-in-95 fade-in duration-200 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent flex flex-col justify-between overflow-hidden"
+        className="relative w-full h-[100dvh] md:h-auto md:max-h-[calc(100vh-24px)] md:max-w-[400px] my-0 md:my-auto bg-gradient-to-b from-[#07111f] via-[#0a192f] to-[#040d1a] border-0 md:border md:border-cyan-500/30 md:hover:border-cyan-400/60 rounded-none md:rounded-[28px] md:sm:rounded-[32px] p-3.5 pt-[calc(0.875rem+env(safe-area-inset-top,0px))] pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))] md:p-4.5 shadow-none md:shadow-[0_0_35px_rgba(6,182,212,0.2),0_20px_50px_rgba(0,0,0,0.8)] ring-0 md:ring-1 md:ring-cyan-500/20 text-white outline-none transform animate-in zoom-in-95 fade-in duration-200 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent flex flex-col justify-between overflow-x-hidden"
       >
         {/* Futuristic Background Texture */}
         <div
@@ -101,8 +104,8 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
           }}
         />
 
-        {/* Mobile Smartphone Top Notch / Speaker Line Indicator */}
-        <div className="w-12 h-1 rounded-full bg-slate-700/80 border border-slate-600/50 mx-auto mb-2 shrink-0 opacity-80 relative z-10" />
+        {/* Mobile Smartphone Top Notch / Speaker Line Indicator (Shown ONLY on Tablet/Desktop) */}
+        <div className="hidden md:block w-12 h-1 rounded-full bg-slate-700/80 border border-slate-600/50 mx-auto mb-2 shrink-0 opacity-80 relative z-10" />
 
         {/* Ambient Subtle Cyan Glow Backdrop behind Modal Header */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4/5 h-24 bg-gradient-to-tr from-cyan-500/20 via-blue-500/10 to-transparent blur-2xl pointer-events-none rounded-full" />
@@ -198,10 +201,11 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
             <AgentControlFooter onClose={onClose} />
           </div>
 
-          {/* Bottom Smartphone Home Indicator Bar */}
-          <div className="w-16 h-0.5 rounded-full bg-slate-300 mx-auto pt-0.5 opacity-60 shrink-0" />
+          {/* Bottom Smartphone Home Indicator Bar (Shown ONLY on Tablet/Desktop) */}
+          <div className="hidden md:block w-16 h-0.5 rounded-full bg-slate-700/80 mx-auto pt-0.5 opacity-60 shrink-0" />
         </div>
       </div>
     </div>
+  );
   );
 };

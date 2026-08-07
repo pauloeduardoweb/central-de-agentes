@@ -8,7 +8,7 @@ interface AgentStatusBlockProps {
 
 export const AgentStatusBlock: React.FC<AgentStatusBlockProps> = ({ agent }) => {
   return (
-    <div className="px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl bg-[#0a192e]/80 border border-cyan-500/25 text-slate-200 flex items-center justify-between gap-2 shadow-sm">
+    <div className="px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl bg-[#0b1728]/90 border border-cyan-500/20 text-slate-200 flex items-center justify-between gap-2 shadow-sm">
       <div className="flex items-center space-x-2 min-w-0">
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
         <span className="text-[10px] sm:text-[11px] font-bold text-slate-300 truncate">

@@ -22,7 +22,7 @@ export const AgentActionCard: React.FC<AgentActionCardProps> = ({
 }) => {
   const variantStyles = {
     amber: {
-      cardBg: 'bg-[#0a192e]/80 hover:bg-[#0c203b]',
+      cardBg: 'bg-[#0b1728]/80 hover:bg-[#0e2038]',
       border: 'border-amber-500/35 hover:border-amber-400/70',
       glow: 'shadow-sm hover:shadow-[0_0_20px_rgba(245,158,11,0.2)]',
       iconBg: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
@@ -31,7 +31,7 @@ export const AgentActionCard: React.FC<AgentActionCardProps> = ({
       externalBtn: 'bg-slate-800/80 text-slate-400 group-hover:bg-amber-950/80 group-hover:text-amber-300',
     },
     emerald: {
-      cardBg: 'bg-[#0a192e]/80 hover:bg-[#0c203b]',
+      cardBg: 'bg-[#0b1728]/80 hover:bg-[#0e2038]',
       border: 'border-emerald-500/35 hover:border-emerald-400/70',
       glow: 'shadow-sm hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]',
       iconBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
@@ -40,7 +40,7 @@ export const AgentActionCard: React.FC<AgentActionCardProps> = ({
       externalBtn: 'bg-slate-800/80 text-slate-400 group-hover:bg-emerald-950/80 group-hover:text-emerald-300',
     },
     indigo: {
-      cardBg: 'bg-[#0a192e]/80 hover:bg-[#0c203b]',
+      cardBg: 'bg-[#0b1728]/80 hover:bg-[#0e2038]',
       border: 'border-indigo-500/35 hover:border-indigo-400/70',
       glow: 'shadow-sm hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]',
       iconBg: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
@@ -49,7 +49,7 @@ export const AgentActionCard: React.FC<AgentActionCardProps> = ({
       externalBtn: 'bg-slate-800/80 text-slate-400 group-hover:bg-indigo-950/80 group-hover:text-indigo-300',
     },
     purple: {
-      cardBg: 'bg-[#0a192e]/80 hover:bg-[#0c203b]',
+      cardBg: 'bg-[#0b1728]/80 hover:bg-[#0e2038]',
       border: 'border-purple-500/35 hover:border-purple-400/70',
       glow: 'shadow-sm hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]',
       iconBg: 'bg-purple-500/15 text-purple-400 border-purple-500/30',

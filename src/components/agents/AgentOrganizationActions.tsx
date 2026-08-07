@@ -35,7 +35,7 @@ export const AgentOrganizationActions: React.FC<AgentOrganizationActionsProps> =
             className={`w-full text-left p-2.5 rounded-2xl border transition-all duration-200 cursor-pointer flex items-center space-x-2.5 hover:scale-[1.01] active:scale-[0.98] ${
               isPinned
                 ? 'bg-amber-950/60 border-amber-500/60 text-amber-200 shadow-md shadow-amber-950/40'
-                : 'bg-[#0a192e]/80 hover:bg-[#0c203b] border-cyan-500/25 hover:border-cyan-400/60 text-slate-300 hover:text-white shadow-sm'
+                : 'bg-[#0b1728]/80 hover:bg-[#0e2038] border-cyan-500/25 hover:border-cyan-400/60 text-slate-300 hover:text-white shadow-sm'
             }`}
           >
             <div
@@ -69,7 +69,7 @@ export const AgentOrganizationActions: React.FC<AgentOrganizationActionsProps> =
           className={`w-full text-left p-2.5 rounded-2xl border transition-all duration-200 cursor-pointer flex items-center space-x-2.5 hover:scale-[1.01] active:scale-[0.98] ${
             isFavorite
               ? 'bg-rose-950/60 border-rose-500/60 text-rose-200 shadow-md shadow-rose-950/40'
-              : 'bg-[#0a192e]/80 hover:bg-[#0c203b] border-cyan-500/25 hover:border-cyan-400/60 text-slate-300 hover:text-white shadow-sm'
+              : 'bg-[#0b1728]/80 hover:bg-[#0e2038] border-cyan-500/25 hover:border-cyan-400/60 text-slate-300 hover:text-white shadow-sm'
           }`}
         >
           <div
