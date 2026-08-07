@@ -24,7 +24,7 @@ export function getStoredAgents(): Agent[] {
           return {
             ...def,
             isFavorite: Boolean(stored.isFavorite),
-            usageCount: stored.usageCount || def.usageCount,
+            usageCount: Math.max(stored.usageCount || 0, def.usageCount),
             lastUsedAt: stored.lastUsedAt || def.lastUsedAt,
           };
         }
