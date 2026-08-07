@@ -10,16 +10,17 @@ interface AgentControlHeaderProps {
 
 export const AgentControlHeader: React.FC<AgentControlHeaderProps> = ({ agent, onClose }) => {
   const isTikTokCategory = !agent.category || agent.category.toLowerCase().includes('tiktok');
+  const displayImage = agent.coverImage || agent.avatarUrl;
 
   return (
     <div className="relative pb-3 border-b border-cyan-500/20">
       <div className="flex items-start justify-between gap-3 pr-8">
         {/* Agent Avatar / Graphic & Title Info */}
         <div className="flex items-center space-x-3 min-w-0">
-          <div className="relative shrink-0 w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-br from-cyan-500/25 via-slate-800 to-slate-950 border border-cyan-400/60 flex items-center justify-center p-0.5 shadow-[0_0_18px_rgba(6,182,212,0.3)] overflow-hidden">
-            {agent.avatarUrl ? (
+          <div className="relative shrink-0 w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-cyan-500/25 via-slate-800 to-slate-950 border border-cyan-400/60 flex items-center justify-center p-0.5 shadow-[0_0_18px_rgba(6,182,212,0.3)] overflow-hidden">
+            {displayImage ? (
               <img
-                src={agent.avatarUrl}
+                src={displayImage}
                 alt={agent.name}
                 className="w-full h-full object-cover rounded-[13px]"
                 referrerPolicy="no-referrer"

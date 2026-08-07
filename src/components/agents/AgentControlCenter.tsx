@@ -71,13 +71,45 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
 
   if (!isOpen) return null;
 
+  // Determine if this is the Mensageiro de Deus isolated visual test
+  const isMensageiroDeDeus =
+    agent.id === 'agent-tiktok2k-mensageiro-de-deus' ||
+    agent.name?.toLowerCase().trim() === 'mensageiro de deus';
+
   // Determine if agent has example video/demo
   const hasExample = Boolean(
-    onWatchExample && (agent.exampleVideoUrl || (agent.exampleVideoUrls && agent.exampleVideoUrls.length > 0))
+    agent.exampleVideoUrl || (agent.exampleVideoUrls && agent.exampleVideoUrls.length > 0)
   );
 
   // ChatGPT or WhatsApp link check
   const isWhatsApp = agent.chatGptUrl?.includes('wa.me');
+
+  const handleWatchExample = () => {
+    if (onWatchExample) {
+      onWatchExample();
+    } else {
+      const videoUrl = agent.exampleVideoUrl || agent.exampleVideoUrls?.[0];
+      if (videoUrl) {
+        window.open(videoUrl, '_blank');
+      }
+    }
+  };
+
+  const handleOpenChatGPT = (e: React.MouseEvent) => {
+    if (onOpenChatGPT) {
+      onOpenChatGPT(e);
+    } else if (agent.chatGptUrl) {
+      window.open(agent.chatGptUrl, '_blank');
+    }
+  };
+
+  const handleOpenGemini = (e: React.MouseEvent) => {
+    if (onOpenGemini) {
+      onOpenGemini(e);
+    } else if (agent.geminiUrl) {
+      window.open(agent.geminiUrl, '_blank');
+    }
+  };
 
   return (
     <div
@@ -116,74 +148,136 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
             <AgentControlHeader agent={agent} onClose={onClose} />
           </div>
 
-          {/* Agent Status Block */}
-          <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-            <AgentStatusBlock agent={agent} />
-          </div>
+          {/* ISOLATED LAYOUT FOR "MENSAGEIRO DE DEUS" */}
+          {isMensageiroDeDeus ? (
+            <>
+              {/* Agent Status Block (without Local badge) */}
+              <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                <AgentStatusBlock agent={agent} hideLocalBadge={true} />
+              </div>
 
-          {/* Primary Action Block - ABRIR NO APP (Chat Local) */}
-          <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-            <AgentPrimaryAction agent={agent} onOpenLocal={onOpenLocal} />
-          </div>
+              {/* Exact Ordered Stack:
+                  1. ASSISTIR EXEMPLO (Amber)
+                  2. ABRIR NO APP (BETA) (Cyan/Blue Primary CTA)
+                  3. ABRIR NO CHATGPT (Emerald/Green)
+                  4. ABRIR NO GEMINI (Purple/Roxo)
+              */}
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* 1. ASSISTIR EXEMPLO */}
+                <AgentActionCard
+                  title="ASSISTIR EXEMPLO"
+                  description="Veja uma demonstração completa antes de utilizar."
+                  icon={<Play className="w-3.5 h-3.5 text-amber-300 fill-amber-300/30" />}
+                  variant="amber"
+                  badge="DEMO"
+                  onClick={handleWatchExample}
+                />
 
-          {/* Secondary Action Cards Stack */}
-          <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-            {/* Assistir Exemplo Card (Shown ONLY when available) */}
-            {hasExample && onWatchExample && (
-              <AgentActionCard
-                title="ASSISTIR EXEMPLO"
-                description="Veja uma demonstração completa antes de utilizar."
-                icon={<Play className="w-3.5 h-3.5 text-amber-300 fill-amber-300/30" />}
-                variant="amber"
-                badge="DEMO"
-                onClick={() => {
-                  onWatchExample();
-                }}
-              />
-            )}
+                {/* 2. ABRIR NO APP (BETA) */}
+                <AgentPrimaryAction agent={agent} onOpenLocal={onOpenLocal} />
 
-            {/* Abrir no ChatGPT / WhatsApp Card */}
-            {agent.chatGptUrl && onOpenChatGPT && (
-              <AgentActionCard
-                title={isWhatsApp ? 'ABRIR WHATSAPP' : 'ABRIR NO CHATGPT'}
-                description={
-                  isWhatsApp
-                    ? 'Conecte-se diretamente com o suporte via WhatsApp.'
-                    : 'Use a estrutura oficial deste agente no ChatGPT.'
-                }
-                icon={
-                  isWhatsApp ? (
-                    <MessageCircle className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300/30" />
-                  ) : (
-                    <ExternalLink className="w-3.5 h-3.5 text-emerald-300" />
-                  )
-                }
-                variant="emerald"
-                badge={isWhatsApp ? 'WHATSAPP' : 'OFICIAL'}
-                isExternal={true}
-                onClick={onOpenChatGPT}
-              />
-            )}
+                {/* 3. ABRIR NO CHATGPT */}
+                {(agent.chatGptUrl || onOpenChatGPT) && (
+                  <AgentActionCard
+                    title={isWhatsApp ? 'ABRIR WHATSAPP' : 'ABRIR NO CHATGPT'}
+                    description={
+                      isWhatsApp
+                        ? 'Conecte-se diretamente com o suporte via WhatsApp.'
+                        : 'Use a estrutura oficial deste agente no ChatGPT.'
+                    }
+                    icon={
+                      isWhatsApp ? (
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300/30" />
+                      ) : (
+                        <ExternalLink className="w-3.5 h-3.5 text-emerald-300" />
+                      )
+                    }
+                    variant="emerald"
+                    badge={isWhatsApp ? 'WHATSAPP' : 'OFICIAL'}
+                    isExternal={true}
+                    onClick={handleOpenChatGPT}
+                  />
+                )}
 
-            {/* Abrir no Gemini Card */}
-            {(agent.geminiUrl || onOpenGemini) && (
-              <AgentActionCard
-                title="ABRIR NO GEMINI"
-                description="Execute este agente na plataforma Gemini."
-                icon={<Sparkles className="w-3.5 h-3.5 text-indigo-300" />}
-                variant="indigo"
-                badge="GEMINI"
-                isExternal={true}
-                onClick={(e) => {
-                  if (onOpenGemini) {
-                    onOpenGemini(e);
-                  } else if (agent.geminiUrl) {
-                    window.open(agent.geminiUrl, '_blank');
-                  }
-                }}
-              />
-            )}
-          </div>
+                {/* 4. ABRIR NO GEMINI */}
+                {(agent.geminiUrl || onOpenGemini) && (
+                  <AgentActionCard
+                    title="ABRIR NO GEMINI"
+                    description="Execute este agente na plataforma Gemini."
+                    icon={<Sparkles className="w-3.5 h-3.5 text-purple-300" />}
+                    variant="purple"
+                    badge="GEMINI"
+                    isExternal={true}
+                    onClick={handleOpenGemini}
+                  />
+                )}
+              </div>
+            </>
+          ) : (
+            /* STANDARD LAYOUT FOR ALL OTHER AGENTS */
+            <>
+              {/* Agent Status Block */}
+              <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                <AgentStatusBlock agent={agent} />
+              </div>
+
+              {/* Primary Action Block - ABRIR NO APP (Chat Local) */}
+              <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                <AgentPrimaryAction agent={agent} onOpenLocal={onOpenLocal} />
+              </div>
+
+              {/* Secondary Action Cards Stack */}
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Assistir Exemplo Card */}
+                {hasExample && (
+                  <AgentActionCard
+                    title="ASSISTIR EXEMPLO"
+                    description="Veja uma demonstração completa antes de utilizar."
+                    icon={<Play className="w-3.5 h-3.5 text-amber-300 fill-amber-300/30" />}
+                    variant="amber"
+                    badge="DEMO"
+                    onClick={handleWatchExample}
+                  />
+                )}
+
+                {/* Abrir no ChatGPT / WhatsApp Card */}
+                {(agent.chatGptUrl || onOpenChatGPT) && (
+                  <AgentActionCard
+                    title={isWhatsApp ? 'ABRIR WHATSAPP' : 'ABRIR NO CHATGPT'}
+                    description={
+                      isWhatsApp
+                        ? 'Conecte-se diretamente com o suporte via WhatsApp.'
+                        : 'Use a estrutura oficial deste agente no ChatGPT.'
+                    }
+                    icon={
+                      isWhatsApp ? (
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300/30" />
+                      ) : (
+                        <ExternalLink className="w-3.5 h-3.5 text-emerald-300" />
+                      )
+                    }
+                    variant="emerald"
+                    badge={isWhatsApp ? 'WHATSAPP' : 'OFICIAL'}
+                    isExternal={true}
+                    onClick={handleOpenChatGPT}
+                  />
+                )}
+
+                {/* Abrir no Gemini Card */}
+                {(agent.geminiUrl || onOpenGemini) && (
+                  <AgentActionCard
+                    title="ABRIR NO GEMINI"
+                    description="Execute este agente na plataforma Gemini."
+                    icon={<Sparkles className="w-3.5 h-3.5 text-indigo-300" />}
+                    variant="indigo"
+                    badge="GEMINI"
+                    isExternal={true}
+                    onClick={handleOpenGemini}
+                  />
+                )}
+              </div>
+            </>
+          )}
 
           {/* Organization Section: Fixar & Favoritar */}
           <div className="animate-in fade-in slide-in-from-top-2 duration-200">
