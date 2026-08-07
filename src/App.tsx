@@ -60,6 +60,8 @@ export default function App() {
         setActiveView('mentor');
         if (currentPath.startsWith('/mentor/integracoes/tiktok')) {
           setMentorTab('tiktok');
+        } else if (mentorTab === 'tiktok') {
+          setMentorTab('products');
         }
       } else {
         // Redirect non-master keys away from /mentor URLs to Central de Agentes
@@ -639,7 +641,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         ) : isMaster && (activeView === 'mentor' || currentPath.startsWith('/mentor')) ? (
           <MentorPanel
             studentCode={studentCode}
-            initialTab={currentPath.startsWith('/mentor/integracoes/tiktok') ? 'tiktok' : mentorTab}
+            initialTab={currentPath.startsWith('/mentor/integracoes/tiktok') ? 'tiktok' : (mentorTab === 'tiktok' ? 'products' : mentorTab)}
             onBackToHub={() => {
               if (typeof window !== 'undefined') {
                 window.history.pushState({}, '', '/');
@@ -647,7 +649,20 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
               setCurrentPath('/');
               setActiveView('hub');
             }}
-            onTabChange={(tab) => setMentorTab(tab)}
+            onTabChange={(tab) => {
+              setMentorTab(tab);
+              if (tab === 'tiktok') {
+                if (typeof window !== 'undefined' && window.location.pathname !== '/mentor/integracoes/tiktok') {
+                  window.history.pushState({}, '', '/mentor/integracoes/tiktok');
+                  setCurrentPath('/mentor/integracoes/tiktok');
+                }
+              } else {
+                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor/integracoes/tiktok')) {
+                  window.history.pushState({}, '', '/mentor');
+                  setCurrentPath('/mentor');
+                }
+              }
+            }}
           />
         ) : (
           <>
