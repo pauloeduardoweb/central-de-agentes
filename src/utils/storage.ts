@@ -5,6 +5,10 @@ const AGENTS_STORAGE_KEY = 'gpt_central_agents_v15';
 const CHAT_SESSIONS_STORAGE_KEY = 'gpt_central_chats_v1';
 const TEAMS_STORAGE_KEY = 'gpt_central_teams_v1';
 
+const LEGACY_REMOVED_OFFICIAL_IDS = new Set([
+  'agent-shop-frutas-em-crise',
+]);
+
 export function getStoredAgents(): Agent[] {
   try {
     const raw = localStorage.getItem(AGENTS_STORAGE_KEY);
@@ -32,8 +36,17 @@ export function getStoredAgents(): Agent[] {
         return def;
       });
 
-      // Preserve user created custom agents (excluding any that match a default agent ID)
-      const customAgents = parsed.filter((agent) => agent.isCustom && !defaultIds.has(agent.id));
+      // Preserve user created custom agents (excluding any default or legacy removed official agents)
+      const customAgents = parsed.filter((agent) => {
+        if (!agent.isCustom) return false;
+        if (defaultIds.has(agent.id)) return false;
+        if (LEGACY_REMOVED_OFFICIAL_IDS.has(agent.id)) return false;
+        // Do not resurrect removed official agents as custom agents
+        if (agent.id.startsWith('agent-shop-') || agent.id.startsWith('agent-tiktok2k-') || agent.id.startsWith('agent-suporte-') || agent.id.startsWith('agent-recurso-')) {
+          return false;
+        }
+        return true;
+      });
 
       // Strictly deduplicate by ID to guarantee single entry per agent
       const seenIds = new Set<string>();
