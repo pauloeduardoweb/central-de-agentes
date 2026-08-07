@@ -179,7 +179,14 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
 
     // If agent has a custom coverImage (e.g. TikTok Shop or TikTok 2K posters), use the clean full-poster card layout
     if (agent.coverImage) {
-      const safeCoverUrl = getSafeImageUrl(agent.coverImage);
+      const originalImage = agent.coverImage;
+      const safeCoverUrl = getSafeImageUrl(originalImage);
+
+      console.log('[TIKTOK CARD IMAGE]', {
+        agent: agent.name,
+        originalImage,
+        resolvedImage: safeCoverUrl,
+      });
 
       return (
         <div className="relative w-full h-full bg-slate-950 flex flex-col justify-between p-1 sm:p-3.5 overflow-hidden text-center select-none rounded-2xl">
@@ -188,11 +195,12 @@ export const TikTokPosterCard: React.FC<TikTokPosterCardProps> = ({
             src={safeCoverUrl}
             alt={agent.name}
             onError={(e) => {
-              const target = e.currentTarget;
-              if (target.src.includes('wsrv.nl') && agent.coverImage) {
-                target.src = agent.coverImage;
-              } else if (agent.coverImage && !target.src.includes('wsrv.nl')) {
-                target.src = `https://wsrv.nl/?url=${encodeURIComponent(agent.coverImage)}`;
+              console.error('[IMAGE LOAD ERROR]', {
+                agent: agent.name,
+                src: e.currentTarget.src,
+              });
+              if (originalImage && e.currentTarget.src !== originalImage) {
+                e.currentTarget.src = originalImage;
               }
             }}
             className="absolute inset-0 w-full h-full object-cover object-center opacity-100 group-hover:scale-105 transition-transform duration-500 pointer-events-none"
