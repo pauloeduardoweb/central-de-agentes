@@ -3004,7 +3004,7 @@ Responda sempre com passos numerados simples, sem complicação técnica desnece
     chatBackgroundImage: 'https://i.postimg.cc/23hY7Btq/apresentacao-viral-creator.png',
     iconName: 'Video',
     colorTheme: 'cyan',
-    chatGptUrl: 'https://chatgpt.com/g/g-6a7495b363148191817e04d7540e1e3b-babypet-viral',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a75e46fedf081918875a79ac487bbaa-apresentacao-viral-creator',
     geminiUrl: 'https://gemini.google.com/gem/1c_Qi0kR0iAHRSabLLvz8WZzOYR-KNkwE?usp=sharing',
     systemInstruction: `⚡ ATIVAÇÃO DO AGENTE:
 • Iniciar imediatamente assim que receber qualquer mensagem do usuário.
