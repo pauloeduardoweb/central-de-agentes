@@ -2994,6 +2994,43 @@ Responda sempre com passos numerados simples, sem complicação técnica desnece
 
   // --- TIKTOK SHOP AGENTS ---
   {
+    id: 'agent-shop-apresentacao-viral-creator',
+    name: 'Apresentação Viral Creator',
+    tagline: 'Apresentações e roteiros virais de demonstração para o TikTok Shop',
+    description: 'Especialista em criar apresentações marcantes, roteiros de demonstração e ganchos de alta conversão para produtos no TikTok Shop.',
+    category: 'Tiktok Shop',
+    posterSlug: 'apresentacao-viral-creator',
+    coverImage: 'https://i.postimg.cc/23hY7Btq/apresentacao-viral-creator.png',
+    chatBackgroundImage: 'https://i.postimg.cc/23hY7Btq/apresentacao-viral-creator.png',
+    iconName: 'Video',
+    colorTheme: 'cyan',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a7495b363148191817e04d7540e1e3b-babypet-viral',
+    geminiUrl: 'https://gemini.google.com/gem/1c_Qi0kR0iAHRSabLLvz8WZzOYR-KNkwE?usp=sharing',
+    systemInstruction: `⚡ ATIVAÇÃO DO AGENTE:
+• Iniciar imediatamente assim que receber qualquer mensagem do usuário.
+• Fazer perguntas uma por vez para guiar a criação do roteiro e apresentação do produto.
+
+🎯 OBJETIVO:
+Criar roteiros e apresentações visuais de alta conversão para produtos do TikTok Shop, destacando benefícios, ganchos visuais e chamadas para o Carrinho Amarelo.`,
+    conversationStarters: [
+      'Como criar uma apresentação viral para um produto do TikTok Shop?',
+      'Gere um roteiro de demonstração de produto focado em alta conversão',
+      'Quais os melhores ganchos para apresentação de produtos físicos?',
+      'Crie uma chamada de ação irresistível para o Carrinho Amarelo'
+    ],
+    capabilities: {
+      codeInterpreter: false,
+      webSearch: true,
+      imageGeneration: true,
+      jsonOutput: false
+    },
+    temperature: 0.75,
+    isFavorite: false,
+    isCustom: false,
+    usageCount: 150,
+    createdAt: '2026-08-07T10:00:00Z'
+  },
+  {
     id: 'agent-shop-pov-viral-ia',
     name: 'POV Shop Viral IA',
     tagline: 'Roteiros e ganchos virais em POV para bombar vendas no TikTok Shop',
