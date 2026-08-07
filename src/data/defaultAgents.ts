@@ -3027,8 +3027,45 @@ Criar roteiros e apresentações visuais de alta conversão para produtos do Tik
     temperature: 0.75,
     isFavorite: false,
     isCustom: false,
-    usageCount: 150,
+    usageCount: 225,
     createdAt: '2026-08-07T10:00:00Z'
+  },
+  {
+    id: 'agent-shop-look-que-vende',
+    name: 'Look que vende',
+    tagline: 'Roteiros de moda, provadores dinâmicos e combinações de estilo para o TikTok Shop',
+    description: 'Especialista em criar conteúdos de moda, combinações de outfits, provadores dinâmicos e ganchos irresistíveis para vender roupas e acessórios no TikTok Shop.',
+    category: 'Tiktok Shop',
+    posterSlug: 'look-que-vende',
+    coverImage: 'https://i.postimg.cc/rw9zGH3Q/Chat-GPT-Image-7-de-ago-de-2026-12-47-09.png',
+    chatBackgroundImage: 'https://i.postimg.cc/rw9zGH3Q/Chat-GPT-Image-7-de-ago-de-2026-12-47-09.png',
+    iconName: 'Shirt',
+    colorTheme: 'pink',
+    chatGptUrl: 'https://chatgpt.com/g/g-6a75f17bd29c8191a9b314fc0f5180f7-look-que-vende',
+    geminiUrl: 'https://gemini.google.com/gem/1_3SY8b01Pys3Rs4n56l6IzGbgyL_JmT3?usp=sharing',
+    systemInstruction: `⚡ ATIVAÇÃO DO AGENTE:
+• Iniciar imediatamente assim que receber qualquer mensagem do usuário.
+• Fazer perguntas uma por vez para entender as peças de roupa, o estilo e o público-alvo.
+
+🎯 OBJETIVO:
+Criar roteiros de moda e combinações de looks focados em alta conversão no TikTok Shop, destacando caimento, tecido, preço e chamada para o Carrinho Amarelo.`,
+    conversationStarters: [
+      'Como criar um vídeo de provador dinâmico que vende no TikTok Shop?',
+      'Monte um roteiro de apresentação de look para vender rápido',
+      'Quais os melhores ganchos para vídeos de moda e roupas?',
+      'Crie uma chamada irresistível para o Carrinho Amarelo focada em moda'
+    ],
+    capabilities: {
+      codeInterpreter: false,
+      webSearch: true,
+      imageGeneration: true,
+      jsonOutput: false
+    },
+    temperature: 0.75,
+    isFavorite: false,
+    isCustom: false,
+    usageCount: 220,
+    createdAt: '2026-08-07T12:00:00Z'
   },
   {
     id: 'agent-shop-pov-viral-ia',
