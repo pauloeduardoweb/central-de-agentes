@@ -34,157 +34,157 @@ export const StatsBar: React.FC<StatsBarProps> = ({
   const totalExecutions = agents.reduce((acc, curr) => acc + (curr.usageCount || 0), 0);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 my-6">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3.5 my-4 sm:my-6">
       
       {/* 1. Total de Agentes */}
-      <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group">
+      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group min-w-0 w-full">
         <div 
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
             backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/40">
+        <div className="relative overflow-hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/40">
           <img 
             src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
             referrerPolicy="no-referrer"
           />
-          <ChatGPTIcon className="w-5 h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
+          <ChatGPTIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
         </div>
-        <div className="overflow-hidden relative z-10">
-          <p className="text-[11px] font-bold text-cyan-300/90 truncate">Total de Agentes</p>
-          <div className="flex items-baseline space-x-1.5">
-            <span className="text-lg font-black text-white">{totalAgents}</span>
+        <div className="min-w-0 flex-1 relative z-10">
+          <p className="text-[10px] sm:text-[11px] font-bold text-cyan-300/90 truncate leading-tight">Total de Agentes</p>
+          <div className="flex items-baseline space-x-1.5 mt-0.5">
+            <span className="text-sm sm:text-lg font-black text-white leading-tight">{totalAgents}</span>
           </div>
         </div>
       </div>
 
       {/* 2. Favoritos */}
-      <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group">
+      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group min-w-0 w-full">
         <div 
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
             backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 via-red-600 to-rose-700 text-white border border-rose-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-rose-500/30">
+        <div className="relative overflow-hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-rose-500 via-red-600 to-rose-700 text-white border border-rose-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-rose-500/30">
           <img 
             src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
             referrerPolicy="no-referrer"
           />
-          <Heart className="w-5 h-5 text-white fill-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
+          <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-white fill-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
         </div>
-        <div className="overflow-hidden relative z-10">
-          <p className="text-[11px] font-bold text-cyan-300/90 truncate">Favoritos</p>
-          <p className="text-lg font-black text-white">{favoriteAgents}</p>
+        <div className="min-w-0 flex-1 relative z-10">
+          <p className="text-[10px] sm:text-[11px] font-bold text-cyan-300/90 truncate leading-tight">Favoritos</p>
+          <p className="text-sm sm:text-lg font-black text-white truncate leading-tight mt-0.5">{favoriteAgents}</p>
         </div>
       </div>
 
       {/* 3. Interações de Chat */}
-      <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group">
+      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group min-w-0 w-full">
         <div 
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
             backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-blue-600 to-cyan-600 text-white border border-indigo-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
+        <div className="relative overflow-hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-indigo-500 via-blue-600 to-cyan-600 text-white border border-indigo-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
           <img 
             src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
             referrerPolicy="no-referrer"
           />
-          <MessageCircle className="w-5 h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
+          <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
         </div>
-        <div className="overflow-hidden relative z-10">
-          <p className="text-[11px] font-bold text-cyan-300/90 truncate">Interações de Chat</p>
-          <p className="text-lg font-black text-white">{totalExecutions}</p>
+        <div className="min-w-0 flex-1 relative z-10">
+          <p className="text-[10px] sm:text-[11px] font-bold text-cyan-300/90 truncate leading-tight">Interações de Chat</p>
+          <p className="text-sm sm:text-lg font-black text-white truncate leading-tight mt-0.5">{totalExecutions}</p>
         </div>
       </div>
 
       {/* 4. Modelo AI Ativo */}
-      <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group">
+      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group min-w-0 w-full">
         <div 
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
             backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-indigo-600 to-blue-700 text-white border border-purple-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-purple-500/30">
+        <div className="relative overflow-hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-purple-500 via-indigo-600 to-blue-700 text-white border border-purple-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-purple-500/30">
           <img 
             src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
             referrerPolicy="no-referrer"
           />
-          <Sparkles className="w-5 h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
+          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
         </div>
-        <div className="overflow-hidden relative z-10">
-          <p className="text-[11px] font-bold text-cyan-300/90 truncate">Modelo AI Ativo</p>
-          <p className="text-xs font-black text-white mt-0.5 truncate">Gemini 3.6 Flash</p>
+        <div className="min-w-0 flex-1 relative z-10">
+          <p className="text-[10px] sm:text-[11px] font-bold text-cyan-300/90 truncate leading-tight">Modelo AI Ativo</p>
+          <p className="text-[11px] sm:text-xs font-black text-white mt-0.5 truncate leading-tight">Gemini 3.6 Flash</p>
         </div>
       </div>
 
       {/* 5. Programa de Afiliados */}
       <button
         onClick={onOpenAfiliados}
-        className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-emerald-400 border border-emerald-500/50 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95"
+        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-emerald-400 border border-emerald-500/50 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
       >
         <div 
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
             backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 text-slate-950 border border-emerald-300 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30">
-          <DollarSign className="w-5 h-5 text-slate-950 relative z-10" />
+        <div className="relative overflow-hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 text-slate-950 border border-emerald-300 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30">
+          <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-slate-950 relative z-10" />
         </div>
-        <div className="overflow-hidden relative z-10">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 truncate">Programa de</p>
-          <p className="text-xs font-black text-white truncate">AFILIADOS</p>
+        <div className="min-w-0 flex-1 relative z-10">
+          <p className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 truncate leading-tight">Programa de</p>
+          <p className="text-xs font-black text-white truncate leading-tight">AFILIADOS</p>
         </div>
       </button>
 
       {/* 6. Detalhes do Site */}
       <button
         onClick={onOpenSiteModal}
-        className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95"
+        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
       >
         <div 
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
             backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/30">
+        <div className="relative overflow-hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/30">
           <img 
             src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
             referrerPolicy="no-referrer"
           />
-          <Globe className="w-5 h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
+          <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
         </div>
-        <div className="overflow-hidden relative z-10">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-300/90 truncate">Plataforma</p>
-          <p className="text-xs font-black text-white truncate">Detalhes do Site</p>
+        <div className="min-w-0 flex-1 relative z-10">
+          <p className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-cyan-300/90 truncate leading-tight">Plataforma</p>
+          <p className="text-xs font-black text-white truncate leading-tight">Detalhes do Site</p>
         </div>
       </button>
 
@@ -193,29 +193,29 @@ export const StatsBar: React.FC<StatsBarProps> = ({
         href="https://geracaozpro.com/"
         target="_blank"
         rel="noopener noreferrer"
-        className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95"
+        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
       >
         <div 
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
             backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/30">
+        <div className="relative overflow-hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/30">
           <img 
             src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
             referrerPolicy="no-referrer"
           />
-          <span className="font-black text-xl text-white relative z-10 leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] select-none">Z</span>
+          <span className="font-black text-base sm:text-xl text-white relative z-10 leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] select-none">Z</span>
         </div>
-        <div className="overflow-hidden relative z-10">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-300/90 truncate">geracaozpro.com</p>
-          <p className="text-xs font-black text-white flex items-center space-x-1 truncate">
-            <span>Visitar Site</span>
+        <div className="min-w-0 flex-1 relative z-10">
+          <p className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-cyan-300/90 truncate leading-tight">geracaozpro.com</p>
+          <p className="text-xs font-black text-white flex items-center space-x-1 min-w-0 leading-tight">
+            <span className="truncate">Visitar Site</span>
             <ExternalLink className="w-3 h-3 text-cyan-300 shrink-0 ml-0.5" />
           </p>
         </div>
@@ -224,28 +224,28 @@ export const StatsBar: React.FC<StatsBarProps> = ({
       {/* 8. Certificados */}
       <button
         onClick={onOpenCertificados}
-        className="p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95"
+        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
       >
         <div 
-          className="absolute inset-0 opacity-15 pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
             backgroundImage: `url('https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         />
-        <div className="relative overflow-hidden w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/30">
+        <div className="relative overflow-hidden w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700 text-white border border-cyan-300/80 flex items-center justify-center shrink-0 shadow-lg shadow-cyan-500/30">
           <img 
             src="https://i.postimg.cc/sfqDXz09/Chat-GPT-Image-22-de-jul-de-2026-18-23-54.png" 
             alt="" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay pointer-events-none"
             referrerPolicy="no-referrer"
           />
-          <Award className="w-5 h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
+          <Award className="w-4 h-4 sm:w-5 sm:h-5 text-white relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" />
         </div>
-        <div className="overflow-hidden relative z-10">
-          <p className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-300 truncate">Geração Z Pro</p>
-          <p className="text-xs font-black text-white truncate">Certificados</p>
+        <div className="min-w-0 flex-1 relative z-10">
+          <p className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-cyan-300 truncate leading-tight">Geração Z Pro</p>
+          <p className="text-xs font-black text-white truncate leading-tight">Certificados</p>
         </div>
       </button>
 
