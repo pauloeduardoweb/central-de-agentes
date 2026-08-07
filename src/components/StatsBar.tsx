@@ -28,7 +28,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
   onOpenSiteModal,
   onOpenCertificados,
 }) => {
-  const totalAgents = agents.filter((a) => a.category !== 'Suporte').length;
+  const totalAgents = agents.filter((a) => a.category !== 'Suporte' && !a.isCustom).length;
   const favoriteAgents = agents.filter((a) => a.isFavorite).length;
   const customAgents = agents.filter((a) => a.isCustom).length;
   const totalExecutions = agents.reduce((acc, curr) => acc + (curr.usageCount || 0), 0);
@@ -37,7 +37,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
     <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3.5 my-4 sm:my-6">
       
       {/* 1. Total de Agentes */}
-      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group min-w-0 w-full">
+      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group min-w-0 w-full">
         <div 
           className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
@@ -64,7 +64,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
       </div>
 
       {/* 2. Favoritos */}
-      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group min-w-0 w-full">
+      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group min-w-0 w-full">
         <div 
           className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
@@ -89,7 +89,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
       </div>
 
       {/* 3. Interações de Chat */}
-      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group min-w-0 w-full">
+      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group min-w-0 w-full">
         <div 
           className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
@@ -114,7 +114,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
       </div>
 
       {/* 4. Modelo AI Ativo */}
-      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group min-w-0 w-full">
+      <div className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group min-w-0 w-full">
         <div 
           className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
           style={{
@@ -141,7 +141,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
       {/* 5. Programa de Afiliados */}
       <button
         onClick={onOpenAfiliados}
-        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-emerald-400 border border-emerald-500/50 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
+        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] hover:border-emerald-400 border border-emerald-500/50 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
       >
         <div 
           className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
@@ -163,7 +163,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
       {/* 6. Detalhes do Site */}
       <button
         onClick={onOpenSiteModal}
-        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
+        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
       >
         <div 
           className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
@@ -193,7 +193,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
         href="https://geracaozpro.com/"
         target="_blank"
         rel="noopener noreferrer"
-        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
+        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
       >
         <div 
           className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
@@ -224,7 +224,7 @@ export const StatsBar: React.FC<StatsBarProps> = ({
       {/* 8. Certificados */}
       <button
         onClick={onOpenCertificados}
-        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f]/95 via-[#091322]/95 to-[#040d1a]/95 hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 backdrop-blur-md relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
+        className="p-2.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#0a192f] via-[#091322] to-[#040d1a] hover:border-cyan-400 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 flex items-center space-x-2.5 sm:space-x-3.5 relative overflow-hidden group transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 min-w-0 w-full"
       >
         <div 
           className="absolute inset-0 w-full h-full opacity-15 pointer-events-none"
