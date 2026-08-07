@@ -3,6 +3,7 @@ import { Key, AlertTriangle, Lock, Unlock, Copy, Check, Crown, Bot, MessageSquar
 import { resolveChatMediaUrl } from '../utils/chatMediaUrl';
 import { getNicknameInitials } from '../utils/avatarUtils';
 import { isMasterKey } from '../data/studentCodes';
+import { getSafeImageUrl } from '../utils/imageUrl';
 
 interface HeaderProps {
   onOpenCreate?: () => void;
@@ -66,8 +67,15 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const blockBgStyle: React.CSSProperties = {
+    backgroundImage: `linear-gradient(rgba(2, 11, 24, 0.42), rgba(2, 11, 24, 0.60)), url('/assets/fundo-geracao-z-pro.jpg')`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  };
+
   return (
-    <header className={`relative z-50 shrink-0 border-b border-cyan-500/20 bg-[#020d14]/95 backdrop-blur-md transition-all pt-[max(6px,env(safe-area-inset-top))] ${
+    <header className={`relative z-50 shrink-0 bg-transparent transition-all pt-[max(6px,env(safe-area-inset-top))] ${
       activeView === 'chat' ? 'pb-1.5 px-2 min-h-0' : 'px-3 sm:px-6 py-2 sm:py-3'
     }`}>
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
@@ -75,17 +83,8 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Navigation Tabs (Agentes | Bate-papo | Mentor) */}
         {hasApiKey && onSelectView && (
           <div 
-            className="flex items-center justify-start gap-1 bg-slate-900/90 p-1 rounded-xl border border-cyan-500/30 shadow-xs shrink-0 w-full sm:w-auto overflow-x-auto no-scrollbar bg-cover bg-center bg-no-repeat"
-            style={
-              activeView === 'hub'
-                ? {
-                    backgroundImage: `linear-gradient(rgba(0, 8, 28, 0.78), rgba(0, 18, 55, 0.88)), url('/assets/fundo-geracao-z-pro.jpg')`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                  }
-                : undefined
-            }
+            className="flex items-center justify-start gap-1 p-1 rounded-xl border border-cyan-500/30 shadow-xs shrink-0 w-full sm:w-auto overflow-hidden bg-cover bg-center bg-no-repeat backdrop-blur-md"
+            style={blockBgStyle}
           >
             <div className="flex items-center space-x-1 shrink-0">
               {/* Agentes */}
@@ -156,13 +155,8 @@ export const Header: React.FC<HeaderProps> = ({
       {/* CARD DE PERFIL AZUL (NO PAINEL PRINCIPAL) */}
       {activeView === 'hub' && hasApiKey && (
         <div 
-          className="max-w-7xl mx-auto border border-cyan-500/30 rounded-xl p-2.5 mt-2 shadow-lg bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: `linear-gradient(rgba(0, 8, 28, 0.78), rgba(0, 18, 55, 0.88)), url('/assets/fundo-geracao-z-pro.jpg')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-          }}
+          className="max-w-7xl mx-auto border border-cyan-500/30 rounded-xl p-2.5 mt-2 shadow-lg bg-cover bg-center bg-no-repeat backdrop-blur-md overflow-hidden"
+          style={blockBgStyle}
         >
           {/* LAYOUT DESKTOP (lg:flex) - Linha única horizontal original */}
           <div className="hidden lg:flex items-center justify-between gap-4 py-1 px-2">
