@@ -597,3 +597,78 @@ export async function getProductMinerRanking(limit = 50, sort: ProductRankingSor
     },
   };
 }
+
+export type CollectorCategoryStat = {
+  category: string;
+  productCount: number;
+  lastCollectedAt: string | null;
+  status: 'Ativa' | 'Pendente';
+};
+
+const COLLECTOR_CATEGORIES = ['Beleza', 'Casa', 'Moda', 'Cozinha', 'Eletrônicos', 'Fitness', 'Bebê', 'Pet'];
+
+export async function getCollectorCategoriesStats(): Promise<CollectorCategoryStat[]> {
+  if (!isDatabaseConfigured()) {
+    return COLLECTOR_CATEGORIES.map((cat) => ({
+      category: cat,
+      productCount: 0,
+      lastCollectedAt: null,
+      status: 'Pendente',
+    }));
+  }
+
+  await ensureProductMinerTables();
+
+  const statsList: CollectorCategoryStat[] = [];
+
+  for (const cat of COLLECTOR_CATEGORIES) {
+    try {
+      const [productRows]: any = await db.query(
+        `SELECT COUNT(DISTINCT product_id) as total_products, MAX(last_seen_at) as last_seen
+         FROM tiktok_shop_products
+         WHERE LOWER(query_source) = LOWER(?) OR category_path LIKE ?`,
+        [cat, `%${cat}%`]
+      );
+
+      const [cacheRows]: any = await db.query(
+        `SELECT updated_at FROM tiktok_shop_search_cache
+         WHERE LOWER(search_query) = LOWER(?) AND region = 'BR'
+         ORDER BY updated_at DESC LIMIT 1`,
+        [cat]
+      );
+
+      const row = Array.isArray(productRows) ? productRows[0] : null;
+      const cacheRow = Array.isArray(cacheRows) ? cacheRows[0] : null;
+
+      const productCount = Number(row?.total_products || 0);
+
+      let lastCollectedAt: string | null = null;
+      if (row?.last_seen) {
+        lastCollectedAt = new Date(row.last_seen).toISOString();
+      }
+      if (cacheRow?.updated_at) {
+        const cacheDate = new Date(cacheRow.updated_at).toISOString();
+        if (!lastCollectedAt || cacheDate > lastCollectedAt) {
+          lastCollectedAt = cacheDate;
+        }
+      }
+
+      statsList.push({
+        category: cat,
+        productCount,
+        lastCollectedAt,
+        status: productCount > 0 ? 'Ativa' : 'Pendente',
+      });
+    } catch (err: any) {
+      console.warn(`[Collector Stats Error for ${cat}]:`, err?.message || err);
+      statsList.push({
+        category: cat,
+        productCount: 0,
+        lastCollectedAt: null,
+        status: 'Pendente',
+      });
+    }
+  }
+
+  return statsList;
+}
