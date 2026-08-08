@@ -6,6 +6,8 @@ import {
 import {
   loadProductRanking,
   ProductMinerProduct,
+  ProductRankingMeta,
+  ProductRankingSort,
   searchProducts,
 } from '../../services/productMinerApi';
 
@@ -14,6 +16,13 @@ interface ProductMinerPageProps {
 }
 
 const QUICK_SEARCHES = ['beleza', 'casa', 'moda', 'cozinha', 'eletrônicos', 'fitness', 'bebê', 'pet'];
+
+const RANKING_FILTERS: Array<{ id: ProductRankingSort; label: string }> = [
+  { id: 'total', label: 'Mais vendidos' },
+  { id: '24h', label: 'Vendas 24h' },
+  { id: '7d', label: 'Vendas 7 dias' },
+  { id: 'spiking', label: '🔥 Disparando' },
+];
 
 function formatMoney(cents: number | null, symbol = 'R$') {
   if (cents === null || cents === undefined) return '—';
@@ -25,7 +34,17 @@ function compactNumber(value: number | null | undefined) {
   return new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
 
-const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number }> = ({ product, position }) => {
+function formatPercent(value: number | null | undefined) {
+  if (value === null || value === undefined) return '—';
+  const prefix = value > 0 ? '+' : '';
+  return `${prefix}${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+}
+
+const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number; rankingSort?: ProductRankingSort }> = ({ product, position, rankingSort }) => {
+  const show24h = product.sales24h !== undefined && product.sales24h !== null;
+  const show7d = product.sales7d !== undefined && product.sales7d !== null;
+  const isSpikingRanking = rankingSort === 'spiking';
+
   return (
     <article className="group rounded-2xl border border-cyan-500/20 bg-slate-950/70 overflow-hidden shadow-lg shadow-cyan-950/10 hover:border-cyan-400/45 transition-all">
       <div className="relative aspect-[4/3] bg-slate-900 overflow-hidden">
@@ -40,7 +59,9 @@ const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number }>
         {product.discountPercent ? (
           <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-rose-500/90 text-white text-xs font-black">-{product.discountPercent}%</div>
         ) : null}
-        {product.video?.url ? (
+        {isSpikingRanking && show24h ? (
+          <div className="absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-orange-500/95 text-white text-[11px] font-black flex items-center gap-1"><Flame className="w-3 h-3 fill-current" /> DISPARANDO</div>
+        ) : product.video?.url ? (
           <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-fuchsia-500/90 text-white text-[11px] font-bold flex items-center gap-1"><Play className="w-3 h-3 fill-current" /> Vídeo associado</div>
         ) : null}
       </div>
@@ -56,14 +77,23 @@ const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number }>
             ) : null}
           </div>
           <div className="text-right">
-            <div className="text-xs text-slate-400">Vendas</div>
+            <div className="text-xs text-slate-400">Vendas totais</div>
             <div className="font-black text-cyan-300">{compactNumber(product.soldCount)}</div>
           </div>
         </div>
 
-        {product.sales24h !== undefined && product.sales24h !== null ? (
-          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2.5 py-2">
-            <TrendingUp className="w-3.5 h-3.5" /> +{compactNumber(product.sales24h)} vendas em ~24h
+        {(show24h || show7d) ? (
+          <div className="grid grid-cols-2 gap-2">
+            <div className={`rounded-lg border px-2.5 py-2 ${rankingSort === '24h' || rankingSort === 'spiking' ? 'border-emerald-400/35 bg-emerald-500/10' : 'border-slate-700/70 bg-slate-900/60'}`}>
+              <div className="text-[10px] text-slate-500">≈ 24 horas</div>
+              <div className="text-xs font-black text-emerald-300">{show24h ? `+${compactNumber(product.sales24h)}` : 'Coletando'}</div>
+              {show24h ? <div className="text-[10px] text-emerald-400/80">{formatPercent(product.growth24hPercent)}</div> : null}
+            </div>
+            <div className={`rounded-lg border px-2.5 py-2 ${rankingSort === '7d' ? 'border-violet-400/35 bg-violet-500/10' : 'border-slate-700/70 bg-slate-900/60'}`}>
+              <div className="text-[10px] text-slate-500">≈ 7 dias</div>
+              <div className="text-xs font-black text-violet-300">{show7d ? `+${compactNumber(product.sales7d)}` : 'Coletando'}</div>
+              {show7d ? <div className="text-[10px] text-violet-400/80">{formatPercent(product.growth7dPercent)}</div> : null}
+            </div>
           </div>
         ) : null}
 
@@ -109,6 +139,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<ProductMinerProduct[]>([]);
   const [ranking, setRanking] = useState<ProductMinerProduct[]>([]);
+  const [rankingMeta, setRankingMeta] = useState<ProductRankingMeta | null>(null);
+  const [rankingSort, setRankingSort] = useState<ProductRankingSort>('total');
   const [mode, setMode] = useState<'search' | 'ranking'>('search');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -122,11 +154,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
   useEffect(() => {
     if (mode !== 'ranking') return;
     setRankingLoading(true);
-    loadProductRanking(studentCode, 60)
-      .then(setRanking)
+    setError('');
+    loadProductRanking(studentCode, 60, rankingSort)
+      .then((data) => {
+        setRanking(data.products || []);
+        setRankingMeta(data.meta || null);
+      })
       .catch((err) => setError(err?.message || 'Falha ao carregar ranking.'))
       .finally(() => setRankingLoading(false));
-  }, [mode, studentCode]);
+  }, [mode, rankingSort, studentCode]);
 
   const runSearch = async (targetQuery = query, targetPage = 1) => {
     const clean = targetQuery.trim();
@@ -201,6 +237,30 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
         ) : null}
       </div>
 
+      {mode === 'ranking' ? (
+        <div className="rounded-2xl border border-slate-800/90 bg-slate-950/55 p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex gap-2 flex-wrap">
+            {RANKING_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                onClick={() => setRankingSort(filter.id)}
+                disabled={rankingLoading}
+                className={`px-3 py-2 rounded-lg text-xs font-black border transition-all ${rankingSort === filter.id ? 'border-amber-400/40 bg-amber-500/15 text-amber-300' : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:text-white'}`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          {rankingMeta ? (
+            <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>{rankingMeta.trackedProducts} produtos monitorados</span>
+              <span>• {rankingMeta.with24h} com histórico 24h</span>
+              <span>• {rankingMeta.with7d} com histórico 7d</span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {error ? <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div> : null}
 
       {mode === 'search' ? (
@@ -233,11 +293,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
         <>
           {rankingLoading ? <div className="py-16 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-amber-300" /></div> : null}
           {!rankingLoading && ranking.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 py-16 text-center text-sm text-slate-500">Faça algumas buscas para alimentar o ranking.</div>
+            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 py-16 px-5 text-center">
+              <TrendingUp className="w-9 h-9 text-slate-700 mx-auto" />
+              {rankingSort === 'total' ? (
+                <p className="mt-3 text-sm text-slate-500">Faça algumas buscas para alimentar o ranking.</p>
+              ) : rankingSort === '7d' ? (
+                <><p className="mt-3 text-sm font-bold text-slate-300">Histórico de 7 dias ainda em formação.</p><p className="mt-1 text-xs text-slate-600">O sistema já está guardando snapshots. Esse ranking aparece quando houver base histórica suficiente.</p></>
+              ) : (
+                <><p className="mt-3 text-sm font-bold text-slate-300">Histórico de 24 horas ainda em formação.</p><p className="mt-1 text-xs text-slate-600">Não é necessário gastar créditos só para preencher isso agora. O ranking aparece após novas coletas ao longo do tempo.</p></>
+              )}
+            </div>
           ) : null}
           {!rankingLoading && ranking.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {ranking.map((product, index) => <ProductCard key={product.productId} product={product} position={index + 1} />)}
+              {ranking.map((product, index) => <ProductCard key={product.productId} product={product} position={index + 1} rankingSort={rankingSort} />)}
             </div>
           ) : null}
         </>
