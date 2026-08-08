@@ -12,6 +12,7 @@ export interface ProductMinerVideo {
 }
 
 export type ProductRankingSort = 'total' | '24h' | '7d' | 'spiking';
+export type ProductSearchSource = 'provider' | 'cache' | 'database' | 'empty';
 
 export interface ProductMinerProduct {
   productId: string;
@@ -43,6 +44,28 @@ export interface ProductRankingMeta {
   sort: ProductRankingSort;
 }
 
+export interface ProductMinerAccess {
+  enabled: boolean;
+  canRefresh: boolean;
+  role: 'mentor' | 'student';
+}
+
+export interface ProductSearchResponse {
+  success: true;
+  region: 'BR';
+  query: string;
+  page: number;
+  products: ProductMinerProduct[];
+  creditsUsed: number;
+  creditsRemaining: number | null;
+  hasMore: boolean;
+  pageSize: number;
+  fromCache: boolean;
+  source: ProductSearchSource;
+  needsRefresh: boolean;
+  cacheExpired: boolean;
+}
+
 function authHeaders(studentCode: string): HeadersInit {
   return {
     'x-student-access-code': studentCode,
@@ -50,34 +73,50 @@ function authHeaders(studentCode: string): HeadersInit {
   };
 }
 
-export async function searchProducts(studentCode: string, query: string, page = 1) {
+function accessError(data: any): Error {
+  const code = String(data?.error || '');
+  if (code === 'PRODUCT_MINER_STUDENTS_DISABLED') {
+    return new Error('O Minerador de Produtos ainda não foi liberado para alunos.');
+  }
+  if (code === 'PRODUCT_MINER_REFRESH_MENTOR_ONLY') {
+    return new Error('Somente o Mentor pode atualizar dados da SocialCrawl.');
+  }
+  if (code === 'SOCIALCRAWL_NOT_CONFIGURED') {
+    return new Error('SocialCrawl ainda não foi configurada no servidor.');
+  }
+  if (code === 'AUTH_REQUIRED' || code === 'ACCESS_DENIED') {
+    return new Error('Sua sessão não tem acesso ao minerador.');
+  }
+  return new Error(data?.detail || data?.error || 'Falha no Minerador de Produtos.');
+}
+
+export async function getProductMinerAccess(studentCode: string): Promise<ProductMinerAccess> {
+  const response = await fetch('/api/product-miner/access', { headers: authHeaders(studentCode) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return { enabled: Boolean(data.enabled), canRefresh: Boolean(data.canRefresh), role: data.role === 'mentor' ? 'mentor' : 'student' };
+}
+
+// Free: reads only our own database/cache.
+export async function searchProducts(studentCode: string, query: string, page = 1): Promise<ProductSearchResponse> {
   const params = new URLSearchParams({ query, page: String(page) });
   const response = await fetch(`/api/product-miner/search?${params.toString()}`, {
     headers: authHeaders(studentCode),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const code = String(data?.error || '');
-    if (code === 'SOCIALCRAWL_NOT_CONFIGURED') {
-      throw new Error('SocialCrawl ainda não foi configurada no servidor.');
-    }
-    if (code === 'AUTH_REQUIRED' || code === 'ACCESS_DENIED') {
-      throw new Error('Sua sessão não tem acesso ao minerador.');
-    }
-    throw new Error(data?.detail || data?.error || 'Falha ao minerar produtos.');
-  }
-  return data as {
-    success: true;
-    region: 'BR';
-    query: string;
-    page: number;
-    products: ProductMinerProduct[];
-    creditsUsed: number;
-    creditsRemaining: number | null;
-    hasMore: boolean;
-    pageSize: number;
-    fromCache: boolean;
-  };
+  if (!response.ok) throw accessError(data);
+  return data as ProductSearchResponse;
+}
+
+// Paid: explicit mentor-only SocialCrawl refresh.
+export async function refreshProducts(studentCode: string, query: string, page = 1): Promise<ProductSearchResponse> {
+  const params = new URLSearchParams({ query, page: String(page) });
+  const response = await fetch(`/api/product-miner/refresh?${params.toString()}`, {
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data as ProductSearchResponse;
 }
 
 export async function loadProductRanking(studentCode: string, limit = 50, sort: ProductRankingSort = 'total') {
@@ -86,6 +125,6 @@ export async function loadProductRanking(studentCode: string, limit = 50, sort: 
     headers: authHeaders(studentCode),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.error || 'Falha ao carregar ranking.');
+  if (!response.ok) throw accessError(data);
   return data as { success: true; products: ProductMinerProduct[]; meta: ProductRankingMeta };
 }
