@@ -8,22 +8,17 @@ type SocialCrawlSearchResponse = {
   success?: boolean;
   platform?: string;
   endpoint?: string;
-  data?: {
-    items?: any[];
-    dropped?: number;
-  };
+  data?: { items?: any[]; dropped?: number };
   credits_used?: number;
   credits_remaining?: number;
   request_id?: string;
   cached?: boolean;
-  pagination?: {
-    next_cursor?: string | null;
-    has_more?: boolean;
-    page_size?: number;
-  };
+  pagination?: { next_cursor?: string | null; has_more?: boolean; page_size?: number };
   error?: string;
   message?: string;
 };
+
+export type ProductRankingSort = 'total' | '24h' | '7d' | 'spiking';
 
 export type MinedProduct = {
   productId: string;
@@ -35,14 +30,20 @@ export type MinedProduct = {
   currencySymbol: string;
   rating: number | null;
   soldCount: number;
+  sales24h?: number | null;
+  sales7d?: number | null;
+  growth24hPercent?: number | null;
+  growth7dPercent?: number | null;
+  trendScore?: number | null;
   sellerId: string | null;
   sellerName: string | null;
   productUrl: string | null;
   category: string | null;
+  lastSeenAt?: string | Date | null;
   video: null | {
     id: string | null;
     url: string | null;
-    description: string | null;
+    description?: string | null;
     author: string | null;
     authorFollowers: number | null;
     views: number | null;
@@ -51,6 +52,19 @@ export type MinedProduct = {
     shares: number | null;
     saves: number | null;
   };
+};
+
+type SnapshotPoint = {
+  soldCount: number;
+  capturedAt: Date;
+};
+
+type TrendMetrics = {
+  sales24h: number | null;
+  sales7d: number | null;
+  growth24hPercent: number | null;
+  growth7dPercent: number | null;
+  trendScore: number | null;
 };
 
 function getSocialCrawlApiKey(): string {
@@ -250,6 +264,81 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
   }
 }
 
+function chooseBaseline(samples: SnapshotPoint[], targetHours: number, minHours: number, maxHours: number): SnapshotPoint | null {
+  const now = Date.now();
+  let best: SnapshotPoint | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const sample of samples) {
+    const ageHours = (now - sample.capturedAt.getTime()) / 3_600_000;
+    if (!Number.isFinite(ageHours) || ageHours < minHours || ageHours > maxHours) continue;
+    const distance = Math.abs(ageHours - targetHours);
+    if (distance < bestDistance) {
+      best = sample;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function calculateWindowMetric(currentSold: number, baseline: SnapshotPoint | null, targetHours: number): { sales: number | null; growth: number | null } {
+  if (!baseline) return { sales: null, growth: null };
+  const elapsedHours = Math.max(1, (Date.now() - baseline.capturedAt.getTime()) / 3_600_000);
+  const rawDelta = Math.max(0, currentSold - baseline.soldCount);
+  const normalizedSales = Math.max(0, Math.round(rawDelta * (targetHours / elapsedHours)));
+  const estimatedBase = Math.max(1, currentSold - normalizedSales);
+  const growth = Number(((normalizedSales / estimatedBase) * 100).toFixed(2));
+  return { sales: normalizedSales, growth };
+}
+
+async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduct[]> {
+  if (!isDatabaseConfigured() || products.length === 0) {
+    return products.map((product) => ({ ...product, sales24h: null, sales7d: null, growth24hPercent: null, growth7dPercent: null, trendScore: null }));
+  }
+
+  await ensureProductMinerTables();
+  const ids = products.map((product) => product.productId).filter(Boolean);
+  if (ids.length === 0) return products;
+
+  const [rows]: any = await db.query(
+    `SELECT product_id, sold_count, captured_at
+     FROM tiktok_shop_product_snapshots
+     WHERE product_id IN (?)
+       AND captured_at >= DATE_SUB(NOW(), INTERVAL 9 DAY)
+     ORDER BY product_id ASC, captured_at ASC`,
+    [ids]
+  );
+
+  const snapshots = new Map<string, SnapshotPoint[]>();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const productId = String(row.product_id);
+    const capturedAt = new Date(row.captured_at);
+    if (!Number.isFinite(capturedAt.getTime())) continue;
+    const list = snapshots.get(productId) || [];
+    list.push({ soldCount: Number(row.sold_count || 0), capturedAt });
+    snapshots.set(productId, list);
+  }
+
+  return products.map((product) => {
+    const list = snapshots.get(product.productId) || [];
+    const baseline24h = chooseBaseline(list, 24, 18, 48);
+    const baseline7d = chooseBaseline(list, 168, 120, 216);
+    const metric24h = calculateWindowMetric(product.soldCount, baseline24h, 24);
+    const metric7d = calculateWindowMetric(product.soldCount, baseline7d, 168);
+    const trendScore = metric24h.sales === null
+      ? null
+      : Math.round(metric24h.sales * (1 + Math.min(Math.max(metric24h.growth || 0, 0), 300) / 100));
+
+    return {
+      ...product,
+      sales24h: metric24h.sales,
+      sales7d: metric7d.sales,
+      growth24hPercent: metric24h.growth,
+      growth7dPercent: metric7d.growth,
+      trendScore,
+    };
+  });
+}
+
 export async function searchTikTokShopProducts(params: {
   query: string;
   page?: number;
@@ -272,7 +361,8 @@ export async function searchTikTokShopProducts(params: {
 
   const cached = await getCachedPayload(query, region, page);
   if (cached) {
-    const products = (cached.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
+    const normalized = (cached.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
+    const products = await attachTrendMetrics(normalized);
     return {
       products,
       creditsUsed: 0,
@@ -313,8 +403,9 @@ export async function searchTikTokShopProducts(params: {
   }
 
   await saveCachedPayload(query, region, page, payload);
-  const products = (payload.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
-  await persistProducts(products, query);
+  const normalized = (payload.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
+  await persistProducts(normalized, query);
+  const products = await attachTrendMetrics(normalized);
 
   return {
     products,
@@ -327,28 +418,8 @@ export async function searchTikTokShopProducts(params: {
   };
 }
 
-export async function getProductMinerRanking(limit = 50): Promise<any[]> {
-  if (!isDatabaseConfigured()) return [];
-  await ensureProductMinerTables();
-  const safeLimit = Math.max(1, Math.min(Number(limit || 50), 100));
-  const [rows]: any = await db.query(
-    `SELECT
-      p.*,
-      (
-        SELECT s.sold_count
-        FROM tiktok_shop_product_snapshots s
-        WHERE s.product_id = p.product_id
-          AND s.captured_at <= DATE_SUB(NOW(), INTERVAL 20 HOUR)
-        ORDER BY s.captured_at DESC
-        LIMIT 1
-      ) AS sold_count_24h_base
-     FROM tiktok_shop_products p
-     ORDER BY p.sold_count DESC, p.last_seen_at DESC
-     LIMIT ?`,
-    [safeLimit]
-  );
-
-  return (Array.isArray(rows) ? rows : []).map((row: any) => ({
+function rowToProduct(row: any): MinedProduct {
+  return {
     productId: String(row.product_id),
     title: row.title,
     imageUrl: row.image_url,
@@ -358,7 +429,6 @@ export async function getProductMinerRanking(limit = 50): Promise<any[]> {
     currencySymbol: row.currency_symbol || 'R$',
     rating: row.rating === null ? null : Number(row.rating),
     soldCount: Number(row.sold_count || 0),
-    sales24h: row.sold_count_24h_base === null ? null : Math.max(0, Number(row.sold_count || 0) - Number(row.sold_count_24h_base || 0)),
     sellerId: row.seller_id,
     sellerName: row.seller_name,
     productUrl: row.product_url,
@@ -375,5 +445,62 @@ export async function getProductMinerRanking(limit = 50): Promise<any[]> {
       shares: row.video_shares === null ? null : Number(row.video_shares),
       saves: row.video_saves === null ? null : Number(row.video_saves),
     } : null,
-  }));
+  };
+}
+
+export async function getProductMinerRanking(limit = 50, sort: ProductRankingSort = 'total'): Promise<{
+  products: MinedProduct[];
+  meta: { trackedProducts: number; with24h: number; with7d: number; sort: ProductRankingSort };
+}> {
+  if (!isDatabaseConfigured()) {
+    return { products: [], meta: { trackedProducts: 0, with24h: 0, with7d: 0, sort } };
+  }
+  await ensureProductMinerTables();
+  const safeLimit = Math.max(1, Math.min(Number(limit || 50), 100));
+  const [rows]: any = await db.query(
+    `SELECT p.*
+     FROM tiktok_shop_products p
+     ORDER BY p.last_seen_at DESC, p.sold_count DESC
+     LIMIT 500`
+  );
+
+  const baseProducts = (Array.isArray(rows) ? rows : []).map(rowToProduct);
+  const enriched = await attachTrendMetrics(baseProducts);
+
+  const sorted = [...enriched].sort((a, b) => {
+    if (sort === '24h') {
+      const av = a.sales24h ?? -1;
+      const bv = b.sales24h ?? -1;
+      return bv - av || b.soldCount - a.soldCount;
+    }
+    if (sort === '7d') {
+      const av = a.sales7d ?? -1;
+      const bv = b.sales7d ?? -1;
+      return bv - av || b.soldCount - a.soldCount;
+    }
+    if (sort === 'spiking') {
+      const av = a.trendScore ?? -1;
+      const bv = b.trendScore ?? -1;
+      return bv - av || (b.sales24h ?? -1) - (a.sales24h ?? -1) || b.soldCount - a.soldCount;
+    }
+    return b.soldCount - a.soldCount || String(b.lastSeenAt || '').localeCompare(String(a.lastSeenAt || ''));
+  });
+
+  const visible = sort === '24h'
+    ? sorted.filter((product) => product.sales24h !== null && product.sales24h !== undefined)
+    : sort === '7d'
+      ? sorted.filter((product) => product.sales7d !== null && product.sales7d !== undefined)
+      : sort === 'spiking'
+        ? sorted.filter((product) => product.trendScore !== null && product.trendScore !== undefined)
+        : sorted;
+
+  return {
+    products: visible.slice(0, safeLimit),
+    meta: {
+      trackedProducts: enriched.length,
+      with24h: enriched.filter((product) => product.sales24h !== null && product.sales24h !== undefined).length,
+      with7d: enriched.filter((product) => product.sales7d !== null && product.sales7d !== undefined).length,
+      sort,
+    },
+  };
 }

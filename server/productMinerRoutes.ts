@@ -1,6 +1,6 @@
 import express from 'express';
 import { lookupKeyType, normalizeAccessCode } from './authKeys.js';
-import { searchTikTokShopProducts, getProductMinerRanking } from './productMinerService.js';
+import { searchTikTokShopProducts, getProductMinerRanking, ProductRankingSort } from './productMinerService.js';
 
 export const productMinerRouter = express.Router();
 
@@ -42,8 +42,12 @@ productMinerRouter.get('/search', async (req, res) => {
 productMinerRouter.get('/ranking', async (req, res) => {
   if (!requireProductMinerAccess(req, res)) return;
   try {
-    const products = await getProductMinerRanking(Number(req.query.limit || 50));
-    return res.json({ success: true, products });
+    const requestedSort = String(req.query.sort || 'total');
+    const sort: ProductRankingSort = requestedSort === '24h' || requestedSort === '7d' || requestedSort === 'spiking'
+      ? requestedSort
+      : 'total';
+    const result = await getProductMinerRanking(Number(req.query.limit || 50), sort);
+    return res.json({ success: true, ...result });
   } catch (error: any) {
     console.error('[Product Miner Ranking Error]:', error?.message || error);
     return res.status(500).json({ error: 'PRODUCT_MINER_RANKING_ERROR' });
