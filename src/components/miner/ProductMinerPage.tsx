@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search, Flame, ShoppingBag, Star, Store, ExternalLink, Play, Eye, Heart,
   MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap, RefreshCw,
+  Layers, ShieldCheck, AlertCircle, CheckCircle2, X, Sparkles, Home, Shirt, Utensils,
+  Cpu, Dumbbell, Baby, Dog,
 } from 'lucide-react';
 import {
   loadProductRanking,
@@ -10,6 +12,8 @@ import {
   ProductRankingSort,
   searchProducts,
   refreshProducts,
+  fetchCollectorCategories,
+  type CollectorCategoryStat,
   type ProductSearchSource,
 } from '../../services/productMinerApi';
 
@@ -41,6 +45,42 @@ function formatPercent(value: number | null | undefined) {
   if (value === null || value === undefined) return '—';
   const prefix = value > 0 ? '+' : '';
   return `${prefix}${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+}
+
+function formatCollectionDate(isoStr: string | null): string {
+  if (!isoStr) return 'Sem dados coletados';
+  const date = new Date(isoStr);
+  if (!Number.isFinite(date.getTime())) return 'Sem dados coletados';
+
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (isToday) {
+    return `Atualizado hoje às ${timeStr}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `Atualizado ontem às ${timeStr}`;
+  }
+
+  const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `Atualizado em ${dateStr} às ${timeStr}`;
+}
+
+function getCategoryIcon(catName: string) {
+  const norm = catName.toLowerCase();
+  if (norm.includes('beleza')) return <Sparkles className="w-5 h-5 text-amber-300" />;
+  if (norm.includes('casa')) return <Home className="w-5 h-5 text-cyan-300" />;
+  if (norm.includes('moda')) return <Shirt className="w-5 h-5 text-fuchsia-300" />;
+  if (norm.includes('cozinha')) return <Utensils className="w-5 h-5 text-orange-300" />;
+  if (norm.includes('eletrônicos') || norm.includes('eletronicos')) return <Cpu className="w-5 h-5 text-blue-300" />;
+  if (norm.includes('fitness')) return <Dumbbell className="w-5 h-5 text-emerald-300" />;
+  if (norm.includes('bebê') || norm.includes('bebe')) return <Baby className="w-5 h-5 text-pink-300" />;
+  if (norm.includes('pet')) return <Dog className="w-5 h-5 text-purple-300" />;
+  return <ShoppingBag className="w-5 h-5 text-cyan-300" />;
 }
 
 const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number; rankingSort?: ProductRankingSort }> = ({ product, position, rankingSort }) => {
@@ -148,13 +188,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
   const [ranking, setRanking] = useState<ProductMinerProduct[]>([]);
   const [rankingMeta, setRankingMeta] = useState<ProductRankingMeta | null>(null);
   const [rankingSort, setRankingSort] = useState<ProductRankingSort>('total');
-  const [mode, setMode] = useState<'search' | 'ranking'>('search');
+  const [mode, setMode] = useState<'search' | 'ranking' | 'collector'>('search');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [rankingLoading, setRankingLoading] = useState(false);
   const [error, setError] = useState('');
   const [credits, setCredits] = useState<{ used: number; remaining: number | null; fromCache: boolean; source: ProductSearchSource; needsRefresh: boolean } | null>(null);
+
+  // Coletor state
+  const [collectorCategories, setCollectorCategories] = useState<CollectorCategoryStat[]>([]);
+  const [collectorLoading, setCollectorLoading] = useState(false);
+  const [refreshingCategory, setRefreshingCategory] = useState<string | null>(null);
+  const [confirmModalCategory, setConfirmModalCategory] = useState<string | null>(null);
+  const [collectorNotice, setCollectorNotice] = useState<string | null>(null);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => b.soldCount - a.soldCount), [products]);
 
@@ -170,6 +217,39 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
       .catch((err) => setError(err?.message || 'Falha ao carregar ranking.'))
       .finally(() => setRankingLoading(false));
   }, [mode, rankingSort, studentCode]);
+
+  const loadCategories = () => {
+    if (!canRefresh) return;
+    setCollectorLoading(true);
+    fetchCollectorCategories(studentCode)
+      .then((cats) => setCollectorCategories(cats))
+      .catch((err) => setError(err?.message || 'Falha ao carregar categorias do coletor.'))
+      .finally(() => setCollectorLoading(false));
+  };
+
+  useEffect(() => {
+    if (mode === 'collector' && canRefresh) {
+      loadCategories();
+    }
+  }, [mode, canRefresh, studentCode]);
+
+  const handleConfirmCategoryCollect = async () => {
+    if (!confirmModalCategory) return;
+    const cat = confirmModalCategory;
+    setRefreshingCategory(cat);
+    setError('');
+    setCollectorNotice(null);
+    try {
+      const res = await refreshProducts(studentCode, cat, 1);
+      setCollectorNotice(`Coleta concluída para ${cat}! ${res.products.length} produtos atualizados na base.`);
+      setConfirmModalCategory(null);
+      loadCategories();
+    } catch (err: any) {
+      setError(err?.message || `Falha ao coletar produtos da categoria ${cat}.`);
+    } finally {
+      setRefreshingCategory(null);
+    }
+  };
 
   const runSearch = async (targetQuery = query, targetPage = 1, refresh = false) => {
     const clean = targetQuery.trim();
@@ -244,8 +324,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="inline-flex p-1 rounded-xl border border-slate-800 bg-slate-950/70 self-start">
-          <button onClick={() => setMode('search')} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 ${mode === 'search' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500'}`}><Search className="w-3.5 h-3.5" /> Pesquisa</button>
-          <button onClick={() => setMode('ranking')} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 ${mode === 'ranking' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-500'}`}><TrendingUp className="w-3.5 h-3.5" /> Ranking</button>
+          <button onClick={() => setMode('search')} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 ${mode === 'search' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500 hover:text-slate-300'}`}><Search className="w-3.5 h-3.5" /> Pesquisa</button>
+          <button onClick={() => setMode('ranking')} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 ${mode === 'ranking' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-500 hover:text-slate-300'}`}><TrendingUp className="w-3.5 h-3.5" /> Ranking</button>
+          {canRefresh ? (
+            <button onClick={() => setMode('collector')} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 ${mode === 'collector' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-slate-500 hover:text-slate-300'}`}>
+              <Layers className="w-3.5 h-3.5 text-purple-400" /> Coletor Geração Z Pro
+            </button>
+          ) : null}
         </div>
 
         {credits && mode === 'search' ? (
@@ -295,10 +380,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
           {!loading && sortedProducts.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 py-16 px-5 text-center">
               <ShoppingBag className="w-10 h-10 text-slate-700 mx-auto" />
-              <h2 className="mt-3 font-bold text-slate-300">{query.trim() ? 'Ainda não temos esse termo no banco.' : 'Digite um produto ou nicho para começar'}</h2>
-              <p className="text-xs text-slate-600 mt-1">Pesquisar no banco nunca consome créditos da SocialCrawl.</p>
-              {query.trim() && canRefresh ? <p className="text-xs text-amber-400/80 mt-2">Use “Atualizar SocialCrawl • 1 crédito” somente quando quiser coletar dados novos.</p> : null}
-              {query.trim() && !canRefresh ? <p className="text-xs text-slate-500 mt-2">Aguarde uma nova coleta feita pelo Mentor.</p> : null}
+              <h2 className="mt-3 font-bold text-slate-300">
+                {query.trim() ? 'Nenhum produto encontrado' : 'Digite um produto ou nicho para começar'}
+              </h2>
+              {query.trim() ? (
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  Ainda não temos dados coletados para esta pesquisa. A base é atualizada pelo Mentor.
+                </p>
+              ) : (
+                <p className="text-xs text-slate-600 mt-1">
+                  Pesquisar no banco do Geração Z Pro nunca consome créditos.
+                </p>
+              )}
             </div>
           ) : null}
 
@@ -318,7 +411,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
             </div>
           ) : null}
         </>
-      ) : (
+      ) : mode === 'ranking' ? (
         <>
           {rankingLoading ? <div className="py-16 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-amber-300" /></div> : null}
           {!rankingLoading && ranking.length === 0 ? (
@@ -339,7 +432,146 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
             </div>
           ) : null}
         </>
-      )}
+      ) : mode === 'collector' && canRefresh ? (
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-950/80 to-slate-950/90 p-5 md:p-6 shadow-xl shadow-purple-950/10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-purple-300 text-xs font-black uppercase tracking-wider">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" /> Painel do Coletor • Mentor
+                </div>
+                <h2 className="mt-1 text-xl md:text-2xl font-black text-white">Base Geração Z Pro</h2>
+                <p className="mt-1 text-xs md:text-sm text-slate-300">
+                  Os alunos consultam estes dados sem consumir créditos.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-3 py-2 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-300 font-bold">
+                  8 Categorias Monitoradas
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {collectorNotice ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{collectorNotice}</span>
+              </div>
+              <button onClick={() => setCollectorNotice(null)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
+            </div>
+          ) : null}
+
+          {collectorLoading ? (
+            <div className="py-16 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-purple-400" /></div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {collectorCategories.map((cat) => (
+                <div key={cat.category} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 flex flex-col justify-between space-y-4 hover:border-purple-500/40 transition-all">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                          {getCategoryIcon(cat.category)}
+                        </div>
+                        <h3 className="font-extrabold text-base text-white">{cat.category}</h3>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${cat.status === 'Ativa' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
+                        {cat.status === 'Ativa' ? 'Base Ativa' : 'Pendente'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-xs text-slate-300 font-bold">
+                        {cat.productCount} {cat.productCount === 1 ? 'produto armazenado' : 'produtos armazenados'}
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-medium">
+                        {formatCollectionDate(cat.lastCollectedAt)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setConfirmModalCategory(cat.category)}
+                    disabled={refreshingCategory === cat.category}
+                    className="w-full py-2.5 px-3 rounded-xl border border-amber-400/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {refreshingCategory === cat.category ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Coletando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5" /> Atualizar • 1 crédito
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {confirmModalCategory ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-purple-500/30 bg-slate-950 p-6 shadow-2xl shadow-purple-950/30 space-y-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-lg text-white">Confirmar Coleta</h3>
+                  <p className="text-xs text-purple-300 font-medium">Categoria: {confirmModalCategory}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => !refreshingCategory && setConfirmModalCategory(null)}
+                disabled={Boolean(refreshingCategory)}
+                className="text-slate-500 hover:text-white disabled:opacity-30"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
+              <p className="text-sm font-bold text-amber-200 leading-snug">
+                Atualizar esta categoria consumirá 1 crédito da SocialCrawl. Continuar?
+              </p>
+              <p className="text-xs text-slate-400 leading-normal">
+                A requisição buscará os 30 principais produtos da categoria <strong className="text-white">{confirmModalCategory}</strong> na região <strong className="text-white">BR</strong> e atualizará o banco de dados do Geração Z Pro.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={() => setConfirmModalCategory(null)}
+                disabled={Boolean(refreshingCategory)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 text-xs font-bold disabled:opacity-30"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmCategoryCollect}
+                disabled={Boolean(refreshingCategory)}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-amber-950/30 disabled:opacity-50"
+              >
+                {refreshingCategory ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Coletando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" /> Confirmar e Atualizar (1 crédito)
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 };
