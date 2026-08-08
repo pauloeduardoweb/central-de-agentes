@@ -119,7 +119,24 @@ export async function refreshProducts(studentCode: string, query: string, page =
   return data as ProductSearchResponse;
 }
 
+export interface CollectorCategoryStat {
+  category: string;
+  productCount: number;
+  lastCollectedAt: string | null;
+  status: 'Ativa' | 'Pendente';
+}
+
+export async function fetchCollectorCategories(studentCode: string): Promise<CollectorCategoryStat[]> {
+  const response = await fetch('/api/product-miner/collector/categories', {
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return (data.categories || []) as CollectorCategoryStat[];
+}
+
 export async function loadProductRanking(studentCode: string, limit = 50, sort: ProductRankingSort = 'total') {
+
   const params = new URLSearchParams({ limit: String(limit), sort });
   const response = await fetch(`/api/product-miner/ranking?${params.toString()}`, {
     headers: authHeaders(studentCode),
