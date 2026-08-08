@@ -1,7 +1,7 @@
 import { Agent } from '../types';
 
 interface PageLabelParams {
-  activeView: 'hub' | 'mentor';
+  activeView: 'hub' | 'mentor' | 'chat' | 'miner';
   selectedChatAgent: Agent | null;
   showGeracaoZProModal: boolean;
   showCertificadosModal: boolean;
@@ -56,6 +56,9 @@ export function getCurrentPageLabel({
   if (showImportModal) return 'Importar ChatGPT';
   if (showExportModal) return 'Exportar / Backup';
   if (showApiKeyModal) return 'Acesso do Aluno';
+
+  if (activeView === 'chat') return 'Bate-papo';
+  if (activeView === 'miner') return 'Minerar Produtos';
 
   // 3. Mentor View tabs
   if (activeView === 'mentor') {
