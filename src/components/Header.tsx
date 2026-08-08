@@ -17,6 +17,7 @@ interface HeaderProps {
   studentCode?: string;
   agentCount: number;
   isMaster?: boolean;
+  showProductMiner?: boolean;
   activeView?: 'hub' | 'mentor' | 'chat' | 'miner';
   onSelectView?: (view: 'hub' | 'mentor' | 'chat' | 'miner') => void;
 }
@@ -28,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   hasApiKey,
   studentCode,
   isMaster = false,
+  showProductMiner = false,
   activeView = 'hub',
   onSelectView,
 }) => {
@@ -102,20 +104,22 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="sm:hidden">Agentes</span>
                 </button>
 
-                {/* Minerador de Produtos */}
-                <button
-                  type="button"
-                  onClick={() => onSelectView('miner')}
-                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                    activeView === 'miner'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="hidden sm:inline">Minerar Produtos</span>
-                  <span className="sm:hidden">Minerar</span>
-                </button>
+                {/* Minerador de Produtos - oculto para alunos enquanto não liberado */}
+                {showProductMiner && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectView('miner')}
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                      activeView === 'miner'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="hidden sm:inline">Minerar Produtos</span>
+                    <span className="sm:hidden">Minerar</span>
+                  </button>
+                )}
 
                 {/* Bate-papo */}
                 <button
@@ -243,19 +247,21 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Central de Agentes</span>
                   </button>
 
-                  {/* Minerador de Produtos */}
-                  <button
-                    type="button"
-                    onClick={() => onSelectView('miner')}
-                    className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                      activeView === 'miner'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span>Minerar Produtos</span>
-                  </button>
+                  {/* Minerador de Produtos - oculto para alunos enquanto não liberado */}
+                  {showProductMiner && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectView('miner')}
+                      className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                        activeView === 'miner'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>Minerar Produtos</span>
+                    </button>
+                  )}
 
                   {/* Bate-papo */}
                   <button
