@@ -11,6 +11,8 @@ export interface ProductMinerVideo {
   saves?: number | null;
 }
 
+export type ProductRankingSort = 'total' | '24h' | '7d' | 'spiking';
+
 export interface ProductMinerProduct {
   productId: string;
   title: string;
@@ -22,12 +24,23 @@ export interface ProductMinerProduct {
   rating: number | null;
   soldCount: number;
   sales24h?: number | null;
+  sales7d?: number | null;
+  growth24hPercent?: number | null;
+  growth7dPercent?: number | null;
+  trendScore?: number | null;
   sellerId: string | null;
   sellerName: string | null;
   productUrl: string | null;
   category: string | null;
   lastSeenAt?: string | null;
   video: ProductMinerVideo | null;
+}
+
+export interface ProductRankingMeta {
+  trackedProducts: number;
+  with24h: number;
+  with7d: number;
+  sort: ProductRankingSort;
 }
 
 function authHeaders(studentCode: string): HeadersInit {
@@ -67,11 +80,12 @@ export async function searchProducts(studentCode: string, query: string, page = 
   };
 }
 
-export async function loadProductRanking(studentCode: string, limit = 50) {
-  const response = await fetch(`/api/product-miner/ranking?limit=${limit}`, {
+export async function loadProductRanking(studentCode: string, limit = 50, sort: ProductRankingSort = 'total') {
+  const params = new URLSearchParams({ limit: String(limit), sort });
+  const response = await fetch(`/api/product-miner/ranking?${params.toString()}`, {
     headers: authHeaders(studentCode),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data?.error || 'Falha ao carregar ranking.');
-  return data.products as ProductMinerProduct[];
+  return data as { success: true; products: ProductMinerProduct[]; meta: ProductRankingMeta };
 }
