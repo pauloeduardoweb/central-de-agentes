@@ -18,6 +18,7 @@ import { TechGridBackground } from './components/TechGridBackground';
 import { TermsPage } from './pages/TermsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { ProductMinerPage } from './components/miner/ProductMinerPage';
+import { getProductMinerAccess } from './services/productMinerApi';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
 import { getDeviceId, unbindCurrentDevice } from './utils/deviceId';
@@ -39,6 +40,7 @@ export default function App() {
   });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [activeView, setActiveView] = useState<'hub' | 'mentor' | 'chat' | 'miner'>('hub');
+  const [productMinerAccess, setProductMinerAccess] = useState<{ enabled: boolean; canRefresh: boolean }>({ enabled: false, canRefresh: false });
   const [currentPath, setCurrentPath] = useState<string>(() => {
     return typeof window !== 'undefined' ? window.location.pathname : '/';
   });
@@ -54,8 +56,39 @@ export default function App() {
   }, []);
 
   const isMaster = isMasterKey(studentCode);
+  const canAccessProductMiner = isMaster || productMinerAccess.enabled;
+  const canRefreshProductMiner = isMaster || productMinerAccess.canRefresh;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!studentCode) {
+      setProductMinerAccess({ enabled: false, canRefresh: false });
+      return;
+    }
+    if (isMaster) {
+      setProductMinerAccess({ enabled: true, canRefresh: true });
+      return;
+    }
+    getProductMinerAccess(studentCode)
+      .then((access) => {
+        if (!cancelled) setProductMinerAccess({ enabled: access.enabled, canRefresh: access.canRefresh });
+      })
+      .catch(() => {
+        if (!cancelled) setProductMinerAccess({ enabled: false, canRefresh: false });
+      });
+    return () => { cancelled = true; };
+  }, [studentCode, isMaster]);
+
+  useEffect(() => {
+    if (activeView === 'miner' && !canAccessProductMiner) setActiveView('hub');
+  }, [activeView, canAccessProductMiner]);
 
   const handleSelectView = (view: 'hub' | 'mentor' | 'chat' | 'miner') => {
+    if (view === 'miner' && !canAccessProductMiner) {
+      setActiveView('hub');
+      return;
+    }
+
     if (view === 'mentor' && !isMaster) {
       if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
         window.history.replaceState({}, '', '/');
@@ -657,6 +690,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         studentCode={studentCode}
         agentCount={agents.filter((a) => a.category !== 'Suporte' && !a.isCustom).length}
         isMaster={isMaster}
+        showProductMiner={canAccessProductMiner}
         activeView={activeView}
         onSelectView={handleSelectView}
       />
@@ -674,8 +708,8 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
             sessionId={sessionId}
             onLogout={handleDisconnectApiKey}
           />
-        ) : activeView === 'miner' ? (
-          <ProductMinerPage studentCode={studentCode} />
+        ) : activeView === 'miner' && canAccessProductMiner ? (
+          <ProductMinerPage studentCode={studentCode} canRefresh={canRefreshProductMiner} />
         ) : isMaster && activeView === 'mentor' ? (
           <MentorPanel
             studentCode={studentCode}
