@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search, Flame, ShoppingBag, Star, Store, ExternalLink, Play, Eye, Heart,
-  MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap,
+  MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap, RefreshCw,
 } from 'lucide-react';
 import {
   loadProductRanking,
@@ -9,10 +9,13 @@ import {
   ProductRankingMeta,
   ProductRankingSort,
   searchProducts,
+  refreshProducts,
+  type ProductSearchSource,
 } from '../../services/productMinerApi';
 
 interface ProductMinerPageProps {
   studentCode: string;
+  canRefresh?: boolean;
 }
 
 const QUICK_SEARCHES = ['beleza', 'casa', 'moda', 'cozinha', 'eletrônicos', 'fitness', 'bebê', 'pet'];
@@ -135,7 +138,7 @@ const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number; r
   );
 };
 
-export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode }) => {
+export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode, canRefresh = false }) => {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<ProductMinerProduct[]>([]);
   const [ranking, setRanking] = useState<ProductMinerProduct[]>([]);
@@ -147,7 +150,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
   const [loading, setLoading] = useState(false);
   const [rankingLoading, setRankingLoading] = useState(false);
   const [error, setError] = useState('');
-  const [credits, setCredits] = useState<{ used: number; remaining: number | null; fromCache: boolean } | null>(null);
+  const [credits, setCredits] = useState<{ used: number; remaining: number | null; fromCache: boolean; source: ProductSearchSource; needsRefresh: boolean } | null>(null);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => b.soldCount - a.soldCount), [products]);
 
@@ -164,21 +167,29 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
       .finally(() => setRankingLoading(false));
   }, [mode, rankingSort, studentCode]);
 
-  const runSearch = async (targetQuery = query, targetPage = 1) => {
+  const runSearch = async (targetQuery = query, targetPage = 1, refresh = false) => {
     const clean = targetQuery.trim();
     if (clean.length < 2) return;
     setMode('search');
     setLoading(true);
     setError('');
     try {
-      const data = await searchProducts(studentCode, clean, targetPage);
+      const data = refresh
+        ? await refreshProducts(studentCode, clean, targetPage)
+        : await searchProducts(studentCode, clean, targetPage);
       setQuery(clean);
       setProducts(data.products || []);
       setPage(targetPage);
       setHasMore(Boolean(data.hasMore));
-      setCredits({ used: data.creditsUsed, remaining: data.creditsRemaining, fromCache: data.fromCache });
+      setCredits({
+        used: data.creditsUsed,
+        remaining: data.creditsRemaining,
+        fromCache: data.fromCache,
+        source: data.source,
+        needsRefresh: Boolean(data.needsRefresh),
+      });
     } catch (err: any) {
-      setError(err?.message || 'Não foi possível minerar produtos agora.');
+      setError(err?.message || 'Não foi possível buscar produtos agora.');
     } finally {
       setLoading(false);
     }
@@ -195,7 +206,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="px-3 py-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 font-bold">🇧🇷 Região BR fixa</span>
-            <span className="px-3 py-2 rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-300 font-bold">30 produtos/chamada</span>
+            <span className="px-3 py-2 rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-300 font-bold">30 produtos/página</span>
           </div>
         </div>
 
@@ -205,19 +216,24 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && runSearch(query, 1)}
+              onKeyDown={(e) => e.key === 'Enter' && runSearch(query, 1, false)}
               placeholder="Ex.: beleza, air fryer, vestido, relógio..."
               className="w-full h-11 rounded-xl border border-slate-700/80 bg-slate-950/90 pl-10 pr-4 text-sm text-white outline-none focus:border-cyan-400/60"
             />
           </div>
-          <button onClick={() => runSearch(query, 1)} disabled={loading || query.trim().length < 2} className="h-11 px-5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-black disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/30">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flame className="w-4 h-4" />} Minerar agora
+          <button onClick={() => runSearch(query, 1, false)} disabled={loading || query.trim().length < 2} className="h-11 px-5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-black disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/30">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />} Pesquisar no banco
           </button>
+          {canRefresh ? (
+            <button onClick={() => runSearch(query, 1, true)} disabled={loading || query.trim().length < 2} className="h-11 px-4 rounded-xl border border-amber-400/35 bg-amber-500/10 text-amber-300 text-xs font-black disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-amber-500/20" title="Esta ação consulta a SocialCrawl e pode consumir 1 crédito.">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar SocialCrawl • 1 crédito
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-3 flex gap-2 flex-wrap">
           {QUICK_SEARCHES.map((item) => (
-            <button key={item} onClick={() => runSearch(item, 1)} disabled={loading} className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/70 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/30 text-xs font-semibold capitalize">{item}</button>
+            <button key={item} onClick={() => runSearch(item, 1, false)} disabled={loading} className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/70 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/30 text-xs font-semibold capitalize">{item}</button>
           ))}
         </div>
       </div>
@@ -229,10 +245,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
         </div>
 
         {credits && mode === 'search' ? (
-          <div className="text-[11px] text-slate-500 flex items-center gap-2">
+          <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2">
             <Database className="w-3.5 h-3.5" />
-            {credits.fromCache ? 'Resultado em cache: 0 crédito' : `${credits.used} crédito usado`}
+            {credits.source === 'provider'
+              ? `${credits.used} crédito usado na atualização`
+              : credits.source === 'database'
+                ? 'Banco Geração Z Pro: 0 crédito'
+                : credits.source === 'cache'
+                  ? 'Dados já coletados: 0 crédito'
+                  : 'Nenhuma chamada externa: 0 crédito'}
             {credits.remaining !== null ? <span>• {credits.remaining} restantes</span> : null}
+            {credits.needsRefresh && canRefresh ? <span className="text-amber-400">• atualização disponível</span> : null}
           </div>
         ) : null}
       </div>
@@ -266,10 +289,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
       {mode === 'search' ? (
         <>
           {!loading && sortedProducts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 py-16 text-center">
+            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 py-16 px-5 text-center">
               <ShoppingBag className="w-10 h-10 text-slate-700 mx-auto" />
-              <h2 className="mt-3 font-bold text-slate-300">Digite um produto ou nicho para começar</h2>
-              <p className="text-xs text-slate-600 mt-1">A busca só consome crédito quando uma consulta nova é feita.</p>
+              <h2 className="mt-3 font-bold text-slate-300">{query.trim() ? 'Ainda não temos esse termo no banco.' : 'Digite um produto ou nicho para começar'}</h2>
+              <p className="text-xs text-slate-600 mt-1">Pesquisar no banco nunca consome créditos da SocialCrawl.</p>
+              {query.trim() && canRefresh ? <p className="text-xs text-amber-400/80 mt-2">Use “Atualizar SocialCrawl • 1 crédito” somente quando quiser coletar dados novos.</p> : null}
+              {query.trim() && !canRefresh ? <p className="text-xs text-slate-500 mt-2">Aguarde uma nova coleta feita pelo Mentor.</p> : null}
             </div>
           ) : null}
 
@@ -283,9 +308,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode 
 
           {!loading && sortedProducts.length > 0 ? (
             <div className="flex items-center justify-center gap-3 pt-2">
-              <button disabled={page <= 1} onClick={() => runSearch(query, page - 1)} className="px-4 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-300 disabled:opacity-30">Anterior</button>
+              <button disabled={page <= 1} onClick={() => runSearch(query, page - 1, false)} className="px-4 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-300 disabled:opacity-30">Anterior</button>
               <span className="text-xs text-slate-500">Página {page}</span>
-              <button disabled={!hasMore} onClick={() => runSearch(query, page + 1)} className="px-4 py-2 rounded-lg border border-cyan-500/30 text-xs font-bold text-cyan-300 disabled:opacity-30">Próxima</button>
+              <button disabled={!hasMore} onClick={() => runSearch(query, page + 1, false)} className="px-4 py-2 rounded-lg border border-cyan-500/30 text-xs font-bold text-cyan-300 disabled:opacity-30">Próxima</button>
             </div>
           ) : null}
         </>
