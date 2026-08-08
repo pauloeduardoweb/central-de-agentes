@@ -20,8 +20,10 @@ import {
   ensureProfilesTable,
   ensureChatTables,
   ensureTikTokConnectionsTable,
+  ensureProductMinerTables,
 } from './server/database.js';
 import { tiktokRouter } from './server/tiktokRoutes.js';
+import { productMinerRouter } from './server/productMinerRoutes.js';
 import {
   getGlobalRankingHandler,
   getUserRankingStatsHandler,
@@ -143,6 +145,7 @@ function getGeminiClient(customApiKey?: string) {
 const apiRouter = express.Router();
 apiRouter.use(chatExtraRouter);
 apiRouter.use('/tiktok', tiktokRouter);
+apiRouter.use('/product-miner', productMinerRouter);
 
 // Health check endpoint
 apiRouter.get(['/health', '/api/health'], (_req, res) => {
@@ -2590,6 +2593,7 @@ async function startServer() {
         ensureProgressTable(),
         ensureProfilesTable(),
         ensureTikTokConnectionsTable(),
+        ensureProductMinerTables(),
       ]);
       console.log('[MySQL] All database schemas verified');
     } catch (e: any) {
