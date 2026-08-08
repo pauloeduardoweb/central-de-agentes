@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, AlertTriangle, Lock, Unlock, Copy, Check, Crown, Bot, MessageSquare, LogOut } from 'lucide-react';
+import { Key, AlertTriangle, Lock, Unlock, Copy, Check, Crown, Bot, MessageSquare, LogOut, Flame } from 'lucide-react';
 import { resolveChatMediaUrl } from '../utils/chatMediaUrl';
 import { getNicknameInitials } from '../utils/avatarUtils';
 import { isMasterKey } from '../data/studentCodes';
@@ -17,8 +17,8 @@ interface HeaderProps {
   studentCode?: string;
   agentCount: number;
   isMaster?: boolean;
-  activeView?: 'hub' | 'mentor' | 'chat';
-  onSelectView?: (view: 'hub' | 'mentor' | 'chat') => void;
+  activeView?: 'hub' | 'mentor' | 'chat' | 'miner';
+  onSelectView?: (view: 'hub' | 'mentor' | 'chat' | 'miner') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -100,6 +100,21 @@ export const Header: React.FC<HeaderProps> = ({
                   <Bot className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                   <span className="hidden sm:inline">Central de Agentes</span>
                   <span className="sm:hidden">Agentes</span>
+                </button>
+
+                {/* Minerador de Produtos */}
+                <button
+                  type="button"
+                  onClick={() => onSelectView('miner')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    activeView === 'miner'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="hidden sm:inline">Minerar Produtos</span>
+                  <span className="sm:hidden">Minerar</span>
                 </button>
 
                 {/* Bate-papo */}
@@ -226,6 +241,20 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <Bot className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                     <span>Central de Agentes</span>
+                  </button>
+
+                  {/* Minerador de Produtos */}
+                  <button
+                    type="button"
+                    onClick={() => onSelectView('miner')}
+                    className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                      activeView === 'miner'
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>Minerar Produtos</span>
                   </button>
 
                   {/* Bate-papo */}
