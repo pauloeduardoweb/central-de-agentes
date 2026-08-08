@@ -49,8 +49,8 @@ const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number; r
   const isSpikingRanking = rankingSort === 'spiking';
 
   return (
-    <article className="group rounded-2xl border border-cyan-500/20 bg-slate-950/70 overflow-hidden shadow-lg shadow-cyan-950/10 hover:border-cyan-400/45 transition-all">
-      <div className="relative aspect-[4/3] bg-slate-900 overflow-hidden">
+    <article className="group rounded-2xl border border-cyan-500/20 bg-slate-950/70 overflow-hidden shadow-lg shadow-cyan-950/10 hover:border-cyan-400/45 transition-all flex flex-col h-full">
+      <div className="relative aspect-[4/3] bg-slate-900 overflow-hidden shrink-0">
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300" />
         ) : (
@@ -69,7 +69,7 @@ const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number; r
         ) : null}
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3 flex-1 flex flex-col">
         <h3 className="font-extrabold text-sm text-white leading-snug line-clamp-2 min-h-[40px]">{product.title}</h3>
 
         <div className="flex items-end justify-between gap-3">
@@ -119,9 +119,13 @@ const ProductCard: React.FC<{ product: ProductMinerProduct; position?: number; r
               <span title="Salvos"><Bookmark className="w-3.5 h-3.5 mx-auto mb-1 text-amber-300" />{compactNumber(product.video.saves)}</span>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3 min-h-[78px] flex items-center justify-center text-center">
+            <span className="text-xs text-slate-500 font-medium">Sem vídeo associado</span>
+          </div>
+        )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-auto pt-1">
           {product.productUrl ? (
             <a href={product.productUrl} target="_blank" rel="noreferrer" className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25 px-3 py-2 text-xs font-bold">
               Produto <ExternalLink className="w-3.5 h-3.5" />
