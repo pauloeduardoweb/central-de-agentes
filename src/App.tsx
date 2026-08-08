@@ -17,6 +17,7 @@ import { ChatPage } from './components/chat/ChatPage';
 import { TechGridBackground } from './components/TechGridBackground';
 import { TermsPage } from './pages/TermsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
+import { ProductMinerPage } from './components/miner/ProductMinerPage';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
 import { getDeviceId, unbindCurrentDevice } from './utils/deviceId';
@@ -37,7 +38,7 @@ export default function App() {
     return localStorage.getItem('user_session_id') || '';
   });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [activeView, setActiveView] = useState<'hub' | 'mentor' | 'chat'>('hub');
+  const [activeView, setActiveView] = useState<'hub' | 'mentor' | 'chat' | 'miner'>('hub');
   const [currentPath, setCurrentPath] = useState<string>(() => {
     return typeof window !== 'undefined' ? window.location.pathname : '/';
   });
@@ -54,7 +55,7 @@ export default function App() {
 
   const isMaster = isMasterKey(studentCode);
 
-  const handleSelectView = (view: 'hub' | 'mentor' | 'chat') => {
+  const handleSelectView = (view: 'hub' | 'mentor' | 'chat' | 'miner') => {
     if (view === 'mentor' && !isMaster) {
       if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
         window.history.replaceState({}, '', '/');
@@ -82,6 +83,12 @@ export default function App() {
         setCurrentPath('/');
       }
       setActiveView('chat');
+    } else if (view === 'miner') {
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
+        window.history.pushState({}, '', '/');
+        setCurrentPath('/');
+      }
+      setActiveView('miner');
     }
   };
 
@@ -667,6 +674,8 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
             sessionId={sessionId}
             onLogout={handleDisconnectApiKey}
           />
+        ) : activeView === 'miner' ? (
+          <ProductMinerPage studentCode={studentCode} />
         ) : isMaster && activeView === 'mentor' ? (
           <MentorPanel
             studentCode={studentCode}
