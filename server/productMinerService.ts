@@ -2,7 +2,7 @@ import { db, isDatabaseConfigured, ensureProductMinerTables } from './database.j
 
 const SOCIALCRAWL_BASE_URL = 'https://www.socialcrawl.dev/v1';
 const DEFAULT_REGION = 'BR';
-const DEFAULT_CACHE_MINUTES = 15;
+const DEFAULT_CACHE_MINUTES = 1440;
 
 type SocialCrawlSearchResponse = {
   success?: boolean;
@@ -154,11 +154,34 @@ async function getCachedPayload(query: string, region: string, page: number): Pr
   }
 }
 
+async function getStoredPayload(query: string, region: string, page: number): Promise<{ payload: SocialCrawlSearchResponse; expired: boolean } | null> {
+  if (!isDatabaseConfigured()) return null;
+  await ensureProductMinerTables();
+  try {
+    const [rows]: any = await db.query(
+      `SELECT payload_json, expires_at
+       FROM tiktok_shop_search_cache
+       WHERE search_query = ? AND region = ? AND page = ?
+       LIMIT 1`,
+      [query, region, page]
+    );
+    if (!Array.isArray(rows) || !rows[0]?.payload_json) return null;
+    const expiresAt = rows[0]?.expires_at ? new Date(rows[0].expires_at).getTime() : 0;
+    return {
+      payload: JSON.parse(rows[0].payload_json),
+      expired: !expiresAt || expiresAt <= Date.now(),
+    };
+  } catch (error: any) {
+    console.warn('[Product Miner Stored Cache Read Warning]:', error?.message || error);
+    return null;
+  }
+}
+
 async function saveCachedPayload(query: string, region: string, page: number, payload: SocialCrawlSearchResponse): Promise<void> {
   if (!isDatabaseConfigured()) return;
   await ensureProductMinerTables();
   const configured = Number(process.env.SOCIALCRAWL_CACHE_MINUTES || DEFAULT_CACHE_MINUTES);
-  const minutes = Number.isFinite(configured) ? Math.max(1, Math.min(configured, 120)) : DEFAULT_CACHE_MINUTES;
+  const minutes = Number.isFinite(configured) ? Math.max(1, Math.min(configured, 10080)) : DEFAULT_CACHE_MINUTES;
   await db.query(
     `INSERT INTO tiktok_shop_search_cache
       (search_query, region, page, payload_json, expires_at)
@@ -343,6 +366,7 @@ export async function searchTikTokShopProducts(params: {
   query: string;
   page?: number;
   region?: string;
+  forceRefresh?: boolean;
 }): Promise<{
   products: MinedProduct[];
   creditsUsed: number;
@@ -350,6 +374,9 @@ export async function searchTikTokShopProducts(params: {
   hasMore: boolean;
   pageSize: number;
   fromCache: boolean;
+  source: 'provider' | 'cache' | 'database' | 'empty';
+  needsRefresh: boolean;
+  cacheExpired: boolean;
   requestId: string | null;
 }> {
   const query = String(params.query || '').trim();
@@ -358,19 +385,82 @@ export async function searchTikTokShopProducts(params: {
   const requestedPage = Number.parseInt(String(params.page || 1), 10);
   const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(requestedPage, 20)) : 1;
   const region = String(params.region || DEFAULT_REGION).trim().toUpperCase();
+  const forceRefresh = Boolean(params.forceRefresh);
 
-  const cached = await getCachedPayload(query, region, page);
-  if (cached) {
-    const normalized = (cached.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
-    const products = await attachTrendMetrics(normalized);
+  // Normal searches are ALWAYS free: first reuse any stored SocialCrawl result,
+  // even when its refresh window has expired. Provider credits are spent only
+  // through an explicit mentor refresh.
+  if (!forceRefresh) {
+    const stored = await getStoredPayload(query, region, page);
+    if (stored) {
+      const normalized = (stored.payload.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
+      const products = await attachTrendMetrics(normalized);
+      return {
+        products,
+        creditsUsed: 0,
+        creditsRemaining: null,
+        hasMore: Boolean(stored.payload.pagination?.has_more),
+        pageSize: Number(stored.payload.pagination?.page_size || products.length),
+        fromCache: true,
+        source: 'cache',
+        needsRefresh: stored.expired,
+        cacheExpired: stored.expired,
+        requestId: stored.payload.request_id || null,
+      };
+    }
+
+    // If this exact search has never been collected, search our own product bank.
+    // This also costs zero SocialCrawl credits.
+    if (isDatabaseConfigured()) {
+      await ensureProductMinerTables();
+      const safePageSize = 30;
+      const offset = (page - 1) * safePageSize;
+      const like = `%${query}%`;
+      const [rows]: any = await db.query(
+        `SELECT p.*
+         FROM tiktok_shop_products p
+         WHERE p.title LIKE ?
+            OR p.seller_name LIKE ?
+            OR p.category_path LIKE ?
+            OR p.query_source LIKE ?
+         ORDER BY
+           CASE WHEN LOWER(p.query_source) = LOWER(?) THEN 0 ELSE 1 END,
+           p.sold_count DESC,
+           p.last_seen_at DESC
+         LIMIT ? OFFSET ?`,
+        [like, like, like, like, query, safePageSize + 1, offset]
+      );
+      const localRows = Array.isArray(rows) ? rows : [];
+      const hasMore = localRows.length > safePageSize;
+      const localProducts = localRows.slice(0, safePageSize).map(rowToProduct);
+      if (localProducts.length > 0) {
+        const products = await attachTrendMetrics(localProducts);
+        return {
+          products,
+          creditsUsed: 0,
+          creditsRemaining: null,
+          hasMore,
+          pageSize: safePageSize,
+          fromCache: true,
+          source: 'database',
+          needsRefresh: true,
+          cacheExpired: false,
+          requestId: null,
+        };
+      }
+    }
+
     return {
-      products,
+      products: [],
       creditsUsed: 0,
-      creditsRemaining: cached.credits_remaining ?? null,
-      hasMore: Boolean(cached.pagination?.has_more),
-      pageSize: Number(cached.pagination?.page_size || products.length),
+      creditsRemaining: null,
+      hasMore: false,
+      pageSize: 0,
       fromCache: true,
-      requestId: cached.request_id || null,
+      source: 'empty',
+      needsRefresh: true,
+      cacheExpired: false,
+      requestId: null,
     };
   }
 
@@ -414,6 +504,9 @@ export async function searchTikTokShopProducts(params: {
     hasMore: Boolean(payload.pagination?.has_more),
     pageSize: Number(payload.pagination?.page_size || products.length),
     fromCache: false,
+    source: 'provider',
+    needsRefresh: false,
+    cacheExpired: false,
     requestId: payload.request_id || null,
   };
 }
