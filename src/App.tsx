@@ -99,7 +99,7 @@ export default function App() {
     }
 
     if (view === 'hub') {
-      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
+      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/mentor') || window.location.pathname.startsWith('/miner'))) {
         window.history.pushState({}, '', '/');
       }
       setCurrentPath('/');
@@ -111,28 +111,38 @@ export default function App() {
       setCurrentPath('/mentor');
       setActiveView('mentor');
     } else if (view === 'chat') {
-      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
+      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/mentor') || window.location.pathname.startsWith('/miner'))) {
         window.history.pushState({}, '', '/');
         setCurrentPath('/');
       }
       setActiveView('chat');
     } else if (view === 'miner') {
-      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
-        window.history.pushState({}, '', '/');
-        setCurrentPath('/');
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/miner')) {
+        window.history.pushState({}, '', '/miner');
+        setCurrentPath('/miner');
       }
       setActiveView('miner');
     }
   };
 
   useEffect(() => {
-    if (currentPath.startsWith('/mentor')) {
+    if (currentPath.startsWith('/miner')) {
+      if (canAccessProductMiner) {
+        setActiveView('miner');
+      } else {
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/miner')) {
+          window.history.replaceState({}, '', '/');
+        }
+        setCurrentPath('/');
+        setActiveView('hub');
+      }
+    } else if (currentPath.startsWith('/mentor')) {
       if (isMaster) {
         setActiveView('mentor');
         if (currentPath.startsWith('/mentor/integracoes/tiktok')) {
           setMentorTab('tiktok');
         } else if (mentorTab === 'tiktok') {
-          setMentorTab('products');
+          setMentorTab('challenges');
         }
       } else {
         // Redirect non-master keys away from /mentor URLs to Central de Agentes
@@ -147,7 +157,7 @@ export default function App() {
         setActiveView('hub');
       }
     }
-  }, [currentPath, isMaster]);
+  }, [currentPath, isMaster, canAccessProductMiner]);
 
   const userIdentifier = studentCode
     ? (isMaster ? 'MASTER' : normalizeAccessCode(studentCode))
