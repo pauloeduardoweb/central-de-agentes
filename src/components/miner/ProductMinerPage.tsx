@@ -84,12 +84,11 @@ const CLASSIFICATIONS: ClassificationItem[] = [
 ];
 
 const TIKTOK_CATEGORIES = [
-  { filterKey: 'Todos', label: 'Todos' },
   { filterKey: 'Moda', label: 'Moda' },
-  { filterKey: 'Itens para Casa', label: 'Casa' },
+  { filterKey: 'Itens para Casa', label: 'Itens para Casa' },
   { filterKey: 'Eletrônicos', label: 'Eletrônicos' },
-  { filterKey: 'Beleza e Cuidados Pessoais', label: 'Beleza' },
-  { filterKey: 'Esporte e Lazer', label: 'Esporte' },
+  { filterKey: 'Beleza e Cuidados Pessoais', label: 'Beleza e Cuidados Pessoais' },
+  { filterKey: 'Esporte e Lazer', label: 'Esporte e Lazer' },
   { filterKey: 'Brinquedos e Pets', label: 'Brinquedos e Pets' },
   { filterKey: 'Health', label: 'Health' },
 ];
@@ -1086,12 +1085,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-400">Categorias:</span>
-          {selectedCategory !== 'Todos' ? (
+          {selectedCategory && selectedCategory !== 'Todos' ? (
             <button
               onClick={() => setSelectedCategory('Todos')}
               className="text-[10px] font-bold text-rose-400 hover:underline"
             >
-              Ver Todas
+              Limpar filtro
             </button>
           ) : null}
         </div>
@@ -1104,8 +1103,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <button
                 key={cat.filterKey}
                 type="button"
-                onClick={() => setSelectedCategory(cat.filterKey)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all snap-start ${
+                onClick={() => setSelectedCategory(isActive ? 'Todos' : cat.filterKey)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all snap-start whitespace-nowrap ${
                   isActive
                     ? 'border-cyan-400/60 bg-gradient-to-r from-cyan-500/30 to-blue-600/30 text-cyan-200 shadow-md shadow-cyan-950/40 font-black'
                     : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:border-slate-700'
