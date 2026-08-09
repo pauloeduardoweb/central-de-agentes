@@ -1,6 +1,6 @@
 import express from 'express';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
-import { searchTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, ProductRankingSort } from './productMinerService.js';
+import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, ProductRankingSort } from './productMinerService.js';
 
 export const productMinerRouter = express.Router();
 
@@ -76,14 +76,16 @@ productMinerRouter.get('/search', async (req, res) => {
   }
 });
 
-// PAID refresh: only the Mentor can intentionally spend a SocialCrawl credit.
+// PAID refresh: only the Mentor can intentionally spend SocialCrawl credits.
 productMinerRouter.post('/refresh', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
   try {
     const query = String(req.body?.query || req.body?.q || req.query.query || req.query.q || '').trim();
-    const page = Number(req.body?.page || req.query.page || 1);
-    const result = await searchTikTokShopProducts({ query, page, region: 'BR', forceRefresh: true });
-    return res.json({ success: true, region: 'BR', query, page, ...result });
+    const page = req.body?.page ? Number(req.body.page) : undefined;
+    const maxProducts = req.body?.maxProducts ? Number(req.body.maxProducts) : undefined;
+
+    const result = await refreshMultiPageTikTokShopProducts({ query, region: 'BR', maxProducts, page });
+    return res.json({ success: true, region: 'BR', ...result });
   } catch (error: any) {
     console.error('[Product Miner Refresh Error]:', error?.message || error);
     const message = String(error?.message || 'PRODUCT_MINER_ERROR');

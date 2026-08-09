@@ -522,7 +522,98 @@ export async function searchTikTokShopProducts(params: {
   };
 }
 
-function rowToProduct(row: any): MinedProduct {
+export async function refreshMultiPageTikTokShopProducts(params: {
+  query: string;
+  region?: string;
+  maxProducts?: number;
+  page?: number;
+}): Promise<{
+  products: MinedProduct[];
+  uniqueProductsCount: number;
+  pagesConsulted: number;
+  creditsUsed: number;
+  creditsRemaining: number | null;
+  hasMore: boolean;
+  query: string;
+  category: string;
+  timestamp: string;
+  partialError: string | null;
+}> {
+  const query = String(params.query || '').trim();
+  if (query.length < 2) throw new Error('SEARCH_QUERY_TOO_SHORT');
+  if (query.length > 120) throw new Error('SEARCH_QUERY_TOO_LONG');
+
+  const region = String(params.region || DEFAULT_REGION).trim().toUpperCase();
+
+  // Validate maxProducts (allowed: 30, 90, 150, 300; strictly capped at 300)
+  let rawMax = Number(params.maxProducts || 300);
+  if (!Number.isFinite(rawMax) || rawMax < 30) rawMax = 30;
+  if (rawMax > 300) rawMax = 300;
+
+  let startPage = 1;
+  let maxPages = Math.min(10, Math.max(1, Math.ceil(rawMax / 30)));
+
+  if (params.page && !params.maxProducts) {
+    startPage = Math.max(1, Math.min(Number(params.page), 20));
+    maxPages = startPage;
+  }
+
+  const seenProductIds = new Set<string>();
+  const allUniqueProducts: MinedProduct[] = [];
+  let pagesConsulted = 0;
+  let totalCreditsUsed = 0;
+  let creditsRemaining: number | null = null;
+  let hasMore = true;
+  let partialError: string | null = null;
+
+  for (let p = startPage; p <= maxPages; p++) {
+    try {
+      const res = await searchTikTokShopProducts({
+        query,
+        page: p,
+        region,
+        forceRefresh: true,
+      });
+
+      pagesConsulted++;
+      totalCreditsUsed += res.creditsUsed;
+      if (res.creditsRemaining !== null) {
+        creditsRemaining = res.creditsRemaining;
+      }
+      hasMore = res.hasMore;
+
+      for (const prod of res.products) {
+        if (prod.productId && !seenProductIds.has(prod.productId)) {
+          seenProductIds.add(prod.productId);
+          allUniqueProducts.push(prod);
+        }
+      }
+
+      if (!hasMore || res.products.length === 0) {
+        break;
+      }
+    } catch (err: any) {
+      console.warn(`[MultiPage Collection Partial Failure on page ${p} for query "${query}"]:`, err?.message || err);
+      partialError = err?.message || `Falha na página ${p}`;
+      break;
+    }
+  }
+
+  return {
+    products: allUniqueProducts,
+    uniqueProductsCount: allUniqueProducts.length,
+    pagesConsulted,
+    creditsUsed: totalCreditsUsed,
+    creditsRemaining,
+    hasMore,
+    query,
+    category: query,
+    timestamp: new Date().toISOString(),
+    partialError,
+  };
+}
+
+export function rowToProduct(row: any): MinedProduct {
   return {
     productId: String(row.product_id),
     title: row.title,
