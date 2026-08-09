@@ -3,7 +3,7 @@ import {
   Search, Flame, ShoppingBag, Star, Store, ExternalLink, Play, Eye, Heart,
   MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap, RefreshCw,
   Layers, ShieldCheck, AlertCircle, CheckCircle2, X, Sparkles, Home, Shirt, Utensils,
-  Cpu, Dumbbell, Baby, Dog,
+  Cpu, Dumbbell, Baby, Dog, Copy, Check, Video, Download, FileText, BarChart3, Wand2, Filter
 } from 'lucide-react';
 import {
   loadProductRanking,
@@ -16,6 +16,11 @@ import {
   type CollectorCategoryStat,
   type ProductSearchSource,
 } from '../../services/productMinerApi';
+import {
+  ScriptGeneratorModal,
+  VideoAnalysisModal,
+  VideoDownloadModal,
+} from './ProductMinerModals';
 
 interface ProductMinerPageProps {
   studentCode: string;
@@ -88,10 +93,31 @@ const ProductCard: React.FC<{
   product: ProductMinerProduct;
   position?: number;
   rankingSort?: ProductRankingSort;
-}> = ({ product, position, rankingSort }) => {
+  onOpenScriptModal?: (p: ProductMinerProduct) => void;
+  onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
+  onOpenDownloadModal?: (p: ProductMinerProduct) => void;
+}> = ({
+  product,
+  position,
+  rankingSort,
+  onOpenScriptModal,
+  onOpenAnalysisModal,
+  onOpenDownloadModal,
+}) => {
+  const [linkCopied, setLinkCopied] = useState(false);
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
   const isSpikingRanking = rankingSort === 'spiking';
+
+  const handleCopyVideoLink = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (product.video?.url) {
+      navigator.clipboard.writeText(product.video.url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
 
   return (
     <article className="group rounded-2xl border border-cyan-500/20 bg-slate-950/70 overflow-hidden shadow-lg shadow-cyan-950/10 hover:border-cyan-400/45 transition-all flex flex-col h-full">
@@ -215,7 +241,7 @@ const ProductCard: React.FC<{
         </div>
 
         {product.video ? (
-          <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-3 space-y-2">
+          <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-3 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-bold text-fuchsia-300 truncate">
                 @{product.video.author || 'creator'}
@@ -255,6 +281,61 @@ const ProductCard: React.FC<{
                 {compactNumber(product.video.saves)}
               </span>
             </div>
+
+            {/* Video Action Buttons Area */}
+            <div className="pt-2 border-t border-fuchsia-500/20 space-y-1.5">
+              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => onOpenScriptModal?.(product)}
+                  className="py-1.5 px-2 rounded-lg bg-gradient-to-r from-fuchsia-600/30 to-purple-600/30 border border-fuchsia-500/40 text-fuchsia-200 hover:text-white font-black flex items-center justify-center gap-1 transition-all"
+                >
+                  <Sparkles className="w-3 h-3 text-fuchsia-300" />
+                  ✨ Gerar Roteiro
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenAnalysisModal?.(product)}
+                  className="py-1.5 px-2 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:text-white font-bold flex items-center justify-center gap-1 transition-all"
+                >
+                  <BarChart3 className="w-3 h-3 text-cyan-300" />
+                  🔍 Analisar
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-1 text-[10px]">
+                {product.video.url ? (
+                  <a
+                    href={product.video.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="py-1 px-1.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 hover:text-white font-bold flex items-center justify-center gap-1 truncate"
+                  >
+                    <Play className="w-3 h-3 text-cyan-400" />
+                    Assistir
+                  </a>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={handleCopyVideoLink}
+                  className="py-1 px-1.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 hover:text-white font-bold flex items-center justify-center gap-1 truncate"
+                >
+                  {linkCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                  {linkCopied ? 'Copiado' : 'Copiar'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenDownloadModal?.(product)}
+                  className="py-1 px-1.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 hover:text-white font-bold flex items-center justify-center gap-1 truncate"
+                >
+                  <Download className="w-3 h-3 text-amber-400" />
+                  Baixar
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3 min-h-[78px] flex items-center justify-center text-center">
@@ -275,22 +356,12 @@ const ProductCard: React.FC<{
               Produto <ExternalLink className="w-3.5 h-3.5" />
             </a>
           ) : null}
-
-          {product.video?.url ? (
-            <a
-              href={product.video.url}
-              target="_blank"
-              rel="noreferrer"
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-500/25 px-3 py-2 text-xs font-bold"
-            >
-              Vídeo <Play className="w-3.5 h-3.5" />
-            </a>
-          ) : null}
         </div>
       </div>
     </article>
   );
 };
+
 
 export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   studentCode,
@@ -326,6 +397,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   // Coletor multipágina: até 300 produtos por categoria (padrão 90)
   const [selectedMaxProducts, setSelectedMaxProducts] = useState<number>(90);
 
+  // Local Ranking Filters
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
+  const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
+
+  // Modals state
+  const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
+  const [analysisModalProduct, setAnalysisModalProduct] = useState<ProductMinerProduct | null>(null);
+  const [downloadModalProduct, setDownloadModalProduct] = useState<ProductMinerProduct | null>(null);
+
   const sortedProducts = useMemo(
     () => [...products].sort((a, b) => b.soldCount - a.soldCount),
     [products],
@@ -337,7 +418,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     setRankingLoading(true);
     setError('');
 
-    loadProductRanking(studentCode, 60, rankingSort)
+    loadProductRanking(studentCode, 150, rankingSort)
       .then((data) => {
         setRanking(data.products || []);
         setRankingMeta(data.meta || null);
@@ -345,6 +426,29 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       .catch((err) => setError(err?.message || 'Falha ao carregar ranking.'))
       .finally(() => setRankingLoading(false));
   }, [mode, rankingSort, studentCode]);
+
+  const filteredRanking = useMemo(() => {
+    return ranking.filter((product) => {
+      if (selectedCategory !== 'Todos') {
+        const cat = (product.category || '').toLowerCase();
+        const normCat = cat.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const normTarget = selectedCategory.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (!normCat.includes(normTarget)) return false;
+      }
+
+      if (hasVideoOnly && !product.video) {
+        return false;
+      }
+
+      if (viralVideoOnly) {
+        if (!product.video || (product.video.views ?? 0) < 1000000) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [ranking, selectedCategory, hasVideoOnly, viralVideoOnly]);
 
   const loadCategories = () => {
     if (!canRefresh) return;
@@ -614,39 +718,116 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       </div>
 
       {mode === 'ranking' ? (
-        <div className="rounded-2xl border border-slate-800/90 bg-slate-950/55 p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex gap-2 flex-wrap">
-            {RANKING_FILTERS.map((filter) => (
-              <button
-                key={filter.id}
-                onClick={() => setRankingSort(filter.id)}
-                disabled={rankingLoading}
-                className={`px-3 py-2 rounded-lg text-xs font-black border transition-all ${
-                  rankingSort === filter.id
-                    ? 'border-amber-400/40 bg-amber-500/15 text-amber-300'
-                    : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:text-white'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+        <div className="space-y-3">
+          {/* Main ranking sorting tabs */}
+          <div className="rounded-2xl border border-slate-800/90 bg-slate-950/55 p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex gap-2 flex-wrap">
+              {RANKING_FILTERS.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setRankingSort(filter.id)}
+                  disabled={rankingLoading}
+                  className={`px-3 py-2 rounded-lg text-xs font-black border transition-all ${
+                    rankingSort === filter.id
+                      ? 'border-amber-400/40 bg-amber-500/15 text-amber-300'
+                      : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            {rankingMeta ? (
+              <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>
+                  {rankingMeta.trackedProducts} produtos monitorados
+                </span>
+
+                <span>
+                  • {rankingMeta.with24h} com histórico 24h
+                </span>
+
+                <span>
+                  • {rankingMeta.with7d} com histórico 7d
+                </span>
+              </div>
+            ) : null}
           </div>
 
-          {rankingMeta ? (
-            <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>
-                {rankingMeta.trackedProducts} produtos monitorados
-              </span>
+          {/* Local MySQL Filters: Category & Video Status */}
+          <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/80 p-3.5 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                <Filter className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Filtros do Ranking</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-bold">
+                  0 Créditos • Consulta Local
+                </span>
+              </div>
 
-              <span>
-                • {rankingMeta.with24h} com histórico 24h
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setHasVideoOnly((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                    hasVideoOnly
+                      ? 'border-fuchsia-500/50 bg-fuchsia-500/20 text-fuchsia-300'
+                      : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Play className="w-3 h-3 text-fuchsia-400 fill-current" />
+                  Com vídeo
+                </button>
 
-              <span>
-                • {rankingMeta.with7d} com histórico 7d
-              </span>
+                <button
+                  type="button"
+                  onClick={() => setViralVideoOnly((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                    viralVideoOnly
+                      ? 'border-amber-400/50 bg-amber-500/20 text-amber-300'
+                      : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Flame className="w-3 h-3 text-amber-400 fill-current" />
+                  Vídeo viral (1M+ views)
+                </button>
+
+                {(selectedCategory !== 'Todos' || hasVideoOnly || viralVideoOnly) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory('Todos');
+                      setHasVideoOnly(false);
+                      setViralVideoOnly(false);
+                    }}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 underline font-bold px-1"
+                  >
+                    Limpar filtros
+                  </button>
+                ) : null}
+              </div>
             </div>
-          ) : null}
+
+            {/* Category horizontal selector */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[11px] font-bold text-slate-500 shrink-0 mr-1">Categoria:</span>
+              {['Todos', 'Beleza', 'Casa', 'Moda', 'Cozinha', 'Eletrônicos', 'Fitness', 'Bebê', 'Pet'].map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 border transition-all ${
+                    selectedCategory === cat
+                      ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-300'
+                      : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -692,6 +873,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <ProductCard
                   key={product.productId}
                   product={product}
+                  onOpenScriptModal={(p) => setScriptModalProduct(p)}
+                  onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
+                  onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
                 />
               ))}
             </div>
@@ -733,46 +917,31 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             </div>
           ) : null}
 
-          {!rankingLoading && ranking.length === 0 ? (
+          {!rankingLoading && filteredRanking.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 py-16 px-5 text-center">
               <TrendingUp className="w-9 h-9 text-slate-700 mx-auto" />
 
-              {rankingSort === 'total' ? (
-                <p className="mt-3 text-sm text-slate-500">
-                  Faça algumas buscas para alimentar o ranking.
-                </p>
-              ) : rankingSort === '7d' ? (
-                <>
-                  <p className="mt-3 text-sm font-bold text-slate-300">
-                    Histórico de 7 dias ainda em formação.
-                  </p>
+              <p className="mt-3 text-sm font-bold text-slate-300">
+                Nenhum produto encontrado para os filtros selecionados.
+              </p>
 
-                  <p className="mt-1 text-xs text-slate-600">
-                    O sistema já está guardando snapshots. Esse ranking aparece quando houver base histórica suficiente.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-3 text-sm font-bold text-slate-300">
-                    Histórico de 24 horas ainda em formação.
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-600">
-                    Não é necessário gastar créditos só para preencher isso agora. O ranking aparece após novas coletas ao longo do tempo.
-                  </p>
-                </>
-              )}
+              <p className="mt-1 text-xs text-slate-500">
+                Tente alterar a categoria ou desmarcar os filtros de vídeo.
+              </p>
             </div>
           ) : null}
 
-          {!rankingLoading && ranking.length > 0 ? (
+          {!rankingLoading && filteredRanking.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {ranking.map((product, index) => (
+              {filteredRanking.map((product, index) => (
                 <ProductCard
                   key={product.productId}
                   product={product}
                   position={index + 1}
                   rankingSort={rankingSort}
+                  onOpenScriptModal={(p) => setScriptModalProduct(p)}
+                  onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
+                  onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
                 />
               ))}
             </div>
@@ -1042,6 +1211,26 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           </div>
         </div>
       ) : null}
+      {/* Modais de Ações de Vídeo e IA */}
+      <ScriptGeneratorModal
+        isOpen={Boolean(scriptModalProduct)}
+        onClose={() => setScriptModalProduct(null)}
+        product={scriptModalProduct}
+        studentCode={studentCode}
+      />
+
+      <VideoAnalysisModal
+        isOpen={Boolean(analysisModalProduct)}
+        onClose={() => setAnalysisModalProduct(null)}
+        product={analysisModalProduct}
+        onOpenScriptModal={(p) => setScriptModalProduct(p)}
+      />
+
+      <VideoDownloadModal
+        isOpen={Boolean(downloadModalProduct)}
+        onClose={() => setDownloadModalProduct(null)}
+        product={downloadModalProduct}
+      />
     </section>
   );
 };
