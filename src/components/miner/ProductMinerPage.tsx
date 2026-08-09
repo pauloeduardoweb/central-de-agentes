@@ -315,7 +315,7 @@ const MobileProductCard: React.FC<{
             </div>
 
             {product.score !== undefined && product.score !== null ? (
-              <span className="text-[10px] font-black text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <span className="text-[10px] font-medium text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
                 <Zap className="w-2.5 h-2.5 text-amber-500 fill-current" />
                 Score: {product.score}
               </span>
@@ -335,7 +335,7 @@ const MobileProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="px-2 py-1 rounded bg-white text-amber-800 font-bold border border-amber-300 hover:bg-amber-50 shadow-sm flex items-center gap-1"
+                  className="px-2 py-1 rounded bg-white text-amber-800 font-bold border border-slate-200 hover:bg-slate-50 shadow-sm flex items-center gap-1"
                   title="Gerar Roteiro"
                 >
                   <Sparkles className="w-2.5 h-2.5 text-amber-600" />
@@ -443,9 +443,9 @@ const ProductCard: React.FC<{
 
       <div className="p-4 space-y-3 flex-1 flex flex-col">
         {product.score !== undefined && product.score !== null ? (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold self-start shadow-sm">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-normal self-start shadow-sm">
             <Zap className="w-3.5 h-3.5 text-amber-500 fill-current" />
-            <span>Score Geração Z Pro: <strong className="text-amber-950 font-black">{product.score}</strong>/100</span>
+            <span>Score Geração Z Pro: <span className="text-amber-950 font-medium">{product.score}</span>/100</span>
           </div>
         ) : null}
 
@@ -583,7 +583,7 @@ const ProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="py-1.5 px-2 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-50 font-black flex items-center justify-center gap-1 transition-all shadow-sm"
+                  className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-amber-800 hover:bg-slate-50 font-bold flex items-center justify-center gap-1 transition-all shadow-sm"
                 >
                   <Sparkles className="w-3 h-3 text-amber-600" />
                   ✨ Gerar Roteiro
@@ -733,6 +733,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
+  // Ranking Pagination State
+  const [rankingPage, setRankingPage] = useState<number>(1);
+
+  // Reset ranking page whenever any filter, classification, sort, or mode changes
+  useEffect(() => {
+    setRankingPage(1);
+  }, [selectedCategory, hasVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
+
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
   const [analysisModalProduct, setAnalysisModalProduct] = useState<ProductMinerProduct | null>(null);
@@ -802,6 +810,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
     return copy;
   }, [products, ranking, mode, selectedCategory, hasVideoOnly, viralVideoOnly, selectedClassification]);
+
+  const currentRenderProducts = useMemo(() => {
+    if (mode === 'ranking') {
+      const start = (rankingPage - 1) * 30;
+      return displayProducts.slice(start, start + 30);
+    }
+    return displayProducts;
+  }, [displayProducts, mode, rankingPage]);
+
+  const totalRankingPages = useMemo(() => {
+    if (mode !== 'ranking') return 1;
+    return Math.max(1, Math.ceil(displayProducts.length / 30));
+  }, [displayProducts.length, mode]);
 
   const loadDailyStatus = async () => {
     if (!canRefresh) return;
@@ -972,23 +993,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-amber-600 text-xs font-black uppercase tracking-[0.18em]">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              Inteligência de Mercado
-            </div>
-
-            <h1 className="mt-1 text-xl sm:text-2xl md:text-3xl font-black text-slate-900">
-              Minerar Produtos
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900">
+              Minerar Produtos TikTok Shop
             </h1>
           </div>
 
           <div className="flex items-center gap-2 text-[11px]">
             <span className="px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold">
               🇧🇷 Região BR
-            </span>
-
-            <span className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 font-bold">
-              30 prod/pág
             </span>
           </div>
         </div>
@@ -1014,12 +1026,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <button
               onClick={() => runSearch(query, 1, false)}
               disabled={loading || query.trim().length === 1}
-              className="flex-1 sm:flex-none h-10 sm:h-11 px-5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs sm:text-sm font-black disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition-all"
+              className="flex-1 sm:flex-none h-10 sm:h-11 px-5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm transition-all"
             >
               {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
               ) : (
-                <Database className="w-4 h-4" />
+                <Database className="w-4 h-4 text-amber-600" />
               )}
               Pesquisar
             </button>
@@ -1052,7 +1064,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <Trophy className="w-3.5 h-3.5 text-amber-500" />
             Classificações de Produtos
           </span>
-          <span className="text-[10px] text-slate-500 font-medium">Inspirado no TikTok Shop</span>
         </div>
 
         {/* Horizontal scrollable row of classification icons (~4 visible on mobile + peek of 5th) */}
@@ -1313,34 +1324,40 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <>
               {/* Mobile View: Compact Vertical List (TikTok Shop inspired layout) */}
               <div className="block sm:hidden space-y-2.5">
-                {displayProducts.map((product, index) => (
-                  <MobileProductCard
-                    key={product.productId}
-                    product={product}
-                    position={index + 1}
-                    rankingSort={rankingSort}
-                    isMentor={canRefresh}
-                    onOpenScriptModal={(p) => setScriptModalProduct(p)}
-                    onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
-                    onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
-                  />
-                ))}
+                {currentRenderProducts.map((product, index) => {
+                  const globalPos = mode === 'ranking' ? (rankingPage - 1) * 30 + index + 1 : index + 1;
+                  return (
+                    <MobileProductCard
+                      key={product.productId}
+                      product={product}
+                      position={globalPos}
+                      rankingSort={rankingSort}
+                      isMentor={canRefresh}
+                      onOpenScriptModal={(p) => setScriptModalProduct(p)}
+                      onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
+                      onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
+                    />
+                  );
+                })}
               </div>
 
               {/* Desktop View: Full Rich Grid */}
               <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                {displayProducts.map((product, index) => (
-                  <ProductCard
-                    key={product.productId}
-                    product={product}
-                    position={index + 1}
-                    rankingSort={rankingSort}
-                    isMentor={canRefresh}
-                    onOpenScriptModal={(p) => setScriptModalProduct(p)}
-                    onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
-                    onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
-                  />
-                ))}
+                {currentRenderProducts.map((product, index) => {
+                  const globalPos = mode === 'ranking' ? (rankingPage - 1) * 30 + index + 1 : index + 1;
+                  return (
+                    <ProductCard
+                      key={product.productId}
+                      product={product}
+                      position={globalPos}
+                      rankingSort={rankingSort}
+                      isMentor={canRefresh}
+                      onOpenScriptModal={(p) => setScriptModalProduct(p)}
+                      onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
+                      onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
+                    />
+                  );
+                })}
               </div>
 
               {/* Pagination controls for Search mode */}
@@ -1348,20 +1365,57 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div className="flex items-center justify-center gap-3 pt-4">
                   <button
                     disabled={page <= 1}
-                    onClick={() => runSearch(query, page - 1, false)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm"
+                    onClick={() => {
+                      runSearch(query, page - 1, false);
+                      window.scrollTo({ top: 350, behavior: 'smooth' });
+                    }}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm transition-all"
                   >
                     Anterior
                   </button>
 
-                  <span className="text-xs text-slate-500 font-semibold">
+                  <span className="text-xs text-slate-600 font-semibold bg-white border border-slate-200 px-3.5 py-2 rounded-xl shadow-sm">
                     Página {page}
                   </span>
 
                   <button
                     disabled={!hasMore}
-                    onClick={() => runSearch(query, page + 1, false)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm"
+                    onClick={() => {
+                      runSearch(query, page + 1, false);
+                      window.scrollTo({ top: 350, behavior: 'smooth' });
+                    }}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm transition-all"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              ) : null}
+
+              {/* Pagination controls for Ranking mode */}
+              {mode === 'ranking' && totalRankingPages > 1 ? (
+                <div className="flex items-center justify-center gap-3 pt-4">
+                  <button
+                    disabled={rankingPage <= 1}
+                    onClick={() => {
+                      setRankingPage((p) => Math.max(1, p - 1));
+                      window.scrollTo({ top: 350, behavior: 'smooth' });
+                    }}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm transition-all"
+                  >
+                    Anterior
+                  </button>
+
+                  <span className="text-xs text-slate-600 font-semibold bg-white border border-slate-200 px-3.5 py-2 rounded-xl shadow-sm">
+                    Página {rankingPage} de {totalRankingPages}
+                  </span>
+
+                  <button
+                    disabled={rankingPage >= totalRankingPages}
+                    onClick={() => {
+                      setRankingPage((p) => Math.min(totalRankingPages, p + 1));
+                      window.scrollTo({ top: 350, behavior: 'smooth' });
+                    }}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm transition-all"
                   >
                     Próxima
                   </button>
