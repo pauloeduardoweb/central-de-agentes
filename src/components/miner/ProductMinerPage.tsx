@@ -4,7 +4,8 @@ import {
   MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap, RefreshCw,
   Layers, ShieldCheck, AlertCircle, CheckCircle2, X, Sparkles, Home, Shirt, Utensils,
   Cpu, Dumbbell, Baby, Dog, Copy, Check, Video, Download, FileText, BarChart3, Wand2, Filter,
-  Trophy, ThumbsUp, SlidersHorizontal, ChevronDown, ChevronUp
+  Trophy, ThumbsUp, SlidersHorizontal, ChevronDown, ChevronUp,
+  BadgeDollarSign, Clock3, Rocket, Clapperboard, Gauge
 } from 'lucide-react';
 import {
   loadProductRanking,
@@ -41,7 +42,17 @@ const RANKING_FILTERS: Array<{ id: ProductRankingSort; label: string }> = [
   { id: 'spiking', label: '🔥 Disparando' },
 ];
 
-export type ClassificationType = 'best_sellers' | 'top_rated' | 'trending' | 'most_searched' | 'editors_choice';
+export type ClassificationType =
+  | 'best_sellers'
+  | 'top_rated'
+  | 'trending'
+  | 'most_searched'
+  | 'editors_choice'
+  | 'highest_commission'
+  | 'sales_24h'
+  | 'spiking'
+  | 'viral_video'
+  | 'score_geraz';
 
 export interface ClassificationItem {
   id: ClassificationType;
@@ -51,35 +62,67 @@ export interface ClassificationItem {
 }
 
 const CLASSIFICATIONS: ClassificationItem[] = [
+  // 1-5: TikTok Shop standard navigation
   {
     id: 'best_sellers',
     label: 'Mais vendidos',
     imgUrl: 'https://i.postimg.cc/tg8X1nND/troféu.jpg',
-    fallbackIcon: <Trophy className="w-6 h-6 text-amber-400" />,
+    fallbackIcon: <Trophy className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'top_rated',
     label: 'Melhores avaliações',
     imgUrl: 'https://i.postimg.cc/JnJRj7p3/Like.jpg',
-    fallbackIcon: <ThumbsUp className="w-6 h-6 text-blue-400" />,
+    fallbackIcon: <ThumbsUp className="w-6 h-6 text-blue-500" />,
   },
   {
     id: 'trending',
     label: 'Tendências',
     imgUrl: 'https://i.postimg.cc/26vCnj0n/Fogo.jpg',
-    fallbackIcon: <Flame className="w-6 h-6 text-orange-400" />,
+    fallbackIcon: <Flame className="w-6 h-6 text-orange-500" />,
   },
   {
     id: 'most_searched',
     label: 'Mais pesquisados',
     imgUrl: 'https://i.postimg.cc/PxZd1fSW/Lupa.jpg',
-    fallbackIcon: <Search className="w-6 h-6 text-cyan-400" />,
+    fallbackIcon: <Search className="w-6 h-6 text-cyan-500" />,
   },
   {
     id: 'editors_choice',
     label: 'Escolha do dia',
     imgUrl: 'https://i.postimg.cc/767qSPKN/coração.jpg',
-    fallbackIcon: <Heart className="w-6 h-6 text-rose-400" />,
+    fallbackIcon: <Heart className="w-6 h-6 text-rose-500" />,
+  },
+  // 6-10: Geração Z Pro Exclusive Intelligence
+  {
+    id: 'highest_commission',
+    label: 'Maior Comissão',
+    imgUrl: '',
+    fallbackIcon: <BadgeDollarSign className="w-6 h-6 text-amber-600" />,
+  },
+  {
+    id: 'sales_24h',
+    label: 'Vendas 24h',
+    imgUrl: '',
+    fallbackIcon: <Clock3 className="w-6 h-6 text-amber-600" />,
+  },
+  {
+    id: 'spiking',
+    label: 'Disparando',
+    imgUrl: '',
+    fallbackIcon: <Rocket className="w-6 h-6 text-amber-600" />,
+  },
+  {
+    id: 'viral_video',
+    label: 'Vídeo Viral',
+    imgUrl: '',
+    fallbackIcon: <Clapperboard className="w-6 h-6 text-amber-600" />,
+  },
+  {
+    id: 'score_geraz',
+    label: 'Score Geração Z Pro',
+    imgUrl: '',
+    fallbackIcon: <Gauge className="w-6 h-6 text-amber-600" />,
   },
 ];
 
@@ -420,7 +463,7 @@ const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive
           : 'border-slate-200 bg-slate-100 hover:border-slate-300 hover:bg-slate-200/80'
       }`}
     >
-      {!imgError ? (
+      {item.imgUrl && !imgError ? (
         <img
           src={item.imgUrl}
           alt={item.label}
@@ -1078,6 +1121,41 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         if (scoreDiff !== 0) return scoreDiff;
         return (b.soldCount || 0) - (a.soldCount || 0);
       });
+    } else if (selectedClassification === 'highest_commission') {
+      copy.sort((a, b) => {
+        const commB = b.estimatedCommissionCents ?? (b.commissionRatePercent && b.priceCents ? Math.round((b.priceCents * b.commissionRatePercent) / 100) : 0);
+        const commA = a.estimatedCommissionCents ?? (a.commissionRatePercent && a.priceCents ? Math.round((a.priceCents * a.commissionRatePercent) / 100) : 0);
+        if (commB !== commA) return commB - commA;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
+    } else if (selectedClassification === 'sales_24h') {
+      copy.sort((a, b) => {
+        const s24b = b.sales24h ?? 0;
+        const s24a = a.sales24h ?? 0;
+        if (s24b !== s24a) return s24b - s24a;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
+    } else if (selectedClassification === 'spiking') {
+      copy.sort((a, b) => {
+        const spikeB = (b.growth24hPercent ?? 0) * 100 + (b.sales24h ?? 0);
+        const spikeA = (a.growth24hPercent ?? 0) * 100 + (a.sales24h ?? 0);
+        if (spikeB !== spikeA) return spikeB - spikeA;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
+    } else if (selectedClassification === 'viral_video') {
+      copy.sort((a, b) => {
+        const vB = b.video?.views ?? (b.video?.url ? 1 : 0);
+        const vA = a.video?.views ?? (a.video?.url ? 1 : 0);
+        if (vB !== vA) return vB - vA;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
+    } else if (selectedClassification === 'score_geraz') {
+      copy.sort((a, b) => {
+        const scB = b.score ?? 0;
+        const scA = a.score ?? 0;
+        if (scB !== scA) return scB - scA;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
     }
 
     return copy;
@@ -1280,7 +1358,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-amber-600">
               Minerar Produtos TikTok Shop
             </h1>
           </div>
@@ -1343,7 +1421,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       </div>
 
       {/* ================================================== */}
-      {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (TIKTOK SHOP STYLE) */}
+      {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (10 CLASSIFICATIONS)*/}
       {/* ================================================== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
@@ -1351,30 +1429,45 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <Trophy className="w-3.5 h-3.5 text-amber-500" />
             Classificações de Produtos
           </span>
+          <span className="text-[10px] font-bold text-slate-400">
+            10 inteligências
+          </span>
         </div>
 
-        {/* Horizontal scrollable row of classification icons (~4 visible on mobile + peek of 5th) */}
-        <div className="flex items-start justify-between sm:justify-start gap-2 sm:gap-5 overflow-x-auto pb-2 pt-1 scrollbar-none snap-x">
-          {CLASSIFICATIONS.map((c) => {
-            const isActive = selectedClassification === c.id;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setSelectedClassification(c.id)}
-                className="flex flex-col items-center shrink-0 w-[78px] sm:w-[90px] md:w-auto group focus:outline-none snap-start"
-              >
-                <ClassificationIconComponent item={c} isActive={isActive} />
-                <span
-                  className={`text-[11px] font-bold text-center mt-1.5 leading-tight max-w-[80px] transition-colors ${
-                    isActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
-                  }`}
+        {/* Horizontal scrollable row of classification icons (~4 visible on mobile + scrollable) */}
+        <div
+          className="w-full overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1"
+          onWheel={(e) => {
+            if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+              e.currentTarget.scrollLeft += e.deltaY;
+            }
+          }}
+        >
+          <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 pr-6">
+            {CLASSIFICATIONS.map((c) => {
+              const isActive = selectedClassification === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedClassification(c.id);
+                    setPage(1);
+                  }}
+                  className="flex flex-col items-center shrink-0 w-[80px] sm:w-[92px] group focus:outline-none"
                 >
-                  {c.label}
-                </span>
-              </button>
-            );
-          })}
+                  <ClassificationIconComponent item={c} isActive={isActive} />
+                  <span
+                    className={`text-[11px] font-bold text-center mt-1.5 leading-tight max-w-[84px] transition-colors ${
+                      isActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
+                    }`}
+                  >
+                    {c.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
