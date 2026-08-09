@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Package,
   Trophy,
   Users,
   Key,
@@ -9,11 +8,7 @@ import {
   ArrowLeft,
   Crown,
   Video,
-  ArrowRight,
-  CheckCircle2,
-  Sparkles,
 } from 'lucide-react';
-import { ProductLibrary } from './ProductLibrary';
 import { MentorStudentsList } from './MentorStudentsList';
 import { MentorOnlineMonitoring } from './MentorOnlineMonitoring';
 import { MentorChallenges } from './MentorChallenges';
@@ -29,8 +24,15 @@ interface MentorPanelProps {
 }
 
 export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToHub, onTabChange, initialTab }) => {
-  const [activeTab, setActiveTab] = useState<string>(initialTab && initialTab !== 'products' ? initialTab : 'challenges');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return initialTab && initialTab !== 'products' ? initialTab : 'challenges';
+  });
   const [profile, setProfile] = useState<any>(null);
+
+  const onTabChangeRef = useRef(onTabChange);
+  useEffect(() => {
+    onTabChangeRef.current = onTabChange;
+  }, [onTabChange]);
 
   useEffect(() => {
     if (!studentCode) return;
@@ -49,16 +51,18 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
   }, [studentCode]);
 
   useEffect(() => {
-    if (initialTab) {
+    if (initialTab && initialTab !== 'products' && initialTab !== activeTab) {
       setActiveTab(initialTab);
     }
   }, [initialTab]);
 
+  const prevActiveTabRef = useRef<string>(activeTab);
   useEffect(() => {
-    if (onTabChange) {
-      onTabChange(activeTab);
+    if (prevActiveTabRef.current !== activeTab) {
+      prevActiveTabRef.current = activeTab;
+      onTabChangeRef.current?.(activeTab);
     }
-  }, [activeTab, onTabChange]);
+  }, [activeTab]);
 
   // If viewing TikTok Integration, completely unmount the Dashboard header & grid
   if (activeTab === 'tiktok') {
@@ -267,9 +271,6 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
 
       {/* Tab Content Display */}
       <div className="pt-2">
-        {activeTab === 'products' && (
-          <ProductLibrary studentCode={studentCode} />
-        )}
         {activeTab === 'challenges' && (
           <MentorChallenges studentCode={studentCode} />
         )}
