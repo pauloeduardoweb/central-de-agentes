@@ -83,15 +83,100 @@ const CLASSIFICATIONS: ClassificationItem[] = [
   },
 ];
 
-const TIKTOK_CATEGORIES = [
-  { filterKey: 'Moda', label: 'Moda' },
-  { filterKey: 'Itens para Casa', label: 'Itens para Casa' },
-  { filterKey: 'Eletrônicos', label: 'Eletrônicos' },
-  { filterKey: 'Beleza e Cuidados Pessoais', label: 'Beleza e Cuidados Pessoais' },
-  { filterKey: 'Esporte e Lazer', label: 'Esporte e Lazer' },
-  { filterKey: 'Brinquedos e Pets', label: 'Brinquedos e Pets' },
-  { filterKey: 'Health', label: 'Health' },
+export interface CategoryConfigItem {
+  filterKey: string;
+  label: string;
+  subcategories: string[];
+}
+
+export const CATEGORY_CONFIG: CategoryConfigItem[] = [
+  {
+    filterKey: 'Moda',
+    label: 'Moda',
+    subcategories: [
+      'Todas',
+      'Acessórios',
+      'Malas e Mochilas',
+      'Moda Feminina',
+      'Moda Masculina',
+      'Calçados',
+    ],
+  },
+  {
+    filterKey: 'Itens para Casa',
+    label: 'Itens para Casa',
+    subcategories: [
+      'Todas',
+      'Utensílios de Cozinha',
+      'Móveis',
+      'Ferramentas',
+      'Artigos para Festas',
+      'Reforma e Construção',
+      'Itens para Banheiro',
+      'Produtos de Limpeza',
+      'Decoração de Casa',
+      'Cama, Mesa e Banho',
+    ],
+  },
+  {
+    filterKey: 'Eletrônicos',
+    label: 'Eletrônicos',
+    subcategories: [
+      'Todas',
+      'Celulares e Eletrônicos',
+      'Livros e Revistas',
+      'Automotivo',
+      'Computadores e Equipamentos',
+      'Dispositivos de Higiene',
+      'Eletrodomésticos',
+      'Livros e Áudio',
+    ],
+  },
+  {
+    filterKey: 'Beleza e Cuidados Pessoais',
+    label: 'Beleza e Cuidados Pessoais',
+    subcategories: [
+      'Todas',
+      'Maquiagem',
+      'Cuidados Capilares',
+      'Perfumes',
+      'Cuidados com o Corpo',
+      'Cuidados Masculinos',
+      'Cuidados com a Pele',
+    ],
+  },
+  {
+    filterKey: 'Esportes e Lazer',
+    label: 'Esportes e Lazer',
+    subcategories: [
+      'Todas',
+      'Fitness',
+      'Equipamentos para Lazer',
+      'Roupas Esportivas',
+      'Acessórios para Esportes',
+      'Calçados Esportivos',
+    ],
+  },
+  {
+    filterKey: 'Brinquedos e Pets',
+    label: 'Brinquedos e Pets',
+    subcategories: [
+      'Todas',
+      'Produtos para Pets',
+      'Suprimentos para Pets',
+    ],
+  },
+  {
+    filterKey: 'Health',
+    label: 'Health',
+    subcategories: [
+      'Todas',
+      'Health Nutrition',
+    ],
+  },
 ];
+
+const TIKTOK_CATEGORIES = CATEGORY_CONFIG.map((c) => ({ filterKey: c.filterKey, label: c.label }));
 
 function formatMoney(cents: number | null | undefined, symbol = 'R$') {
   if (cents === null || cents === undefined) return '—';
@@ -175,6 +260,87 @@ function matchesCategoryFilter(productCatRaw: string | null, selectedCat: string
   }
 
   return cat.includes(target);
+}
+
+function matchesSubcategoryFilter(
+  productCatRaw: string | null | undefined,
+  productTitleRaw: string | null | undefined,
+  selectedSubcat: string,
+  selectedCat: string
+): boolean {
+  if (!selectedSubcat || selectedSubcat === 'Todas' || selectedSubcat === 'Todos') {
+    return true;
+  }
+
+  const catStr = (productCatRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const titleStr = (productTitleRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const fullText = `${catStr} ${titleStr}`;
+
+  const sub = selectedSubcat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  const KEYWORD_MAP: Record<string, string[]> = {
+    // Moda
+    'acessorios': ['acessorio', 'bijuteria', 'joia', 'relogio', 'oculos', 'chapeu', 'cinto', 'bolsa', 'corrente', 'brinco', 'colar', 'anel'],
+    'malas e mochilas': ['mala', 'mochila', 'bagagem', 'pochete', 'carteira', 'necessaire'],
+    'moda feminina': ['feminina', 'feminino', 'vestido', 'saia', 'suti', 'lingerie', 'blusa', 'top', 'blazer', 'cropped', 'body'],
+    'moda masculina': ['masculina', 'masculino', 'camisa', 'camiseta', 'bermuda', 'cueca', 'jaqueta', 'casaco', 'paleto'],
+    'calcados': ['calcado', 'sapato', 'tenis', 'sandalia', 'chinelo', 'bota', 'sapatilha', 'crocs', 'rasteira', 'salto'],
+
+    // Itens para Casa
+    'utensilios de cozinha': ['cozinha', 'utensilio', 'panela', 'faca', 'copo', 'prato', 'xicara', 'airfryer', 'air fryer', 'liquidificador', 'pote', 'organizador de cozinha', 'forma', 'assadeira', 'garrafa termica'],
+    'moveis': ['moveis', 'movel', 'mesa', 'cadeira', 'sofa', 'estante', 'armario', 'cama', 'rack', 'escrivaninha', 'banqueta'],
+    'ferramentas': ['ferramenta', 'furadeira', 'parafusadeira', 'chave', 'alicate', 'trena', 'martelo', 'jogo de chaves', 'broca'],
+    'artigos para festas': ['festa', 'balao', 'aniversario', 'decoracao de festa', 'lembrancinha', 'painel de festa'],
+    'reforma e construcao': ['reforma', 'construcao', 'torneira', 'piso', 'tinta', 'soquete', 'lampada', 'tomada', 'chuveiro', 'fechadura', 'fita adesiva'],
+    'itens para banheiro': ['banheiro', 'toalha de banho', 'chuveiro', 'saboneteira', 'porta escova', 'tapete de banheiro', 'suporte banheiro'],
+    'produtos de limpeza': ['limpeza', 'vassoura', 'rodo', 'mop', 'detergente', 'desinfetante', 'pano', 'esponja', 'sabao', 'amaciante', 'aspirador'],
+    'decoracao de casa': ['decoracao', 'quadro', 'espelho', 'vela', 'vaso', 'almofada', 'tapete', 'luminaria', 'cortina', 'relogio de parede'],
+    'cama, mesa e banho': ['cama', 'mesa e banho', 'lencol', 'travesseiro', 'edredom', 'manta', 'toalha', 'fronha', 'coberdrom'],
+
+    // Eletrônicos
+    'celulares e eletronicos': ['celular', 'smartphone', 'capinha', 'pelicula', 'carregador', 'fone', 'headphone', 'bluetooth', 'eletronico', 'smartwatch', 'relogio inteligente'],
+    'livros e revistas': ['livro', 'revista', 'hq', 'manga', 'e-book', 'leitura'],
+    'automotivo': ['automotivo', 'carro', 'moto', 'suporte celular', 'suporte carro', 'veiculo', 'som automotivo', 'camera re'],
+    'computadores e equipamentos': ['computador', 'notebook', 'laptop', 'teclado', 'mouse', 'monitor', 'pc', 'hardware', 'usb', 'hub', 'placa'],
+    'dispositivos de higiene': ['higiene', 'escova eletrica', 'barbeador', 'aparador', 'secador', 'prancha', 'chapinha', 'irrigador'],
+    'eletrodomesticos': ['eletrodomestico', 'geladeira', 'fogao', 'microondas', 'ventilador', 'ar condicionado', 'aspirador', 'batedeira', 'fritadeira'],
+    'livros e audio': ['audio', 'caixa de som', 'soundbar', 'microfone', 'headset', 'speaker', 'amplificador'],
+
+    // Beleza e Cuidados Pessoais
+    'maquiagem': ['maquiagem', 'batom', 'base', 'corretivo', 'rimel', 'pincel', 'sombra', 'gloss', 'delineador', 'blush', 'iluminador'],
+    'cuidados capilares': ['cabelo', 'shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'tintura', 'creme de pentear', 'reparador'],
+    'perfumes': ['perfume', 'fragrancia', 'colonia', 'body splash', 'eau de parfum', 'decant'],
+    'cuidados com o corpo': ['corpo', 'hidratante', 'sabonete', 'desodorante', 'esfoliante', 'locao corporal', 'óleo corporal'],
+    'cuidados masculinos': ['masculinos', 'masculino', 'barba', 'pos barba', 'locao', 'gel de barbear', 'pomada capilar', 'balm'],
+    'cuidados com a pele': ['pele', 'skincare', 'protetor solar', 'serum', 'retinol', 'hidratante facial', 'vitamina c', 'sabonete facial', 'tonico'],
+
+    // Esportes e Lazer
+    'fitness': ['fitness', 'academia', 'haltere', 'elastico', 'corda', 'colchonete', 'whey', 'suplemento', 'halter', 'faixa elastica', 'pesos'],
+    'equipamentos para lazer': ['lazer', 'camping', 'barraca', 'pesca', 'piscina', 'patins', 'skate', 'boia', 'lanterna'],
+    'roupas esportivas': ['roupas esportivas', 'roupa esportiva', 'top esportivo', 'legging', 'bermuda treino', 'dry fit', 'regata treino', 'conjunto fitness'],
+    'acessorios para esportes': ['acessorios para esportes', 'garrafa', 'squeeze', 'luva academia', 'faixa', 'joelheira', 'bolsa academia', 'caneleira'],
+    'calcados esportivos': ['calcados esportivos', 'tenis corrida', 'chuteira', 'tenis treino', 'tenis academia'],
+
+    // Brinquedos e Pets
+    'produtos para pets': ['pet', 'cachorro', 'gato', 'coleira', 'caminha pet', 'racao', 'arranhador', 'brinquedo pet', 'guia'],
+    'suprimentos para pets': ['suprimentos para pets', 'tapete higienico', 'comedouro', 'bebedouro', 'shampoo pet', 'caixa de areia', 'eliminador de odores'],
+
+    // Health
+    'health nutrition': ['nutrition', 'nutricao', 'suplemento', 'vitamina', 'whey', 'creatina', 'colageno', 'omega 3', 'protein', 'termogenico', 'pre treino'],
+  };
+
+  const keywords = KEYWORD_MAP[sub];
+  if (keywords && keywords.length > 0) {
+    const hasMatch = keywords.some((kw) => fullText.includes(kw));
+    if (hasMatch) return true;
+  }
+
+  const subWords = sub.split(/\s+/).filter((w) => w.length > 3 && w !== 'para' && w !== 'com');
+  if (subWords.length > 0) {
+    return subWords.some((word) => fullText.includes(word));
+  }
+
+  return fullText.includes(sub);
 }
 
 const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive: boolean }> = ({ item, isActive }) => {
@@ -729,17 +895,24 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   // Local Ranking Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('Todas');
   const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
+  const activeCategoryConfig = useMemo(
+    () => CATEGORY_CONFIG.find((c) => c.filterKey === selectedCategory),
+    [selectedCategory]
+  );
+
   // Ranking Pagination State
   const [rankingPage, setRankingPage] = useState<number>(1);
 
-  // Reset ranking page whenever any filter, classification, sort, or mode changes
+  // Reset ranking page and search page whenever any filter, subcategory, classification, sort, or mode changes
   useEffect(() => {
     setRankingPage(1);
-  }, [selectedCategory, hasVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
+    setPage(1);
+  }, [selectedCategory, selectedSubcategory, hasVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
 
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
@@ -789,12 +962,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     };
   }, [mode, rankingSort, studentCode]);
 
-  /* Unified Display List applying Category Filter + Classification Order */
+  /* Unified Display List applying Category Filter + Subcategory Filter + Classification Order */
   const displayProducts = useMemo(() => {
     let list = mode === 'ranking' ? ranking : products;
 
-    // 1. Filter by TikTok category
+    // 1. Filter by TikTok main category
     list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory));
+
+    // 1b. Filter by subcategory
+    if (selectedSubcategory && selectedSubcategory !== 'Todas' && selectedSubcategory !== 'Todos') {
+      list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedSubcategory, selectedCategory));
+    }
 
     // 2. Filter by video options
     if (hasVideoOnly) {
@@ -837,7 +1015,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
 
     return copy;
-  }, [products, ranking, mode, selectedCategory, hasVideoOnly, viralVideoOnly, selectedClassification]);
+  }, [products, ranking, mode, selectedCategory, selectedSubcategory, hasVideoOnly, viralVideoOnly, selectedClassification]);
 
   const totalRankingPages = useMemo(() => {
     if (mode !== 'ranking') return 1;
@@ -1024,7 +1202,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
   }, [mode]);
 
-  const activeFilterCount = (selectedCategory !== 'Todos' ? 1 : 0) + (hasVideoOnly ? 1 : 0) + (viralVideoOnly ? 1 : 0);
+  const activeFilterCount =
+    (selectedCategory !== 'Todos' ? 1 : 0) +
+    (selectedSubcategory !== 'Todas' ? 1 : 0) +
+    (hasVideoOnly ? 1 : 0) +
+    (viralVideoOnly ? 1 : 0);
 
   return (
     <section className="space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
@@ -1131,14 +1313,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       </div>
 
       {/* ================================================== */}
-      {/* 2 — CATEGORIAS DO TIKTOK SHOP                      */}
+      {/* 2 — CATEGORIAS E SUBCATEGORIAS TIKTOK SHOP          */}
       {/* ================================================== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-sm">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-600">Categorias:</span>
           {selectedCategory && selectedCategory !== 'Todos' ? (
             <button
-              onClick={() => setSelectedCategory('Todos')}
+              type="button"
+              onClick={() => {
+                setSelectedCategory('Todos');
+                setSelectedSubcategory('Todas');
+              }}
               className="text-[10px] font-bold text-rose-600 hover:underline"
             >
               Limpar filtro
@@ -1148,13 +1334,21 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
         {/* Categories Pills Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none snap-x">
-          {TIKTOK_CATEGORIES.map((cat) => {
+          {CATEGORY_CONFIG.map((cat) => {
             const isActive = selectedCategory === cat.filterKey;
             return (
               <button
                 key={cat.filterKey}
                 type="button"
-                onClick={() => setSelectedCategory(isActive ? 'Todos' : cat.filterKey)}
+                onClick={() => {
+                  if (isActive) {
+                    setSelectedCategory('Todos');
+                    setSelectedSubcategory('Todas');
+                  } else {
+                    setSelectedCategory(cat.filterKey);
+                    setSelectedSubcategory('Todas');
+                  }
+                }}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all snap-start whitespace-nowrap ${
                   isActive
                     ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
@@ -1166,6 +1360,45 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             );
           })}
         </div>
+
+        {/* Subcategories Horizontal Scroll Row (Renders when a main category is selected) */}
+        {activeCategoryConfig ? (
+          <div className="pt-2 border-t border-slate-100 space-y-1.5 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Subcategorias de <span className="font-black text-slate-800">{activeCategoryConfig.label}</span>:
+              </span>
+              {selectedSubcategory && selectedSubcategory !== 'Todas' ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedSubcategory('Todas')}
+                  className="text-[10px] font-bold text-amber-700 hover:underline"
+                >
+                  Ver todas de {activeCategoryConfig.label}
+                </button>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none snap-x">
+              {activeCategoryConfig.subcategories.map((subcat) => {
+                const isSubActive = selectedSubcategory === subcat;
+                return (
+                  <button
+                    key={subcat}
+                    type="button"
+                    onClick={() => setSelectedSubcategory(subcat)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 border transition-all snap-start whitespace-nowrap ${
+                      isSubActive
+                        ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
+                    }`}
+                  >
+                    {subcat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* ================================================== */}
@@ -1251,6 +1484,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <button
               onClick={() => {
                 setSelectedCategory('Todos');
+                setSelectedSubcategory('Todas');
                 setHasVideoOnly(false);
                 setViralVideoOnly(false);
               }}
@@ -1407,11 +1641,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 Tente selecionar outra categoria ou classificação, ou realize uma pesquisa diferente no campo acima.
               </p>
-              {(selectedCategory !== 'Todos' || hasVideoOnly || viralVideoOnly) ? (
+              {(selectedCategory !== 'Todos' || selectedSubcategory !== 'Todas' || hasVideoOnly || viralVideoOnly) ? (
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedCategory('Todos');
+                    setSelectedSubcategory('Todas');
                     setHasVideoOnly(false);
                     setViralVideoOnly(false);
                   }}
