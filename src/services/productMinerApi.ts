@@ -167,3 +167,79 @@ export async function loadProductRanking(studentCode: string, limit = 50, sort: 
   if (!response.ok) throw accessError(data);
   return data as { success: true; products: ProductMinerProduct[]; meta: ProductRankingMeta };
 }
+
+export type ProductScriptType = 'roteiro_completo' | 'roteiro_viral' | 'copy_venda' | 'hooks' | 'cta';
+
+export async function generateProductScript(
+  studentCode: string,
+  product: ProductMinerProduct,
+  scriptType: ProductScriptType,
+  customPrompt?: string,
+  variantSeed?: number
+): Promise<{ success: boolean; script: string }> {
+  const response = await fetch('/api/product-miner/generate-script', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      product,
+      scriptType,
+      customPrompt,
+      variantSeed,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data as { success: true; script: string };
+}
+
+export type VideoStrength = 'Fraco' | 'Bom' | 'Forte' | 'Viral';
+
+export function calculateVideoAnalysis(video: ProductMinerProduct['video']) {
+  if (!video) return null;
+
+  const views = Number(video.views || 0);
+  const likes = Number(video.likes || 0);
+  const comments = Number(video.comments || 0);
+  const shares = Number(video.shares || 0);
+  const saves = Number(video.saves || 0);
+  const followers = Number(video.authorFollowers || 0);
+
+  const totalInteractions = likes + comments + shares + saves;
+  const engagementRate = views > 0 ? (totalInteractions / views) * 100 : 0;
+
+  let classification: VideoStrength = 'Fraco';
+  let badgeColor = 'bg-slate-800/80 text-slate-300 border-slate-700';
+  let scorePercent = 25;
+
+  if (views >= 1000000 || (views >= 300000 && engagementRate >= 5)) {
+    classification = 'Viral';
+    badgeColor = 'bg-gradient-to-r from-amber-500/20 to-rose-500/20 text-amber-300 border-amber-500/40 font-black';
+    scorePercent = 100;
+  } else if (views >= 100000 || engagementRate >= 3) {
+    classification = 'Forte';
+    badgeColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold';
+    scorePercent = 75;
+  } else if (views >= 10000 || engagementRate >= 1) {
+    classification = 'Bom';
+    badgeColor = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-semibold';
+    scorePercent = 50;
+  }
+
+  return {
+    views,
+    likes,
+    comments,
+    shares,
+    saves,
+    followers,
+    totalInteractions,
+    engagementRate: Number(engagementRate.toFixed(2)),
+    classification,
+    badgeColor,
+    scorePercent,
+  };
+}
