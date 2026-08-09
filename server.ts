@@ -133,14 +133,7 @@ app.use(express.static(path.join(process.cwd(), 'dist'), { maxAge: '1d' }));
 
 const PORT = 3000;
 
-// Lazy initialization of Gemini client
-function getGeminiClient(customApiKey?: string) {
-  const apiKey = customApiKey || process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY_MISSING');
-  }
-  return new GoogleGenAI({ apiKey });
-}
+import { getGeminiClient } from './server/geminiHelper.js';
 
 const apiRouter = express.Router();
 apiRouter.use(chatExtraRouter);
