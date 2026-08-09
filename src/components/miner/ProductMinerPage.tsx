@@ -93,6 +93,7 @@ const ProductCard: React.FC<{
   product: ProductMinerProduct;
   position?: number;
   rankingSort?: ProductRankingSort;
+  isMentor?: boolean;
   onOpenScriptModal?: (p: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
   onOpenDownloadModal?: (p: ProductMinerProduct) => void;
@@ -100,6 +101,7 @@ const ProductCard: React.FC<{
   product,
   position,
   rankingSort,
+  isMentor,
   onOpenScriptModal,
   onOpenAnalysisModal,
   onOpenDownloadModal,
@@ -108,6 +110,7 @@ const ProductCard: React.FC<{
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
   const isSpikingRanking = rankingSort === 'spiking';
+  const isVideoPrepared = Boolean(product.videoDownload?.isPrepared);
 
   const handleCopyVideoLink = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -304,7 +307,7 @@ const ProductCard: React.FC<{
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-1 text-[10px]">
+              <div className={`grid ${isMentor ? 'grid-cols-3' : 'grid-cols-2'} gap-1 text-[10px]`}>
                 {product.video.url ? (
                   <a
                     href={product.video.url}
@@ -326,14 +329,25 @@ const ProductCard: React.FC<{
                   {linkCopied ? 'Copiado' : 'Copiar'}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => onOpenDownloadModal?.(product)}
-                  className="py-1 px-1.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 hover:text-white font-bold flex items-center justify-center gap-1 truncate"
-                >
-                  <Download className="w-3 h-3 text-amber-400" />
-                  Baixar
-                </button>
+                {isMentor ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenDownloadModal?.(product)}
+                    className={`py-1 px-1.5 rounded-md border font-bold flex items-center justify-center gap-1 truncate transition-all ${
+                      isVideoPrepared
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:text-white'
+                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
+                    }`}
+                    title={
+                      isVideoPrepared
+                        ? 'Baixar vídeo (.mp4)'
+                        : 'Preparar download do vídeo'
+                    }
+                  >
+                    <Download className={`w-3 h-3 ${isVideoPrepared ? 'text-emerald-400' : 'text-amber-400'}`} />
+                    {isVideoPrepared ? 'Baixar' : 'Preparar'}
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -873,6 +887,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <ProductCard
                   key={product.productId}
                   product={product}
+                  isMentor={canRefresh}
                   onOpenScriptModal={(p) => setScriptModalProduct(p)}
                   onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
                   onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
@@ -939,6 +954,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   product={product}
                   position={index + 1}
                   rankingSort={rankingSort}
+                  isMentor={canRefresh}
                   onOpenScriptModal={(p) => setScriptModalProduct(p)}
                   onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
                   onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
@@ -1230,6 +1246,24 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         isOpen={Boolean(downloadModalProduct)}
         onClose={() => setDownloadModalProduct(null)}
         product={downloadModalProduct}
+        studentCode={studentCode}
+        isMentor={canRefresh}
+        onVideoPrepared={(productId, directUrl) => {
+          setProducts((prev) =>
+            prev.map((p) =>
+              p.productId === productId
+                ? { ...p, videoDownload: { isPrepared: true, directMediaUrl: directUrl, status: 'COMPLETED' } }
+                : p
+            )
+          );
+          setRanking((prev) =>
+            prev.map((p) =>
+              p.productId === productId
+                ? { ...p, videoDownload: { isPrepared: true, directMediaUrl: directUrl, status: 'COMPLETED' } }
+                : p
+            )
+          );
+        }}
       />
     </section>
   );

@@ -8,6 +8,7 @@ import {
   ProductScriptType,
   generateProductScript,
   calculateVideoAnalysis,
+  prepareProductVideoDownload,
 } from '../../services/productMinerApi';
 
 function compactNumber(value: number | null | undefined) {
@@ -436,30 +437,61 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
 
 
 // ==========================================
-// 3. VIDEO DOWNLOAD AUDIT NOTICE MODAL
+// 3. VIDEO DOWNLOAD MODAL
 // ==========================================
 interface VideoDownloadModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: ProductMinerProduct | null;
+  studentCode: string;
+  isMentor: boolean;
+  onVideoPrepared?: (productId: string, directMediaUrl: string) => void;
 }
 
 export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
   isOpen,
   onClose,
   product,
+  studentCode,
+  isMentor,
+  onVideoPrepared,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [error, setError] = useState('');
+  const [preparedUrl, setPreparedUrl] = useState<string | null>(null);
 
-  if (!isOpen || !product || !product.video) return null;
+  if (!isOpen || !product || !product.video || !isMentor) return null;
 
   const video = product.video;
+  const isPrepared = Boolean(preparedUrl || product.videoDownload?.isPrepared);
+  const downloadApiUrl = `/api/product-miner/videos/${product.productId}/download`;
 
   const handleCopyLink = () => {
     if (!video.url) return;
     navigator.clipboard.writeText(video.url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handlePrepareDownload = async () => {
+    setPreparing(true);
+    setError('');
+    try {
+      const res = await prepareProductVideoDownload(studentCode, product.productId);
+      if (res.success && res.directMediaUrl) {
+        setPreparedUrl(res.directMediaUrl);
+        if (onVideoPrepared) {
+          onVideoPrepared(product.productId, res.directMediaUrl);
+        }
+      } else {
+        setError(res.message || 'Não foi possível preparar o vídeo para download.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao comunicar com o servidor.');
+    } finally {
+      setPreparing(false);
+    }
   };
 
   return (
@@ -473,10 +505,12 @@ export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-black text-white">
-                Download do Vídeo
+                Download de Vídeo TikTok
               </h2>
               <p className="text-xs text-slate-400">
-                Auditoria de URL do vídeo associado ao produto.
+                {isPrepared
+                  ? 'Mídia preparada em cache. Baixar sem novos custos de créditos.'
+                  : 'Extração de mídia bruta do TikTok via SocialCrawl (Mentor)'}
               </p>
             </div>
           </div>
@@ -489,61 +523,112 @@ export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
           </button>
         </div>
 
-        {/* Video Share URL Box */}
+        {/* Video Info Box */}
         <div className="mt-4 p-4 rounded-xl border border-slate-800 bg-slate-950/80 space-y-3">
           <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
-            <span>URL Registrada no Banco de Dados:</span>
-            <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30">
-              Página Web do TikTok
+            <span>Produto:</span>
+            <span className="text-cyan-300 font-extrabold truncate max-w-[280px]">
+              {product.title}
             </span>
           </div>
 
-          <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-400 font-mono break-all select-all">
-            {video.url || 'Nenhuma URL cadastrada'}
+          <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-400 font-mono break-all select-all flex items-center justify-between gap-2">
+            <span className="truncate">{video.url || 'Sem URL de vídeo'}</span>
+            <span className="shrink-0 text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+              @{video.author || 'criador'}
+            </span>
           </div>
 
-          <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300 text-xs space-y-1.5">
-            <div className="font-bold flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-              Auditoria do Recurso de Download Direto
+          {error ? (
+            <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
             </div>
-            <p className="text-[11px] text-amber-200/90 leading-relaxed">
-              • A URL armazenada é o link direto para visualização da página do TikTok.<br />
-              • O download do arquivo brutos de vídeo (.mp4 CDN) requer chamada de extração de stream via SocialCrawl (1 crédito por vídeo).<br />
-              • Para proteger o saldo de créditos do projeto, o download automático em lote permanece travado até autorização pelo Mentor.
-            </p>
-          </div>
+          ) : null}
+
+          {isPrepared ? (
+            <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                Vídeo Já Preparado (Mídia em Cache)
+              </div>
+              <p className="text-[11px] text-emerald-200/90 leading-relaxed">
+                Este vídeo já foi extraído e está salvo. O download utiliza o arquivo em cache e consome <strong>0 créditos adicionais</strong>.
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300 text-xs space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                Atenção Mentor: Preparar Download
+              </div>
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                Ao clicar em <strong>"Preparar download • até 10 créditos"</strong>, o servidor chamará a API da SocialCrawl para extrair o vídeo brutos (.mp4) em alta qualidade sem marca d'água.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
         <div className="mt-5 flex flex-wrap gap-2">
+          {isPrepared ? (
+            <a
+              href={downloadApiUrl}
+              download={`tiktok_video_${product.productId}.mp4`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/20"
+            >
+              <Download className="w-4 h-4" />
+              Baixar Vídeo (.mp4)
+            </a>
+          ) : (
+            <button
+              onClick={handlePrepareDownload}
+              disabled={preparing}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-950/20 disabled:opacity-50"
+            >
+              {preparing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Extraindo Mídia (SocialCrawl)...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  Preparar download • até 10 créditos
+                </>
+              )}
+            </button>
+          )}
+
           {video.url ? (
             <a
               href={video.url}
               target="_blank"
               rel="noreferrer"
-              className="flex-1 py-2.5 px-4 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold text-xs flex items-center justify-center gap-2"
+              className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5"
             >
-              <Play className="w-4 h-4 fill-current" />
-              Assistir no TikTok
+              <ExternalLink className="w-3.5 h-3.5" />
+              TikTok
             </a>
           ) : null}
 
           <button
             onClick={handleCopyLink}
-            className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${
+            className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
               copied
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                 : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
             }`}
           >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            {copied ? 'Link Copiado!' : 'Copiar Link'}
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? 'Copiado!' : 'Copiar'}
           </button>
 
           <button
             onClick={onClose}
-            className="py-2.5 px-4 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:text-white text-xs font-bold"
+            className="py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:text-white text-xs font-bold"
           >
             Fechar
           </button>
