@@ -110,9 +110,13 @@ export async function searchProducts(studentCode: string, query: string, page = 
 
 // Paid: explicit mentor-only SocialCrawl refresh.
 export async function refreshProducts(studentCode: string, query: string, page = 1): Promise<ProductSearchResponse> {
-  const params = new URLSearchParams({ query, page: String(page) });
-  const response = await fetch(`/api/product-miner/refresh?${params.toString()}`, {
-    headers: authHeaders(studentCode),
+  const response = await fetch('/api/product-miner/refresh', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query, page }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw accessError(data);
