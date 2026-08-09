@@ -35,6 +35,8 @@ export interface ProductMinerProduct {
   productUrl: string | null;
   category: string | null;
   lastSeenAt?: string | null;
+  estimatedCommissionCents?: number | null;
+  commissionRatePercent?: number | null;
   video: ProductMinerVideo | null;
   videoDownload?: {
     isPrepared: boolean;
