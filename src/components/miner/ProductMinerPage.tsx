@@ -5,7 +5,7 @@ import {
   Layers, ShieldCheck, AlertCircle, CheckCircle2, X, Sparkles, Home, Shirt, Utensils,
   Cpu, Dumbbell, Baby, Dog, Copy, Check, Video, Download, FileText, BarChart3, Wand2, Filter,
   Trophy, ThumbsUp, SlidersHorizontal, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  BadgeDollarSign, Clock3, Rocket, Clapperboard, Gauge
+  BadgeDollarSign, Clock3, Rocket, Clapperboard, Gauge, Target
 } from 'lucide-react';
 import {
   loadProductRanking,
@@ -98,31 +98,31 @@ const CLASSIFICATIONS: ClassificationItem[] = [
   {
     id: 'highest_commission',
     label: 'Maior Comissão',
-    imgUrl: 'https://i.postimg.cc/vBQxqGhF/maior_comissão.png',
+    imgUrl: 'https://i.postimg.cc/m1gxft2d/maiorcomissao.png',
     fallbackIcon: <BadgeDollarSign className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'sales_24h',
     label: 'Vendas 24h',
-    imgUrl: 'https://i.postimg.cc/C1mB99PW/vendas24h.png',
+    imgUrl: 'https://i.postimg.cc/YLCcKhCp/vendas24h.png',
     fallbackIcon: <Clock3 className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'spiking',
     label: 'Disparando',
-    imgUrl: 'https://i.postimg.cc/262bggcJ/Disparando.png',
+    imgUrl: 'https://i.postimg.cc/Zv5ktC5S/disparando.png',
     fallbackIcon: <Rocket className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'viral_video',
     label: 'Vídeo Viral',
-    imgUrl: 'https://i.postimg.cc/nz0jNNRy/Vídeo_Viral.png',
+    imgUrl: 'https://i.postimg.cc/H8kGDVkH/videoviral.png',
     fallbackIcon: <Clapperboard className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'score_geraz',
     label: 'Score Geração Z Pro',
-    imgUrl: 'https://i.postimg.cc/4dB7jjLj/Score_Geração_Z_Pro.png',
+    imgUrl: 'https://i.postimg.cc/1V3xhf3m/scoregeracaozpro.png',
     fallbackIcon: <Gauge className="w-6 h-6 text-amber-500" />,
   },
 ];
@@ -1023,6 +1023,129 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [confirmModalCategory, setConfirmModalCategory] = useState<string | null>(null);
   const [collectorNotice, setCollectorNotice] = useState<string | null>(null);
 
+  // Adquirir Produtos (Collector Expansion) State
+  const [collectorSubTab, setCollectorSubTab] = useState<'expand' | 'update'>('expand');
+  const [expansionTargetCount, setExpansionTargetCount] = useState<number>(300);
+  const [selectedExpansionCategories, setSelectedExpansionCategories] = useState<string[]>([
+    'Moda',
+    'Itens para Casa',
+    'Eletrônicos',
+    'Beleza e Cuidados Pessoais',
+    'Esportes e Lazer',
+    'Brinquedos e Pets',
+    'Health',
+  ]);
+  const [selectedSubcategoriesMap, setSelectedSubcategoriesMap] = useState<Record<string, string[]>>({});
+  const [openCategoryDrawers, setOpenCategoryDrawers] = useState<Record<string, boolean>>({});
+
+  // Batch Execution Modal and Progress State
+  const [showBatchConfirmModal, setShowBatchConfirmModal] = useState<boolean>(false);
+  const [isBatchExecuting, setIsBatchExecuting] = useState<boolean>(false);
+  const [batchProgress, setBatchProgress] = useState<{
+    currentCategory: string;
+    currentSubcategory?: string;
+    processedCategories: number;
+    totalCategories: number;
+    newProductsCount: number;
+    updatedProductsCount: number;
+    creditsUsed: number;
+  } | null>(null);
+  const [batchSummaryModal, setBatchSummaryModal] = useState<{
+    open: boolean;
+    totalProducts: number;
+    newProducts: number;
+    updatedProducts: number;
+    creditsUsed: number;
+    categoriesProcessed: number;
+  } | null>(null);
+
+  const toggleSelectCategory = (catName: string) => {
+    setSelectedExpansionCategories((prev) =>
+      prev.includes(catName) ? prev.filter((c) => c !== catName) : [...prev, catName]
+    );
+  };
+
+  const toggleSelectAllCategories = () => {
+    const allCats = CATEGORY_CONFIG.map((c) => c.filterKey);
+    if (selectedExpansionCategories.length === allCats.length) {
+      setSelectedExpansionCategories([]);
+    } else {
+      setSelectedExpansionCategories(allCats);
+    }
+  };
+
+  const toggleSelectSubcategory = (catName: string, subName: string) => {
+    setSelectedSubcategoriesMap((prev) => {
+      const current = prev[catName] || [];
+      const updated = current.includes(subName)
+        ? current.filter((s) => s !== subName)
+        : [...current, subName];
+      return { ...prev, [catName]: updated };
+    });
+  };
+
+  const toggleCategoryDrawer = (catName: string) => {
+    setOpenCategoryDrawers((prev) => ({ ...prev, [catName]: !prev[catName] }));
+  };
+
+  const handleExecuteBatchExpansion = async () => {
+    setShowBatchConfirmModal(false);
+    setIsBatchExecuting(true);
+    setError('');
+    setCollectorNotice(null);
+
+    const categoriesToProcess = selectedExpansionCategories.length > 0
+      ? selectedExpansionCategories
+      : CATEGORY_CONFIG.map((c) => c.filterKey);
+
+    let totalNewCount = 0;
+    let totalCreditsUsed = 0;
+    let processedCats = 0;
+
+    for (const cat of categoriesToProcess) {
+      setBatchProgress({
+        currentCategory: cat,
+        processedCategories: processedCats,
+        totalCategories: categoriesToProcess.length,
+        newProductsCount: totalNewCount,
+        updatedProductsCount: 0,
+        creditsUsed: totalCreditsUsed,
+      });
+
+      try {
+        const selectedSubs = selectedSubcategoriesMap[cat] || [];
+        if (selectedSubs.length > 0) {
+          for (const sub of selectedSubs) {
+            setBatchProgress((prev) => prev ? { ...prev, currentSubcategory: sub } : null);
+            const res = await refreshProducts(studentCode, sub, Math.min(150, expansionTargetCount));
+            totalNewCount += res.uniqueProductsCount ?? res.products?.length ?? 0;
+            totalCreditsUsed += res.creditsUsed ?? 1;
+          }
+        } else {
+          const res = await refreshProducts(studentCode, cat, expansionTargetCount);
+          totalNewCount += res.uniqueProductsCount ?? res.products?.length ?? 0;
+          totalCreditsUsed += res.creditsUsed ?? Math.ceil(expansionTargetCount / 30);
+        }
+      } catch (err: any) {
+        console.warn(`[Batch Expansion Warning for ${cat}]:`, err?.message || err);
+      }
+
+      processedCats++;
+    }
+
+    setIsBatchExecuting(false);
+    loadCategories();
+
+    setBatchSummaryModal({
+      open: true,
+      totalProducts: totalNewCount,
+      newProducts: totalNewCount,
+      updatedProducts: 0,
+      creditsUsed: totalCreditsUsed,
+      categoriesProcessed: processedCats,
+    });
+  };
+
   // Atualização Diária da Base State
   const [dailyStatus, setDailyStatus] = useState<DailyRefreshStatus | null>(null);
   const [isDailyRefreshing, setIsDailyRefreshing] = useState(false);
@@ -1035,6 +1158,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('Todas');
   const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
+  const [aiVideoOnly, setAiVideoOnly] = useState<boolean>(false);
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
@@ -1060,7 +1184,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   useEffect(() => {
     setRankingPage(1);
     setPage(1);
-  }, [selectedCategory, selectedSubcategory, hasVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
+  }, [selectedCategory, selectedSubcategory, hasVideoOnly, aiVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
 
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
@@ -1125,6 +1249,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     // 2. Filter by video options
     if (hasVideoOnly) {
       list = list.filter((p) => Boolean(p.video?.url));
+    }
+    if (aiVideoOnly) {
+      list = list.filter((p) => Boolean((p.video as any)?.isAi || (p.video as any)?.is_ai || (p.video as any)?.aiGenerated || (p as any)?.isAiVideo));
     }
     if (viralVideoOnly) {
       list = list.filter((p) => Boolean(p.video && (p.video.views ?? 0) >= 1000000));
@@ -1389,6 +1516,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     (selectedCategory !== 'Todos' ? 1 : 0) +
     (selectedSubcategory !== 'Todas' ? 1 : 0) +
     (hasVideoOnly ? 1 : 0) +
+    (aiVideoOnly ? 1 : 0) +
     (viralVideoOnly ? 1 : 0);
 
   return (
@@ -1397,8 +1525,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl border border-amber-500 bg-amber-400 text-slate-900 shadow-sm">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+            <div className="inline-flex items-center px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl border border-amber-500 bg-amber-500 text-white shadow-sm">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
                 Minerar Produtos TikTok Shop
               </h1>
             </div>
@@ -1744,6 +1872,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 setSelectedCategory('Todos');
                 setSelectedSubcategory('Todas');
                 setHasVideoOnly(false);
+                setAiVideoOnly(false);
                 setViralVideoOnly(false);
                 if (rankingSort === '7d') setRankingSort('opportunities');
               }}
@@ -1765,6 +1894,22 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             >
               <Play className="w-3 h-3 text-amber-600 fill-current" />
               Apenas com vídeo
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAiVideoOnly((p) => !p);
+                setPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                aiVideoOnly
+                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <Wand2 className="w-3 h-3 text-amber-600" />
+              Apenas com vídeo IA
             </button>
 
             <button
@@ -1905,13 +2050,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 Tente selecionar outra categoria ou classificação, ou realize uma pesquisa diferente no campo acima.
               </p>
-              {(selectedCategory !== 'Todos' || selectedSubcategory !== 'Todas' || hasVideoOnly || viralVideoOnly) ? (
+              {(selectedCategory !== 'Todos' || selectedSubcategory !== 'Todas' || hasVideoOnly || aiVideoOnly || viralVideoOnly) ? (
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedCategory('Todos');
                     setSelectedSubcategory('Todas');
                     setHasVideoOnly(false);
+                    setAiVideoOnly(false);
                     setViralVideoOnly(false);
                   }}
                   className="mt-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold"
@@ -2031,169 +2177,417 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           ) : null}
         </>
       ) : mode === 'collector' && canRefresh ? (
-        /* PAINEL DO COLETOR (MENTOR ONLY) */
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
+        /* PAINEL ADQUIRIR PRODUTOS (BASE GERAÇÃO Z PRO) */
+        <div className="space-y-6">
+          {/* Main Top Control Header */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2 text-amber-700 text-xs font-black uppercase tracking-wider">
                   <ShieldCheck className="w-4 h-4 text-amber-600" />
-                  Painel do Coletor • Mentor
+                  Módulo Mentor • Gestão de Base
                 </div>
 
                 <h2 className="mt-1 text-xl md:text-2xl font-black text-slate-900">
-                  Base Geração Z Pro
+                  Adquirir Produtos — Base de Inteligência
                 </h2>
 
-                <p className="mt-1 text-xs md:text-sm text-slate-600">
-                  Os alunos consultam estes dados sem consumir créditos.
+                <p className="mt-1 text-xs md:text-sm text-slate-600 max-w-2xl">
+                  Expanda a cobertura por subcategoria ou execute a reciclagem contínua dos produtos do Geração Z Pro. Alunos consultam esta base sem consumir seus próprios créditos.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 text-xs">
-                <span className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 font-bold">
-                  8 Categorias Monitoradas
+              <div className="flex items-center gap-2 text-xs shrink-0">
+                <span className="px-3.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 font-extrabold flex items-center gap-1.5 shadow-sm">
+                  <Layers className="w-4 h-4 text-amber-600" />
+                  7 Categorias Oficiais
                 </span>
               </div>
             </div>
 
-            <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <span className="text-xs font-bold text-slate-700">
-                Quantidade por Categoria (Individual):
-              </span>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { count: 30, credits: 'até 1 crédito' },
-                  { count: 90, credits: 'até 3 créditos' },
-                  { count: 150, credits: 'até 5 créditos' },
-                  { count: 300, credits: 'até 10 créditos' },
-                ].map((opt) => (
-                  <button
-                    key={opt.count}
-                    onClick={() => setSelectedMaxProducts(opt.count)}
-                    disabled={Boolean(refreshingCategory) || isDailyRefreshing}
-                    className={`px-3 py-2 rounded-xl text-xs font-black border transition-all text-center ${
-                      selectedMaxProducts === opt.count
-                        ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-sm font-black'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div>{opt.count} produtos</div>
-                    <div className="text-[10px] font-normal opacity-80">
-                      {opt.credits}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Card Especial: Atualização Diária da Base */}
-          <div className="rounded-2xl border border-amber-200 bg-white p-5 md:p-6 shadow-sm space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 text-amber-700 text-xs font-black uppercase tracking-wider">
-                  <RefreshCw className={`w-4 h-4 text-amber-600 ${isDailyRefreshing ? 'animate-spin' : ''}`} />
-                  Atualização Diária da Base • 8 Categorias
-                </div>
-                <h3 className="mt-1 text-lg font-black text-slate-900">
-                  Atualizar Todas as Categorias em Sequência
-                </h3>
-                <p className="mt-1 text-xs text-slate-600 max-w-2xl">
-                  Atualiza as 8 categorias oficiais (Beleza, Casa, Moda, Cozinha, Eletrônicos, Fitness, Bebê, Pet) em lote, coletando até 90 produtos por categoria (3 páginas por categoria) e consumindo até 24 créditos SocialCrawl.
-                </p>
-              </div>
+            {/* Mode Switcher: Expandir Base vs Atualizar Base */}
+            <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCollectorSubTab('expand')}
+                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all ${
+                  collectorSubTab === 'expand'
+                    ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Rocket className="w-4 h-4" />
+                <span>🚀 Expandir Base (Captar Novos Produtos)</span>
+              </button>
 
               <button
                 type="button"
-                onClick={() => setShowDailyConfirmModal(true)}
-                disabled={isDailyRefreshing || Boolean(dailyStatus?.isCooldownActive) || Boolean(refreshingCategory)}
-                className={`px-5 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md transition-all ${
-                  isDailyRefreshing
-                    ? 'bg-amber-100 text-amber-900 border border-amber-300 cursor-wait'
-                    : dailyStatus?.isCooldownActive
-                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800 opacity-90'
-                    : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-500/20 hover:scale-[1.02]'
+                onClick={() => setCollectorSubTab('update')}
+                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all ${
+                  collectorSubTab === 'update'
+                    ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                {isDailyRefreshing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Atualizando base ({dailyStatus?.categoriesProcessed ?? 0}/8)...</span>
-                  </>
-                ) : dailyStatus?.isCooldownActive ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Base atualizada hoje ✅</span>
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4" />
-                    <span>🔄 Atualizar todas as categorias • até 24 créditos</span>
-                  </>
-                )}
+                <RefreshCw className="w-4 h-4" />
+                <span>🔄 Atualizar Base (Reciclar 7 Categorias)</span>
               </button>
             </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
-              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
-                <div className="text-[11px] text-slate-500">Última atualização geral</div>
-                <div className="font-bold text-slate-800 mt-0.5 truncate">
-                  {dailyStatus?.completedAt || dailyStatus?.startedAt
-                    ? formatCollectionDate(dailyStatus.completedAt || dailyStatus.startedAt)
-                    : 'Nenhuma realizada'}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
-                <div className="text-[11px] text-slate-500">Categorias processadas</div>
-                <div className="font-extrabold text-amber-700 mt-0.5">
-                  {dailyStatus ? `${dailyStatus.categoriesProcessed} / ${dailyStatus.totalCategories}` : '0 / 8'}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
-                <div className="text-[11px] text-slate-500">Próxima recomendada</div>
-                <div className="font-bold text-slate-800 mt-0.5 truncate">
-                  {dailyStatus?.isCooldownActive && dailyStatus.cooldownRemainingSeconds > 0
-                    ? `Em ~${Math.ceil(dailyStatus.cooldownRemainingSeconds / 3600)} horas`
-                    : 'Pronta para atualizar'}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
-                <div className="text-[11px] text-slate-500">Status atual</div>
-                <div className="font-bold mt-0.5 truncate">
-                  {isDailyRefreshing ? (
-                    <span className="text-amber-700 animate-pulse">🔄 Em andamento ({dailyStatus?.currentCategory || 'processando'})</span>
-                  ) : dailyStatus?.status === 'COMPLETED' ? (
-                    <span className="text-emerald-700">Base Ativa ✅</span>
-                  ) : dailyStatus?.status === 'PARTIAL_FAILED' ? (
-                    <span className="text-amber-700">Atualização Parcial ⚠️</span>
-                  ) : (
-                    <span className="text-slate-600">Pronta para atualização</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {dailyStatus?.isCooldownActive ? (
-              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span>A base de dados já passou pela atualização diária recomendada. A proteção de 24 horas está ativa no backend.</span>
-              </div>
-            ) : null}
           </div>
 
+          {/* TAB 1: EXPANDIR BASE */}
+          {collectorSubTab === 'expand' && (
+            <div className="space-y-5 animate-fade-in">
+              {/* Card 1: Volume Target Selection */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                      <Target className="w-4 h-4 text-amber-600" /> 1. Meta de Expansão por Categoria
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Escolha a profundidade de busca (múltiplas páginas por categoria)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { count: 100, label: '100 produtos', desc: '~4 págs / 4 crs por cat', tag: 'Rápido' },
+                    { count: 300, label: '300 produtos', desc: '~10 págs / 10 crs por cat', tag: '✨ Recomendado' },
+                    { count: 500, label: '500 produtos', desc: '~17 págs / 17 crs por cat', tag: 'Aprofundado' },
+                    { count: 1000, label: '1.000 produtos', desc: '~34 págs / 34 crs por cat', tag: 'Avançado' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.count}
+                      type="button"
+                      onClick={() => setExpansionTargetCount(opt.count)}
+                      disabled={isBatchExecuting || isDailyRefreshing}
+                      className={`p-3.5 rounded-2xl border text-left transition-all ${
+                        expansionTargetCount === opt.count
+                          ? 'border-amber-500 bg-amber-50/80 ring-2 ring-amber-400/30 text-amber-950 shadow-sm'
+                          : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-sm">{opt.label}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          {opt.tag}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 2: Select Categories & Subcategories */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-amber-600" /> 2. Selecionar Escopo de Categorias (7 Oficiais)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Marque as categorias que deseja expandir ou abra o menu de subcategorias para direcionar o foco
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={toggleSelectAllCategories}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold shrink-0"
+                  >
+                    {selectedExpansionCategories.length === CATEGORY_CONFIG.length
+                      ? 'Desmarcar Todas'
+                      : 'Selecionar Todas (7)'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {CATEGORY_CONFIG.map((catConfig) => {
+                    const isCatSelected = selectedExpansionCategories.includes(catConfig.filterKey);
+                    const isDrawerOpen = Boolean(openCategoryDrawers[catConfig.filterKey]);
+                    const selectedSubs = selectedSubcategoriesMap[catConfig.filterKey] || [];
+                    const stat = collectorCategories.find((c) => c.category === catConfig.filterKey);
+
+                    return (
+                      <div
+                        key={catConfig.filterKey}
+                        className={`rounded-2xl border transition-all p-4 space-y-3 ${
+                          isCatSelected
+                            ? 'border-amber-300 bg-amber-50/30'
+                            : 'border-slate-200 bg-slate-50/30 opacity-80'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isCatSelected}
+                              onChange={() => toggleSelectCategory(catConfig.filterKey)}
+                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 shrink-0"
+                            />
+
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="p-1.5 rounded-lg bg-white border border-slate-200 shrink-0">
+                                {getCategoryIcon(catConfig.filterKey)}
+                              </div>
+                              <span className="font-extrabold text-sm text-slate-900 truncate">
+                                {catConfig.filterKey}
+                              </span>
+                            </div>
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleCategoryDrawer(catConfig.filterKey)}
+                            className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-amber-700 text-[11px] font-bold flex items-center gap-1 shrink-0"
+                          >
+                            <span>Subcategorias ({catConfig.subcategories.length})</span>
+                            {isDrawerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+
+                        {/* Status bar */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                          <span>Armazenados: <strong className="text-slate-800">{stat?.productCount ?? 0} prods</strong></span>
+                          <span>
+                            Cobertura: <strong className="text-amber-700">{stat?.coverageCount ?? 0}/{catConfig.subcategories.length} subcats</strong>
+                          </span>
+                        </div>
+
+                        {/* Subcategories Accordion Drawer */}
+                        {isDrawerOpen && (
+                          <div className="pt-2 border-t border-slate-200/80 space-y-2 animate-fade-in">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              Subcategorias de {catConfig.filterKey}:
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                              {catConfig.subcategories.map((subName) => {
+                                const isSubChecked = selectedSubs.includes(subName);
+                                const subStat = stat?.subcategories?.find((s) => s.name === subName);
+                                const count = subStat?.productCount ?? 0;
+
+                                return (
+                                  <label
+                                    key={subName}
+                                    className={`flex items-center justify-between p-2 rounded-lg border text-[11px] cursor-pointer transition-all ${
+                                      isSubChecked
+                                        ? 'border-amber-400 bg-amber-100/60 font-bold text-amber-950'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 truncate pr-1">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSubChecked}
+                                        onChange={() => toggleSelectSubcategory(catConfig.filterKey, subName)}
+                                        className="w-3 h-3 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+                                      />
+                                      <span className="truncate">{subName}</span>
+                                    </div>
+
+                                    {count < 15 ? (
+                                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 shrink-0">
+                                        ⚠️ {count}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] font-bold text-emerald-700 shrink-0">
+                                        ✅ {count}
+                                      </span>
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Card 3: Execution Estimation & Trigger Panel */}
+              {(() => {
+                const totalCats = selectedExpansionCategories.length;
+                const pagesPerCat = Math.ceil(expansionTargetCount / 30);
+                const estimatedCreditsTotal = totalCats * pagesPerCat;
+                const totalTargetProducts = totalCats * expansionTargetCount;
+
+                return (
+                  <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-amber-50/80 p-5 md:p-6 shadow-md space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 text-amber-800 text-xs font-black uppercase tracking-wider">
+                          <Gauge className="w-4 h-4 text-amber-600" />
+                          Estimativa Pré-Execução de Expansão
+                        </div>
+                        <h3 className="mt-1 text-lg font-black text-slate-900">
+                          Resumo da Operação de Aquisição
+                        </h3>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowBatchConfirmModal(true)}
+                        disabled={isBatchExecuting || totalCats === 0}
+                        className="px-6 py-3.5 rounded-xl font-black text-xs md:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] flex items-center justify-center gap-2.5 disabled:opacity-50"
+                      >
+                        <Rocket className="w-4.5 h-4.5" />
+                        <span>🚀 Iniciar Expansão da Base ({estimatedCreditsTotal} crs)</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-200/60 text-xs">
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                        <div className="text-[11px] text-slate-500 font-medium">Categorias Ativas</div>
+                        <div className="font-black text-amber-900 text-sm mt-0.5">
+                          {totalCats} de 7 selecionadas
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                        <div className="text-[11px] text-slate-500 font-medium">Meta Total de Produtos</div>
+                        <div className="font-black text-amber-900 text-sm mt-0.5">
+                          ~{totalTargetProducts.toLocaleString('pt-BR')} prods
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                        <div className="text-[11px] text-slate-500 font-medium">Créditos SocialCrawl Estimados</div>
+                        <div className="font-black text-amber-900 text-sm mt-0.5">
+                          ~{estimatedCreditsTotal} créditos
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                        <div className="text-[11px] text-slate-500 font-medium">Saldo Disponível na Conta</div>
+                        <div className="font-black text-emerald-700 text-sm mt-0.5">
+                          {credits?.remaining !== null && credits?.remaining !== undefined
+                            ? `${credits.remaining} créditos`
+                            : 'Ativo via SocialCrawl'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* TAB 2: ATUALIZAR BASE */}
+          {collectorSubTab === 'update' && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="rounded-2xl border border-amber-200 bg-white p-5 md:p-6 shadow-sm space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-amber-700 text-xs font-black uppercase tracking-wider">
+                      <RefreshCw className={`w-4 h-4 text-amber-600 ${isDailyRefreshing ? 'animate-spin' : ''}`} />
+                      Atualização Diária da Base • 7 Categorias
+                    </div>
+                    <h3 className="mt-1 text-lg font-black text-slate-900">
+                      Atualizar Todas as Categorias em Sequência
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-600 max-w-2xl">
+                      Varre e recicla as 7 categorias oficiais do TikTok Shop em lote (Moda, Itens para Casa, Eletrônicos, Beleza e Cuidados Pessoais, Esportes e Lazer, Brinquedos e Pets, Health), mantendo ranking, score e ordenações atualizados.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowDailyConfirmModal(true)}
+                    disabled={isDailyRefreshing || Boolean(dailyStatus?.isCooldownActive) || Boolean(refreshingCategory)}
+                    className={`px-5 py-3.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md transition-all shrink-0 ${
+                      isDailyRefreshing
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300 cursor-wait'
+                        : dailyStatus?.isCooldownActive
+                        ? 'bg-emerald-50 border border-emerald-200 text-emerald-800 opacity-90'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-500/20 hover:scale-[1.02]'
+                    }`}
+                  >
+                    {isDailyRefreshing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Atualizando base ({dailyStatus?.categoriesProcessed ?? 0}/7)...</span>
+                      </>
+                    ) : dailyStatus?.isCooldownActive ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Base atualizada hoje ✅</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        <span>🔄 Atualizar 7 Categorias Diárias (~70 créditos)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
+                  <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+                    <div className="text-[11px] text-slate-500">Última atualização geral</div>
+                    <div className="font-bold text-slate-800 mt-0.5 truncate">
+                      {dailyStatus?.completedAt || dailyStatus?.startedAt
+                        ? formatCollectionDate(dailyStatus.completedAt || dailyStatus.startedAt)
+                        : 'Nenhuma realizada'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+                    <div className="text-[11px] text-slate-500">Categorias processadas</div>
+                    <div className="font-extrabold text-amber-700 mt-0.5">
+                      {dailyStatus ? `${dailyStatus.categoriesProcessed} / ${dailyStatus.totalCategories}` : '0 / 7'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+                    <div className="text-[11px] text-slate-500">Próxima recomendada</div>
+                    <div className="font-bold text-slate-800 mt-0.5 truncate">
+                      {dailyStatus?.isCooldownActive && dailyStatus.cooldownRemainingSeconds > 0
+                        ? `Em ~${Math.ceil(dailyStatus.cooldownRemainingSeconds / 3600)} horas`
+                        : 'Pronta para atualizar'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+                    <div className="text-[11px] text-slate-500">Status atual</div>
+                    <div className="font-bold mt-0.5 truncate">
+                      {isDailyRefreshing ? (
+                        <span className="text-amber-700 animate-pulse">🔄 Em andamento ({dailyStatus?.currentCategory || 'processando'})</span>
+                      ) : dailyStatus?.status === 'COMPLETED' ? (
+                        <span className="text-emerald-700">Base Ativa ✅</span>
+                      ) : dailyStatus?.status === 'PARTIAL_FAILED' ? (
+                        <span className="text-amber-700">Atualização Parcial ⚠️</span>
+                      ) : (
+                        <span className="text-slate-600">Pronta para atualização</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {dailyStatus?.isCooldownActive ? (
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>A base de dados já passou pela atualização diária recomendada. A proteção de 24 horas está ativa no backend.</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+
           {collectorNotice ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex items-center justify-between">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex items-center justify-between shadow-sm">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{collectorNotice}</span>
               </div>
 
               <button
+                type="button"
                 onClick={() => setCollectorNotice(null)}
                 className="text-slate-400 hover:text-slate-600"
               >
@@ -2202,82 +2596,308 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             </div>
           ) : null}
 
-          {collectorLoading ? (
-            <div className="py-16 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+          {/* SECTION 3: CATEGORY COVERAGE BREAKDOWN GRID */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-amber-600" /> Status e Cobertura por Categoria (7 Categorias Oficiais)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Acompanhe a distribuição de produtos e subcategorias armazenadas no banco
+                </p>
+              </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {collectorCategories.map((cat) => (
-                <div
-                  key={cat.category}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col justify-between space-y-4 hover:border-amber-300 shadow-sm transition-all"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700">
-                          {getCategoryIcon(cat.category)}
+
+            {collectorLoading ? (
+              <div className="py-16 flex justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {collectorCategories.map((cat) => {
+                  const isDrawerOpen = Boolean(openCategoryDrawers[cat.category]);
+                  const catConfig = CATEGORY_CONFIG.find((c) => c.filterKey === cat.category);
+                  const totalSubCount = catConfig?.subcategories.length || cat.totalSubcategories || 0;
+
+                  return (
+                    <div
+                      key={cat.category}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col justify-between space-y-4 hover:border-amber-300 shadow-sm transition-all"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 shrink-0">
+                              {getCategoryIcon(cat.category)}
+                            </div>
+
+                            <h3 className="font-extrabold text-sm text-slate-900 truncate">
+                              {cat.category}
+                            </h3>
+                          </div>
+
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border shrink-0 ${
+                              cat.status === 'Ativa'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                : 'border-amber-200 bg-amber-50 text-amber-800'
+                            }`}
+                          >
+                            {cat.status === 'Ativa' ? 'Base Ativa' : 'Pendente'}
+                          </span>
                         </div>
 
-                        <h3 className="font-extrabold text-base text-slate-900">
-                          {cat.category}
-                        </h3>
+                        <div className="space-y-1 bg-slate-50 border border-slate-100 p-2.5 rounded-xl">
+                          <div className="text-xs text-slate-900 font-extrabold">
+                            {cat.productCount} {cat.productCount === 1 ? 'produto armazenado' : 'produtos armazenados'}
+                          </div>
+
+                          <div className="text-[11px] text-amber-800 font-bold">
+                            Cobertura: {cat.coverageCount || 0} de {totalSubCount} subcategorias
+                          </div>
+
+                          <div className="text-[10px] text-slate-400 font-medium">
+                            {formatCollectionDate(cat.lastCollectedAt)}
+                          </div>
+                        </div>
+
+                        {/* Subcategories Accordion Button */}
+                        <button
+                          type="button"
+                          onClick={() => toggleCategoryDrawer(cat.category)}
+                          className="w-full py-1.5 px-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[11px] font-bold flex items-center justify-between transition-all"
+                        >
+                          <span>Ver Subcategorias ({totalSubCount})</span>
+                          {isDrawerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {/* Drawer content */}
+                        {isDrawerOpen && (
+                          <div className="space-y-1.5 pt-1 border-t border-slate-100 animate-fade-in max-h-40 overflow-y-auto pr-1">
+                            {catConfig?.subcategories.map((subName) => {
+                              const subStat = cat.subcategories?.find((s) => s.name === subName);
+                              const subCount = subStat?.productCount ?? 0;
+
+                              return (
+                                <div
+                                  key={subName}
+                                  className="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-slate-50 border border-slate-200/60"
+                                >
+                                  <span className="truncate pr-1 text-slate-700 font-medium">{subName}</span>
+                                  {subCount < 15 ? (
+                                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 shrink-0">
+                                      ⚠️ {subCount} prods
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] font-bold text-emerald-700 shrink-0">
+                                      ✅ {subCount} prods
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
-                      <span
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
-                          cat.status === 'Ativa'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                            : 'border-amber-200 bg-amber-50 text-amber-800'
-                        }`}
-                      >
-                        {cat.status === 'Ativa'
-                          ? 'Base Ativa'
-                          : 'Pendente'}
-                      </span>
+                      <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmModalCategory(cat.category)}
+                          disabled={refreshingCategory === cat.category}
+                          className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-black flex items-center justify-center gap-1 transition-all disabled:opacity-50"
+                        >
+                          {refreshingCategory === cat.category ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3" />
+                          )}
+                          <span>Atualizar</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedExpansionCategories([cat.category]);
+                            setCollectorSubTab('expand');
+                          }}
+                          className="py-2 px-2 rounded-xl border border-amber-500 bg-amber-500 text-white hover:bg-amber-600 text-[11px] font-black flex items-center justify-center gap-1 transition-all"
+                        >
+                          <Rocket className="w-3 h-3" />
+                          <span>Expandir</span>
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="space-y-1">
-                      <div className="text-xs text-slate-800 font-bold">
-                        {cat.productCount}{' '}
-                        {cat.productCount === 1
-                          ? 'produto armazenado'
-                          : 'produtos armazenados'}
-                      </div>
-
-                      <div className="text-[11px] text-slate-500 font-medium">
-                        {formatCollectionDate(cat.lastCollectedAt)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setConfirmModalCategory(cat.category)}
-                    disabled={refreshingCategory === cat.category}
-                    className="w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {refreshingCategory === cat.category ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Coletando...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Atualizar até {selectedMaxProducts} • máx.{' '}
-                        {selectedMaxProducts === 30
-                          ? '1 crédito'
-                          : `${Math.ceil(selectedMaxProducts / 30)} créditos`}
-                      </>
-                    )}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
+
+      {/* MODAL 1: BATCH EXPANSION CONFIRMATION */}
+      {showBatchConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
+                  <Rocket className="w-6 h-6" />
+                </div>
+
+                <div>
+                  <h3 className="font-extrabold text-lg text-slate-900">
+                    Confirmar Expansão da Base
+                  </h3>
+                  <p className="text-xs text-amber-700 font-bold">
+                    Operação em Lote • Geração Z Pro
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowBatchConfirmModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 space-y-3 text-xs">
+              <div className="font-extrabold text-amber-950 text-sm">
+                Resumo da Chamada SocialCrawl:
+              </div>
+
+              <div className="space-y-1 text-slate-700">
+                <div>• Categorias Selecionadas: <strong className="text-slate-900">{selectedExpansionCategories.join(', ')}</strong></div>
+                <div>• Meta por Categoria: <strong className="text-slate-900">{expansionTargetCount} produtos</strong></div>
+                <div>• Total de Produtos Alvo: <strong className="text-slate-900">~{(selectedExpansionCategories.length * expansionTargetCount).toLocaleString('pt-BR')} produtos</strong></div>
+                <div>• Estimativa de Consumo: <strong className="text-slate-900">~{selectedExpansionCategories.length * Math.ceil(expansionTargetCount / 30)} créditos</strong></div>
+              </div>
+
+              <p className="text-slate-600 text-[11px] leading-relaxed pt-1 border-t border-amber-200/60">
+                A operação fará buscas sequenciais na SocialCrawl para alimentar o banco do Geração Z Pro. Todos os novos produtos serão gravados com score e métricas completas.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowBatchConfirmModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteBatchExpansion}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-amber-500/20"
+              >
+                <Rocket className="w-4 h-4" />
+                Confirmar e Iniciar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: BATCH EXECUTION PROGRESS OVERLAY */}
+      {isBatchExecuting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-amber-300 bg-white p-6 shadow-2xl text-center space-y-5">
+            <div className="w-14 h-14 mx-auto rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600">
+              <Loader2 className="w-7 h-7 animate-spin" />
+            </div>
+
+            <div>
+              <h3 className="font-black text-xl text-slate-900">
+                Expandindo Base de Produtos...
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Aguarde enquanto buscamos e processamos os produtos na SocialCrawl
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3 text-left">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                <span>Processando Categoria:</span>
+                <span className="text-amber-700">{batchProgress?.currentCategory}</span>
+              </div>
+
+              {batchProgress?.currentSubcategory && (
+                <div className="flex items-center justify-between text-[11px] text-slate-600">
+                  <span>Subcategoria:</span>
+                  <span className="font-semibold text-slate-900">{batchProgress.currentSubcategory}</span>
+                </div>
+              )}
+
+              {/* Progress bar */}
+              <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-amber-500 h-2.5 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.round(((batchProgress?.processedCategories || 0) / (batchProgress?.totalCategories || 1)) * 100)}%`,
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>Progresso: {batchProgress?.processedCategories} de {batchProgress?.totalCategories} categorias</span>
+                <span>Créditos: {batchProgress?.creditsUsed}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: BATCH SUMMARY MODAL */}
+      {batchSummaryModal?.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5 text-center">
+            <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-600">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div>
+              <h3 className="font-black text-xl text-slate-900">
+                Expansão Concluída! 🎉
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                A base do Geração Z Pro foi atualizada com sucesso
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-left text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[11px] text-slate-500">Categorias Processadas</div>
+                <div className="font-black text-slate-900 text-sm mt-0.5">{batchSummaryModal.categoriesProcessed} de 7</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[11px] text-slate-500">Produtos Adquiridos</div>
+                <div className="font-black text-amber-700 text-sm mt-0.5">+{batchSummaryModal.totalProducts} prods</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 col-span-2">
+                <div className="text-[11px] text-slate-500">Créditos SocialCrawl Consumidos</div>
+                <div className="font-black text-slate-900 text-sm mt-0.5">{batchSummaryModal.creditsUsed} créditos</div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setBatchSummaryModal(null)}
+              className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md shadow-amber-500/20"
+            >
+              Fechar e Ver Base Atualizada
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal for Individual Category Collection */}
       {confirmModalCategory ? (
