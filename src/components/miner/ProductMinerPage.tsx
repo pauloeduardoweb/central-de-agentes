@@ -3,7 +3,8 @@ import {
   Search, Flame, ShoppingBag, Star, Store, ExternalLink, Play, Eye, Heart,
   MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap, RefreshCw,
   Layers, ShieldCheck, AlertCircle, CheckCircle2, X, Sparkles, Home, Shirt, Utensils,
-  Cpu, Dumbbell, Baby, Dog, Copy, Check, Video, Download, FileText, BarChart3, Wand2, Filter
+  Cpu, Dumbbell, Baby, Dog, Copy, Check, Video, Download, FileText, BarChart3, Wand2, Filter,
+  Trophy, ThumbsUp, SlidersHorizontal, ChevronDown, ChevronUp
 } from 'lucide-react';
 import {
   loadProductRanking,
@@ -40,7 +41,60 @@ const RANKING_FILTERS: Array<{ id: ProductRankingSort; label: string }> = [
   { id: 'spiking', label: '🔥 Disparando' },
 ];
 
-function formatMoney(cents: number | null, symbol = 'R$') {
+export type ClassificationType = 'best_sellers' | 'top_rated' | 'trending' | 'most_searched' | 'editors_choice';
+
+export interface ClassificationItem {
+  id: ClassificationType;
+  label: string;
+  imgUrl: string;
+  fallbackIcon: React.ReactNode;
+}
+
+const CLASSIFICATIONS: ClassificationItem[] = [
+  {
+    id: 'best_sellers',
+    label: 'Mais vendidos',
+    imgUrl: 'https://i.postimg.cc/tg8X1nND/troféu.jpg',
+    fallbackIcon: <Trophy className="w-6 h-6 text-amber-400" />,
+  },
+  {
+    id: 'top_rated',
+    label: 'Melhores avaliações',
+    imgUrl: 'https://i.postimg.cc/JnJRj7p3/Like.jpg',
+    fallbackIcon: <ThumbsUp className="w-6 h-6 text-blue-400" />,
+  },
+  {
+    id: 'trending',
+    label: 'Tendências',
+    imgUrl: 'https://i.postimg.cc/26vCnj0n/Fogo.jpg',
+    fallbackIcon: <Flame className="w-6 h-6 text-orange-400" />,
+  },
+  {
+    id: 'most_searched',
+    label: 'Mais pesquisados',
+    imgUrl: 'https://i.postimg.cc/PxZd1fSW/Lupa.jpg',
+    fallbackIcon: <Search className="w-6 h-6 text-cyan-400" />,
+  },
+  {
+    id: 'editors_choice',
+    label: 'Escolha do dia',
+    imgUrl: 'https://i.postimg.cc/767qSPKN/coração.jpg',
+    fallbackIcon: <Heart className="w-6 h-6 text-rose-400" />,
+  },
+];
+
+const TIKTOK_CATEGORIES = [
+  'Todos',
+  'Moda',
+  'Itens para Casa',
+  'Eletrônicos',
+  'Beleza e Cuidados Pessoais',
+  'Esporte e Lazer',
+  'Brinquedos e Pets',
+  'Health',
+];
+
+function formatMoney(cents: number | null | undefined, symbol = 'R$') {
   if (cents === null || cents === undefined) return '—';
   return `${symbol} ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -92,6 +146,230 @@ function getCategoryIcon(catName: string) {
   return <ShoppingBag className="w-5 h-5 text-cyan-300" />;
 }
 
+function matchesCategoryFilter(productCatRaw: string | null, selectedCat: string): boolean {
+  if (!selectedCat || selectedCat === 'Todos') return true;
+  if (!productCatRaw) return false;
+
+  const cat = productCatRaw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const target = selectedCat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  if (target === 'moda') {
+    return cat.includes('moda') || cat.includes('vestuario') || cat.includes('roupa') || cat.includes('calçado');
+  }
+  if (target.includes('casa')) {
+    return cat.includes('casa') || cat.includes('cozinha') || cat.includes('lar') || cat.includes('decoracao');
+  }
+  if (target.includes('eletronicos')) {
+    return cat.includes('eletronico') || cat.includes('tecnologia') || cat.includes('gadget') || cat.includes('celular') || cat.includes('fone');
+  }
+  if (target.includes('beleza')) {
+    return cat.includes('beleza') || cat.includes('pessoal') || cat.includes('cosmetico') || cat.includes('skincare') || cat.includes('cabelo') || cat.includes('maquiagem');
+  }
+  if (target.includes('esporte')) {
+    return cat.includes('esporte') || cat.includes('fitness') || cat.includes('lazer') || cat.includes('treino') || cat.includes('academia');
+  }
+  if (target.includes('brinquedos') || target.includes('pets')) {
+    return cat.includes('pet') || cat.includes('brinquedo') || cat.includes('bebe') || cat.includes('infantil') || cat.includes('animais');
+  }
+  if (target.includes('health')) {
+    return cat.includes('health') || cat.includes('saude') || cat.includes('suplemento') || cat.includes('vitamina');
+  }
+
+  return cat.includes(target);
+}
+
+const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive: boolean }> = ({ item, isActive }) => {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <div
+      className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
+        isActive
+          ? 'border-amber-400 bg-gradient-to-br from-amber-500/30 to-orange-500/30 shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/50 scale-105'
+          : 'border-slate-800 bg-slate-900/90 hover:border-slate-700'
+      }`}
+    >
+      {!imgError ? (
+        <img
+          src={item.imgUrl}
+          alt={item.label}
+          onError={() => setImgError(true)}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        item.fallbackIcon
+      )}
+    </div>
+  );
+};
+
+/* Compact Mobile Card (TikTok Shop list style) */
+const MobileProductCard: React.FC<{
+  product: ProductMinerProduct;
+  position?: number;
+  rankingSort?: ProductRankingSort;
+  isMentor?: boolean;
+  onOpenScriptModal?: (p: ProductMinerProduct) => void;
+  onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
+  onOpenDownloadModal?: (p: ProductMinerProduct) => void;
+}> = ({
+  product,
+  position,
+  rankingSort,
+  isMentor,
+  onOpenScriptModal,
+  onOpenAnalysisModal,
+  onOpenDownloadModal,
+}) => {
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyVideoLink = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (product.video?.url) {
+      navigator.clipboard.writeText(product.video.url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
+  return (
+    <article className="rounded-xl border border-slate-800 bg-slate-950/90 p-3 shadow-md hover:border-cyan-500/30 transition-all flex gap-3 relative overflow-hidden">
+      {/* Ranking position tag */}
+      {position ? (
+        <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded-md bg-slate-950/90 border border-amber-400/50 text-amber-300 text-[10px] font-black shadow-sm">
+          #{position}
+        </div>
+      ) : null}
+
+      {/* Product Image */}
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-slate-900 overflow-hidden shrink-0 border border-slate-800">
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-600">
+            <ShoppingBag className="w-8 h-8" />
+          </div>
+        )}
+
+        {product.discountPercent ? (
+          <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-rose-600/90 text-white text-[9px] font-black">
+            -{product.discountPercent}%
+          </div>
+        ) : null}
+
+        {product.video?.url ? (
+          <div className="absolute top-1 right-1 p-1 rounded-full bg-fuchsia-600/90 text-white shadow" title="Possui vídeo">
+            <Play className="w-2.5 h-2.5 fill-current" />
+          </div>
+        ) : null}
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-1 min-w-0 flex flex-col justify-between space-y-1">
+        <div>
+          {/* Title */}
+          <h3 className="font-extrabold text-xs text-white leading-snug line-clamp-2">
+            {product.title}
+          </h3>
+
+          {/* Vendas & Rating */}
+          <div className="flex items-center gap-2 mt-1 text-[11px] flex-wrap">
+            <span className="font-black text-cyan-300">
+              {compactNumber(product.soldCount)} vendidos
+            </span>
+
+            {product.rating ? (
+              <span className="font-bold text-amber-300 flex items-center gap-0.5">
+                <Star className="w-3 h-3 fill-current text-amber-400" />
+                {product.rating}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Ganho Afiliado / Comissão */}
+          {product.estimatedCommissionCents ? (
+            <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-black">
+              Ganhe {formatMoney(product.estimatedCommissionCents, product.currencySymbol)}
+            </div>
+          ) : product.commissionRatePercent ? (
+            <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-black">
+              Comissão {product.commissionRatePercent}%
+            </div>
+          ) : null}
+
+          {/* Price & Score Geração Z Pro */}
+          <div className="flex items-center justify-between gap-2 mt-1 flex-wrap">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm font-black text-emerald-300">
+                {formatMoney(product.priceCents, product.currencySymbol)}
+              </span>
+              {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
+                <span className="text-[10px] text-slate-500 line-through">
+                  {formatMoney(product.originalPriceCents, product.currencySymbol)}
+                </span>
+              ) : null}
+            </div>
+
+            {product.score !== undefined && product.score !== null ? (
+              <span className="text-[10px] font-black text-purple-300 bg-purple-950/80 border border-purple-500/30 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Zap className="w-2.5 h-2.5 text-amber-300 fill-current" />
+                Score: {product.score}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-1 text-[10px]">
+          <div className="truncate max-w-[90px] text-[10px] text-slate-400">
+            {product.sellerName || 'TikTok Shop'}
+          </div>
+
+          <div className="flex items-center gap-1">
+            {product.video ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onOpenScriptModal?.(product)}
+                  className="px-2 py-1 rounded bg-fuchsia-500/20 text-fuchsia-300 font-bold border border-fuchsia-500/30 hover:bg-fuchsia-500/30"
+                  title="Gerar Roteiro"
+                >
+                  Roteiro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenAnalysisModal?.(product)}
+                  className="px-2 py-1 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 hover:bg-cyan-500/30"
+                  title="Analisar"
+                >
+                  Analisar
+                </button>
+              </>
+            ) : null}
+
+            {product.productUrl ? (
+              <a
+                href={product.productUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-2 py-1 rounded bg-slate-800 text-slate-200 hover:text-white font-bold border border-slate-700 flex items-center gap-0.5"
+              >
+                Ver <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+};
+
+/* Desktop Full Card */
 const ProductCard: React.FC<{
   product: ProductMinerProduct;
   position?: number;
@@ -174,6 +452,17 @@ const ProductCard: React.FC<{
         <h3 className="font-extrabold text-sm text-white leading-snug line-clamp-2 min-h-[40px]">
           {product.title}
         </h3>
+
+        {/* Ganho Afiliado / Comissão (se disponível) */}
+        {product.estimatedCommissionCents ? (
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-black self-start">
+            Ganhe {formatMoney(product.estimatedCommissionCents, product.currencySymbol)} por venda
+          </div>
+        ) : product.commissionRatePercent ? (
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-black self-start">
+            Comissão {product.commissionRatePercent}%
+          </div>
+        ) : null}
 
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -389,6 +678,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [ranking, setRanking] = useState<ProductMinerProduct[]>([]);
   const [rankingMeta, setRankingMeta] = useState<ProductRankingMeta | null>(null);
   const [rankingSort, setRankingSort] = useState<ProductRankingSort>('opportunities');
+
+  const [selectedClassification, setSelectedClassification] = useState<ClassificationType>('best_sellers');
+
   const [mode, setModeState] = useState<'search' | 'ranking' | 'collector'>(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('gzp_miner_mode');
@@ -405,6 +697,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       localStorage.setItem('gzp_miner_mode', newMode);
     }
   };
+
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -431,23 +724,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [isDailyRefreshing, setIsDailyRefreshing] = useState(false);
   const [showDailyConfirmModal, setShowDailyConfirmModal] = useState(false);
 
-  // Coletor multipágina: até 300 produtos por categoria (padrão 90)
+  // Coletor multipágina
   const [selectedMaxProducts, setSelectedMaxProducts] = useState<number>(90);
 
   // Local Ranking Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
   const [analysisModalProduct, setAnalysisModalProduct] = useState<ProductMinerProduct | null>(null);
   const [downloadModalProduct, setDownloadModalProduct] = useState<ProductMinerProduct | null>(null);
-
-  const sortedProducts = useMemo(
-    () => [...products].sort((a, b) => b.soldCount - a.soldCount),
-    [products],
-  );
 
   useEffect(() => {
     if (mode !== 'ranking') return;
@@ -464,28 +753,55 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       .finally(() => setRankingLoading(false));
   }, [mode, rankingSort, studentCode]);
 
-  const filteredRanking = useMemo(() => {
-    return ranking.filter((product) => {
-      if (selectedCategory !== 'Todos') {
-        const cat = (product.category || '').toLowerCase();
-        const normCat = cat.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const normTarget = selectedCategory.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        if (!normCat.includes(normTarget)) return false;
-      }
+  /* Unified Display List applying Category Filter + Classification Order */
+  const displayProducts = useMemo(() => {
+    let list = mode === 'ranking' ? ranking : products;
 
-      if (hasVideoOnly && !product.video) {
-        return false;
-      }
+    // 1. Filter by TikTok category
+    list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory));
 
-      if (viralVideoOnly) {
-        if (!product.video || (product.video.views ?? 0) < 1000000) {
-          return false;
-        }
-      }
+    // 2. Filter by video options
+    if (hasVideoOnly) {
+      list = list.filter((p) => Boolean(p.video?.url));
+    }
+    if (viralVideoOnly) {
+      list = list.filter((p) => Boolean(p.video && (p.video.views ?? 0) >= 1000000));
+    }
 
-      return true;
-    });
-  }, [ranking, selectedCategory, hasVideoOnly, viralVideoOnly]);
+    // 3. Sort by classification choice
+    const copy = [...list];
+    if (selectedClassification === 'best_sellers') {
+      copy.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
+    } else if (selectedClassification === 'top_rated') {
+      copy.sort((a, b) => {
+        const rateDiff = (b.rating || 0) - (a.rating || 0);
+        if (Math.abs(rateDiff) > 0.01) return rateDiff;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
+    } else if (selectedClassification === 'trending') {
+      copy.sort((a, b) => {
+        const g24b = b.growth24hPercent ?? b.sales24h ?? 0;
+        const g24a = a.growth24hPercent ?? a.sales24h ?? 0;
+        if (g24b !== g24a) return g24b - g24a;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
+    } else if (selectedClassification === 'most_searched') {
+      copy.sort((a, b) => {
+        const aScore = (a.trendScore || 0) + (a.video?.views ? Math.log10(a.video.views) : 0);
+        const bScore = (b.trendScore || 0) + (b.video?.views ? Math.log10(b.video.views) : 0);
+        if (bScore !== aScore) return bScore - aScore;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
+    } else if (selectedClassification === 'editors_choice') {
+      copy.sort((a, b) => {
+        const scoreDiff = (b.score || 0) - (a.score || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        return (b.soldCount || 0) - (a.soldCount || 0);
+      });
+    }
+
+    return copy;
+  }, [products, ranking, mode, selectedCategory, hasVideoOnly, viralVideoOnly, selectedClassification]);
 
   const loadDailyStatus = async () => {
     if (!canRefresh) return;
@@ -648,37 +964,37 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
   }, [mode]);
 
+  const activeFilterCount = (selectedCategory !== 'Todos' ? 1 : 0) + (hasVideoOnly ? 1 : 0) + (viralVideoOnly ? 1 : 0);
+
   return (
-    <section className="space-y-5 pb-8">
-      <div className="rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-[#071a28]/95 via-[#07131f]/95 to-[#040b13]/95 p-5 md:p-6 shadow-xl shadow-cyan-950/20">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <section className="space-y-4 pb-12">
+      {/* Top Header Card */}
+      <div className="rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-[#071a28]/95 via-[#07131f]/95 to-[#040b13]/95 p-4 sm:p-5 shadow-xl shadow-cyan-950/20">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 text-cyan-300 text-xs font-black uppercase tracking-[0.18em]">
-              <Zap className="w-4 h-4" />
+              <Zap className="w-3.5 h-3.5 text-amber-300 fill-current" />
               TikTok Shop Brasil
             </div>
 
-            <h1 className="mt-2 text-2xl md:text-3xl font-black text-white">
+            <h1 className="mt-1 text-xl sm:text-2xl md:text-3xl font-black text-white">
               Minerar Produtos
             </h1>
-
-            <p className="mt-1 text-sm text-slate-400">
-              Descubra produtos, vendas, lojas e vídeos associados sem sair do Geração Z Pro.
-            </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <span className="px-3 py-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 font-bold">
-              🇧🇷 Região BR fixa
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 font-bold">
+              🇧🇷 Região BR
             </span>
 
-            <span className="px-3 py-2 rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-300 font-bold">
-              30 produtos/página
+            <span className="px-2.5 py-1 rounded-lg border border-cyan-500/25 bg-cyan-500/10 text-cyan-300 font-bold">
+              30 prod/pág
             </span>
           </div>
         </div>
 
-        <div className="mt-5 flex flex-col md:flex-row gap-2">
+        {/* Search Input Bar */}
+        <div className="mt-4 flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
 
@@ -690,49 +1006,50 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 runSearch(query, 1, false)
               }
               placeholder="Ex.: beleza, air fryer, vestido, relógio..."
-              className="w-full h-11 rounded-xl border border-slate-700/80 bg-slate-950/90 pl-10 pr-4 text-sm text-white outline-none focus:border-cyan-400/60"
+              className="w-full h-10 sm:h-11 rounded-xl border border-slate-700/80 bg-slate-950/90 pl-10 pr-4 text-xs sm:text-sm text-white outline-none focus:border-cyan-400/60"
             />
           </div>
 
-          <button
-            onClick={() => runSearch(query, 1, false)}
-            disabled={loading || query.trim().length === 1}
-            className="h-11 px-5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-black disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/30"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Database className="w-4 h-4" />
-            )}
-
-            Pesquisar no banco
-          </button>
-
-          {canRefresh ? (
+          <div className="flex gap-2">
             <button
-              onClick={() => runSearch(query, 1, true)}
-              disabled={loading || query.trim().length < 2}
-              className="h-11 px-4 rounded-xl border border-amber-400/35 bg-amber-500/10 text-amber-300 text-xs font-black disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-amber-500/20"
-              title="Esta ação consulta a SocialCrawl e pode consumir 1 crédito."
+              onClick={() => runSearch(query, 1, false)}
+              disabled={loading || query.trim().length === 1}
+              className="flex-1 sm:flex-none h-10 sm:h-11 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs sm:text-sm font-black disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-950/30"
             >
-              <RefreshCw
-                className={`w-4 h-4 ${
-                  loading ? 'animate-spin' : ''
-                }`}
-              />
-
-              Atualizar SocialCrawl • 1 crédito
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Database className="w-4 h-4" />
+              )}
+              Pesquisar
             </button>
-          ) : null}
+
+            {canRefresh ? (
+              <button
+                onClick={() => runSearch(query, 1, true)}
+                disabled={loading || query.trim().length < 2}
+                className="h-10 sm:h-11 px-3 rounded-xl border border-amber-400/35 bg-amber-500/10 text-amber-300 text-xs font-black disabled:opacity-50 flex items-center justify-center gap-1.5 hover:bg-amber-500/20"
+                title="Esta ação consulta a SocialCrawl e pode consumir 1 crédito."
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${
+                    loading ? 'animate-spin' : ''
+                  }`}
+                />
+                <span className="hidden md:inline">SocialCrawl • 1 crédito</span>
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-3 flex gap-2 flex-wrap">
+        {/* Quick Search Chips */}
+        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {QUICK_SEARCHES.map((item) => (
             <button
               key={item}
               onClick={() => runSearch(item, 1, false)}
               disabled={loading}
-              className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/70 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/30 text-xs font-semibold capitalize"
+              className="px-2.5 py-1 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/30 text-[11px] font-semibold capitalize shrink-0"
             >
               {item}
             </button>
@@ -740,13 +1057,91 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
       </div>
 
+      {/* ================================================== */}
+      {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (TIKTOK SHOP STYLE) */}
+      {/* ================================================== */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3 sm:p-4 shadow-lg space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            Classificações de Produtos
+          </span>
+          <span className="text-[10px] text-slate-500 font-medium">Inspirado no TikTok Shop</span>
+        </div>
+
+        {/* Horizontal scrollable row of classification icons */}
+        <div className="flex items-start gap-3 sm:gap-5 overflow-x-auto pb-2 pt-1 scrollbar-none snap-x">
+          {CLASSIFICATIONS.map((c) => {
+            const isActive = selectedClassification === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedClassification(c.id)}
+                className="flex flex-col items-center shrink-0 group focus:outline-none snap-start"
+              >
+                <ClassificationIconComponent item={c} isActive={isActive} />
+                <span
+                  className={`text-[11px] font-bold text-center mt-1.5 leading-tight max-w-[80px] transition-colors ${
+                    isActive ? 'text-amber-300 font-black' : 'text-slate-400 group-hover:text-slate-200'
+                  }`}
+                >
+                  {c.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================================================== */}
+      {/* 2 — CATEGORIAS DO TIKTOK SHOP                      */}
+      {/* ================================================== */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-400">Categorias:</span>
+          {selectedCategory !== 'Todos' ? (
+            <button
+              onClick={() => setSelectedCategory('Todos')}
+              className="text-[10px] font-bold text-rose-400 hover:underline"
+            >
+              Ver Todas
+            </button>
+          ) : null}
+        </div>
+
+        {/* Categories Pills Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none snap-x">
+          {TIKTOK_CATEGORIES.map((cat) => {
+            const isActive = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all snap-start ${
+                  isActive
+                    ? 'border-cyan-400/60 bg-gradient-to-r from-cyan-500/30 to-blue-600/30 text-cyan-200 shadow-md shadow-cyan-950/40 font-black'
+                    : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ================================================== */}
+      {/* 3 — MODES & ADVANCED FILTERS BAR                   */}
+      {/* ================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="inline-flex p-1 rounded-xl border border-slate-800 bg-slate-950/70 self-start">
+        <div className="inline-flex p-1 rounded-xl border border-slate-800 bg-slate-950/80 self-start">
           <button
             onClick={() => setMode('search')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
               mode === 'search'
-                ? 'bg-cyan-500/20 text-cyan-300'
+                ? 'bg-cyan-500/20 text-cyan-300 font-black border border-cyan-500/30'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
@@ -756,9 +1151,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           <button
             onClick={() => setMode('ranking')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
               mode === 'ranking'
-                ? 'bg-amber-500/20 text-amber-300'
+                ? 'bg-amber-500/20 text-amber-300 font-black border border-amber-500/30'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
@@ -769,152 +1164,119 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           {canRefresh ? (
             <button
               onClick={() => setMode('collector')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
                 mode === 'collector'
-                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  ? 'bg-purple-500/20 text-purple-300 font-black border border-purple-500/30'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-purple-400" />
-              Coletor Geração Z Pro
+              Coletor
             </button>
           ) : null}
         </div>
 
-        {credits && mode === 'search' ? (
-          <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2">
-            <Database className="w-3.5 h-3.5" />
-
-            {credits.source === 'provider'
-              ? `${credits.used} crédito usado na atualização`
-              : credits.source === 'database'
-                ? 'Banco Geração Z Pro: 0 crédito'
-                : credits.source === 'cache'
-                  ? 'Dados já coletados: 0 crédito'
-                  : 'Nenhuma chamada externa: 0 crédito'}
-
-            {credits.remaining !== null ? (
-              <span>• {credits.remaining} restantes</span>
-            ) : null}
-
-            {credits.needsRefresh && canRefresh ? (
-              <span className="text-amber-400">
-                • atualização disponível
+        <div className="flex items-center gap-2">
+          {/* Advanced Filters Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters((prev) => !prev)}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+              showAdvancedFilters || activeFilterCount > 0
+                ? 'border-cyan-400/50 bg-cyan-500/15 text-cyan-300'
+                : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white'
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Filtros Avançados</span>
+            {activeFilterCount > 0 ? (
+              <span className="w-4 h-4 rounded-full bg-cyan-400 text-slate-950 text-[10px] font-black flex items-center justify-center">
+                {activeFilterCount}
               </span>
             ) : null}
-          </div>
-        ) : null}
+            {showAdvancedFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {credits && mode === 'search' ? (
+            <span className="text-[11px] text-slate-500 hidden md:inline">
+              {credits.source === 'provider' ? `${credits.used} crédito` : '0 crédito'}
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      {mode === 'ranking' ? (
-        <div className="space-y-3">
-          {/* Main ranking sorting tabs */}
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-950/55 p-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div className="flex gap-2 flex-wrap">
-              {RANKING_FILTERS.map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setRankingSort(filter.id)}
-                  disabled={rankingLoading}
-                  className={`px-3 py-2 rounded-lg text-xs font-black border transition-all ${
-                    rankingSort === filter.id
-                      ? 'border-amber-400/40 bg-amber-500/15 text-amber-300'
-                      : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-
-            {rankingMeta ? (
-              <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>
-                  {rankingMeta.trackedProducts} produtos monitorados
-                </span>
-
-                <span>
-                  • {rankingMeta.with24h} com histórico 24h
-                </span>
-
-                <span>
-                  • {rankingMeta.with7d} com histórico 7d
-                </span>
-              </div>
-            ) : null}
+      {/* Advanced Filters Drawer Panel */}
+      {showAdvancedFilters ? (
+        <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/90 p-4 space-y-3 animate-fade-in">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5" /> Filtros e Métricas Adicionais
+            </span>
+            <button
+              onClick={() => {
+                setSelectedCategory('Todos');
+                setHasVideoOnly(false);
+                setViralVideoOnly(false);
+              }}
+              className="text-[11px] text-rose-400 hover:underline font-bold"
+            >
+              Limpar Todos
+            </button>
           </div>
 
-          {/* Local MySQL Filters: Category & Video Status */}
-          <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/80 p-3.5 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                <Filter className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Filtros do Ranking</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-bold">
-                  0 Créditos • Consulta Local
-                </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Sort mode selector for ranking */}
+            {mode === 'ranking' ? (
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-slate-400 font-bold">Métrica do Ranking:</span>
+                <div className="flex gap-1.5 flex-wrap">
+                  {RANKING_FILTERS.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setRankingSort(f.id)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                        rankingSort === f.id
+                          ? 'border-amber-400 bg-amber-500/20 text-amber-300'
+                          : 'border-slate-800 bg-slate-900 text-slate-400'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+            ) : null}
 
-              <div className="flex items-center gap-2 flex-wrap">
+            {/* Video filters */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] text-slate-400 font-bold">Filtros de Vídeo:</span>
+              <div className="flex gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => setHasVideoOnly((prev) => !prev)}
+                  onClick={() => setHasVideoOnly((p) => !p)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
                     hasVideoOnly
                       ? 'border-fuchsia-500/50 bg-fuchsia-500/20 text-fuchsia-300'
-                      : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white'
+                      : 'border-slate-800 bg-slate-900 text-slate-400'
                   }`}
                 >
                   <Play className="w-3 h-3 text-fuchsia-400 fill-current" />
-                  Com vídeo
+                  Apenas com vídeo
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setViralVideoOnly((prev) => !prev)}
+                  onClick={() => setViralVideoOnly((p) => !p)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
                     viralVideoOnly
                       ? 'border-amber-400/50 bg-amber-500/20 text-amber-300'
-                      : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white'
+                      : 'border-slate-800 bg-slate-900 text-slate-400'
                   }`}
                 >
                   <Flame className="w-3 h-3 text-amber-400 fill-current" />
                   Vídeo viral (1M+ views)
                 </button>
-
-                {(selectedCategory !== 'Todos' || hasVideoOnly || viralVideoOnly) ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory('Todos');
-                      setHasVideoOnly(false);
-                      setViralVideoOnly(false);
-                    }}
-                    className="text-[11px] text-rose-400 hover:text-rose-300 underline font-bold px-1"
-                  >
-                    Limpar filtros
-                  </button>
-                ) : null}
               </div>
-            </div>
-
-            {/* Category horizontal selector */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-              <span className="text-[11px] font-bold text-slate-500 shrink-0 mr-1">Categoria:</span>
-              {['Todos', 'Beleza', 'Casa', 'Moda', 'Cozinha', 'Eletrônicos', 'Fitness', 'Bebê', 'Pet'].map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 border transition-all ${
-                    selectedCategory === cat
-                      ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-300'
-                      : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
             </div>
           </div>
         </div>
@@ -926,119 +1288,104 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
       ) : null}
 
-      {mode === 'search' ? (
+      {/* ================================================== */}
+      {/* 4 — LISTA / FEED DE PRODUTOS                       */}
+      {/* ================================================== */}
+      {mode === 'search' || mode === 'ranking' ? (
         <>
-          {!loading && sortedProducts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 py-16 px-5 text-center">
-              <ShoppingBag className="w-10 h-10 text-slate-700 mx-auto" />
-
-              <h2 className="mt-3 font-bold text-slate-300">
-                {query.trim()
-                  ? 'Nenhum produto encontrado'
-                  : 'Digite um produto ou nicho para começar'}
-              </h2>
-
-              {query.trim() ? (
-                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                  Ainda não temos dados coletados para esta pesquisa. A base é atualizada pelo Mentor.
-                </p>
-              ) : (
-                <p className="text-xs text-slate-600 mt-1">
-                  Pesquisar no banco do Geração Z Pro nunca consome créditos.
-                </p>
-              )}
-            </div>
-          ) : null}
-
-          {loading ? (
+          {(loading || rankingLoading) ? (
             <div className="py-16 flex justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
             </div>
           ) : null}
 
-          {!loading && sortedProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {sortedProducts.map((product) => (
-                <ProductCard
-                  key={product.productId}
-                  product={product}
-                  isMentor={canRefresh}
-                  onOpenScriptModal={(p) => setScriptModalProduct(p)}
-                  onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
-                  onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
-                />
-              ))}
-            </div>
-          ) : null}
-
-          {!loading && sortedProducts.length > 0 ? (
-            <div className="flex items-center justify-center gap-3 pt-2">
-              <button
-                disabled={page <= 1}
-                onClick={() =>
-                  runSearch(query, page - 1, false)
-                }
-                className="px-4 py-2 rounded-lg border border-slate-700 text-xs font-bold text-slate-300 disabled:opacity-30"
-              >
-                Anterior
-              </button>
-
-              <span className="text-xs text-slate-500">
-                Página {page}
-              </span>
-
-              <button
-                disabled={!hasMore}
-                onClick={() =>
-                  runSearch(query, page + 1, false)
-                }
-                className="px-4 py-2 rounded-lg border border-cyan-500/30 text-xs font-bold text-cyan-300 disabled:opacity-30"
-              >
-                Próxima
-              </button>
-            </div>
-          ) : null}
-        </>
-      ) : mode === 'ranking' ? (
-        <>
-          {rankingLoading ? (
-            <div className="py-16 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-amber-300" />
-            </div>
-          ) : null}
-
-          {!rankingLoading && filteredRanking.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 py-16 px-5 text-center">
-              <TrendingUp className="w-9 h-9 text-slate-700 mx-auto" />
-
-              <p className="mt-3 text-sm font-bold text-slate-300">
-                Nenhum produto encontrado para os filtros selecionados.
+          {!(loading || rankingLoading) && displayProducts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 py-16 px-5 text-center space-y-2">
+              <ShoppingBag className="w-10 h-10 text-slate-700 mx-auto" />
+              <h2 className="font-bold text-slate-300">
+                Nenhum produto encontrado com os filtros atuais.
+              </h2>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Tente selecionar outra categoria ou classificação, ou realize uma pesquisa diferente no campo acima.
               </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Tente alterar a categoria ou desmarcar os filtros de vídeo.
-              </p>
+              {(selectedCategory !== 'Todos' || hasVideoOnly || viralVideoOnly) ? (
+                <button
+                  onClick={() => {
+                    setSelectedCategory('Todos');
+                    setHasVideoOnly(false);
+                    setViralVideoOnly(false);
+                  }}
+                  className="mt-2 px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-bold"
+                >
+                  Remover Filtros
+                </button>
+              ) : null}
             </div>
           ) : null}
 
-          {!rankingLoading && filteredRanking.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {filteredRanking.map((product, index) => (
-                <ProductCard
-                  key={product.productId}
-                  product={product}
-                  position={index + 1}
-                  rankingSort={rankingSort}
-                  isMentor={canRefresh}
-                  onOpenScriptModal={(p) => setScriptModalProduct(p)}
-                  onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
-                  onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
-                />
-              ))}
-            </div>
+          {!(loading || rankingLoading) && displayProducts.length > 0 ? (
+            <>
+              {/* Mobile View: Compact Vertical List (TikTok Shop inspired layout) */}
+              <div className="block sm:hidden space-y-2.5">
+                {displayProducts.map((product, index) => (
+                  <MobileProductCard
+                    key={product.productId}
+                    product={product}
+                    position={index + 1}
+                    rankingSort={rankingSort}
+                    isMentor={canRefresh}
+                    onOpenScriptModal={(p) => setScriptModalProduct(p)}
+                    onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
+                    onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
+                  />
+                ))}
+              </div>
+
+              {/* Desktop View: Full Rich Grid */}
+              <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                {displayProducts.map((product, index) => (
+                  <ProductCard
+                    key={product.productId}
+                    product={product}
+                    position={index + 1}
+                    rankingSort={rankingSort}
+                    isMentor={canRefresh}
+                    onOpenScriptModal={(p) => setScriptModalProduct(p)}
+                    onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
+                    onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
+                  />
+                ))}
+              </div>
+
+              {/* Pagination controls for Search mode */}
+              {mode === 'search' ? (
+                <div className="flex items-center justify-center gap-3 pt-4">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => runSearch(query, page - 1, false)}
+                    className="px-4 py-2 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 disabled:opacity-30 hover:bg-slate-800"
+                  >
+                    Anterior
+                  </button>
+
+                  <span className="text-xs text-slate-500">
+                    Página {page}
+                  </span>
+
+                  <button
+                    disabled={!hasMore}
+                    onClick={() => runSearch(query, page + 1, false)}
+                    className="px-4 py-2 rounded-xl border border-cyan-500/30 text-xs font-bold text-cyan-300 disabled:opacity-30 hover:bg-cyan-500/10"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </>
       ) : mode === 'collector' && canRefresh ? (
+        /* PAINEL DO COLETOR (MENTOR ONLY) */
         <div className="space-y-5">
           <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-950/80 to-slate-950/90 p-5 md:p-6 shadow-xl shadow-purple-950/10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1071,28 +1418,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  {
-                    count: 30,
-                    credits: 'até 1 crédito',
-                  },
-                  {
-                    count: 90,
-                    credits: 'até 3 créditos',
-                  },
-                  {
-                    count: 150,
-                    credits: 'até 5 créditos',
-                  },
-                  {
-                    count: 300,
-                    credits: 'até 10 créditos',
-                  },
+                  { count: 30, credits: 'até 1 crédito' },
+                  { count: 90, credits: 'até 3 créditos' },
+                  { count: 150, credits: 'até 5 créditos' },
+                  { count: 300, credits: 'até 10 créditos' },
                 ].map((opt) => (
                   <button
                     key={opt.count}
-                    onClick={() =>
-                      setSelectedMaxProducts(opt.count)
-                    }
+                    onClick={() => setSelectedMaxProducts(opt.count)}
                     disabled={Boolean(refreshingCategory) || isDailyRefreshing}
                     className={`px-3 py-2 rounded-xl text-xs font-black border transition-all text-center ${
                       selectedMaxProducts === opt.count
@@ -1101,7 +1434,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     }`}
                   >
                     <div>{opt.count} produtos</div>
-
                     <div className="text-[10px] font-normal opacity-80">
                       {opt.credits}
                     </div>
@@ -1158,7 +1490,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </button>
             </div>
 
-            {/* Resumo visual do Status */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-500/20 text-xs">
               <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
                 <div className="text-[11px] text-slate-400">Última atualização geral</div>
@@ -1213,7 +1544,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-
                 <span>{collectorNotice}</span>
               </div>
 
@@ -1277,12 +1607,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   </div>
 
                   <button
-                    onClick={() =>
-                      setConfirmModalCategory(cat.category)
-                    }
-                    disabled={
-                      refreshingCategory === cat.category
-                    }
+                    onClick={() => setConfirmModalCategory(cat.category)}
+                    disabled={refreshingCategory === cat.category}
                     className="w-full py-2.5 px-3 rounded-xl border border-amber-400/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   >
                     {refreshingCategory === cat.category ? (
@@ -1296,9 +1622,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         Atualizar até {selectedMaxProducts} • máx.{' '}
                         {selectedMaxProducts === 30
                           ? '1 crédito'
-                          : `${Math.ceil(
-                              selectedMaxProducts / 30,
-                            )} créditos`}
+                          : `${Math.ceil(selectedMaxProducts / 30)} créditos`}
                       </>
                     )}
                   </button>
@@ -1309,6 +1633,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
       ) : null}
 
+      {/* Confirmation Modal for Individual Category Collection */}
       {confirmModalCategory ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md rounded-2xl border border-purple-500/30 bg-slate-950 p-6 shadow-2xl shadow-purple-950/30 space-y-5">
@@ -1330,10 +1655,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </div>
 
               <button
-                onClick={() =>
-                  !refreshingCategory &&
-                  setConfirmModalCategory(null)
-                }
+                onClick={() => !refreshingCategory && setConfirmModalCategory(null)}
                 disabled={Boolean(refreshingCategory)}
                 className="text-slate-500 hover:text-white disabled:opacity-30"
               >
@@ -1343,36 +1665,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
               <p className="text-sm font-bold text-amber-200 leading-snug">
-                Esta coleta buscará até {selectedMaxProducts}{' '}
-                produtos da TikTok Shop Brasil e poderá consumir
-                até {Math.ceil(selectedMaxProducts / 30)}{' '}
-                {Math.ceil(selectedMaxProducts / 30) === 1
-                  ? 'crédito'
-                  : 'créditos'}{' '}
-                da SocialCrawl. Continuar?
+                Esta coleta buscará até {selectedMaxProducts} produtos da TikTok Shop Brasil e poderá consumir até {Math.ceil(selectedMaxProducts / 30)} {Math.ceil(selectedMaxProducts / 30) === 1 ? 'crédito' : 'créditos'} da SocialCrawl. Continuar?
               </p>
 
               <p className="text-xs text-slate-400 leading-normal">
-                A requisição consultará sequencialmente até{' '}
-                {Math.ceil(selectedMaxProducts / 30)}{' '}
-                {Math.ceil(selectedMaxProducts / 30) === 1
-                  ? 'página'
-                  : 'páginas'}{' '}
-                de resultados para a categoria{' '}
-                <strong className="text-white">
-                  {confirmModalCategory}
-                </strong>{' '}
-                na região{' '}
-                <strong className="text-white">BR</strong> e
-                atualizará o banco de dados do Geração Z Pro.
+                A requisição consultará sequencialmente até {Math.ceil(selectedMaxProducts / 30)} {Math.ceil(selectedMaxProducts / 30) === 1 ? 'página' : 'páginas'} de resultados para a categoria <strong className="text-white">{confirmModalCategory}</strong> na região <strong className="text-white">BR</strong> e atualizará o banco de dados do Geração Z Pro.
               </p>
             </div>
 
             <div className="flex items-center gap-3 pt-1">
               <button
-                onClick={() =>
-                  setConfirmModalCategory(null)
-                }
+                onClick={() => setConfirmModalCategory(null)}
                 disabled={Boolean(refreshingCategory)}
                 className="flex-1 py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 text-xs font-bold disabled:opacity-30"
               >
@@ -1401,7 +1704,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
       ) : null}
 
-      {/* Modal de Confirmação da Atualização Diária */}
+      {/* Confirmation Modal for Daily Refresh */}
       {showDailyConfirmModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-950 p-6 shadow-2xl shadow-amber-950/40 space-y-5">
@@ -1461,7 +1764,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           </div>
         </div>
       ) : null}
-      {/* Modais de Ações de Vídeo e IA */}
+
+      {/* Video & AI Modals */}
       <ScriptGeneratorModal
         isOpen={Boolean(scriptModalProduct)}
         onClose={() => setScriptModalProduct(null)}
