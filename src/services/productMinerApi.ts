@@ -11,7 +11,7 @@ export interface ProductMinerVideo {
   saves?: number | null;
 }
 
-export type ProductRankingSort = 'total' | '24h' | '7d' | 'spiking';
+export type ProductRankingSort = 'opportunities' | 'total' | '24h' | '7d' | 'spiking';
 export type ProductSearchSource = 'provider' | 'cache' | 'database' | 'empty';
 
 export interface ProductMinerProduct {
@@ -29,6 +29,7 @@ export interface ProductMinerProduct {
   growth24hPercent?: number | null;
   growth7dPercent?: number | null;
   trendScore?: number | null;
+  score?: number | null;
   sellerId: string | null;
   sellerName: string | null;
   productUrl: string | null;
@@ -120,7 +121,7 @@ export interface CollectorRefreshResponse extends ProductSearchResponse {
 export async function refreshProducts(
   studentCode: string,
   query: string,
-  maxProductsOrPage: number = 300
+  maxProductsOrPage: number = 90
 ): Promise<CollectorRefreshResponse> {
   const isMultiPageRequest = maxProductsOrPage >= 30;
   const body = isMultiPageRequest
@@ -156,7 +157,7 @@ export async function fetchCollectorCategories(studentCode: string): Promise<Col
   return (data.categories || []) as CollectorCategoryStat[];
 }
 
-export async function loadProductRanking(studentCode: string, limit = 50, sort: ProductRankingSort = 'total') {
+export async function loadProductRanking(studentCode: string, limit = 50, sort: ProductRankingSort = 'opportunities') {
 
   const params = new URLSearchParams({ limit: String(limit), sort });
   const response = await fetch(`/api/product-miner/ranking?${params.toString()}`, {
