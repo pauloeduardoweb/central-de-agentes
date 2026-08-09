@@ -30,7 +30,7 @@ import { Check } from 'lucide-react';
 export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('Tiktok 2K');
-  const [mentorTab, setMentorTab] = useState<string>('products');
+  const [mentorTab, setMentorTab] = useState<string>('challenges');
   const [userApiKey, setUserApiKey] = useState<string>('');
   const [studentCode, setStudentCode] = useState<string>(() => {
     return localStorage.getItem('user_student_access_code') || '';
@@ -723,7 +723,7 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
         ) : isMaster && activeView === 'mentor' ? (
           <MentorPanel
             studentCode={studentCode}
-            initialTab={currentPath.startsWith('/mentor/integracoes/tiktok') ? 'tiktok' : (mentorTab === 'tiktok' ? 'products' : mentorTab)}
+            initialTab={currentPath.startsWith('/mentor/integracoes/tiktok') ? 'tiktok' : (mentorTab === 'tiktok' || mentorTab === 'products' ? 'challenges' : mentorTab)}
             onBackToHub={() => handleSelectView('hub')}
             onTabChange={(tab) => {
               setMentorTab(tab);
