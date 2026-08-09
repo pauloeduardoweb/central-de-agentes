@@ -29,7 +29,7 @@ interface MentorPanelProps {
 }
 
 export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToHub, onTabChange, initialTab }) => {
-  const [activeTab, setActiveTab] = useState<string>(initialTab || 'products');
+  const [activeTab, setActiveTab] = useState<string>(initialTab && initialTab !== 'products' ? initialTab : 'challenges');
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
       <div className="animate-in fade-in duration-300 w-full">
         <TikTokIntegration
           studentCode={studentCode}
-          onBackToMentor={() => setActiveTab('products')}
+          onBackToMentor={() => setActiveTab('challenges')}
         />
       </div>
     );
@@ -75,16 +75,6 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
   const adminName = profile?.nickname ? `${profile.nickname} — ADM` : 'Bigode — ADM';
 
   const mentorCards = [
-    {
-      id: 'products',
-      title: 'Biblioteca de Produtos',
-      shortDescription: 'Catálogo de Produtos & Mídias',
-      description: 'Gerenciamento do catálogo de produtos, imagens e mídias.',
-      icon: Package,
-      badge: 'Ativo',
-      badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
-      isAvailable: true,
-    },
     {
       id: 'challenges',
       title: 'Criar Desafios',
