@@ -84,14 +84,14 @@ const CLASSIFICATIONS: ClassificationItem[] = [
 ];
 
 const TIKTOK_CATEGORIES = [
-  'Todos',
-  'Moda',
-  'Itens para Casa',
-  'Eletrônicos',
-  'Beleza e Cuidados Pessoais',
-  'Esporte e Lazer',
-  'Brinquedos e Pets',
-  'Health',
+  { filterKey: 'Todos', label: 'Todos' },
+  { filterKey: 'Moda', label: 'Moda' },
+  { filterKey: 'Itens para Casa', label: 'Casa' },
+  { filterKey: 'Eletrônicos', label: 'Eletrônicos' },
+  { filterKey: 'Beleza e Cuidados Pessoais', label: 'Beleza' },
+  { filterKey: 'Esporte e Lazer', label: 'Esporte' },
+  { filterKey: 'Brinquedos e Pets', label: 'Brinquedos e Pets' },
+  { filterKey: 'Health', label: 'Health' },
 ];
 
 function formatMoney(cents: number | null | undefined, symbol = 'R$') {
@@ -1041,20 +1041,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             ) : null}
           </div>
         </div>
-
-        {/* Quick Search Chips */}
-        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {QUICK_SEARCHES.map((item) => (
-            <button
-              key={item}
-              onClick={() => runSearch(item, 1, false)}
-              disabled={loading}
-              className="px-2.5 py-1 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/30 text-[11px] font-semibold capitalize shrink-0"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* ================================================== */}
@@ -1069,8 +1055,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           <span className="text-[10px] text-slate-500 font-medium">Inspirado no TikTok Shop</span>
         </div>
 
-        {/* Horizontal scrollable row of classification icons */}
-        <div className="flex items-start gap-3 sm:gap-5 overflow-x-auto pb-2 pt-1 scrollbar-none snap-x">
+        {/* Horizontal scrollable row of classification icons (~4 visible on mobile + peek of 5th) */}
+        <div className="flex items-start justify-between sm:justify-start gap-2 sm:gap-5 overflow-x-auto pb-2 pt-1 scrollbar-none snap-x">
           {CLASSIFICATIONS.map((c) => {
             const isActive = selectedClassification === c.id;
             return (
@@ -1078,7 +1064,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 key={c.id}
                 type="button"
                 onClick={() => setSelectedClassification(c.id)}
-                className="flex flex-col items-center shrink-0 group focus:outline-none snap-start"
+                className="flex flex-col items-center shrink-0 w-[78px] sm:w-[90px] md:w-auto group focus:outline-none snap-start"
               >
                 <ClassificationIconComponent item={c} isActive={isActive} />
                 <span
@@ -1113,19 +1099,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         {/* Categories Pills Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none snap-x">
           {TIKTOK_CATEGORIES.map((cat) => {
-            const isActive = selectedCategory === cat;
+            const isActive = selectedCategory === cat.filterKey;
             return (
               <button
-                key={cat}
+                key={cat.filterKey}
                 type="button"
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => setSelectedCategory(cat.filterKey)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all snap-start ${
                   isActive
                     ? 'border-cyan-400/60 bg-gradient-to-r from-cyan-500/30 to-blue-600/30 text-cyan-200 shadow-md shadow-cyan-950/40 font-black'
                     : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:border-slate-700'
                 }`}
               >
-                {cat}
+                {cat.label}
               </button>
             );
           })}
