@@ -686,26 +686,101 @@ export async function searchTikTokShopProducts(params: {
   requestId: string | null;
 }> {
   const query = String(params.query || '').trim();
-  if (query.length < 2) throw new Error('SEARCH_QUERY_TOO_SHORT');
+  if (query.length === 1) throw new Error('SEARCH_QUERY_TOO_SHORT');
   if (query.length > 120) throw new Error('SEARCH_QUERY_TOO_LONG');
   const requestedPage = Number.parseInt(String(params.page || 1), 10);
-  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(requestedPage, 20)) : 1;
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(requestedPage, 50)) : 1;
   const region = String(params.region || DEFAULT_REGION).trim().toUpperCase();
   const forceRefresh = Boolean(params.forceRefresh);
 
   // Normal searches are ALWAYS free: first reuse any stored SocialCrawl result,
-  // even when its refresh window has expired. Provider credits are spent only
-  // through an explicit mentor refresh.
+  // or query our MySQL database. Provider credits are spent only through an explicit mentor refresh.
   if (!forceRefresh) {
+    // 1. If query is empty, return top products from MySQL database
+    if (!query) {
+      if (isDatabaseConfigured()) {
+        await ensureProductMinerTables();
+        const safePageSize = 30;
+        const offset = (page - 1) * safePageSize;
+        const [rows]: any = await db.query(
+          `SELECT p.*
+           FROM tiktok_shop_products p
+           ORDER BY p.sold_count DESC, p.last_seen_at DESC
+           LIMIT ? OFFSET ?`,
+          [safePageSize + 1, offset]
+        );
+        const localRows = Array.isArray(rows) ? rows : [];
+        let hasMore = localRows.length > safePageSize;
+        let localProducts = localRows.slice(0, safePageSize).map(rowToProduct);
+
+        // Fallback: If requested page > 1 has no products, return page 1
+        if (localProducts.length === 0 && page > 1) {
+          const [fallbackRows]: any = await db.query(
+            `SELECT p.*
+             FROM tiktok_shop_products p
+             ORDER BY p.sold_count DESC, p.last_seen_at DESC
+             LIMIT ? OFFSET 0`,
+            [safePageSize + 1]
+          );
+          const fRows = Array.isArray(fallbackRows) ? fallbackRows : [];
+          hasMore = fRows.length > safePageSize;
+          localProducts = fRows.slice(0, safePageSize).map(rowToProduct);
+        }
+
+        const products = await attachTrendMetrics(localProducts);
+        return {
+          products,
+          creditsUsed: 0,
+          creditsRemaining: null,
+          hasMore,
+          pageSize: safePageSize,
+          fromCache: true,
+          source: 'database',
+          needsRefresh: false,
+          cacheExpired: false,
+          requestId: null,
+        };
+      }
+
+      return {
+        products: [],
+        creditsUsed: 0,
+        creditsRemaining: null,
+        hasMore: false,
+        pageSize: 0,
+        fromCache: true,
+        source: 'empty',
+        needsRefresh: false,
+        cacheExpired: false,
+        requestId: null,
+      };
+    }
+
+    // 2. Query provided: check cache for this exact page
     const stored = await getStoredPayload(query, region, page);
     if (stored) {
       const normalized = (stored.payload.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
+
+      // Check if page + 1 exists in cache or if DB has more items
+      const storedNext = await getStoredPayload(query, region, page + 1);
+      let localHasMore = Boolean(storedNext);
+      if (!localHasMore && isDatabaseConfigured()) {
+        const like = `%${query}%`;
+        const [countRows]: any = await db.query(
+          `SELECT COUNT(*) as total FROM tiktok_shop_products p
+           WHERE p.title LIKE ? OR p.seller_name LIKE ? OR p.category_path LIKE ? OR p.query_source LIKE ?`,
+          [like, like, like, like]
+        );
+        const total = Number(Array.isArray(countRows) ? countRows[0]?.total || 0 : 0);
+        localHasMore = total > page * 30;
+      }
+
       const products = await attachTrendMetrics(normalized);
       return {
         products,
         creditsUsed: 0,
         creditsRemaining: null,
-        hasMore: Boolean(stored.payload.pagination?.has_more),
+        hasMore: localHasMore,
         pageSize: Number(stored.payload.pagination?.page_size || products.length),
         fromCache: true,
         source: 'cache',
@@ -715,8 +790,7 @@ export async function searchTikTokShopProducts(params: {
       };
     }
 
-    // If this exact search has never been collected, search our own product bank.
-    // This also costs zero SocialCrawl credits.
+    // 3. Not in cache for this page -> search MySQL database for matching products
     if (isDatabaseConfigured()) {
       await ensureProductMinerTables();
       const safePageSize = 30;
@@ -737,8 +811,30 @@ export async function searchTikTokShopProducts(params: {
         [like, like, like, like, query, safePageSize + 1, offset]
       );
       const localRows = Array.isArray(rows) ? rows : [];
-      const hasMore = localRows.length > safePageSize;
-      const localProducts = localRows.slice(0, safePageSize).map(rowToProduct);
+      let hasMore = localRows.length > safePageSize;
+      let localProducts = localRows.slice(0, safePageSize).map(rowToProduct);
+
+      // Fallback: If page > 1 returns 0 products, try page 1 for this query
+      if (localProducts.length === 0 && page > 1) {
+        const [fallbackRows]: any = await db.query(
+          `SELECT p.*
+           FROM tiktok_shop_products p
+           WHERE p.title LIKE ?
+              OR p.seller_name LIKE ?
+              OR p.category_path LIKE ?
+              OR p.query_source LIKE ?
+           ORDER BY
+             CASE WHEN LOWER(p.query_source) = LOWER(?) THEN 0 ELSE 1 END,
+             p.sold_count DESC,
+             p.last_seen_at DESC
+           LIMIT ? OFFSET 0`,
+          [like, like, like, like, query, safePageSize + 1]
+        );
+        const fRows = Array.isArray(fallbackRows) ? fallbackRows : [];
+        hasMore = fRows.length > safePageSize;
+        localProducts = fRows.slice(0, safePageSize).map(rowToProduct);
+      }
+
       if (localProducts.length > 0) {
         const products = await attachTrendMetrics(localProducts);
         return {
