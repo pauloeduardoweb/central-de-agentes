@@ -87,21 +87,20 @@ export const Header: React.FC<HeaderProps> = ({
                 backgroundPosition: 'center',
               }}
             />
-            <div className="relative z-10 flex items-center justify-start gap-1 overflow-x-auto no-scrollbar">
-              <div className="flex items-center space-x-1 shrink-0">
+            <div className="relative z-10 flex items-center justify-between w-full gap-1">
+              <div className="flex items-center justify-between w-full gap-1">
                 {/* Agentes */}
                 <button
                   type="button"
                   onClick={() => onSelectView('hub')}
-                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`flex-1 min-w-0 px-2 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1 transition-all whitespace-nowrap cursor-pointer ${
                     activeView === 'hub'
                       ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <Bot className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span className="hidden sm:inline">Central de Agentes</span>
-                  <span className="sm:hidden">Agentes</span>
+                  <span>Agentes</span>
                 </button>
 
                 {/* Minerador de Produtos - oculto para alunos enquanto não liberado */}
@@ -109,15 +108,14 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectView('miner')}
-                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    className={`flex-1 min-w-0 px-2 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1 transition-all whitespace-nowrap cursor-pointer ${
                       activeView === 'miner'
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span className="hidden sm:inline">Minerar Produtos</span>
-                    <span className="sm:hidden">Minerar</span>
+                    <span>Minerar</span>
                   </button>
                 )}
 
@@ -125,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => onSelectView('chat')}
-                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`flex-1 min-w-0 px-2 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1 transition-all whitespace-nowrap cursor-pointer ${
                     activeView === 'chat'
                       ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
                       : 'text-slate-400 hover:text-white'
@@ -140,15 +138,14 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectView('mentor')}
-                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 sm:space-x-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    className={`flex-1 min-w-0 px-2 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1 transition-all whitespace-nowrap cursor-pointer ${
                       activeView === 'mentor'
                         ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
                         : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
                     }`}
                   >
                     <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span className="hidden sm:inline">Painel do Mentor</span>
-                    <span className="sm:hidden">Mentor</span>
+                    <span>Mentor</span>
                   </button>
                 )}
               </div>
