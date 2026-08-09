@@ -1094,6 +1094,8 @@ export function ensureProductMinerTables(): Promise<void> {
           INDEX idx_pmsl_code_time (student_code, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      await ensureDailyCollectionsTable();
     })().catch((err: any) => {
       productMinerTablesPromise = null;
       console.warn('[MySQL ensureProductMinerTables Error]:', err?.message || err);
@@ -1101,6 +1103,36 @@ export function ensureProductMinerTables(): Promise<void> {
     });
   }
   return productMinerTablesPromise;
+}
+
+let dailyCollectionsPromise: Promise<void> | null = null;
+export function ensureDailyCollectionsTable(): Promise<void> {
+  if (!isDatabaseConfigured()) return Promise.resolve();
+  if (!dailyCollectionsPromise) {
+    dailyCollectionsPromise = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS product_miner_daily_collections (
+          id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          completed_at DATETIME DEFAULT NULL,
+          categories_processed INT NOT NULL DEFAULT 0,
+          unique_products_count INT NOT NULL DEFAULT 0,
+          credits_used INT NOT NULL DEFAULT 0,
+          status ENUM('RUNNING', 'COMPLETED', 'PARTIAL_FAILED', 'FAILED') NOT NULL DEFAULT 'RUNNING',
+          current_category VARCHAR(120) DEFAULT NULL,
+          failed_categories TEXT DEFAULT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_pmdc_completed (completed_at),
+          INDEX idx_pmdc_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    })().catch((err: any) => {
+      dailyCollectionsPromise = null;
+      console.warn('[MySQL ensureDailyCollectionsTable Error]:', err?.message || err);
+      throw err;
+    });
+  }
+  return dailyCollectionsPromise;
 }
 
 let tiktokConnectionsPromise: Promise<void> | null = null;

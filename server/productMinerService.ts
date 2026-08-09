@@ -1200,3 +1200,184 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
 
   return statsList;
 }
+
+export type DailyRefreshStatusResult = {
+  id: number;
+  startedAt: string;
+  completedAt: string | null;
+  categoriesProcessed: number;
+  totalCategories: number;
+  uniqueProductsCount: number;
+  creditsUsed: number;
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED';
+  currentCategory: string | null;
+  failedCategories: string[];
+  isCooldownActive: boolean;
+  cooldownRemainingSeconds: number;
+  nextRecommendedAt: string | null;
+  isCurrentlyRunning: boolean;
+};
+
+export async function getDailyRefreshStatus(): Promise<DailyRefreshStatusResult | null> {
+  if (!isDatabaseConfigured()) return null;
+  await ensureProductMinerTables();
+
+  try {
+    const [rows]: any = await db.query(
+      `SELECT * FROM product_miner_daily_collections ORDER BY id DESC LIMIT 1`
+    );
+
+    const record = Array.isArray(rows) && rows[0];
+    if (!record) return null;
+
+    const startedAt = record.started_at ? new Date(record.started_at).toISOString() : new Date().toISOString();
+    const completedAt = record.completed_at ? new Date(record.completed_at).toISOString() : null;
+    const now = Date.now();
+    const referenceTime = record.completed_at ? new Date(record.completed_at).getTime() : new Date(record.started_at).getTime();
+
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const elapsedMs = now - referenceTime;
+
+    const isFinishedStatus = record.status === 'COMPLETED' || record.status === 'PARTIAL_FAILED';
+    const isCooldownActive = isFinishedStatus && elapsedMs < COOLDOWN_MS;
+
+    const cooldownRemainingSeconds = isCooldownActive ? Math.ceil((COOLDOWN_MS - elapsedMs) / 1000) : 0;
+    const nextRecommendedAt = isFinishedStatus ? new Date(referenceTime + COOLDOWN_MS).toISOString() : null;
+
+    const startedMs = new Date(record.started_at).getTime();
+    const isCurrentlyRunning = record.status === 'RUNNING' && (now - startedMs < 15 * 60 * 1000);
+
+    let failedCategories: string[] = [];
+    if (record.failed_categories) {
+      try {
+        failedCategories = JSON.parse(record.failed_categories);
+      } catch {
+        failedCategories = [];
+      }
+    }
+
+    return {
+      id: Number(record.id),
+      startedAt,
+      completedAt,
+      categoriesProcessed: Number(record.categories_processed || 0),
+      totalCategories: COLLECTOR_CATEGORIES.length,
+      uniqueProductsCount: Number(record.unique_products_count || 0),
+      creditsUsed: Number(record.credits_used || 0),
+      status: record.status,
+      currentCategory: record.current_category || null,
+      failedCategories,
+      isCooldownActive,
+      cooldownRemainingSeconds,
+      nextRecommendedAt,
+      isCurrentlyRunning,
+    };
+  } catch (err: any) {
+    console.warn('[getDailyRefreshStatus Error]:', err?.message || err);
+    return null;
+  }
+}
+
+export async function executeDailyRefresh(): Promise<DailyRefreshStatusResult> {
+  if (!isDatabaseConfigured()) {
+    throw new Error('DATABASE_NOT_CONFIGURED');
+  }
+
+  await ensureProductMinerTables();
+
+  const currentStatus = await getDailyRefreshStatus();
+  if (currentStatus?.isCooldownActive) {
+    throw new Error('DAILY_REFRESH_COOLDOWN');
+  }
+  if (currentStatus?.isCurrentlyRunning) {
+    throw new Error('DAILY_REFRESH_IN_PROGRESS');
+  }
+
+  const [insertRes]: any = await db.query(
+    `INSERT INTO product_miner_daily_collections
+     (started_at, categories_processed, unique_products_count, credits_used, status, current_category)
+     VALUES (NOW(), 0, 0, 0, 'RUNNING', ?)`,
+    [COLLECTOR_CATEGORIES[0]]
+  );
+
+  const runId = insertRes.insertId;
+  const seenProductIds = new Set<string>();
+  let totalCreditsUsed = 0;
+  let categoriesProcessed = 0;
+  const failedCategories: string[] = [];
+
+  for (const cat of COLLECTOR_CATEGORIES) {
+    try {
+      await db.query(
+        `UPDATE product_miner_daily_collections
+         SET current_category = ?
+         WHERE id = ?`,
+        [cat, runId]
+      ).catch(() => {});
+
+      const res = await refreshMultiPageTikTokShopProducts({
+        query: cat,
+        region: 'BR',
+        maxProducts: 90,
+      });
+
+      totalCreditsUsed += Number(res.creditsUsed || 0);
+
+      for (const p of res.products) {
+        if (p.productId) seenProductIds.add(p.productId);
+      }
+
+      categoriesProcessed++;
+
+      if (res.partialError) {
+        failedCategories.push(cat);
+      }
+    } catch (catErr: any) {
+      console.warn(`[Daily Refresh Failure for category ${cat}]:`, catErr?.message || catErr);
+      failedCategories.push(cat);
+    }
+
+    await db.query(
+      `UPDATE product_miner_daily_collections
+       SET categories_processed = ?, unique_products_count = ?, credits_used = ?, failed_categories = ?
+       WHERE id = ?`,
+      [categoriesProcessed, seenProductIds.size, totalCreditsUsed, JSON.stringify(failedCategories), runId]
+    ).catch(() => {});
+  }
+
+  let finalStatus: 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED' = 'COMPLETED';
+  if (failedCategories.length > 0) {
+    if (failedCategories.length === COLLECTOR_CATEGORIES.length) {
+      finalStatus = 'FAILED';
+    } else {
+      finalStatus = 'PARTIAL_FAILED';
+    }
+  }
+
+  await db.query(
+    `UPDATE product_miner_daily_collections
+     SET completed_at = NOW(), status = ?, categories_processed = ?, unique_products_count = ?, credits_used = ?, current_category = NULL, failed_categories = ?
+     WHERE id = ?`,
+    [finalStatus, categoriesProcessed, seenProductIds.size, totalCreditsUsed, JSON.stringify(failedCategories), runId]
+  );
+
+  const updatedStatus = await getDailyRefreshStatus();
+  if (updatedStatus) return updatedStatus;
+
+  return {
+    id: Number(runId),
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    categoriesProcessed,
+    totalCategories: COLLECTOR_CATEGORIES.length,
+    uniqueProductsCount: seenProductIds.size,
+    creditsUsed: totalCreditsUsed,
+    status: finalStatus,
+    currentCategory: null,
+    failedCategories,
+    isCooldownActive: finalStatus !== 'FAILED',
+    cooldownRemainingSeconds: 86400,
+    nextRecommendedAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    isCurrentlyRunning: false,
+  };
+}

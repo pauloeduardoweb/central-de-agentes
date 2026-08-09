@@ -1,6 +1,6 @@
 import express from 'express';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
-import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, ProductRankingSort } from './productMinerService.js';
+import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, ProductRankingSort } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
 import { db, isDatabaseConfigured } from './database.js';
 
@@ -131,6 +131,43 @@ productMinerRouter.get('/collector/categories', async (req, res) => {
   } catch (error: any) {
     console.error('[Product Miner Collector Stats Error]:', error?.message || error);
     return res.status(500).json({ error: 'PRODUCT_MINER_COLLECTOR_STATS_ERROR' });
+  }
+});
+
+// Coletor: Status da Atualização Diária da Base (Mentor-only)
+productMinerRouter.get('/collector/daily-status', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const status = await getDailyRefreshStatus();
+    return res.json({ success: true, status });
+  } catch (error: any) {
+    console.error('[Product Miner Daily Status Error]:', error?.message || error);
+    return res.status(500).json({ error: 'DAILY_STATUS_ERROR' });
+  }
+});
+
+// Coletor: Executar Atualização Diária da Base (Mentor-only)
+productMinerRouter.post('/collector/daily-refresh', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const status = await executeDailyRefresh();
+    return res.json({ success: true, status });
+  } catch (error: any) {
+    const msg = error?.message || '';
+    if (msg === 'DAILY_REFRESH_COOLDOWN') {
+      return res.status(429).json({
+        error: 'DAILY_REFRESH_COOLDOWN',
+        message: 'A base já foi atualizada nas últimas 24 horas. Aguarde o período de intervalo para atualizar novamente.',
+      });
+    }
+    if (msg === 'DAILY_REFRESH_IN_PROGRESS') {
+      return res.status(409).json({
+        error: 'DAILY_REFRESH_IN_PROGRESS',
+        message: 'Uma atualização diária já está em andamento.',
+      });
+    }
+    console.error('[Product Miner Daily Refresh Route Error]:', error?.message || error);
+    return res.status(500).json({ error: 'DAILY_REFRESH_FAILED', message: error?.message || 'Falha ao executar atualização diária.' });
   }
 });
 
