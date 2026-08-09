@@ -36,6 +36,12 @@ export interface ProductMinerProduct {
   category: string | null;
   lastSeenAt?: string | null;
   video: ProductMinerVideo | null;
+  videoDownload?: {
+    isPrepared: boolean;
+    directMediaUrl?: string | null;
+    preparedAt?: string | null;
+    status?: string | null;
+  } | null;
 }
 
 export interface ProductRankingMeta {
@@ -194,6 +200,24 @@ export async function generateProductScript(
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw accessError(data);
   return data as { success: true; script: string };
+}
+
+export async function prepareProductVideoDownload(
+  studentCode: string,
+  productId: string
+): Promise<{ success: boolean; prepared?: boolean; directMediaUrl?: string; error?: string; message?: string }> {
+  const response = await fetch('/api/product-miner/videos/prepare-download', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ productId }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data;
 }
 
 export type VideoStrength = 'Fraco' | 'Bom' | 'Forte' | 'Viral';
