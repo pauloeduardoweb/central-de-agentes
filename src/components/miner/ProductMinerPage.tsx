@@ -25,6 +25,7 @@ interface ProductMinerPageProps {
 const QUICK_SEARCHES = ['beleza', 'casa', 'moda', 'cozinha', 'eletrônicos', 'fitness', 'bebê', 'pet'];
 
 const RANKING_FILTERS: Array<{ id: ProductRankingSort; label: string }> = [
+  { id: 'opportunities', label: '🔥 Melhores Oportunidades' },
   { id: 'total', label: 'Mais vendidos' },
   { id: '24h', label: 'Vendas 24h' },
   { id: '7d', label: 'Vendas 7 dias' },
@@ -131,6 +132,13 @@ const ProductCard: React.FC<{
       </div>
 
       <div className="p-4 space-y-3 flex-1 flex flex-col">
+        {product.score !== undefined && product.score !== null ? (
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-950/90 to-indigo-950/90 border border-purple-500/40 text-purple-200 text-xs font-semibold self-start shadow-sm">
+            <Zap className="w-3.5 h-3.5 text-amber-300 fill-current" />
+            <span>Score Geração Z Pro: <strong className="text-amber-300 font-black">{product.score}</strong>/100</span>
+          </div>
+        ) : null}
+
         <h3 className="font-extrabold text-sm text-white leading-snug line-clamp-2 min-h-[40px]">
           {product.title}
         </h3>
@@ -292,7 +300,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [products, setProducts] = useState<ProductMinerProduct[]>([]);
   const [ranking, setRanking] = useState<ProductMinerProduct[]>([]);
   const [rankingMeta, setRankingMeta] = useState<ProductRankingMeta | null>(null);
-  const [rankingSort, setRankingSort] = useState<ProductRankingSort>('total');
+  const [rankingSort, setRankingSort] = useState<ProductRankingSort>('opportunities');
   const [mode, setMode] = useState<'search' | 'ranking' | 'collector'>('search');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -315,8 +323,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [confirmModalCategory, setConfirmModalCategory] = useState<string | null>(null);
   const [collectorNotice, setCollectorNotice] = useState<string | null>(null);
 
-  // Coletor multipágina: até 300 produtos por categoria
-  const [selectedMaxProducts, setSelectedMaxProducts] = useState<number>(300);
+  // Coletor multipágina: até 300 produtos por categoria (padrão 90)
+  const [selectedMaxProducts, setSelectedMaxProducts] = useState<number>(90);
 
   const sortedProducts = useMemo(
     () => [...products].sort((a, b) => b.soldCount - a.soldCount),
