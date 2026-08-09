@@ -454,25 +454,38 @@ function matchesSubcategoryFilter(
 
 const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive: boolean }> = ({ item, isActive }) => {
   const [imgError, setImgError] = useState(false);
+  const hasValidImage = Boolean(item.imgUrl) && !imgError;
 
-  return (
-    <div
-      className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
-        isActive
-          ? 'border-amber-500 bg-gradient-to-br from-amber-400/30 to-orange-400/30 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
-          : 'border-slate-200 bg-slate-100 hover:border-slate-300 hover:bg-slate-200/80'
-      }`}
-    >
-      {item.imgUrl && !imgError ? (
+  if (hasValidImage) {
+    return (
+      <div
+        className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
+          isActive
+            ? 'border-amber-500 bg-gradient-to-br from-amber-400/30 to-orange-400/30 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
+            : 'border-slate-200 bg-slate-100 hover:border-slate-300 hover:bg-slate-200/80'
+        }`}
+      >
         <img
           src={item.imgUrl}
           alt={item.label}
           onError={() => setImgError(true)}
           className="w-full h-full object-cover"
         />
-      ) : (
-        item.fallbackIcon
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full transition-all flex items-center justify-center shrink-0 border-2 ${
+        isActive
+          ? 'border-amber-500 bg-slate-900 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
+          : 'border-slate-800 bg-slate-900/95 hover:border-amber-500/50 hover:bg-slate-900'
+      }`}
+    >
+      <div className="text-amber-400 flex items-center justify-center">
+        {item.fallbackIcon}
+      </div>
     </div>
   );
 };
@@ -1358,9 +1371,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-amber-600">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
               Minerar Produtos TikTok Shop
             </h1>
+            <div className="mt-1.5 h-0.5 w-16 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" />
           </div>
 
           <div className="flex items-center gap-2 text-[11px]">
