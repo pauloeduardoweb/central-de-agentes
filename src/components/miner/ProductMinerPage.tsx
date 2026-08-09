@@ -1399,32 +1399,41 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
 
         {/* Categories Pills Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none snap-x">
-          {CATEGORY_CONFIG.map((cat) => {
-            const isActive = selectedCategory === cat.filterKey;
-            return (
-              <button
-                key={cat.filterKey}
-                type="button"
-                onClick={() => {
-                  if (isActive) {
-                    setSelectedCategory('Todos');
-                    setSelectedSubcategory('Todas');
-                  } else {
-                    setSelectedCategory(cat.filterKey);
-                    setSelectedSubcategory('Todas');
-                  }
-                }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all snap-start whitespace-nowrap ${
-                  isActive
-                    ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
-                    : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-200/80'
-                }`}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
+        <div
+          className="w-full overflow-x-auto overflow-y-hidden scrollbar-none pb-1"
+          onWheel={(e) => {
+            if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+              e.currentTarget.scrollLeft += e.deltaY;
+            }
+          }}
+        >
+          <div className="flex w-max min-w-max items-center gap-1.5 pr-6">
+            {CATEGORY_CONFIG.map((cat) => {
+              const isActive = selectedCategory === cat.filterKey;
+              return (
+                <button
+                  key={cat.filterKey}
+                  type="button"
+                  onClick={() => {
+                    if (isActive) {
+                      setSelectedCategory('Todos');
+                      setSelectedSubcategory('Todas');
+                    } else {
+                      setSelectedCategory(cat.filterKey);
+                      setSelectedSubcategory('Todas');
+                    }
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all whitespace-nowrap ${
+                    isActive
+                      ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
+                      : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-200/80'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Subcategories Horizontal Scroll Row (Renders when a main category is selected) */}
@@ -1444,24 +1453,33 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </button>
               ) : null}
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none snap-x">
-              {activeCategoryConfig.subcategories.map((subcat) => {
-                const isSubActive = selectedSubcategory === subcat;
-                return (
-                  <button
-                    key={subcat}
-                    type="button"
-                    onClick={() => setSelectedSubcategory(subcat)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 border transition-all snap-start whitespace-nowrap ${
-                      isSubActive
-                        ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
-                    }`}
-                  >
-                    {subcat}
-                  </button>
-                );
-              })}
+            <div
+              className="w-full overflow-x-auto overflow-y-hidden scrollbar-none pb-1"
+              onWheel={(e) => {
+                if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                  e.currentTarget.scrollLeft += e.deltaY;
+                }
+              }}
+            >
+              <div className="flex w-max min-w-max items-center gap-1.5 pr-6">
+                {activeCategoryConfig.subcategories.map((subcat) => {
+                  const isSubActive = selectedSubcategory === subcat;
+                  return (
+                    <button
+                      key={subcat}
+                      type="button"
+                      onClick={() => setSelectedSubcategory(subcat)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 border transition-all whitespace-nowrap ${
+                        isSubActive
+                          ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      {subcat}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         ) : null}
