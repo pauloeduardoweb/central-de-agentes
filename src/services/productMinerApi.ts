@@ -96,7 +96,22 @@ function accessError(data: any): Error {
   if (code === 'AUTH_REQUIRED' || code === 'ACCESS_DENIED') {
     return new Error('Sua sessão não tem acesso ao minerador.');
   }
-  return new Error(data?.detail || data?.error || 'Falha no Minerador de Produtos.');
+  if (code === 'PRODUCT_MINER_RANKING_ERROR') {
+    return new Error('Não foi possível carregar o ranking no momento. Tente novamente.');
+  }
+  if (code === 'PRODUCT_MINER_SEARCH_ERROR') {
+    return new Error('Não foi possível realizar a busca de produtos no momento.');
+  }
+  if (code === 'PRODUCT_MINER_COLLECTOR_STATS_ERROR') {
+    return new Error('Não foi possível carregar as estatísticas do coletor.');
+  }
+  if (data?.detail && typeof data.detail === 'string') {
+    return new Error(data.detail);
+  }
+  if (data?.error && typeof data.error === 'string' && !data.error.includes('_ERROR')) {
+    return new Error(data.error);
+  }
+  return new Error('Falha no Minerador de Produtos. Tente novamente em alguns instantes.');
 }
 
 export async function getProductMinerAccess(studentCode: string): Promise<ProductMinerAccess> {
@@ -201,15 +216,38 @@ export async function runDailyRefresh(studentCode: string): Promise<DailyRefresh
   return data.status as DailyRefreshStatus;
 }
 
-export async function loadProductRanking(studentCode: string, limit = 50, sort: ProductRankingSort = 'opportunities') {
-
+export async function loadProductRanking(
+  studentCode: string,
+  limit = 50,
+  sort: ProductRankingSort = 'opportunities',
+  retryCount = 1
+): Promise<{ success: true; products: ProductMinerProduct[]; meta: ProductRankingMeta }> {
   const params = new URLSearchParams({ limit: String(limit), sort });
-  const response = await fetch(`/api/product-miner/ranking?${params.toString()}`, {
-    headers: authHeaders(studentCode),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw accessError(data);
-  return data as { success: true; products: ProductMinerProduct[]; meta: ProductRankingMeta };
+
+  try {
+    const response = await fetch(`/api/product-miner/ranking?${params.toString()}`, {
+      headers: authHeaders(studentCode),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      if (response.status >= 500 && retryCount > 0) {
+        console.warn(`[loadProductRanking] Status ${response.status}. Tentando novamente (tentativa ${retryCount})...`);
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        return loadProductRanking(studentCode, limit, sort, retryCount - 1);
+      }
+      throw accessError(data);
+    }
+
+    return data as { success: true; products: ProductMinerProduct[]; meta: ProductRankingMeta };
+  } catch (err: any) {
+    if (retryCount > 0 && err?.name !== 'AbortError' && !err?.message?.includes('liberado') && !err?.message?.includes('sessão')) {
+      console.warn(`[loadProductRanking] Erro na requisição. Tentando novamente (tentativa ${retryCount})...`);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return loadProductRanking(studentCode, limit, sort, retryCount - 1);
+    }
+    throw err;
+  }
 }
 
 export type ProductScriptType = 'roteiro_completo' | 'roteiro_viral' | 'copy_venda' | 'hooks' | 'cta';
