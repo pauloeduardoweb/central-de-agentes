@@ -1025,11 +1025,34 @@ export function ensureProductMinerTables(): Promise<void> {
           price_cents INT DEFAULT NULL,
           video_views BIGINT DEFAULT NULL,
           query_source VARCHAR(120) DEFAULT NULL,
+          rating FLOAT DEFAULT NULL,
+          seller_id VARCHAR(64) DEFAULT NULL,
+          seller_name VARCHAR(255) DEFAULT NULL,
+          collection_position INT DEFAULT NULL,
           captured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_tsps_product_time (product_id, captured_at),
           INDEX idx_tsps_captured (captured_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      try {
+        const [cols]: any = await db.query(`SHOW COLUMNS FROM tiktok_shop_product_snapshots`);
+        const colNames = Array.isArray(cols) ? cols.map((c: any) => c.Field) : [];
+        if (!colNames.includes('rating')) {
+          await db.query(`ALTER TABLE tiktok_shop_product_snapshots ADD COLUMN rating FLOAT DEFAULT NULL`).catch(() => {});
+        }
+        if (!colNames.includes('seller_id')) {
+          await db.query(`ALTER TABLE tiktok_shop_product_snapshots ADD COLUMN seller_id VARCHAR(64) DEFAULT NULL`).catch(() => {});
+        }
+        if (!colNames.includes('seller_name')) {
+          await db.query(`ALTER TABLE tiktok_shop_product_snapshots ADD COLUMN seller_name VARCHAR(255) DEFAULT NULL`).catch(() => {});
+        }
+        if (!colNames.includes('collection_position')) {
+          await db.query(`ALTER TABLE tiktok_shop_product_snapshots ADD COLUMN collection_position INT DEFAULT NULL`).catch(() => {});
+        }
+      } catch (colErr: any) {
+        console.warn('[MySQL Snapshot Columns Check Warning]:', colErr?.message || colErr);
+      }
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS tiktok_shop_search_cache (

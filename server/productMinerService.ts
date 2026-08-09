@@ -39,6 +39,7 @@ export type MinedProduct = {
   sellerName: string | null;
   productUrl: string | null;
   category: string | null;
+  collectionPosition?: number | null;
   lastSeenAt?: string | Date | null;
   video: null | {
     id: string | null;
@@ -275,12 +276,16 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
       product.priceCents,
       product.video?.views || null,
       query,
+      product.rating ?? null,
+      product.sellerId ?? null,
+      product.sellerName ?? null,
+      product.collectionPosition ?? null,
     ]);
 
   if (snapshotRows.length > 0) {
     await db.query(
       `INSERT INTO tiktok_shop_product_snapshots
-        (product_id, sold_count, price_cents, video_views, query_source)
+        (product_id, sold_count, price_cents, video_views, query_source, rating, seller_id, seller_name, collection_position)
        VALUES ?`,
       [snapshotRows]
     );
@@ -493,7 +498,13 @@ export async function searchTikTokShopProducts(params: {
   }
 
   await saveCachedPayload(query, region, page, payload);
-  const normalized = (payload.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
+  const normalized = (payload.data?.items || [])
+    .map((rawItem, idx) => {
+      const p = normalizeProduct(rawItem);
+      p.collectionPosition = (page - 1) * 30 + (idx + 1);
+      return p;
+    })
+    .filter((item) => item.productId);
   await persistProducts(normalized, query);
   const products = await attachTrendMetrics(normalized);
 
@@ -623,13 +634,7 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
 
   for (const cat of COLLECTOR_CATEGORIES) {
     try {
-      const [productRows]: any = await db.query(
-        `SELECT COUNT(DISTINCT product_id) as total_products, MAX(last_seen_at) as last_seen
-         FROM tiktok_shop_products
-         WHERE LOWER(query_source) = LOWER(?) OR category_path LIKE ?`,
-        [cat, `%${cat}%`]
-      );
-
+      // 1. Prefer exact category search query cache timestamp
       const [cacheRows]: any = await db.query(
         `SELECT updated_at FROM tiktok_shop_search_cache
          WHERE LOWER(search_query) = LOWER(?) AND region = 'BR'
@@ -637,19 +642,44 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
         [cat]
       );
 
-      const row = Array.isArray(productRows) ? productRows[0] : null;
-      const cacheRow = Array.isArray(cacheRows) ? cacheRows[0] : null;
+      // 2. Exact category query snapshot timestamp
+      const [snapshotTimeRows]: any = await db.query(
+        `SELECT MAX(captured_at) as max_captured
+         FROM tiktok_shop_product_snapshots
+         WHERE LOWER(query_source) = LOWER(?)`,
+        [cat]
+      );
 
-      const productCount = Number(row?.total_products || 0);
+      // 3. Count products collected via this category query in snapshots and products table
+      const [snapshotCountRows]: any = await db.query(
+        `SELECT COUNT(DISTINCT product_id) as total_products
+         FROM tiktok_shop_product_snapshots
+         WHERE LOWER(query_source) = LOWER(?)`,
+        [cat]
+      );
+
+      const [productCountRows]: any = await db.query(
+        `SELECT COUNT(DISTINCT product_id) as total_products
+         FROM tiktok_shop_products
+         WHERE LOWER(query_source) = LOWER(?) OR category_path LIKE ?`,
+        [cat, `%${cat}%`]
+      );
+
+      const cacheRow = Array.isArray(cacheRows) ? cacheRows[0] : null;
+      const snapTimeRow = Array.isArray(snapshotTimeRows) ? snapshotTimeRows[0] : null;
+      const snapCount = Number(Array.isArray(snapshotCountRows) ? snapshotCountRows[0]?.total_products || 0 : 0);
+      const prodCount = Number(Array.isArray(productCountRows) ? productCountRows[0]?.total_products || 0 : 0);
+
+      const productCount = Math.max(snapCount, prodCount);
 
       let lastCollectedAt: string | null = null;
-      if (row?.last_seen) {
-        lastCollectedAt = new Date(row.last_seen).toISOString();
-      }
       if (cacheRow?.updated_at) {
-        const cacheDate = new Date(cacheRow.updated_at).toISOString();
-        if (!lastCollectedAt || cacheDate > lastCollectedAt) {
-          lastCollectedAt = cacheDate;
+        lastCollectedAt = new Date(cacheRow.updated_at).toISOString();
+      }
+      if (snapTimeRow?.max_captured) {
+        const snapDate = new Date(snapTimeRow.max_captured).toISOString();
+        if (!lastCollectedAt || snapDate > lastCollectedAt) {
+          lastCollectedAt = snapDate;
         }
       }
 

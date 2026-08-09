@@ -14,8 +14,6 @@ function getRequesterType(req: express.Request): KeyCategory {
     req.header('x-student-access-code') ||
     req.header('x-master-key') ||
     req.header('authorization')?.replace(/^Bearer\s+/i, '') ||
-    req.query.code ||
-    req.query.accessCode ||
     '';
   const code = normalizeAccessCode(raw);
   return code ? lookupKeyType(code) : 'INVALID';
@@ -79,11 +77,11 @@ productMinerRouter.get('/search', async (req, res) => {
 });
 
 // PAID refresh: only the Mentor can intentionally spend a SocialCrawl credit.
-productMinerRouter.get('/refresh', async (req, res) => {
+productMinerRouter.post('/refresh', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
   try {
-    const query = String(req.query.query || req.query.q || '').trim();
-    const page = Number(req.query.page || 1);
+    const query = String(req.body?.query || req.body?.q || req.query.query || req.query.q || '').trim();
+    const page = Number(req.body?.page || req.query.page || 1);
     const result = await searchTikTokShopProducts({ query, page, region: 'BR', forceRefresh: true });
     return res.json({ success: true, region: 'BR', query, page, ...result });
   } catch (error: any) {
