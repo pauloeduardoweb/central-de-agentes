@@ -202,6 +202,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
   const [refreshingCategory, setRefreshingCategory] = useState<string | null>(null);
   const [confirmModalCategory, setConfirmModalCategory] = useState<string | null>(null);
   const [collectorNotice, setCollectorNotice] = useState<string | null>(null);
+  const [selectedMaxProducts, setSelectedMaxProducts] = useState<number>(300);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => b.soldCount - a.soldCount), [products]);
 
@@ -240,8 +241,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
     setError('');
     setCollectorNotice(null);
     try {
-      const res = await refreshProducts(studentCode, cat, 1);
-      setCollectorNotice(`Coleta concluída para ${cat}! ${res.products.length} produtos atualizados na base.`);
+      const res = await refreshProducts(studentCode, cat, selectedMaxProducts);
+      const count = res.uniqueProductsCount ?? res.products?.length ?? 0;
+      const pages = res.pagesConsulted ?? Math.ceil(selectedMaxProducts / 30);
+      const credits = res.creditsUsed ?? pages;
+      let notice = `Coleta concluída para ${cat}! ${count} produtos únicos coletados em ${pages} ${pages === 1 ? 'página' : 'páginas'} (${credits} ${credits === 1 ? 'crédito utilizado' : 'créditos utilizados'}).`;
+      if (res.partialError) {
+        notice += ` (Aviso: ${res.partialError})`;
+      }
+      setCollectorNotice(notice);
       setConfirmModalCategory(null);
       loadCategories();
     } catch (err: any) {
@@ -451,6 +459,32 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
                 </span>
               </div>
             </div>
+
+            <div className="mt-5 pt-4 border-t border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="text-xs font-bold text-slate-300">Quantidade por Categoria:</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { count: 30, credits: 'até 1 crédito' },
+                  { count: 90, credits: 'até 3 créditos' },
+                  { count: 150, credits: 'até 5 créditos' },
+                  { count: 300, credits: 'até 10 créditos' },
+                ].map((opt) => (
+                  <button
+                    key={opt.count}
+                    onClick={() => setSelectedMaxProducts(opt.count)}
+                    disabled={Boolean(refreshingCategory)}
+                    className={`px-3 py-2 rounded-xl text-xs font-black border transition-all text-center ${
+                      selectedMaxProducts === opt.count
+                        ? 'border-purple-400 bg-purple-500/25 text-purple-200 shadow-md shadow-purple-950/40'
+                        : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <div>{opt.count} produtos</div>
+                    <div className="text-[10px] font-normal opacity-80">{opt.credits}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {collectorNotice ? (
@@ -503,7 +537,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
                       </>
                     ) : (
                       <>
-                        <RefreshCw className="w-3.5 h-3.5" /> Atualizar • 1 crédito
+                        <RefreshCw className="w-3.5 h-3.5" /> Atualizar até {selectedMaxProducts} • máx. {selectedMaxProducts === 30 ? '1 crédito' : `${Math.ceil(selectedMaxProducts / 30)} créditos`}
                       </>
                     )}
                   </button>
@@ -538,10 +572,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
 
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
               <p className="text-sm font-bold text-amber-200 leading-snug">
-                Atualizar esta categoria consumirá 1 crédito da SocialCrawl. Continuar?
+                Esta coleta buscará até {selectedMaxProducts} produtos da TikTok Shop Brasil e poderá consumir até {Math.ceil(selectedMaxProducts / 30)} {Math.ceil(selectedMaxProducts / 30) === 1 ? 'crédito' : 'créditos'} da SocialCrawl. Continuar?
               </p>
               <p className="text-xs text-slate-400 leading-normal">
-                A requisição buscará os 30 principais produtos da categoria <strong className="text-white">{confirmModalCategory}</strong> na região <strong className="text-white">BR</strong> e atualizará o banco de dados do Geração Z Pro.
+                A requisição consultará sequencialmente até {Math.ceil(selectedMaxProducts / 30)} {Math.ceil(selectedMaxProducts / 30) === 1 ? 'página' : 'páginas'} de resultados para a categoria <strong className="text-white">{confirmModalCategory}</strong> na região <strong className="text-white">BR</strong> e atualizará o banco de dados do Geração Z Pro.
               </p>
             </div>
 
@@ -564,7 +598,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({ studentCode,
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="w-4 h-4" /> Confirmar e Atualizar (1 crédito)
+                    <RefreshCw className="w-4 h-4" /> Confirmar e Atualizar
                   </>
                 )}
               </button>
