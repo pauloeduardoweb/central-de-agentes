@@ -25,6 +25,7 @@ import {
   ScriptGeneratorModal,
   VideoAnalysisModal,
   VideoDownloadModal,
+  ProductDetailModal,
 } from './ProductMinerModals';
 
 interface ProductMinerPageProps {
@@ -499,9 +500,7 @@ const MobileProductCard: React.FC<{
   isMentor?: boolean;
   isFavorite?: boolean;
   onToggleFavorite?: (p: ProductMinerProduct) => void;
-  onOpenScriptModal?: (p: ProductMinerProduct) => void;
-  onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
-  onOpenDownloadModal?: (p: ProductMinerProduct) => void;
+  onOpenDetailModal?: (p: ProductMinerProduct) => void;
 }> = ({
   product,
   position,
@@ -509,12 +508,13 @@ const MobileProductCard: React.FC<{
   isMentor,
   isFavorite = false,
   onToggleFavorite,
-  onOpenScriptModal,
-  onOpenAnalysisModal,
-  onOpenDownloadModal,
+  onOpenDetailModal,
 }) => {
   return (
-    <article className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm hover:shadow-md hover:border-amber-400/60 transition-all flex gap-3 relative overflow-hidden text-slate-900">
+    <article
+      onClick={() => onOpenDetailModal?.(product)}
+      className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm hover:shadow-md hover:border-amber-400/60 transition-all flex gap-3 relative overflow-hidden text-slate-900 cursor-pointer"
+    >
       {/* Ranking position tag */}
       {position ? (
         <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded-md bg-white/95 border border-amber-400/70 text-amber-700 text-[10px] font-black shadow-sm">
@@ -597,68 +597,35 @@ const MobileProductCard: React.FC<{
             </div>
           ) : null}
 
-          {/* Price & Score Geração Z Pro */}
-          <div className="flex items-center justify-between gap-2 mt-1 flex-wrap">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-sm font-black text-emerald-700">
-                {formatMoney(product.priceCents, product.currencySymbol)}
-              </span>
-              {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-                <span className="text-[10px] text-slate-400 line-through">
-                  {formatMoney(product.originalPriceCents, product.currencySymbol)}
-                </span>
-              ) : null}
-            </div>
-
-            {product.score !== undefined && product.score !== null ? (
-              <span className="text-[10px] font-medium text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
-                <Zap className="w-2.5 h-2.5 text-amber-500 fill-current" />
-                Score: {product.score}
+          {/* Price */}
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-sm font-black text-emerald-700">
+              {formatMoney(product.priceCents, product.currencySymbol)}
+            </span>
+            {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
+              <span className="text-[10px] text-slate-400 line-through">
+                {formatMoney(product.originalPriceCents, product.currencySymbol)}
               </span>
             ) : null}
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Single Action: "Ver" */}
         <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px]">
-          <div className="truncate max-w-[90px] text-[10px] text-slate-500">
+          <div className="truncate max-w-[100px] text-[10px] text-slate-500">
             {product.sellerName || 'TikTok Shop'}
           </div>
 
-          <div className="flex items-center gap-1">
-            {product.video ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onOpenScriptModal?.(product)}
-                  className="px-2 py-1 rounded bg-white text-amber-800 font-bold border border-slate-200 hover:bg-slate-50 shadow-sm flex items-center gap-1"
-                  title="Gerar Roteiro"
-                >
-                  <Sparkles className="w-2.5 h-2.5 text-amber-600" />
-                  Roteiro
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenAnalysisModal?.(product)}
-                  className="px-2 py-1 rounded bg-amber-50 text-amber-800 font-bold border border-amber-200 hover:bg-amber-100"
-                  title="Analisar"
-                >
-                  Analisar
-                </button>
-              </>
-            ) : null}
-
-            {product.productUrl ? (
-              <a
-                href={product.productUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-2 py-1 rounded bg-slate-100 text-slate-700 hover:text-slate-900 font-bold border border-slate-200 flex items-center gap-0.5"
-              >
-                Ver <ExternalLink className="w-2.5 h-2.5" />
-              </a>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetailModal?.(product);
+            }}
+            className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black shadow-sm flex items-center gap-1 transition-all"
+          >
+            Ver <ExternalLink className="w-3 h-3" />
+          </button>
         </div>
       </div>
     </article>
@@ -676,6 +643,7 @@ const ProductCard: React.FC<{
   onOpenScriptModal?: (p: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
   onOpenDownloadModal?: (p: ProductMinerProduct) => void;
+  onOpenDetailModal?: (p: ProductMinerProduct) => void;
 }> = ({
   product,
   position,
@@ -686,6 +654,7 @@ const ProductCard: React.FC<{
   onOpenScriptModal,
   onOpenAnalysisModal,
   onOpenDownloadModal,
+  onOpenDetailModal,
 }) => {
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
@@ -924,6 +893,14 @@ const ProductCard: React.FC<{
         )}
 
         <div className="flex gap-2 mt-auto pt-1">
+          <button
+            type="button"
+            onClick={() => onOpenDetailModal?.(product)}
+            className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-2.5 py-2 text-xs font-bold transition-all"
+          >
+            Detalhes
+          </button>
+
           {product.productUrl ? (
             <a
               href={product.productUrl}
@@ -1158,7 +1135,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('Todas');
   const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
-  const [aiVideoOnly, setAiVideoOnly] = useState<boolean>(false);
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
@@ -1184,12 +1160,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   useEffect(() => {
     setRankingPage(1);
     setPage(1);
-  }, [selectedCategory, selectedSubcategory, hasVideoOnly, aiVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
+  }, [selectedCategory, selectedSubcategory, hasVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
 
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
   const [analysisModalProduct, setAnalysisModalProduct] = useState<ProductMinerProduct | null>(null);
   const [downloadModalProduct, setDownloadModalProduct] = useState<ProductMinerProduct | null>(null);
+  const [detailModalProduct, setDetailModalProduct] = useState<ProductMinerProduct | null>(null);
 
   useEffect(() => {
     if (mode !== 'ranking') return;
@@ -1249,9 +1226,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     // 2. Filter by video options
     if (hasVideoOnly) {
       list = list.filter((p) => Boolean(p.video?.url));
-    }
-    if (aiVideoOnly) {
-      list = list.filter((p) => Boolean((p.video as any)?.isAi || (p.video as any)?.is_ai || (p.video as any)?.aiGenerated || (p as any)?.isAiVideo));
     }
     if (viralVideoOnly) {
       list = list.filter((p) => Boolean(p.video && (p.video.views ?? 0) >= 1000000));
@@ -1516,7 +1490,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     (selectedCategory !== 'Todos' ? 1 : 0) +
     (selectedSubcategory !== 'Todas' ? 1 : 0) +
     (hasVideoOnly ? 1 : 0) +
-    (aiVideoOnly ? 1 : 0) +
     (viralVideoOnly ? 1 : 0);
 
   return (
@@ -1872,7 +1845,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 setSelectedCategory('Todos');
                 setSelectedSubcategory('Todas');
                 setHasVideoOnly(false);
-                setAiVideoOnly(false);
                 setViralVideoOnly(false);
                 if (rankingSort === '7d') setRankingSort('opportunities');
               }}
@@ -1894,22 +1866,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             >
               <Play className="w-3 h-3 text-amber-600 fill-current" />
               Apenas com vídeo
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAiVideoOnly((p) => !p);
-                setPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                aiVideoOnly
-                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <Wand2 className="w-3 h-3 text-amber-600" />
-              Apenas com vídeo IA
             </button>
 
             <button
@@ -2050,14 +2006,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 Tente selecionar outra categoria ou classificação, ou realize uma pesquisa diferente no campo acima.
               </p>
-              {(selectedCategory !== 'Todos' || selectedSubcategory !== 'Todas' || hasVideoOnly || aiVideoOnly || viralVideoOnly) ? (
+              {(selectedCategory !== 'Todos' || selectedSubcategory !== 'Todas' || hasVideoOnly || viralVideoOnly) ? (
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedCategory('Todos');
                     setSelectedSubcategory('Todas');
                     setHasVideoOnly(false);
-                    setAiVideoOnly(false);
                     setViralVideoOnly(false);
                   }}
                   className="mt-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold"
@@ -2083,9 +2038,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       isMentor={canRefresh}
                       isFavorite={isFavorited(product.productId)}
                       onToggleFavorite={toggleFavorite}
-                      onOpenScriptModal={(p) => setScriptModalProduct(p)}
-                      onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
-                      onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
+                      onOpenDetailModal={(p) => setDetailModalProduct(p)}
                     />
                   );
                 })}
@@ -2107,6 +2060,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       onOpenScriptModal={(p) => setScriptModalProduct(p)}
                       onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
                       onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
+                      onOpenDetailModal={(p) => setDetailModalProduct(p)}
                     />
                   );
                 })}
@@ -2253,10 +2207,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { count: 100, label: '100 produtos', desc: '~4 págs / 4 crs por cat', tag: 'Rápido' },
-                    { count: 300, label: '300 produtos', desc: '~10 págs / 10 crs por cat', tag: '✨ Recomendado' },
-                    { count: 500, label: '500 produtos', desc: '~17 págs / 17 crs por cat', tag: 'Aprofundado' },
-                    { count: 1000, label: '1.000 produtos', desc: '~34 págs / 34 crs por cat', tag: 'Avançado' },
+                    { count: 100, label: '100 produtos', desc: '~4 págs / 20 crs por cat', tag: 'Rápido' },
+                    { count: 300, label: '300 produtos', desc: '~10 págs / 50 crs por cat', tag: '✨ Recomendado' },
+                    { count: 500, label: '500 produtos', desc: '~17 págs / 85 crs por cat', tag: 'Aprofundado' },
+                    { count: 1000, label: '1.000 produtos', desc: '~34 págs / 170 crs por cat', tag: 'Avançado' },
                   ].map((opt) => (
                     <button
                       key={opt.count}
@@ -2414,7 +2368,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               {(() => {
                 const totalCats = selectedExpansionCategories.length;
                 const pagesPerCat = Math.ceil(expansionTargetCount / 30);
-                const estimatedCreditsTotal = totalCats * pagesPerCat;
+                const estimatedCreditsTotal = totalCats * pagesPerCat * 5;
                 const totalTargetProducts = totalCats * expansionTargetCount;
 
                 return (
@@ -2890,7 +2844,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
             <button
               type="button"
-              onClick={() => setBatchSummaryModal(null)}
+              onClick={() => {
+                setBatchSummaryModal(null);
+                loadCategories();
+              }}
               className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md shadow-amber-500/20"
             >
               Fechar e Ver Base Atualizada
@@ -3068,6 +3025,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             )
           );
         }}
+      />
+
+      <ProductDetailModal
+        isOpen={Boolean(detailModalProduct)}
+        onClose={() => setDetailModalProduct(null)}
+        product={detailModalProduct}
+        isFavorite={detailModalProduct ? isFavorited(detailModalProduct.productId) : false}
+        onToggleFavorite={toggleFavorite}
+        onOpenScriptModal={(p) => setScriptModalProduct(p)}
+        onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
+        onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
+        isMentor={canRefresh}
       />
     </section>
   );
