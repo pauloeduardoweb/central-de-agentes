@@ -184,8 +184,8 @@ const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive
     <div
       className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
         isActive
-          ? 'border-amber-400 bg-gradient-to-br from-amber-500/30 to-orange-500/30 shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/50 scale-105'
-          : 'border-slate-800 bg-slate-900/90 hover:border-slate-700'
+          ? 'border-amber-500 bg-gradient-to-br from-amber-400/30 to-orange-400/30 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
+          : 'border-slate-200 bg-slate-100 hover:border-slate-300 hover:bg-slate-200/80'
       }`}
     >
       {!imgError ? (
@@ -233,16 +233,16 @@ const MobileProductCard: React.FC<{
   };
 
   return (
-    <article className="rounded-xl border border-slate-800 bg-slate-950/90 p-3 shadow-md hover:border-cyan-500/30 transition-all flex gap-3 relative overflow-hidden">
+    <article className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm hover:shadow-md hover:border-amber-400/60 transition-all flex gap-3 relative overflow-hidden text-slate-900">
       {/* Ranking position tag */}
       {position ? (
-        <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded-md bg-slate-950/90 border border-amber-400/50 text-amber-300 text-[10px] font-black shadow-sm">
+        <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded-md bg-white/95 border border-amber-400/70 text-amber-700 text-[10px] font-black shadow-sm">
           #{position}
         </div>
       ) : null}
 
       {/* Product Image */}
-      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-slate-900 overflow-hidden shrink-0 border border-slate-800">
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
@@ -250,19 +250,19 @@ const MobileProductCard: React.FC<{
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-600">
+          <div className="w-full h-full flex items-center justify-center text-slate-400">
             <ShoppingBag className="w-8 h-8" />
           </div>
         )}
 
         {product.discountPercent ? (
-          <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-rose-600/90 text-white text-[9px] font-black">
+          <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black">
             -{product.discountPercent}%
           </div>
         ) : null}
 
         {product.video?.url ? (
-          <div className="absolute top-1 right-1 p-1 rounded-full bg-fuchsia-600/90 text-white shadow" title="Possui vídeo">
+          <div className="absolute top-1 right-1 p-1 rounded-full bg-fuchsia-600 text-white shadow" title="Possui vídeo">
             <Play className="w-2.5 h-2.5 fill-current" />
           </div>
         ) : null}
@@ -272,18 +272,18 @@ const MobileProductCard: React.FC<{
       <div className="flex-1 min-w-0 flex flex-col justify-between space-y-1">
         <div>
           {/* Title */}
-          <h3 className="font-extrabold text-xs text-white leading-snug line-clamp-2">
+          <h3 className="font-extrabold text-xs text-slate-900 leading-snug line-clamp-2">
             {product.title}
           </h3>
 
           {/* Vendas & Rating */}
           <div className="flex items-center gap-2 mt-1 text-[11px] flex-wrap">
-            <span className="font-black text-cyan-300">
+            <span className="font-black text-amber-700">
               {compactNumber(product.soldCount)} vendidos
             </span>
 
             {product.rating ? (
-              <span className="font-bold text-amber-300 flex items-center gap-0.5">
+              <span className="font-bold text-amber-600 flex items-center gap-0.5">
                 <Star className="w-3 h-3 fill-current text-amber-400" />
                 {product.rating}
               </span>
@@ -292,11 +292,11 @@ const MobileProductCard: React.FC<{
 
           {/* Ganho Afiliado / Comissão */}
           {product.estimatedCommissionCents ? (
-            <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-black">
+            <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
               Ganhe {formatMoney(product.estimatedCommissionCents, product.currencySymbol)}
             </div>
           ) : product.commissionRatePercent ? (
-            <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-black">
+            <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
               Comissão {product.commissionRatePercent}%
             </div>
           ) : null}
@@ -304,19 +304,19 @@ const MobileProductCard: React.FC<{
           {/* Price & Score Geração Z Pro */}
           <div className="flex items-center justify-between gap-2 mt-1 flex-wrap">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-sm font-black text-emerald-300">
+              <span className="text-sm font-black text-emerald-700">
                 {formatMoney(product.priceCents, product.currencySymbol)}
               </span>
               {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-                <span className="text-[10px] text-slate-500 line-through">
+                <span className="text-[10px] text-slate-400 line-through">
                   {formatMoney(product.originalPriceCents, product.currencySymbol)}
                 </span>
               ) : null}
             </div>
 
             {product.score !== undefined && product.score !== null ? (
-              <span className="text-[10px] font-black text-purple-300 bg-purple-950/80 border border-purple-500/30 px-1.5 py-0.5 rounded flex items-center gap-1">
-                <Zap className="w-2.5 h-2.5 text-amber-300 fill-current" />
+              <span className="text-[10px] font-black text-purple-900 bg-purple-100 border border-purple-300 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Zap className="w-2.5 h-2.5 text-amber-500 fill-current" />
                 Score: {product.score}
               </span>
             ) : null}
@@ -324,8 +324,8 @@ const MobileProductCard: React.FC<{
         </div>
 
         {/* Action Controls */}
-        <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-1 text-[10px]">
-          <div className="truncate max-w-[90px] text-[10px] text-slate-400">
+        <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px]">
+          <div className="truncate max-w-[90px] text-[10px] text-slate-500">
             {product.sellerName || 'TikTok Shop'}
           </div>
 
@@ -335,7 +335,7 @@ const MobileProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="px-2 py-1 rounded bg-fuchsia-500/20 text-fuchsia-300 font-bold border border-fuchsia-500/30 hover:bg-fuchsia-500/30"
+                  className="px-2 py-1 rounded bg-fuchsia-50 text-fuchsia-800 font-bold border border-fuchsia-200 hover:bg-fuchsia-100"
                   title="Gerar Roteiro"
                 >
                   Roteiro
@@ -343,7 +343,7 @@ const MobileProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={() => onOpenAnalysisModal?.(product)}
-                  className="px-2 py-1 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 hover:bg-cyan-500/30"
+                  className="px-2 py-1 rounded bg-amber-50 text-amber-800 font-bold border border-amber-200 hover:bg-amber-100"
                   title="Analisar"
                 >
                   Analisar
@@ -356,7 +356,7 @@ const MobileProductCard: React.FC<{
                 href={product.productUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="px-2 py-1 rounded bg-slate-800 text-slate-200 hover:text-white font-bold border border-slate-700 flex items-center gap-0.5"
+                className="px-2 py-1 rounded bg-slate-100 text-slate-700 hover:text-slate-900 font-bold border border-slate-200 flex items-center gap-0.5"
               >
                 Ver <ExternalLink className="w-2.5 h-2.5" />
               </a>
@@ -403,8 +403,8 @@ const ProductCard: React.FC<{
   };
 
   return (
-    <article className="group rounded-2xl border border-cyan-500/20 bg-slate-950/70 overflow-hidden shadow-lg shadow-cyan-950/10 hover:border-cyan-400/45 transition-all flex flex-col h-full">
-      <div className="relative aspect-[4/3] bg-slate-900 overflow-hidden shrink-0">
+    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900">
+      <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden shrink-0 border-b border-slate-100">
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
@@ -412,29 +412,29 @@ const ProductCard: React.FC<{
             className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-600">
+          <div className="w-full h-full flex items-center justify-center text-slate-400">
             <ShoppingBag className="w-10 h-10" />
           </div>
         )}
 
         {position ? (
-          <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-slate-950/90 border border-amber-400/40 text-amber-300 text-xs font-black">
+          <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-white/95 border border-amber-400 text-amber-700 text-xs font-black shadow-sm">
             #{position}
           </div>
         ) : null}
 
         {product.discountPercent ? (
-          <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-rose-500/90 text-white text-xs font-black">
+          <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-rose-600 text-white text-xs font-black shadow-sm">
             -{product.discountPercent}%
           </div>
         ) : null}
 
         {isSpikingRanking && show24h ? (
-          <div className="absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-orange-500/95 text-white text-[11px] font-black flex items-center gap-1">
+          <div className="absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-amber-500 text-white text-[11px] font-black flex items-center gap-1 shadow-sm">
             <Flame className="w-3 h-3 fill-current" /> DISPARANDO
           </div>
         ) : product.video?.url ? (
-          <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-fuchsia-500/90 text-white text-[11px] font-bold flex items-center gap-1">
+          <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-fuchsia-600 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
             <Play className="w-3 h-3 fill-current" /> Vídeo associado
           </div>
         ) : null}
@@ -442,43 +442,43 @@ const ProductCard: React.FC<{
 
       <div className="p-4 space-y-3 flex-1 flex flex-col">
         {product.score !== undefined && product.score !== null ? (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-950/90 to-indigo-950/90 border border-purple-500/40 text-purple-200 text-xs font-semibold self-start shadow-sm">
-            <Zap className="w-3.5 h-3.5 text-amber-300 fill-current" />
-            <span>Score Geração Z Pro: <strong className="text-amber-300 font-black">{product.score}</strong>/100</span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-100 border border-purple-300 text-purple-900 text-xs font-semibold self-start shadow-sm">
+            <Zap className="w-3.5 h-3.5 text-amber-500 fill-current" />
+            <span>Score Geração Z Pro: <strong className="text-purple-900 font-black">{product.score}</strong>/100</span>
           </div>
         ) : null}
 
-        <h3 className="font-extrabold text-sm text-white leading-snug line-clamp-2 min-h-[40px]">
+        <h3 className="font-extrabold text-sm text-slate-900 leading-snug line-clamp-2 min-h-[40px]">
           {product.title}
         </h3>
 
         {/* Ganho Afiliado / Comissão (se disponível) */}
         {product.estimatedCommissionCents ? (
-          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-black self-start">
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
             Ganhe {formatMoney(product.estimatedCommissionCents, product.currencySymbol)} por venda
           </div>
         ) : product.commissionRatePercent ? (
-          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-black self-start">
+          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
             Comissão {product.commissionRatePercent}%
           </div>
         ) : null}
 
         <div className="flex items-end justify-between gap-3">
           <div>
-            <div className="text-lg font-black text-emerald-300">
+            <div className="text-lg font-black text-emerald-700">
               {formatMoney(product.priceCents, product.currencySymbol)}
             </div>
 
             {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-              <div className="text-[11px] text-slate-500 line-through">
+              <div className="text-[11px] text-slate-400 line-through">
                 {formatMoney(product.originalPriceCents, product.currencySymbol)}
               </div>
             ) : null}
           </div>
 
           <div className="text-right">
-            <div className="text-xs text-slate-400">Vendas totais</div>
-            <div className="font-black text-cyan-300">{compactNumber(product.soldCount)}</div>
+            <div className="text-xs text-slate-500">Vendas totais</div>
+            <div className="font-black text-amber-700">{compactNumber(product.soldCount)}</div>
           </div>
         </div>
 
@@ -487,16 +487,16 @@ const ProductCard: React.FC<{
             <div
               className={`rounded-lg border px-2.5 py-2 ${
                 rankingSort === '24h' || rankingSort === 'spiking'
-                  ? 'border-emerald-400/35 bg-emerald-500/10'
-                  : 'border-slate-700/70 bg-slate-900/60'
+                  ? 'border-emerald-300 bg-emerald-50/80'
+                  : 'border-slate-200 bg-slate-50'
               }`}
             >
               <div className="text-[10px] text-slate-500">≈ 24 horas</div>
-              <div className="text-xs font-black text-emerald-300">
+              <div className="text-xs font-black text-emerald-700">
                 {show24h ? `+${compactNumber(product.sales24h)}` : 'Coletando'}
               </div>
               {show24h ? (
-                <div className="text-[10px] text-emerald-400/80">
+                <div className="text-[10px] text-emerald-600">
                   {formatPercent(product.growth24hPercent)}
                 </div>
               ) : null}
@@ -505,16 +505,16 @@ const ProductCard: React.FC<{
             <div
               className={`rounded-lg border px-2.5 py-2 ${
                 rankingSort === '7d'
-                  ? 'border-violet-400/35 bg-violet-500/10'
-                  : 'border-slate-700/70 bg-slate-900/60'
+                  ? 'border-purple-300 bg-purple-50/80'
+                  : 'border-slate-200 bg-slate-50'
               }`}
             >
               <div className="text-[10px] text-slate-500">≈ 7 dias</div>
-              <div className="text-xs font-black text-violet-300">
+              <div className="text-xs font-black text-purple-700">
                 {show7d ? `+${compactNumber(product.sales7d)}` : 'Coletando'}
               </div>
               {show7d ? (
-                <div className="text-[10px] text-violet-400/80">
+                <div className="text-[10px] text-purple-600">
                   {formatPercent(product.growth7dPercent)}
                 </div>
               ) : null}
@@ -523,21 +523,21 @@ const ProductCard: React.FC<{
         ) : null}
 
         <div className="grid grid-cols-2 gap-2 text-[11px]">
-          <div className="rounded-lg bg-slate-900/80 px-2.5 py-2 text-slate-300 flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 text-amber-300" />
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2 text-slate-700 flex items-center gap-1.5 font-medium">
+            <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
             {product.rating ?? '—'}
           </div>
 
-          <div className="rounded-lg bg-slate-900/80 px-2.5 py-2 text-slate-300 flex items-center gap-1.5 min-w-0">
-            <Store className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2 text-slate-700 flex items-center gap-1.5 min-w-0 font-medium">
+            <Store className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             <span className="truncate">{product.sellerName || 'Loja'}</span>
           </div>
         </div>
 
         {product.video ? (
-          <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 p-3 space-y-2.5">
+          <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/50 p-3 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-fuchsia-300 truncate">
+              <span className="text-[11px] font-bold text-fuchsia-900 truncate">
                 @{product.video.author || 'creator'}
               </span>
 
@@ -549,51 +549,51 @@ const ProductCard: React.FC<{
               ) : null}
             </div>
 
-            <div className="grid grid-cols-5 gap-1 text-center text-[10px] text-slate-400">
+            <div className="grid grid-cols-5 gap-1 text-center text-[10px] text-slate-600 font-semibold">
               <span title="Views">
-                <Eye className="w-3.5 h-3.5 mx-auto mb-1 text-cyan-300" />
+                <Eye className="w-3.5 h-3.5 mx-auto mb-1 text-slate-600" />
                 {compactNumber(product.video.views)}
               </span>
 
               <span title="Likes">
-                <Heart className="w-3.5 h-3.5 mx-auto mb-1 text-rose-300" />
+                <Heart className="w-3.5 h-3.5 mx-auto mb-1 text-rose-500" />
                 {compactNumber(product.video.likes)}
               </span>
 
               <span title="Comentários">
-                <MessageCircle className="w-3.5 h-3.5 mx-auto mb-1 text-violet-300" />
+                <MessageCircle className="w-3.5 h-3.5 mx-auto mb-1 text-purple-600" />
                 {compactNumber(product.video.comments)}
               </span>
 
               <span title="Compartilhamentos">
-                <Share2 className="w-3.5 h-3.5 mx-auto mb-1 text-emerald-300" />
+                <Share2 className="w-3.5 h-3.5 mx-auto mb-1 text-emerald-600" />
                 {compactNumber(product.video.shares)}
               </span>
 
               <span title="Salvos">
-                <Bookmark className="w-3.5 h-3.5 mx-auto mb-1 text-amber-300" />
+                <Bookmark className="w-3.5 h-3.5 mx-auto mb-1 text-amber-600" />
                 {compactNumber(product.video.saves)}
               </span>
             </div>
 
             {/* Video Action Buttons Area */}
-            <div className="pt-2 border-t border-fuchsia-500/20 space-y-1.5">
+            <div className="pt-2 border-t border-fuchsia-200/60 space-y-1.5">
               <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="py-1.5 px-2 rounded-lg bg-gradient-to-r from-fuchsia-600/30 to-purple-600/30 border border-fuchsia-500/40 text-fuchsia-200 hover:text-white font-black flex items-center justify-center gap-1 transition-all"
+                  className="py-1.5 px-2 rounded-lg bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white hover:from-fuchsia-700 hover:to-purple-700 font-black flex items-center justify-center gap-1 transition-all shadow-sm"
                 >
-                  <Sparkles className="w-3 h-3 text-fuchsia-300" />
+                  <Sparkles className="w-3 h-3 text-fuchsia-200" />
                   ✨ Gerar Roteiro
                 </button>
 
                 <button
                   type="button"
                   onClick={() => onOpenAnalysisModal?.(product)}
-                  className="py-1.5 px-2 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:text-white font-bold flex items-center justify-center gap-1 transition-all"
+                  className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 font-bold flex items-center justify-center gap-1 transition-all"
                 >
-                  <BarChart3 className="w-3 h-3 text-cyan-300" />
+                  <BarChart3 className="w-3 h-3 text-amber-600" />
                   🔍 Analisar
                 </button>
               </div>
@@ -604,9 +604,9 @@ const ProductCard: React.FC<{
                     href={product.video.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="py-1 px-1.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 hover:text-white font-bold flex items-center justify-center gap-1 truncate"
+                    className="py-1 px-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:text-slate-900 font-bold flex items-center justify-center gap-1 truncate"
                   >
-                    <Play className="w-3 h-3 text-cyan-400" />
+                    <Play className="w-3 h-3 text-amber-600" />
                     Assistir
                   </a>
                 ) : null}
@@ -614,9 +614,9 @@ const ProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={handleCopyVideoLink}
-                  className="py-1 px-1.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 hover:text-white font-bold flex items-center justify-center gap-1 truncate"
+                  className="py-1 px-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:text-slate-900 font-bold flex items-center justify-center gap-1 truncate"
                 >
-                  {linkCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                  {linkCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-slate-400" />}
                   {linkCopied ? 'Copiado' : 'Copiar'}
                 </button>
 
@@ -626,8 +626,8 @@ const ProductCard: React.FC<{
                     onClick={() => onOpenDownloadModal?.(product)}
                     className={`py-1 px-1.5 rounded-md border font-bold flex items-center justify-center gap-1 truncate transition-all ${
                       isVideoPrepared
-                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:text-white'
-                        : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                        : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900'
                     }`}
                     title={
                       isVideoPrepared
@@ -635,7 +635,7 @@ const ProductCard: React.FC<{
                         : 'Preparar download do vídeo'
                     }
                   >
-                    <Download className={`w-3 h-3 ${isVideoPrepared ? 'text-emerald-400' : 'text-amber-400'}`} />
+                    <Download className={`w-3 h-3 ${isVideoPrepared ? 'text-emerald-600' : 'text-amber-600'}`} />
                     {isVideoPrepared ? 'Baixar' : 'Preparar'}
                   </button>
                 ) : null}
@@ -643,8 +643,8 @@ const ProductCard: React.FC<{
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-3 min-h-[78px] flex items-center justify-center text-center">
-            <span className="text-xs text-slate-500 font-medium">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 min-h-[78px] flex items-center justify-center text-center">
+            <span className="text-xs text-slate-400 font-medium">
               Sem vídeo associado
             </span>
           </div>
@@ -656,7 +656,7 @@ const ProductCard: React.FC<{
               href={product.productUrl}
               target="_blank"
               rel="noreferrer"
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25 px-3 py-2 text-xs font-bold"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3 py-2 text-xs font-bold shadow-sm"
             >
               Produto <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -966,27 +966,27 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const activeFilterCount = (selectedCategory !== 'Todos' ? 1 : 0) + (hasVideoOnly ? 1 : 0) + (viralVideoOnly ? 1 : 0);
 
   return (
-    <section className="space-y-4 pb-12">
+    <section className="space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
       {/* Top Header Card */}
-      <div className="rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-[#071a28]/95 via-[#07131f]/95 to-[#040b13]/95 p-4 sm:p-5 shadow-xl shadow-cyan-950/20">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-cyan-300 text-xs font-black uppercase tracking-[0.18em]">
-              <Zap className="w-3.5 h-3.5 text-amber-300 fill-current" />
-              TikTok Shop Brasil
+            <div className="flex items-center gap-2 text-amber-600 text-xs font-black uppercase tracking-[0.18em]">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              Inteligência de Mercado
             </div>
 
-            <h1 className="mt-1 text-xl sm:text-2xl md:text-3xl font-black text-white">
+            <h1 className="mt-1 text-xl sm:text-2xl md:text-3xl font-black text-slate-900">
               Minerar Produtos
             </h1>
           </div>
 
           <div className="flex items-center gap-2 text-[11px]">
-            <span className="px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 font-bold">
+            <span className="px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold">
               🇧🇷 Região BR
             </span>
 
-            <span className="px-2.5 py-1 rounded-lg border border-cyan-500/25 bg-cyan-500/10 text-cyan-300 font-bold">
+            <span className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 font-bold">
               30 prod/pág
             </span>
           </div>
@@ -995,7 +995,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         {/* Search Input Bar */}
         <div className="mt-4 flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 
             <input
               value={query}
@@ -1005,7 +1005,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 runSearch(query, 1, false)
               }
               placeholder="Ex.: beleza, air fryer, vestido, relógio..."
-              className="w-full h-10 sm:h-11 rounded-xl border border-slate-700/80 bg-slate-950/90 pl-10 pr-4 text-xs sm:text-sm text-white outline-none focus:border-cyan-400/60"
+              className="w-full h-10 sm:h-11 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white focus:bg-white pl-10 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 shadow-sm transition-all"
             />
           </div>
 
@@ -1013,7 +1013,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <button
               onClick={() => runSearch(query, 1, false)}
               disabled={loading || query.trim().length === 1}
-              className="flex-1 sm:flex-none h-10 sm:h-11 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs sm:text-sm font-black disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-950/30"
+              className="flex-1 sm:flex-none h-10 sm:h-11 px-5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs sm:text-sm font-black disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition-all"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -1027,7 +1027,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <button
                 onClick={() => runSearch(query, 1, true)}
                 disabled={loading || query.trim().length < 2}
-                className="h-10 sm:h-11 px-3 rounded-xl border border-amber-400/35 bg-amber-500/10 text-amber-300 text-xs font-black disabled:opacity-50 flex items-center justify-center gap-1.5 hover:bg-amber-500/20"
+                className="h-10 sm:h-11 px-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black disabled:opacity-50 flex items-center justify-center gap-1.5 hover:bg-amber-100 transition-all"
                 title="Esta ação consulta a SocialCrawl e pode consumir 1 crédito."
               >
                 <RefreshCw
@@ -1045,10 +1045,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (TIKTOK SHOP STYLE) */}
       {/* ================================================== */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3 sm:p-4 shadow-lg space-y-2">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5 text-amber-500" />
             Classificações de Produtos
           </span>
           <span className="text-[10px] text-slate-500 font-medium">Inspirado no TikTok Shop</span>
@@ -1068,7 +1068,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <ClassificationIconComponent item={c} isActive={isActive} />
                 <span
                   className={`text-[11px] font-bold text-center mt-1.5 leading-tight max-w-[80px] transition-colors ${
-                    isActive ? 'text-amber-300 font-black' : 'text-slate-400 group-hover:text-slate-200'
+                    isActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
                   }`}
                 >
                   {c.label}
@@ -1082,13 +1082,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       {/* 2 — CATEGORIAS DO TIKTOK SHOP                      */}
       {/* ================================================== */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3 space-y-2">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2 shadow-sm">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-400">Categorias:</span>
+          <span className="text-[11px] font-bold text-slate-600">Categorias:</span>
           {selectedCategory && selectedCategory !== 'Todos' ? (
             <button
               onClick={() => setSelectedCategory('Todos')}
-              className="text-[10px] font-bold text-rose-400 hover:underline"
+              className="text-[10px] font-bold text-rose-600 hover:underline"
             >
               Limpar filtro
             </button>
@@ -1106,8 +1106,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 onClick={() => setSelectedCategory(isActive ? 'Todos' : cat.filterKey)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all snap-start whitespace-nowrap ${
                   isActive
-                    ? 'border-cyan-400/60 bg-gradient-to-r from-cyan-500/30 to-blue-600/30 text-cyan-200 shadow-md shadow-cyan-950/40 font-black'
-                    : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white hover:border-slate-700'
+                    ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
+                    : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-200/80'
                 }`}
               >
                 {cat.label}
@@ -1121,13 +1121,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* 3 — MODES & ADVANCED FILTERS BAR                   */}
       {/* ================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="inline-flex p-1 rounded-xl border border-slate-800 bg-slate-950/80 self-start">
+        <div className="inline-flex p-1 rounded-xl border border-slate-200 bg-white shadow-sm self-start">
           <button
             onClick={() => setMode('search')}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
               mode === 'search'
-                ? 'bg-cyan-500/20 text-cyan-300 font-black border border-cyan-500/30'
-                : 'text-slate-500 hover:text-slate-300'
+                ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Search className="w-3.5 h-3.5" />
@@ -1138,8 +1138,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             onClick={() => setMode('ranking')}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
               mode === 'ranking'
-                ? 'bg-amber-500/20 text-amber-300 font-black border border-amber-500/30'
-                : 'text-slate-500 hover:text-slate-300'
+                ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
@@ -1151,11 +1151,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               onClick={() => setMode('collector')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
                 mode === 'collector'
-                  ? 'bg-purple-500/20 text-purple-300 font-black border border-purple-500/30'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-purple-100 text-purple-900 font-black border border-purple-300'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Layers className="w-3.5 h-3.5 text-purple-400" />
+              <Layers className="w-3.5 h-3.5 text-purple-600" />
               Coletor
             </button>
           ) : null}
@@ -1168,14 +1168,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             onClick={() => setShowAdvancedFilters((prev) => !prev)}
             className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
               showAdvancedFilters || activeFilterCount > 0
-                ? 'border-cyan-400/50 bg-cyan-500/15 text-cyan-300'
-                : 'border-slate-800 bg-slate-900/80 text-slate-400 hover:text-white'
+                ? 'border-amber-400 bg-amber-50 text-amber-800'
+                : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900'
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>Filtros Avançados</span>
             {activeFilterCount > 0 ? (
-              <span className="w-4 h-4 rounded-full bg-cyan-400 text-slate-950 text-[10px] font-black flex items-center justify-center">
+              <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">
                 {activeFilterCount}
               </span>
             ) : null}
@@ -1192,10 +1192,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       {/* Advanced Filters Drawer Panel */}
       {showAdvancedFilters ? (
-        <div className="rounded-2xl border border-cyan-500/20 bg-slate-950/90 p-4 space-y-3 animate-fade-in">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <span className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5" /> Filtros e Métricas Adicionais
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-md animate-fade-in">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-amber-500" /> Filtros e Métricas Adicionais
             </span>
             <button
               onClick={() => {
@@ -1203,7 +1203,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 setHasVideoOnly(false);
                 setViralVideoOnly(false);
               }}
-              className="text-[11px] text-rose-400 hover:underline font-bold"
+              className="text-[11px] text-rose-600 hover:underline font-bold"
             >
               Limpar Todos
             </button>
@@ -1213,7 +1213,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             {/* Sort mode selector for ranking */}
             {mode === 'ranking' ? (
               <div className="space-y-1.5">
-                <span className="text-[11px] text-slate-400 font-bold">Métrica do Ranking:</span>
+                <span className="text-[11px] text-slate-600 font-bold">Métrica do Ranking:</span>
                 <div className="flex gap-1.5 flex-wrap">
                   {RANKING_FILTERS.map((f) => (
                     <button
@@ -1221,8 +1221,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       onClick={() => setRankingSort(f.id)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
                         rankingSort === f.id
-                          ? 'border-amber-400 bg-amber-500/20 text-amber-300'
-                          : 'border-slate-800 bg-slate-900 text-slate-400'
+                          ? 'border-amber-400 bg-amber-50 text-amber-800'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       {f.label}
@@ -1234,18 +1234,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
             {/* Video filters */}
             <div className="space-y-1.5">
-              <span className="text-[11px] text-slate-400 font-bold">Filtros de Vídeo:</span>
+              <span className="text-[11px] text-slate-600 font-bold">Filtros de Vídeo:</span>
               <div className="flex gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setHasVideoOnly((p) => !p)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
                     hasVideoOnly
-                      ? 'border-fuchsia-500/50 bg-fuchsia-500/20 text-fuchsia-300'
-                      : 'border-slate-800 bg-slate-900 text-slate-400'
+                      ? 'border-fuchsia-300 bg-fuchsia-50 text-fuchsia-800'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <Play className="w-3 h-3 text-fuchsia-400 fill-current" />
+                  <Play className="w-3 h-3 text-fuchsia-600 fill-current" />
                   Apenas com vídeo
                 </button>
 
@@ -1254,11 +1254,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   onClick={() => setViralVideoOnly((p) => !p)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
                     viralVideoOnly
-                      ? 'border-amber-400/50 bg-amber-500/20 text-amber-300'
-                      : 'border-slate-800 bg-slate-900 text-slate-400'
+                      ? 'border-amber-400 bg-amber-50 text-amber-800'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <Flame className="w-3 h-3 text-amber-400 fill-current" />
+                  <Flame className="w-3 h-3 text-amber-500 fill-current" />
                   Vídeo viral (1M+ views)
                 </button>
               </div>
@@ -1268,7 +1268,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       ) : null}
 
       {error ? (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {error}
         </div>
       ) : null}
@@ -1280,14 +1280,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         <>
           {(loading || rankingLoading) ? (
             <div className="py-16 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+              <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
             </div>
           ) : null}
 
           {!(loading || rankingLoading) && displayProducts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 py-16 px-5 text-center space-y-2">
-              <ShoppingBag className="w-10 h-10 text-slate-700 mx-auto" />
-              <h2 className="font-bold text-slate-300">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 px-5 text-center space-y-2">
+              <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
+              <h2 className="font-bold text-slate-700">
                 Nenhum produto encontrado com os filtros atuais.
               </h2>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
@@ -1300,7 +1300,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     setHasVideoOnly(false);
                     setViralVideoOnly(false);
                   }}
-                  className="mt-2 px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-bold"
+                  className="mt-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold"
                 >
                   Remover Filtros
                 </button>
@@ -1348,19 +1348,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   <button
                     disabled={page <= 1}
                     onClick={() => runSearch(query, page - 1, false)}
-                    className="px-4 py-2 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 disabled:opacity-30 hover:bg-slate-800"
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm"
                   >
                     Anterior
                   </button>
 
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 font-semibold">
                     Página {page}
                   </span>
 
                   <button
                     disabled={!hasMore}
                     onClick={() => runSearch(query, page + 1, false)}
-                    className="px-4 py-2 rounded-xl border border-cyan-500/30 text-xs font-bold text-cyan-300 disabled:opacity-30 hover:bg-cyan-500/10"
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm"
                   >
                     Próxima
                   </button>
@@ -1372,32 +1372,32 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       ) : mode === 'collector' && canRefresh ? (
         /* PAINEL DO COLETOR (MENTOR ONLY) */
         <div className="space-y-5">
-          <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-950/80 to-slate-950/90 p-5 md:p-6 shadow-xl shadow-purple-950/10">
+          <div className="rounded-2xl border border-purple-200 bg-white p-5 md:p-6 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 text-purple-300 text-xs font-black uppercase tracking-wider">
-                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                <div className="flex items-center gap-2 text-purple-700 text-xs font-black uppercase tracking-wider">
+                  <ShieldCheck className="w-4 h-4 text-purple-600" />
                   Painel do Coletor • Mentor
                 </div>
 
-                <h2 className="mt-1 text-xl md:text-2xl font-black text-white">
+                <h2 className="mt-1 text-xl md:text-2xl font-black text-slate-900">
                   Base Geração Z Pro
                 </h2>
 
-                <p className="mt-1 text-xs md:text-sm text-slate-300">
+                <p className="mt-1 text-xs md:text-sm text-slate-600">
                   Os alunos consultam estes dados sem consumir créditos.
                 </p>
               </div>
 
               <div className="flex items-center gap-2 text-xs">
-                <span className="px-3 py-2 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-300 font-bold">
+                <span className="px-3 py-2 rounded-xl border border-purple-200 bg-purple-50 text-purple-800 font-bold">
                   8 Categorias Monitoradas
                 </span>
               </div>
             </div>
 
-            <div className="mt-5 pt-4 border-t border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <span className="text-xs font-bold text-slate-300">
+            <div className="mt-5 pt-4 border-t border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="text-xs font-bold text-slate-700">
                 Quantidade por Categoria (Individual):
               </span>
 
@@ -1414,8 +1414,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     disabled={Boolean(refreshingCategory) || isDailyRefreshing}
                     className={`px-3 py-2 rounded-xl text-xs font-black border transition-all text-center ${
                       selectedMaxProducts === opt.count
-                        ? 'border-purple-400 bg-purple-500/25 text-purple-200 shadow-md shadow-purple-950/40'
-                        : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white hover:border-slate-700'
+                        ? 'border-purple-300 bg-purple-50 text-purple-900 shadow-sm font-black'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                     }`}
                   >
                     <div>{opt.count} produtos</div>
@@ -1429,17 +1429,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           </div>
 
           {/* Card Especial: Atualização Diária da Base */}
-          <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 via-slate-950/80 to-slate-950/90 p-5 md:p-6 shadow-xl shadow-amber-950/10 space-y-4">
+          <div className="rounded-2xl border border-amber-200 bg-white p-5 md:p-6 shadow-sm space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 text-amber-300 text-xs font-black uppercase tracking-wider">
-                  <RefreshCw className={`w-4 h-4 text-amber-400 ${isDailyRefreshing ? 'animate-spin' : ''}`} />
+                <div className="flex items-center gap-2 text-amber-700 text-xs font-black uppercase tracking-wider">
+                  <RefreshCw className={`w-4 h-4 text-amber-600 ${isDailyRefreshing ? 'animate-spin' : ''}`} />
                   Atualização Diária da Base • 8 Categorias
                 </div>
-                <h3 className="mt-1 text-lg font-black text-white">
+                <h3 className="mt-1 text-lg font-black text-slate-900">
                   Atualizar Todas as Categorias em Sequência
                 </h3>
-                <p className="mt-1 text-xs text-slate-300 max-w-2xl">
+                <p className="mt-1 text-xs text-slate-600 max-w-2xl">
                   Atualiza as 8 categorias oficiais (Beleza, Casa, Moda, Cozinha, Eletrônicos, Fitness, Bebê, Pet) em lote, coletando até 90 produtos por categoria (3 páginas por categoria) e consumindo até 24 créditos SocialCrawl.
                 </p>
               </div>
@@ -1448,12 +1448,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 type="button"
                 onClick={() => setShowDailyConfirmModal(true)}
                 disabled={isDailyRefreshing || Boolean(dailyStatus?.isCooldownActive) || Boolean(refreshingCategory)}
-                className={`px-5 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all ${
+                className={`px-5 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md transition-all ${
                   isDailyRefreshing
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-wait'
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300 cursor-wait'
                     : dailyStatus?.isCooldownActive
-                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 opacity-90'
-                    : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 shadow-amber-950/40 hover:scale-[1.02]'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800 opacity-90'
+                    : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-500/20 hover:scale-[1.02]'
                 }`}
               >
                 {isDailyRefreshing ? (
@@ -1463,7 +1463,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   </>
                 ) : dailyStatus?.isCooldownActive ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     <span>Base atualizada hoje ✅</span>
                   </>
                 ) : (
@@ -1475,66 +1475,66 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-500/20 text-xs">
-              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
-                <div className="text-[11px] text-slate-400">Última atualização geral</div>
-                <div className="font-bold text-slate-200 mt-0.5 truncate">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
+              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+                <div className="text-[11px] text-slate-500">Última atualização geral</div>
+                <div className="font-bold text-slate-800 mt-0.5 truncate">
                   {dailyStatus?.completedAt || dailyStatus?.startedAt
                     ? formatCollectionDate(dailyStatus.completedAt || dailyStatus.startedAt)
                     : 'Nenhuma realizada'}
                 </div>
               </div>
 
-              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
-                <div className="text-[11px] text-slate-400">Categorias processadas</div>
-                <div className="font-extrabold text-amber-300 mt-0.5">
+              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+                <div className="text-[11px] text-slate-500">Categorias processadas</div>
+                <div className="font-extrabold text-amber-700 mt-0.5">
                   {dailyStatus ? `${dailyStatus.categoriesProcessed} / ${dailyStatus.totalCategories}` : '0 / 8'}
                 </div>
               </div>
 
-              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
-                <div className="text-[11px] text-slate-400">Próxima recomendada</div>
-                <div className="font-bold text-cyan-300 mt-0.5 truncate">
+              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+                <div className="text-[11px] text-slate-500">Próxima recomendada</div>
+                <div className="font-bold text-slate-800 mt-0.5 truncate">
                   {dailyStatus?.isCooldownActive && dailyStatus.cooldownRemainingSeconds > 0
                     ? `Em ~${Math.ceil(dailyStatus.cooldownRemainingSeconds / 3600)} horas`
                     : 'Pronta para atualizar'}
                 </div>
               </div>
 
-              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
-                <div className="text-[11px] text-slate-400">Status atual</div>
+              <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+                <div className="text-[11px] text-slate-500">Status atual</div>
                 <div className="font-bold mt-0.5 truncate">
                   {isDailyRefreshing ? (
-                    <span className="text-amber-300 animate-pulse">🔄 Em andamento ({dailyStatus?.currentCategory || 'processando'})</span>
+                    <span className="text-amber-700 animate-pulse">🔄 Em andamento ({dailyStatus?.currentCategory || 'processando'})</span>
                   ) : dailyStatus?.status === 'COMPLETED' ? (
-                    <span className="text-emerald-300">Base Ativa ✅</span>
+                    <span className="text-emerald-700">Base Ativa ✅</span>
                   ) : dailyStatus?.status === 'PARTIAL_FAILED' ? (
-                    <span className="text-amber-400">Atualização Parcial ⚠️</span>
+                    <span className="text-amber-700">Atualização Parcial ⚠️</span>
                   ) : (
-                    <span className="text-slate-400">Pronta para atualização</span>
+                    <span className="text-slate-600">Pronta para atualização</span>
                   )}
                 </div>
               </div>
             </div>
 
             {dailyStatus?.isCooldownActive ? (
-              <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <div className="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>A base de dados já passou pela atualização diária recomendada. A proteção de 24 horas está ativa no backend.</span>
               </div>
             ) : null}
           </div>
 
           {collectorNotice ? (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 flex items-center justify-between">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{collectorNotice}</span>
               </div>
 
               <button
                 onClick={() => setCollectorNotice(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1543,23 +1543,23 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           {collectorLoading ? (
             <div className="py-16 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+              <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {collectorCategories.map((cat) => (
                 <div
                   key={cat.category}
-                  className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 flex flex-col justify-between space-y-4 hover:border-purple-500/40 transition-all"
+                  className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col justify-between space-y-4 hover:border-purple-300 shadow-sm transition-all"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                        <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700">
                           {getCategoryIcon(cat.category)}
                         </div>
 
-                        <h3 className="font-extrabold text-base text-white">
+                        <h3 className="font-extrabold text-base text-slate-900">
                           {cat.category}
                         </h3>
                       </div>
@@ -1567,8 +1567,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       <span
                         className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
                           cat.status === 'Ativa'
-                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                            : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                            : 'border-amber-200 bg-amber-50 text-amber-800'
                         }`}
                       >
                         {cat.status === 'Ativa'
@@ -1578,14 +1578,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     </div>
 
                     <div className="space-y-1">
-                      <div className="text-xs text-slate-300 font-bold">
+                      <div className="text-xs text-slate-800 font-bold">
                         {cat.productCount}{' '}
                         {cat.productCount === 1
                           ? 'produto armazenado'
                           : 'produtos armazenados'}
                       </div>
 
-                      <div className="text-[11px] text-slate-400 font-medium">
+                      <div className="text-[11px] text-slate-500 font-medium">
                         {formatCollectionDate(cat.lastCollectedAt)}
                       </div>
                     </div>
@@ -1594,7 +1594,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   <button
                     onClick={() => setConfirmModalCategory(cat.category)}
                     disabled={refreshingCategory === cat.category}
-                    className="w-full py-2.5 px-3 rounded-xl border border-amber-400/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    className="w-full py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-black flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   >
                     {refreshingCategory === cat.category ? (
                       <>
@@ -1620,20 +1620,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       {/* Confirmation Modal for Individual Category Collection */}
       {confirmModalCategory ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-purple-500/30 bg-slate-950 p-6 shadow-2xl shadow-purple-950/30 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300">
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
                   <AlertCircle className="w-6 h-6" />
                 </div>
 
                 <div>
-                  <h3 className="font-extrabold text-lg text-white">
+                  <h3 className="font-extrabold text-lg text-slate-900">
                     Confirmar Coleta
                   </h3>
 
-                  <p className="text-xs text-purple-300 font-medium">
+                  <p className="text-xs text-amber-700 font-medium">
                     Categoria: {confirmModalCategory}
                   </p>
                 </div>
@@ -1642,19 +1642,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <button
                 onClick={() => !refreshingCategory && setConfirmModalCategory(null)}
                 disabled={Boolean(refreshingCategory)}
-                className="text-slate-500 hover:text-white disabled:opacity-30"
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-30"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
-              <p className="text-sm font-bold text-amber-200 leading-snug">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+              <p className="text-sm font-bold text-amber-900 leading-snug">
                 Esta coleta buscará até {selectedMaxProducts} produtos da TikTok Shop Brasil e poderá consumir até {Math.ceil(selectedMaxProducts / 30)} {Math.ceil(selectedMaxProducts / 30) === 1 ? 'crédito' : 'créditos'} da SocialCrawl. Continuar?
               </p>
 
-              <p className="text-xs text-slate-400 leading-normal">
-                A requisição consultará sequencialmente até {Math.ceil(selectedMaxProducts / 30)} {Math.ceil(selectedMaxProducts / 30) === 1 ? 'página' : 'páginas'} de resultados para a categoria <strong className="text-white">{confirmModalCategory}</strong> na região <strong className="text-white">BR</strong> e atualizará o banco de dados do Geração Z Pro.
+              <p className="text-xs text-slate-600 leading-normal">
+                A requisição consultará sequencialmente até {Math.ceil(selectedMaxProducts / 30)} {Math.ceil(selectedMaxProducts / 30) === 1 ? 'página' : 'páginas'} de resultados para a categoria <strong className="text-slate-900">{confirmModalCategory}</strong> na região <strong className="text-slate-900">BR</strong> e atualizará o banco de dados do Geração Z Pro.
               </p>
             </div>
 
@@ -1662,7 +1662,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <button
                 onClick={() => setConfirmModalCategory(null)}
                 disabled={Boolean(refreshingCategory)}
-                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 text-xs font-bold disabled:opacity-30"
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold disabled:opacity-30"
               >
                 Cancelar
               </button>
@@ -1670,7 +1670,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <button
                 onClick={handleConfirmCategoryCollect}
                 disabled={Boolean(refreshingCategory)}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-amber-950/30 disabled:opacity-50"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 disabled:opacity-50"
               >
                 {refreshingCategory ? (
                   <>
@@ -1691,19 +1691,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       {/* Confirmation Modal for Daily Refresh */}
       {showDailyConfirmModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-950 p-6 shadow-2xl shadow-amber-950/40 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
                   <AlertCircle className="w-6 h-6" />
                 </div>
 
                 <div>
-                  <h3 className="font-extrabold text-lg text-white">
+                  <h3 className="font-extrabold text-lg text-slate-900">
                     Confirmar Atualização Diária
                   </h3>
-                  <p className="text-xs text-amber-300 font-medium">
+                  <p className="text-xs text-amber-700 font-medium">
                     Coleta sequencial das 8 categorias
                   </p>
                 </div>
@@ -1711,18 +1711,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
               <button
                 onClick={() => setShowDailyConfirmModal(false)}
-                className="text-slate-500 hover:text-white"
+                className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
-              <p className="text-sm font-bold text-amber-200 leading-snug">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+              <p className="text-sm font-bold text-amber-900 leading-snug">
                 Esta ação atualizará as 8 categorias oficiais do Geração Z Pro, utilizando até 90 produtos por categoria e podendo consumir até 24 créditos SocialCrawl. As categorias serão processadas uma por vez. Continuar?
               </p>
 
-              <div className="text-xs text-slate-300 space-y-1.5 pt-2 border-t border-amber-500/20">
+              <div className="text-xs text-slate-700 space-y-1.5 pt-2 border-t border-amber-200">
                 <div>• <strong>Categorias:</strong> Beleza, Casa, Moda, Cozinha, Eletrônicos, Fitness, Bebê e Pet.</div>
                 <div>• <strong>Profundidade:</strong> Até 90 produtos (3 páginas de 30) por categoria.</div>
                 <div>• <strong>Consumo Máximo:</strong> Até 24 créditos (3 por categoria).</div>
@@ -1733,14 +1733,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <div className="flex items-center gap-3 pt-1">
               <button
                 onClick={() => setShowDailyConfirmModal(false)}
-                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 text-xs font-bold"
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold"
               >
                 Cancelar
               </button>
 
               <button
                 onClick={handleStartDailyRefresh}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-amber-950/30"
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-amber-500/20"
               >
                 <RefreshCw className="w-4 h-4" />
                 Confirmar Atualização
