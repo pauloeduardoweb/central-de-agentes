@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import {
   X, Sparkles, Copy, Check, Play, Eye, Heart, MessageCircle, Share2,
-  Bookmark, Zap, Loader2, Download, AlertCircle, FileText, Wand2, RefreshCw, ExternalLink, ShieldCheck, BarChart3
+  Bookmark, Zap, Loader2, AlertCircle, FileText, Wand2, RefreshCw, ExternalLink, ShieldCheck, BarChart3,
+  Store, Star, Flame, ShoppingBag
 } from 'lucide-react';
 import {
   ProductMinerProduct,
   ProductScriptType,
   generateProductScript,
   calculateVideoAnalysis,
-  prepareProductVideoDownload,
 } from '../../services/productMinerApi';
 
 function compactNumber(value: number | null | undefined) {
@@ -437,201 +437,257 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
 
 
 // ==========================================
-// 3. VIDEO DOWNLOAD MODAL
+// 3. PRODUCT DETAIL MODAL (MOBILE & DESKTOP INTEL)
 // ==========================================
-interface VideoDownloadModalProps {
+interface ProductDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: ProductMinerProduct | null;
-  studentCode: string;
-  isMentor: boolean;
-  onVideoPrepared?: (productId: string, directMediaUrl: string) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (p: ProductMinerProduct) => void;
+  onOpenScriptModal?: (p: ProductMinerProduct) => void;
+  onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
 }
 
-export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
+export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   isOpen,
   onClose,
   product,
-  studentCode,
-  isMentor,
-  onVideoPrepared,
+  isFavorite = false,
+  onToggleFavorite,
+  onOpenScriptModal,
+  onOpenAnalysisModal,
 }) => {
-  const [copied, setCopied] = useState(false);
-  const [preparing, setPreparing] = useState(false);
-  const [error, setError] = useState('');
-  const [preparedUrl, setPreparedUrl] = useState<string | null>(null);
+  if (!isOpen || !product) return null;
 
-  if (!isOpen || !product || !product.video || !isMentor) return null;
-
-  const video = product.video;
-  const isPrepared = Boolean(preparedUrl || product.videoDownload?.isPrepared);
-  const downloadApiUrl = `/api/product-miner/videos/${product.productId}/download`;
-
-  const handleCopyLink = () => {
-    if (!video.url) return;
-    navigator.clipboard.writeText(video.url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handlePrepareDownload = async () => {
-    setPreparing(true);
-    setError('');
-    try {
-      const res = await prepareProductVideoDownload(studentCode, product.productId);
-      if (res.success && res.directMediaUrl) {
-        setPreparedUrl(res.directMediaUrl);
-        if (onVideoPrepared) {
-          onVideoPrepared(product.productId, res.directMediaUrl);
-        }
-      } else {
-        setError(res.message || 'Não foi possível preparar o vídeo para download.');
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Erro ao comunicar com o servidor.');
-    } finally {
-      setPreparing(false);
-    }
-  };
+  const show24h = product.sales24h !== undefined && product.sales24h !== null;
+  const show7d = product.sales7d !== undefined && product.sales7d !== null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
-      <div className="relative w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl my-8 text-slate-900">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
-              <Download className="w-6 h-6" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+      <div className="relative w-[calc(100vw-24px)] sm:w-full max-w-2xl max-h-[90dvh] rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-6 shadow-2xl my-auto text-slate-900 flex flex-col overflow-x-hidden">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 bg-white pb-3 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2 truncate">
+            <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
+              <ShoppingBag className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-lg font-black text-slate-900">
-                Download de Vídeo TikTok
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black text-slate-900 truncate">
+                Detalhes do Produto
               </h2>
-              <p className="text-xs text-slate-500">
-                {isPrepared
-                  ? 'Mídia preparada em cache. Baixar sem novos custos de créditos.'
-                  : 'Extração de mídia bruta do TikTok via SocialCrawl (Mentor)'}
+              <p className="text-[11px] text-slate-500 truncate">
+                {product.sellerName || 'TikTok Shop'}
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100 shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Video Info Box */}
-        <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-          <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
-            <span>Produto:</span>
-            <span className="text-slate-900 font-extrabold truncate max-w-[280px]">
-              {product.title}
-            </span>
-          </div>
-
-          <div className="p-2.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-600 font-mono break-all select-all flex items-center justify-between gap-2">
-            <span className="truncate">{video.url || 'Sem URL de vídeo'}</span>
-            <span className="shrink-0 text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-sans">
-              @{video.author || 'criador'}
-            </span>
-          </div>
-
-          {error ? (
-            <div className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          ) : null}
-
-          {isPrepared ? (
-            <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs space-y-1">
-              <div className="font-bold flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                Vídeo Já Preparado (Mídia em Cache)
-              </div>
-              <p className="text-[11px] text-emerald-700 leading-relaxed">
-                Este vídeo já foi extraído e está salvo. O download utiliza o arquivo em cache e consome <strong>0 créditos adicionais</strong>.
-              </p>
-            </div>
-          ) : (
-            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-xs space-y-1.5">
-              <div className="font-bold flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                Atenção Mentor: Preparar Download
-              </div>
-              <p className="text-[11px] text-amber-800 leading-relaxed">
-                Ao clicar em <strong>"Preparar download • até 10 créditos"</strong>, o servidor chamará a API da SocialCrawl para extrair o vídeo brutos (.mp4) em alta qualidade sem marca d'água.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="mt-5 flex flex-wrap gap-2">
-          {isPrepared ? (
-            <a
-              href={downloadApiUrl}
-              download={`tiktok_video_${product.productId}.mp4`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20"
-            >
-              <Download className="w-4 h-4" />
-              Baixar Vídeo (.mp4)
-            </a>
-          ) : (
-            <button
-              onClick={handlePrepareDownload}
-              disabled={preparing}
-              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 disabled:opacity-50"
-            >
-              {preparing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Extraindo Mídia (SocialCrawl)...
-                </>
+        {/* Scrollable Body */}
+        <div className="overflow-y-auto overflow-x-hidden pr-0.5 space-y-4 pt-3 flex-1">
+          {/* Main Info Box */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start bg-slate-50 border border-slate-200/80 p-3 sm:p-4 rounded-xl">
+            <div className="relative w-full sm:w-36 aspect-square rounded-lg bg-white overflow-hidden shrink-0 border border-slate-200">
+              {product.imageUrl ? (
+                <img
+                  src={product.imageUrl}
+                  alt={product.title}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <>
-                  <Wand2 className="w-4 h-4" />
-                  Preparar download • até 10 créditos
-                </>
+                <div className="w-full h-full flex items-center justify-center text-slate-300">
+                  <ShoppingBag className="w-12 h-12" />
+                </div>
               )}
-            </button>
-          )}
 
-          {video.url ? (
-            <a
-              href={video.url}
-              target="_blank"
-              rel="noreferrer"
-              className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              TikTok
-            </a>
+              {product.discountPercent ? (
+                <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-rose-600 text-white text-xs font-black shadow">
+                  -{product.discountPercent}%
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex-1 min-w-0 space-y-2 w-full">
+              {product.score !== undefined && product.score !== null ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-950 text-xs font-extrabold shadow-sm">
+                  <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                  Score Geração Z Pro: {product.score}/100
+                </div>
+              ) : null}
+
+              <h3 className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug">
+                {product.title}
+              </h3>
+
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-lg sm:text-xl font-black text-emerald-700">
+                  {formatMoney(product.priceCents, product.currencySymbol)}
+                </span>
+                {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
+                  <span className="text-xs text-slate-400 line-through">
+                    {formatMoney(product.originalPriceCents, product.currencySymbol)}
+                  </span>
+                ) : null}
+              </div>
+
+              {product.estimatedCommissionCents ? (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100/80 border border-emerald-300 text-emerald-900 text-xs font-black">
+                  💰 Ganhe {formatMoney(product.estimatedCommissionCents, product.currencySymbol)} por venda
+                </div>
+              ) : product.commissionRatePercent ? (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100/80 border border-emerald-300 text-emerald-900 text-xs font-black">
+                  💰 Comissão de {product.commissionRatePercent}%
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Sales & Ratings Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div className="p-3 rounded-xl border border-slate-200 bg-white">
+              <div className="text-[10px] text-slate-500 font-medium">Vendas Totais</div>
+              <div className="font-black text-amber-700 text-sm sm:text-base mt-0.5">
+                {compactNumber(product.soldCount)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl border border-slate-200 bg-white">
+              <div className="text-[10px] text-slate-500 font-medium">Avaliação</div>
+              <div className="font-black text-amber-600 text-sm sm:text-base mt-0.5 flex items-center gap-1">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                {product.rating ?? '—'}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl border border-slate-200 bg-white">
+              <div className="text-[10px] text-slate-500 font-medium">Vendas 24h</div>
+              <div className="font-black text-emerald-700 text-sm sm:text-base mt-0.5">
+                {show24h ? `+${compactNumber(product.sales24h)}` : 'Coletando'}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl border border-slate-200 bg-white">
+              <div className="text-[10px] text-slate-500 font-medium">Vendas 7 dias</div>
+              <div className="font-black text-slate-900 text-sm sm:text-base mt-0.5">
+                {show7d ? `+${compactNumber(product.sales7d)}` : 'Coletando'}
+              </div>
+            </div>
+          </div>
+
+          {/* Creator & Video Section */}
+          {product.video ? (
+            <div className="p-3.5 sm:p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-3">
+              <div className="flex items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
+                <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                  📹 Criador: @{product.video.author || 'creator'}
+                </span>
+                {product.video.authorFollowers !== null && product.video.authorFollowers !== undefined ? (
+                  <span className="text-[11px] font-semibold text-slate-600 shrink-0">
+                    {compactNumber(product.video.authorFollowers)} seguidores
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-5 gap-1 text-center text-[9px] sm:text-xs text-slate-700 font-semibold">
+                <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
+                  <Eye className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-600" />
+                  <span className="block truncate">{compactNumber(product.video.views)}</span>
+                </div>
+                <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
+                  <Heart className="w-3.5 h-3.5 mx-auto mb-0.5 text-rose-500" />
+                  <span className="block truncate">{compactNumber(product.video.likes)}</span>
+                </div>
+                <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
+                  <MessageCircle className="w-3.5 h-3.5 mx-auto mb-0.5 text-sky-600" />
+                  <span className="block truncate">{compactNumber(product.video.comments)}</span>
+                </div>
+                <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
+                  <Share2 className="w-3.5 h-3.5 mx-auto mb-0.5 text-emerald-600" />
+                  <span className="block truncate">{compactNumber(product.video.shares)}</span>
+                </div>
+                <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
+                  <Bookmark className="w-3.5 h-3.5 mx-auto mb-0.5 text-amber-600" />
+                  <span className="block truncate">{compactNumber(product.video.saves)}</span>
+                </div>
+              </div>
+            </div>
           ) : null}
 
-          <button
-            onClick={handleCopyLink}
-            className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
-              copied
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-            }`}
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? 'Copiado!' : 'Copiar'}
-          </button>
+          {/* Action Buttons Grid - Mobile responsive stack */}
+          <div className="pt-2 border-t border-slate-100 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {product.video ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenScriptModal?.(product);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Sparkles className="w-4 h-4 text-white" />
+                    ✨ Gerar Roteiro AI
+                  </button>
 
-          <button
-            onClick={onClose}
-            className="py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold"
-          >
-            Fechar
-          </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenAnalysisModal?.(product);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <BarChart3 className="w-4 h-4 text-amber-600" />
+                    🔍 Analisar Vídeo
+                  </button>
+                </>
+              ) : null}
+
+              {product.video?.url ? (
+                <a
+                  href={product.video.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-black text-xs flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Play className="w-4 h-4 text-amber-600 fill-amber-500" />
+                  ▶️ Assistir Vídeo
+                </a>
+              ) : null}
+
+              {product.productUrl ? (
+                <a
+                  href={product.productUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                >
+                  🛍️ Ver no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => onToggleFavorite?.(product)}
+                className={`w-full py-2.5 px-3 rounded-xl border font-black text-xs flex items-center justify-center gap-1.5 transition-all ${
+                  isFavorite
+                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current text-rose-500' : ''}`} />
+                {isFavorite ? 'Salvo nos Favoritos' : 'Salvar nos Favoritos'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

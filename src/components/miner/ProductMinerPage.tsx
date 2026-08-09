@@ -24,7 +24,6 @@ import {
 import {
   ScriptGeneratorModal,
   VideoAnalysisModal,
-  VideoDownloadModal,
   ProductDetailModal,
 } from './ProductMinerModals';
 
@@ -1165,7 +1164,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
   const [analysisModalProduct, setAnalysisModalProduct] = useState<ProductMinerProduct | null>(null);
-  const [downloadModalProduct, setDownloadModalProduct] = useState<ProductMinerProduct | null>(null);
   const [detailModalProduct, setDetailModalProduct] = useState<ProductMinerProduct | null>(null);
 
   useEffect(() => {
@@ -2059,7 +2057,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       onToggleFavorite={toggleFavorite}
                       onOpenScriptModal={(p) => setScriptModalProduct(p)}
                       onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
-                      onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
                       onOpenDetailModal={(p) => setDetailModalProduct(p)}
                     />
                   );
@@ -3003,30 +3000,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         onOpenScriptModal={(p) => setScriptModalProduct(p)}
       />
 
-      <VideoDownloadModal
-        isOpen={Boolean(downloadModalProduct)}
-        onClose={() => setDownloadModalProduct(null)}
-        product={downloadModalProduct}
-        studentCode={studentCode}
-        isMentor={canRefresh}
-        onVideoPrepared={(productId, directUrl) => {
-          setProducts((prev) =>
-            prev.map((p) =>
-              p.productId === productId
-                ? { ...p, videoDownload: { isPrepared: true, directMediaUrl: directUrl, status: 'COMPLETED' } }
-                : p
-            )
-          );
-          setRanking((prev) =>
-            prev.map((p) =>
-              p.productId === productId
-                ? { ...p, videoDownload: { isPrepared: true, directMediaUrl: directUrl, status: 'COMPLETED' } }
-                : p
-            )
-          );
-        }}
-      />
-
       <ProductDetailModal
         isOpen={Boolean(detailModalProduct)}
         onClose={() => setDetailModalProduct(null)}
@@ -3035,8 +3008,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         onToggleFavorite={toggleFavorite}
         onOpenScriptModal={(p) => setScriptModalProduct(p)}
         onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
-        onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
-        isMentor={canRefresh}
       />
     </section>
   );
