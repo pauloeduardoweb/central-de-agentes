@@ -386,7 +386,22 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [ranking, setRanking] = useState<ProductMinerProduct[]>([]);
   const [rankingMeta, setRankingMeta] = useState<ProductRankingMeta | null>(null);
   const [rankingSort, setRankingSort] = useState<ProductRankingSort>('opportunities');
-  const [mode, setMode] = useState<'search' | 'ranking' | 'collector'>('search');
+  const [mode, setModeState] = useState<'search' | 'ranking' | 'collector'>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('gzp_miner_mode');
+      if (saved === 'search' || saved === 'ranking' || saved === 'collector') {
+        return saved;
+      }
+    }
+    return 'search';
+  });
+
+  const setMode = (newMode: 'search' | 'ranking' | 'collector') => {
+    setModeState(newMode);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('gzp_miner_mode', newMode);
+    }
+  };
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -540,7 +555,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   ) => {
     const clean = targetQuery.trim();
 
-    if (clean.length < 2) return;
+    if (clean.length === 1) return;
 
     setMode('search');
     setLoading(true);
@@ -572,6 +587,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (mode === 'search' && products.length === 0 && !loading) {
+      runSearch('', 1, false);
+    }
+  }, [mode]);
 
   return (
     <section className="space-y-5 pb-8">
@@ -621,7 +642,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           <button
             onClick={() => runSearch(query, 1, false)}
-            disabled={loading || query.trim().length < 2}
+            disabled={loading || query.trim().length === 1}
             className="h-11 px-5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-black disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/30"
           >
             {loading ? (
