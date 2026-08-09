@@ -262,7 +262,7 @@ const MobileProductCard: React.FC<{
         ) : null}
 
         {product.video?.url ? (
-          <div className="absolute top-1 right-1 p-1 rounded-full bg-fuchsia-600 text-white shadow" title="Possui vídeo">
+          <div className="absolute top-1 right-1 p-1 rounded-full bg-amber-500 text-white shadow" title="Possui vídeo">
             <Play className="w-2.5 h-2.5 fill-current" />
           </div>
         ) : null}
@@ -335,9 +335,10 @@ const MobileProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="px-2 py-1 rounded bg-amber-50 text-amber-900 font-bold border border-amber-200 hover:bg-amber-100"
+                  className="px-2 py-1 rounded bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black hover:from-amber-600 hover:to-orange-600 shadow-sm flex items-center gap-1"
                   title="Gerar Roteiro"
                 >
+                  <Sparkles className="w-2.5 h-2.5 text-white" />
                   Roteiro
                 </button>
                 <button
@@ -434,8 +435,8 @@ const ProductCard: React.FC<{
             <Flame className="w-3 h-3 fill-current" /> DISPARANDO
           </div>
         ) : product.video?.url ? (
-          <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-fuchsia-600 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
-            <Play className="w-3 h-3 fill-current" /> Vídeo associado
+          <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-amber-500 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
+            <Play className="w-3 h-3 fill-current text-white" /> Vídeo associado
           </div>
         ) : null}
       </div>
@@ -535,9 +536,9 @@ const ProductCard: React.FC<{
         </div>
 
         {product.video ? (
-          <div className="rounded-xl border border-rose-200/80 bg-rose-50/30 p-3 space-y-2.5">
+          <div className="rounded-xl border border-amber-200/60 bg-amber-50/20 p-3 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-rose-950 truncate">
+              <span className="text-[11px] font-bold text-slate-900 truncate">
                 @{product.video.author || 'creator'}
               </span>
 
@@ -577,14 +578,14 @@ const ProductCard: React.FC<{
             </div>
 
             {/* Video Action Buttons Area */}
-            <div className="pt-2 border-t border-rose-200/50 space-y-1.5">
+            <div className="pt-2 border-t border-amber-200/40 space-y-1.5">
               <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
                   className="py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black flex items-center justify-center gap-1 transition-all shadow-sm"
                 >
-                  <Sparkles className="w-3 h-3 text-amber-100" />
+                  <Sparkles className="w-3 h-3 text-white" />
                   ✨ Gerar Roteiro
                 </button>
 
@@ -1241,11 +1242,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   onClick={() => setHasVideoOnly((p) => !p)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
                     hasVideoOnly
-                      ? 'border-rose-300 bg-rose-50 text-rose-800'
+                      ? 'border-amber-300 bg-amber-50 text-amber-900'
                       : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <Play className="w-3 h-3 text-rose-600 fill-current" />
+                  <Play className="w-3 h-3 text-amber-600 fill-current" />
                   Apenas com vídeo
                 </button>
 
