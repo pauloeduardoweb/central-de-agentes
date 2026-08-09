@@ -749,16 +749,44 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   useEffect(() => {
     if (mode !== 'ranking') return;
 
+    let active = true;
     setRankingLoading(true);
-    setError('');
+
+    console.log('[ProductMiner] Solicitando ranking:', {
+      mode,
+      rankingSort,
+      selectedCategory,
+      selectedClassification,
+      timestamp: new Date().toISOString(),
+    });
 
     loadProductRanking(studentCode, 150, rankingSort)
       .then((data) => {
+        if (!active) return;
         setRanking(data.products || []);
         setRankingMeta(data.meta || null);
+        setError('');
       })
-      .catch((err) => setError(err?.message || 'Falha ao carregar ranking.'))
-      .finally(() => setRankingLoading(false));
+      .catch((err) => {
+        if (!active) return;
+        const msg = err?.message || 'Não foi possível carregar o ranking no momento. Tente novamente.';
+        console.error('[ProductMiner Ranking Error]', {
+          error: msg,
+          rawError: err,
+          rankingSort,
+          timestamp: new Date().toISOString(),
+        });
+        setError(msg);
+      })
+      .finally(() => {
+        if (active) {
+          setRankingLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [mode, rankingSort, studentCode]);
 
   /* Unified Display List applying Category Filter + Classification Order */
@@ -811,18 +839,29 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     return copy;
   }, [products, ranking, mode, selectedCategory, hasVideoOnly, viralVideoOnly, selectedClassification]);
 
-  const currentRenderProducts = useMemo(() => {
-    if (mode === 'ranking') {
-      const start = (rankingPage - 1) * 30;
-      return displayProducts.slice(start, start + 30);
-    }
-    return displayProducts;
-  }, [displayProducts, mode, rankingPage]);
-
   const totalRankingPages = useMemo(() => {
     if (mode !== 'ranking') return 1;
     return Math.max(1, Math.ceil(displayProducts.length / 30));
   }, [displayProducts.length, mode]);
+
+  const safeRankingPage = useMemo(() => {
+    if (rankingPage > totalRankingPages) return 1;
+    return Math.max(1, rankingPage);
+  }, [rankingPage, totalRankingPages]);
+
+  useEffect(() => {
+    if (rankingPage > totalRankingPages) {
+      setRankingPage(1);
+    }
+  }, [rankingPage, totalRankingPages]);
+
+  const currentRenderProducts = useMemo(() => {
+    if (mode === 'ranking') {
+      const start = (safeRankingPage - 1) * 30;
+      return displayProducts.slice(start, start + 30);
+    }
+    return displayProducts;
+  }, [displayProducts, mode, safeRankingPage]);
 
   const loadDailyStatus = async () => {
     if (!canRefresh) return;
@@ -1279,12 +1318,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
       ) : null}
 
-      {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          {error}
-        </div>
-      ) : null}
-
       {/* ================================================== */}
       {/* 4 — LISTA / FEED DE PRODUTOS                       */}
       {/* ================================================== */}
@@ -1296,7 +1329,76 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             </div>
           ) : null}
 
-          {!(loading || rankingLoading) && displayProducts.length === 0 ? (
+          {/* Banner discreto para aviso de falha de atualização quando já existem produtos armazenados */}
+          {error && displayProducts.length > 0 ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 flex items-center justify-between gap-3 shadow-sm mb-4">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  Exibindo dados em cache. {error.includes('_') ? 'Não foi possível atualizar o ranking agora.' : error}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  if (mode === 'ranking') {
+                    setRankingLoading(true);
+                    loadProductRanking(studentCode, 150, rankingSort)
+                      .then((data) => {
+                        setRanking(data.products || []);
+                        setRankingMeta(data.meta || null);
+                      })
+                      .catch((err) => setError(err?.message || 'Não foi possível carregar o ranking.'))
+                      .finally(() => setRankingLoading(false));
+                  } else {
+                    runSearch(query, page, false);
+                  }
+                }}
+                className="shrink-0 px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 font-bold transition-all text-[11px]"
+              >
+                Tentar atualizar
+              </button>
+            </div>
+          ) : null}
+
+          {/* Estado de Falha Real sem Produtos */}
+          {!(loading || rankingLoading) && error && displayProducts.length === 0 ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 py-12 px-5 text-center space-y-3 my-4">
+              <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
+              <h2 className="font-bold text-rose-900 text-base">
+                Não foi possível carregar os produtos agora.
+              </h2>
+              <p className="text-xs text-rose-700 max-w-md mx-auto">
+                {error.includes('_') ? 'Tente novamente em alguns instantes.' : error}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  if (mode === 'ranking') {
+                    setRankingLoading(true);
+                    loadProductRanking(studentCode, 150, rankingSort)
+                      .then((data) => {
+                        setRanking(data.products || []);
+                        setRankingMeta(data.meta || null);
+                      })
+                      .catch((err) => setError(err?.message || 'Não foi possível carregar o ranking agora. Tente novamente.'))
+                      .finally(() => setRankingLoading(false));
+                  } else {
+                    runSearch(query, page, false);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-all"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Tentar novamente
+              </button>
+            </div>
+          ) : null}
+
+          {/* Estado de Lista Vazia por Filtros (Somente quando NÃO houver Erro) */}
+          {!(loading || rankingLoading) && !error && displayProducts.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 px-5 text-center space-y-2">
               <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
               <h2 className="font-bold text-slate-700">
@@ -1307,6 +1409,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </p>
               {(selectedCategory !== 'Todos' || hasVideoOnly || viralVideoOnly) ? (
                 <button
+                  type="button"
                   onClick={() => {
                     setSelectedCategory('Todos');
                     setHasVideoOnly(false);
