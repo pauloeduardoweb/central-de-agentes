@@ -87,19 +87,19 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-fade-in">
-      <div className="relative w-full max-w-3xl rounded-2xl border border-fuchsia-500/30 bg-slate-900 p-6 shadow-2xl shadow-fuchsia-950/20 my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+      <div className="relative w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl my-8 text-slate-900">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-fuchsia-500/20 to-purple-500/20 border border-fuchsia-500/40 text-fuchsia-300">
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
               <Sparkles className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white flex items-center gap-2">
-                Gerador de Roteiro AI <span className="text-xs px-2 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 font-bold">TikTok Shop</span>
+              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                Gerador de Roteiro AI <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 font-bold">TikTok Shop</span>
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Produza conteúdo viral direcionado para conversão no carrinho amarelo.
               </p>
             </div>
@@ -107,33 +107,33 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Product Summary Header */}
-        <div className="mt-4 p-3 rounded-xl border border-slate-800 bg-slate-950/60 flex items-center gap-3">
+        <div className="mt-4 p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center gap-3">
           {product.imageUrl ? (
             <img src={product.imageUrl} alt={product.title} className="w-12 h-12 rounded-lg object-cover shrink-0" />
           ) : (
-            <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-slate-200 flex items-center justify-center text-slate-400 shrink-0">
               <FileText className="w-6 h-6" />
             </div>
           )}
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-slate-200 truncate">{product.title}</h3>
+              <h3 className="text-xs font-bold text-slate-900 truncate">{product.title}</h3>
               {product.score !== undefined && product.score !== null ? (
-                <span className="shrink-0 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/30">
+                <span className="shrink-0 px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-[10px] font-black border border-amber-200">
                   Score {product.score}/100
                 </span>
               ) : null}
             </div>
-            <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
-              <span className="font-bold text-emerald-400">{formatMoney(product.priceCents, product.currencySymbol)}</span>
+            <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500">
+              <span className="font-bold text-emerald-700">{formatMoney(product.priceCents, product.currencySymbol)}</span>
               <span>• {compactNumber(product.soldCount)} vendas</span>
               {product.video?.views ? <span>• {compactNumber(product.video.views)} views no vídeo</span> : null}
             </div>
@@ -142,7 +142,7 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
 
         {/* Script Type Options */}
         <div className="mt-4 space-y-2">
-          <label className="text-xs font-bold text-slate-300 block">Tipo de Conteúdo Desejado:</label>
+          <label className="text-xs font-bold text-slate-700 block">Tipo de Conteúdo Desejado:</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {SCRIPT_TYPES.map((t) => (
               <button
@@ -150,8 +150,8 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
                 onClick={() => setScriptType(t.id)}
                 className={`p-2.5 rounded-xl border text-left transition-all ${
                   scriptType === t.id
-                    ? 'border-fuchsia-500 bg-fuchsia-500/15 text-white shadow-md shadow-fuchsia-950/20'
-                    : 'border-slate-800 bg-slate-950/50 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                    ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-sm font-bold'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 <div className="text-xs font-bold">{t.label}</div>
@@ -163,15 +163,15 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
 
         {/* Custom Prompt Input */}
         <div className="mt-4 space-y-1.5">
-          <label className="text-xs font-bold text-slate-300 block">
-            Instrução Adicional / Foco Específico <span className="text-slate-500 font-normal">(Opcional)</span>:
+          <label className="text-xs font-bold text-slate-700 block">
+            Instrução Adicional / Foco Específico <span className="text-slate-400 font-normal">(Opcional)</span>:
           </label>
           <input
             type="text"
             value={customPrompt}
             onChange={(e) => setCustomPrompt(e.target.value)}
             placeholder="Ex: Foque na dor de falta de tempo, ou enfatize o preço promocional para estudantes..."
-            className="w-full px-3 py-2 rounded-xl border border-slate-800 bg-slate-950/80 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-fuchsia-500"
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
           />
         </div>
 
@@ -180,7 +180,7 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
           <button
             onClick={() => handleGenerate()}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-950/30 transition-all disabled:opacity-50"
+            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 transition-all disabled:opacity-50"
           >
             {loading ? (
               <>
@@ -200,7 +200,7 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
               onClick={() => handleGenerate(Date.now())}
               disabled={loading}
               title="Gerar uma versão alternativa"
-              className="px-4 py-2.5 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+              className="px-4 py-2.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               Outra Versão
@@ -209,7 +209,7 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
         </div>
 
         {error ? (
-          <div className="mt-3 p-3 rounded-xl border border-rose-500/30 bg-rose-500/10 text-xs text-rose-300">
+          <div className="mt-3 p-3 rounded-xl border border-rose-200 bg-rose-50 text-xs text-rose-800">
             {error}
           </div>
         ) : null}
@@ -218,8 +218,8 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
         {scriptText ? (
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-fuchsia-400" />
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-amber-600" />
                 Roteiro Gerado:
               </span>
 
@@ -227,13 +227,13 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
                 onClick={handleCopy}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
                   copied
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
                 }`}
               >
                 {copied ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
                     Copiado!
                   </>
                 ) : (
@@ -245,7 +245,7 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
               </button>
             </div>
 
-            <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/90 text-xs text-slate-200 whitespace-pre-wrap font-sans leading-relaxed max-h-80 overflow-y-auto">
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 whitespace-pre-wrap font-sans leading-relaxed max-h-80 overflow-y-auto">
               {scriptText}
             </div>
           </div>
@@ -280,19 +280,19 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
   const video = product.video;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-fade-in">
-      <div className="relative w-full max-w-2xl rounded-2xl border border-cyan-500/30 bg-slate-900 p-6 shadow-2xl shadow-cyan-950/20 my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+      <div className="relative w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl my-8 text-slate-900">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300">
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
               <BarChart3 className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white flex items-center gap-2">
+              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 Análise do Vídeo Vencedor
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Métricas detalhadas e diagnóstico de engajamento do TikTok Shop.
               </p>
             </div>
@@ -300,21 +300,21 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Strength Badge & Classification */}
-        <div className="mt-4 p-4 rounded-xl border border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Classificação de Força</div>
             <div className="flex items-center gap-2 mt-1">
               <span className={`px-3 py-1 rounded-lg border text-sm font-black ${analysis.badgeColor}`}>
                 {analysis.classification === 'Viral' ? '🔥 VIRAL (1M+ Views)' : `Classificação: ${analysis.classification}`}
               </span>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-600 font-medium">
                 • {analysis.engagementRate}% de engajamento
               </span>
             </div>
@@ -322,13 +322,13 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
 
           {/* Progress bar */}
           <div className="w-full sm:w-48">
-            <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
               <span>Potencial de Escala</span>
-              <span className="font-bold">{analysis.scorePercent}%</span>
+              <span className="font-bold text-slate-800">{analysis.scorePercent}%</span>
             </div>
-            <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+            <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-amber-400 transition-all duration-500"
+                className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
                 style={{ width: `${analysis.scorePercent}%` }}
               />
             </div>
@@ -336,14 +336,14 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
         </div>
 
         {/* Author / Creator info */}
-        <div className="mt-4 p-3 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/5 flex items-center justify-between">
+        <div className="mt-4 p-3 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-fuchsia-500/20 border border-fuchsia-500/40 flex items-center justify-center font-bold text-fuchsia-300 text-sm">
+            <div className="w-9 h-9 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center font-bold text-amber-900 text-sm">
               @
             </div>
             <div>
-              <div className="text-xs font-bold text-fuchsia-300">@{video.author || 'criador'}</div>
-              <div className="text-[10px] text-slate-400">
+              <div className="text-xs font-bold text-amber-950">@{video.author || 'criador'}</div>
+              <div className="text-[10px] text-slate-500">
                 {video.authorFollowers ? `${compactNumber(video.authorFollowers)} seguidores` : 'Creator do TikTok Shop'}
               </div>
             </div>
@@ -354,7 +354,7 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
               href={video.url}
               target="_blank"
               rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-fuchsia-500/20 border border-fuchsia-500/40 text-fuchsia-300 hover:bg-fuchsia-500/30 text-xs font-bold flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 shadow-sm"
             >
               Ver no TikTok <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -363,47 +363,47 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
 
         {/* Metrics Grid */}
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-center">
-            <Eye className="w-4 h-4 mx-auto mb-1 text-cyan-300" />
-            <div className="text-xs text-slate-400">Visualizações</div>
-            <div className="text-sm font-black text-white mt-0.5">{compactNumber(analysis.views)}</div>
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-center">
+            <Eye className="w-4 h-4 mx-auto mb-1 text-slate-600" />
+            <div className="text-xs text-slate-500">Visualizações</div>
+            <div className="text-sm font-black text-slate-900 mt-0.5">{compactNumber(analysis.views)}</div>
           </div>
 
-          <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-center">
-            <Heart className="w-4 h-4 mx-auto mb-1 text-rose-400" />
-            <div className="text-xs text-slate-400">Curtidas</div>
-            <div className="text-sm font-black text-white mt-0.5">{compactNumber(analysis.likes)}</div>
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-center">
+            <Heart className="w-4 h-4 mx-auto mb-1 text-rose-500" />
+            <div className="text-xs text-slate-500">Curtidas</div>
+            <div className="text-sm font-black text-slate-900 mt-0.5">{compactNumber(analysis.likes)}</div>
           </div>
 
-          <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-center">
-            <MessageCircle className="w-4 h-4 mx-auto mb-1 text-violet-300" />
-            <div className="text-xs text-slate-400">Comentários</div>
-            <div className="text-sm font-black text-white mt-0.5">{compactNumber(analysis.comments)}</div>
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-center">
+            <MessageCircle className="w-4 h-4 mx-auto mb-1 text-sky-600" />
+            <div className="text-xs text-slate-500">Comentários</div>
+            <div className="text-sm font-black text-slate-900 mt-0.5">{compactNumber(analysis.comments)}</div>
           </div>
 
-          <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-center">
-            <Share2 className="w-4 h-4 mx-auto mb-1 text-emerald-300" />
-            <div className="text-xs text-slate-400">Compartilhamentos</div>
-            <div className="text-sm font-black text-white mt-0.5">{compactNumber(analysis.shares)}</div>
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-center">
+            <Share2 className="w-4 h-4 mx-auto mb-1 text-emerald-600" />
+            <div className="text-xs text-slate-500">Compartilhamentos</div>
+            <div className="text-sm font-black text-slate-900 mt-0.5">{compactNumber(analysis.shares)}</div>
           </div>
 
-          <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-center">
-            <Bookmark className="w-4 h-4 mx-auto mb-1 text-amber-300" />
-            <div className="text-xs text-slate-400">Salvos</div>
-            <div className="text-sm font-black text-white mt-0.5">{compactNumber(analysis.saves)}</div>
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-center">
+            <Bookmark className="w-4 h-4 mx-auto mb-1 text-amber-600" />
+            <div className="text-xs text-slate-500">Salvos</div>
+            <div className="text-sm font-black text-slate-900 mt-0.5">{compactNumber(analysis.saves)}</div>
           </div>
 
-          <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-center">
-            <Zap className="w-4 h-4 mx-auto mb-1 text-amber-400" />
-            <div className="text-xs text-slate-400">Engajamento Aprox.</div>
-            <div className="text-sm font-black text-amber-300 mt-0.5">{analysis.engagementRate}%</div>
+          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-center">
+            <Zap className="w-4 h-4 mx-auto mb-1 text-amber-500" />
+            <div className="text-xs text-slate-500">Engajamento Aprox.</div>
+            <div className="text-sm font-black text-amber-700 mt-0.5">{analysis.engagementRate}%</div>
           </div>
         </div>
 
         {/* Zero-credit note */}
-        <div className="mt-4 p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-300 text-xs flex items-center justify-between">
+        <div className="mt-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+            <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
             Análise realizada instantaneamente com dados do MySQL — <strong>0 Créditos Consumidos</strong>.
           </span>
         </div>
@@ -416,7 +416,7 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
                 onClose();
                 onOpenScriptModal(product);
               }}
-              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-950/20"
+              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20"
             >
               <Sparkles className="w-4 h-4" />
               ✨ Gerar Roteiro Deste Vídeo
@@ -425,7 +425,7 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
 
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:text-white text-xs font-bold"
+            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold"
           >
             Fechar
           </button>
@@ -495,19 +495,19 @@ export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-fade-in">
-      <div className="relative w-full max-w-xl rounded-2xl border border-cyan-500/30 bg-slate-900 p-6 shadow-2xl shadow-cyan-950/20 my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+      <div className="relative w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl my-8 text-slate-900">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+        <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300">
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
               <Download className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white">
+              <h2 className="text-lg font-black text-slate-900">
                 Download de Vídeo TikTok
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 {isPrepared
                   ? 'Mídia preparada em cache. Baixar sem novos custos de créditos.'
                   : 'Extração de mídia bruta do TikTok via SocialCrawl (Mentor)'}
@@ -517,52 +517,52 @@ export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Video Info Box */}
-        <div className="mt-4 p-4 rounded-xl border border-slate-800 bg-slate-950/80 space-y-3">
-          <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
+        <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+          <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
             <span>Produto:</span>
-            <span className="text-cyan-300 font-extrabold truncate max-w-[280px]">
+            <span className="text-slate-900 font-extrabold truncate max-w-[280px]">
               {product.title}
             </span>
           </div>
 
-          <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-400 font-mono break-all select-all flex items-center justify-between gap-2">
+          <div className="p-2.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-600 font-mono break-all select-all flex items-center justify-between gap-2">
             <span className="truncate">{video.url || 'Sem URL de vídeo'}</span>
-            <span className="shrink-0 text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+            <span className="shrink-0 text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-sans">
               @{video.author || 'criador'}
             </span>
           </div>
 
           {error ? (
-            <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-2">
+            <div className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
           ) : null}
 
           {isPrepared ? (
-            <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs space-y-1">
+            <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs space-y-1">
               <div className="font-bold flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                 Vídeo Já Preparado (Mídia em Cache)
               </div>
-              <p className="text-[11px] text-emerald-200/90 leading-relaxed">
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
                 Este vídeo já foi extraído e está salvo. O download utiliza o arquivo em cache e consome <strong>0 créditos adicionais</strong>.
               </p>
             </div>
           ) : (
-            <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300 text-xs space-y-1.5">
+            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-xs space-y-1.5">
               <div className="font-bold flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                 Atenção Mentor: Preparar Download
               </div>
-              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+              <p className="text-[11px] text-amber-800 leading-relaxed">
                 Ao clicar em <strong>"Preparar download • até 10 créditos"</strong>, o servidor chamará a API da SocialCrawl para extrair o vídeo brutos (.mp4) em alta qualidade sem marca d'água.
               </p>
             </div>
@@ -577,7 +577,7 @@ export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
               download={`tiktok_video_${product.productId}.mp4`}
               target="_blank"
               rel="noreferrer"
-              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/20"
+              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20"
             >
               <Download className="w-4 h-4" />
               Baixar Vídeo (.mp4)
@@ -586,7 +586,7 @@ export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
             <button
               onClick={handlePrepareDownload}
               disabled={preparing}
-              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-950/20 disabled:opacity-50"
+              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 disabled:opacity-50"
             >
               {preparing ? (
                 <>
@@ -607,7 +607,7 @@ export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
               href={video.url}
               target="_blank"
               rel="noreferrer"
-              className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5"
+              className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               TikTok
@@ -618,17 +618,17 @@ export const VideoDownloadModal: React.FC<VideoDownloadModalProps> = ({
             onClick={handleCopyLink}
             className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
               copied
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
             }`}
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? 'Copiado!' : 'Copiar'}
           </button>
 
           <button
             onClick={onClose}
-            className="py-2.5 px-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:text-white text-xs font-bold"
+            className="py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold"
           >
             Fechar
           </button>

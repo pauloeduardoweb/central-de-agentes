@@ -315,7 +315,7 @@ const MobileProductCard: React.FC<{
             </div>
 
             {product.score !== undefined && product.score !== null ? (
-              <span className="text-[10px] font-black text-purple-900 bg-purple-100 border border-purple-300 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <span className="text-[10px] font-black text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
                 <Zap className="w-2.5 h-2.5 text-amber-500 fill-current" />
                 Score: {product.score}
               </span>
@@ -335,7 +335,7 @@ const MobileProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="px-2 py-1 rounded bg-fuchsia-50 text-fuchsia-800 font-bold border border-fuchsia-200 hover:bg-fuchsia-100"
+                  className="px-2 py-1 rounded bg-amber-50 text-amber-900 font-bold border border-amber-200 hover:bg-amber-100"
                   title="Gerar Roteiro"
                 >
                   Roteiro
@@ -442,9 +442,9 @@ const ProductCard: React.FC<{
 
       <div className="p-4 space-y-3 flex-1 flex flex-col">
         {product.score !== undefined && product.score !== null ? (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-100 border border-purple-300 text-purple-900 text-xs font-semibold self-start shadow-sm">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold self-start shadow-sm">
             <Zap className="w-3.5 h-3.5 text-amber-500 fill-current" />
-            <span>Score Geração Z Pro: <strong className="text-purple-900 font-black">{product.score}</strong>/100</span>
+            <span>Score Geração Z Pro: <strong className="text-amber-950 font-black">{product.score}</strong>/100</span>
           </div>
         ) : null}
 
@@ -505,16 +505,16 @@ const ProductCard: React.FC<{
             <div
               className={`rounded-lg border px-2.5 py-2 ${
                 rankingSort === '7d'
-                  ? 'border-purple-300 bg-purple-50/80'
+                  ? 'border-amber-300 bg-amber-50/80'
                   : 'border-slate-200 bg-slate-50'
               }`}
             >
               <div className="text-[10px] text-slate-500">≈ 7 dias</div>
-              <div className="text-xs font-black text-purple-700">
+              <div className="text-xs font-black text-slate-800">
                 {show7d ? `+${compactNumber(product.sales7d)}` : 'Coletando'}
               </div>
               {show7d ? (
-                <div className="text-[10px] text-purple-600">
+                <div className="text-[10px] text-amber-700 font-semibold">
                   {formatPercent(product.growth7dPercent)}
                 </div>
               ) : null}
@@ -535,9 +535,9 @@ const ProductCard: React.FC<{
         </div>
 
         {product.video ? (
-          <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/50 p-3 space-y-2.5">
+          <div className="rounded-xl border border-rose-200/80 bg-rose-50/30 p-3 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-fuchsia-900 truncate">
+              <span className="text-[11px] font-bold text-rose-950 truncate">
                 @{product.video.author || 'creator'}
               </span>
 
@@ -561,7 +561,7 @@ const ProductCard: React.FC<{
               </span>
 
               <span title="Comentários">
-                <MessageCircle className="w-3.5 h-3.5 mx-auto mb-1 text-purple-600" />
+                <MessageCircle className="w-3.5 h-3.5 mx-auto mb-1 text-sky-600" />
                 {compactNumber(product.video.comments)}
               </span>
 
@@ -577,21 +577,21 @@ const ProductCard: React.FC<{
             </div>
 
             {/* Video Action Buttons Area */}
-            <div className="pt-2 border-t border-fuchsia-200/60 space-y-1.5">
+            <div className="pt-2 border-t border-rose-200/50 space-y-1.5">
               <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="py-1.5 px-2 rounded-lg bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white hover:from-fuchsia-700 hover:to-purple-700 font-black flex items-center justify-center gap-1 transition-all shadow-sm"
+                  className="py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black flex items-center justify-center gap-1 transition-all shadow-sm"
                 >
-                  <Sparkles className="w-3 h-3 text-fuchsia-200" />
+                  <Sparkles className="w-3 h-3 text-amber-100" />
                   ✨ Gerar Roteiro
                 </button>
 
                 <button
                   type="button"
                   onClick={() => onOpenAnalysisModal?.(product)}
-                  className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 font-bold flex items-center justify-center gap-1 transition-all"
+                  className="py-1.5 px-2 rounded-lg bg-white border border-amber-200 text-slate-800 hover:bg-amber-50 font-bold flex items-center justify-center gap-1 transition-all"
                 >
                   <BarChart3 className="w-3 h-3 text-amber-600" />
                   🔍 Analisar
@@ -1151,11 +1151,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               onClick={() => setMode('collector')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
                 mode === 'collector'
-                  ? 'bg-purple-100 text-purple-900 font-black border border-purple-300'
+                  ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Layers className="w-3.5 h-3.5 text-purple-600" />
+              <Layers className="w-3.5 h-3.5 text-amber-600" />
               Coletor
             </button>
           ) : null}
@@ -1241,11 +1241,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   onClick={() => setHasVideoOnly((p) => !p)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
                     hasVideoOnly
-                      ? 'border-fuchsia-300 bg-fuchsia-50 text-fuchsia-800'
+                      ? 'border-rose-300 bg-rose-50 text-rose-800'
                       : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  <Play className="w-3 h-3 text-fuchsia-600 fill-current" />
+                  <Play className="w-3 h-3 text-rose-600 fill-current" />
                   Apenas com vídeo
                 </button>
 
@@ -1372,11 +1372,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       ) : mode === 'collector' && canRefresh ? (
         /* PAINEL DO COLETOR (MENTOR ONLY) */
         <div className="space-y-5">
-          <div className="rounded-2xl border border-purple-200 bg-white p-5 md:p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 text-purple-700 text-xs font-black uppercase tracking-wider">
-                  <ShieldCheck className="w-4 h-4 text-purple-600" />
+                <div className="flex items-center gap-2 text-amber-700 text-xs font-black uppercase tracking-wider">
+                  <ShieldCheck className="w-4 h-4 text-amber-600" />
                   Painel do Coletor • Mentor
                 </div>
 
@@ -1390,13 +1390,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </div>
 
               <div className="flex items-center gap-2 text-xs">
-                <span className="px-3 py-2 rounded-xl border border-purple-200 bg-purple-50 text-purple-800 font-bold">
+                <span className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 font-bold">
                   8 Categorias Monitoradas
                 </span>
               </div>
             </div>
 
-            <div className="mt-5 pt-4 border-t border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <span className="text-xs font-bold text-slate-700">
                 Quantidade por Categoria (Individual):
               </span>
@@ -1414,7 +1414,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     disabled={Boolean(refreshingCategory) || isDailyRefreshing}
                     className={`px-3 py-2 rounded-xl text-xs font-black border transition-all text-center ${
                       selectedMaxProducts === opt.count
-                        ? 'border-purple-300 bg-purple-50 text-purple-900 shadow-sm font-black'
+                        ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-sm font-black'
                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                     }`}
                   >
@@ -1543,14 +1543,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           {collectorLoading ? (
             <div className="py-16 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {collectorCategories.map((cat) => (
                 <div
                   key={cat.category}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col justify-between space-y-4 hover:border-purple-300 shadow-sm transition-all"
+                  className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col justify-between space-y-4 hover:border-amber-300 shadow-sm transition-all"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
