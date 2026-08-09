@@ -416,9 +416,9 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
                 onClose();
                 onOpenScriptModal(product);
               }}
-              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20"
+              className="flex-1 py-2.5 rounded-xl bg-white border border-amber-300 text-amber-800 hover:bg-amber-50 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4 text-amber-600" />
               ✨ Gerar Roteiro Deste Vídeo
             </button>
           ) : null}

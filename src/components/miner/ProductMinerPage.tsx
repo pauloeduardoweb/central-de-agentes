@@ -335,10 +335,10 @@ const MobileProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="px-2 py-1 rounded bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black hover:from-amber-600 hover:to-orange-600 shadow-sm flex items-center gap-1"
+                  className="px-2 py-1 rounded bg-white text-amber-800 font-bold border border-amber-300 hover:bg-amber-50 shadow-sm flex items-center gap-1"
                   title="Gerar Roteiro"
                 >
-                  <Sparkles className="w-2.5 h-2.5 text-white" />
+                  <Sparkles className="w-2.5 h-2.5 text-amber-600" />
                   Roteiro
                 </button>
                 <button
@@ -583,9 +583,9 @@ const ProductCard: React.FC<{
                 <button
                   type="button"
                   onClick={() => onOpenScriptModal?.(product)}
-                  className="py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black flex items-center justify-center gap-1 transition-all shadow-sm"
+                  className="py-1.5 px-2 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-50 font-black flex items-center justify-center gap-1 transition-all shadow-sm"
                 >
-                  <Sparkles className="w-3 h-3 text-white" />
+                  <Sparkles className="w-3 h-3 text-amber-600" />
                   ✨ Gerar Roteiro
                 </button>
 
