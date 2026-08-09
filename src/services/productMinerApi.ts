@@ -163,6 +163,42 @@ export async function fetchCollectorCategories(studentCode: string): Promise<Col
   return (data.categories || []) as CollectorCategoryStat[];
 }
 
+export interface DailyRefreshStatus {
+  id: number;
+  startedAt: string;
+  completedAt: string | null;
+  categoriesProcessed: number;
+  totalCategories: number;
+  uniqueProductsCount: number;
+  creditsUsed: number;
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED';
+  currentCategory: string | null;
+  failedCategories: string[];
+  isCooldownActive: boolean;
+  cooldownRemainingSeconds: number;
+  nextRecommendedAt: string | null;
+  isCurrentlyRunning: boolean;
+}
+
+export async function fetchDailyRefreshStatus(studentCode: string): Promise<DailyRefreshStatus | null> {
+  const response = await fetch('/api/product-miner/collector/daily-status', {
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return (data.status || null) as DailyRefreshStatus | null;
+}
+
+export async function runDailyRefresh(studentCode: string): Promise<DailyRefreshStatus> {
+  const response = await fetch('/api/product-miner/collector/daily-refresh', {
+    method: 'POST',
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data.status as DailyRefreshStatus;
+}
+
 export async function loadProductRanking(studentCode: string, limit = 50, sort: ProductRankingSort = 'opportunities') {
 
   const params = new URLSearchParams({ limit: String(limit), sort });
