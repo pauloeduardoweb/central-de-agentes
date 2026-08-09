@@ -108,19 +108,36 @@ export async function searchProducts(studentCode: string, query: string, page = 
   return data as ProductSearchResponse;
 }
 
+export interface CollectorRefreshResponse extends ProductSearchResponse {
+  uniqueProductsCount?: number;
+  pagesConsulted?: number;
+  category?: string;
+  timestamp?: string;
+  partialError?: string | null;
+}
+
 // Paid: explicit mentor-only SocialCrawl refresh.
-export async function refreshProducts(studentCode: string, query: string, page = 1): Promise<ProductSearchResponse> {
+export async function refreshProducts(
+  studentCode: string,
+  query: string,
+  maxProductsOrPage: number = 300
+): Promise<CollectorRefreshResponse> {
+  const isMultiPageRequest = maxProductsOrPage >= 30;
+  const body = isMultiPageRequest
+    ? { query, maxProducts: maxProductsOrPage }
+    : { query, page: maxProductsOrPage };
+
   const response = await fetch('/api/product-miner/refresh', {
     method: 'POST',
     headers: {
       ...authHeaders(studentCode),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query, page }),
+    body: JSON.stringify(body),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw accessError(data);
-  return data as ProductSearchResponse;
+  return data as CollectorRefreshResponse;
 }
 
 export interface CollectorCategoryStat {
