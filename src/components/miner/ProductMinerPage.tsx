@@ -13,6 +13,9 @@ import {
   searchProducts,
   refreshProducts,
   fetchCollectorCategories,
+  fetchDailyRefreshStatus,
+  runDailyRefresh,
+  type DailyRefreshStatus,
   type CollectorCategoryStat,
   type ProductSearchSource,
 } from '../../services/productMinerApi';
@@ -423,6 +426,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [confirmModalCategory, setConfirmModalCategory] = useState<string | null>(null);
   const [collectorNotice, setCollectorNotice] = useState<string | null>(null);
 
+  // Atualização Diária da Base State
+  const [dailyStatus, setDailyStatus] = useState<DailyRefreshStatus | null>(null);
+  const [isDailyRefreshing, setIsDailyRefreshing] = useState(false);
+  const [showDailyConfirmModal, setShowDailyConfirmModal] = useState(false);
+
   // Coletor multipágina: até 300 produtos por categoria (padrão 90)
   const [selectedMaxProducts, setSelectedMaxProducts] = useState<number>(90);
 
@@ -479,6 +487,21 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     });
   }, [ranking, selectedCategory, hasVideoOnly, viralVideoOnly]);
 
+  const loadDailyStatus = async () => {
+    if (!canRefresh) return;
+    try {
+      const st = await fetchDailyRefreshStatus(studentCode);
+      setDailyStatus(st);
+      if (st?.isCurrentlyRunning) {
+        setIsDailyRefreshing(true);
+      } else {
+        setIsDailyRefreshing(false);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const loadCategories = () => {
     if (!canRefresh) return;
 
@@ -488,6 +511,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       .then((cats) => setCollectorCategories(cats))
       .catch((err) => setError(err?.message || 'Falha ao carregar categorias do coletor.'))
       .finally(() => setCollectorLoading(false));
+
+    loadDailyStatus();
   };
 
   useEffect(() => {
@@ -495,6 +520,35 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       loadCategories();
     }
   }, [mode, canRefresh, studentCode]);
+
+  useEffect(() => {
+    if (!isDailyRefreshing || !canRefresh) return;
+    const interval = setInterval(() => {
+      loadDailyStatus();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isDailyRefreshing, canRefresh, studentCode]);
+
+  const handleStartDailyRefresh = async () => {
+    setShowDailyConfirmModal(false);
+    setIsDailyRefreshing(true);
+    setError('');
+    setCollectorNotice(null);
+
+    try {
+      const result = await runDailyRefresh(studentCode);
+      setDailyStatus(result);
+      setIsDailyRefreshing(false);
+
+      const notice = `Atualização Diária concluída! ${result.categoriesProcessed} de ${result.totalCategories} categorias processadas (${result.uniqueProductsCount} produtos únicos, ${result.creditsUsed} créditos utilizados).`;
+      setCollectorNotice(notice);
+      loadCategories();
+    } catch (err: any) {
+      setIsDailyRefreshing(false);
+      setError(err?.message || 'Falha ao executar atualização diária da base.');
+      loadDailyStatus();
+    }
+  };
 
   const handleConfirmCategoryCollect = async () => {
     if (!confirmModalCategory) return;
@@ -1012,7 +1066,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
             <div className="mt-5 pt-4 border-t border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <span className="text-xs font-bold text-slate-300">
-                Quantidade por Categoria:
+                Quantidade por Categoria (Individual):
               </span>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1039,7 +1093,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     onClick={() =>
                       setSelectedMaxProducts(opt.count)
                     }
-                    disabled={Boolean(refreshingCategory)}
+                    disabled={Boolean(refreshingCategory) || isDailyRefreshing}
                     className={`px-3 py-2 rounded-xl text-xs font-black border transition-all text-center ${
                       selectedMaxProducts === opt.count
                         ? 'border-purple-400 bg-purple-500/25 text-purple-200 shadow-md shadow-purple-950/40'
@@ -1055,6 +1109,104 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Card Especial: Atualização Diária da Base */}
+          <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 via-slate-950/80 to-slate-950/90 p-5 md:p-6 shadow-xl shadow-amber-950/10 space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-amber-300 text-xs font-black uppercase tracking-wider">
+                  <RefreshCw className={`w-4 h-4 text-amber-400 ${isDailyRefreshing ? 'animate-spin' : ''}`} />
+                  Atualização Diária da Base • 8 Categorias
+                </div>
+                <h3 className="mt-1 text-lg font-black text-white">
+                  Atualizar Todas as Categorias em Sequência
+                </h3>
+                <p className="mt-1 text-xs text-slate-300 max-w-2xl">
+                  Atualiza as 8 categorias oficiais (Beleza, Casa, Moda, Cozinha, Eletrônicos, Fitness, Bebê, Pet) em lote, coletando até 90 produtos por categoria (3 páginas por categoria) e consumindo até 24 créditos SocialCrawl.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowDailyConfirmModal(true)}
+                disabled={isDailyRefreshing || Boolean(dailyStatus?.isCooldownActive) || Boolean(refreshingCategory)}
+                className={`px-5 py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all ${
+                  isDailyRefreshing
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-wait'
+                    : dailyStatus?.isCooldownActive
+                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 opacity-90'
+                    : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 shadow-amber-950/40 hover:scale-[1.02]'
+                }`}
+              >
+                {isDailyRefreshing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Atualizando base ({dailyStatus?.categoriesProcessed ?? 0}/8)...</span>
+                  </>
+                ) : dailyStatus?.isCooldownActive ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Base atualizada hoje ✅</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    <span>🔄 Atualizar todas as categorias • até 24 créditos</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Resumo visual do Status */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-500/20 text-xs">
+              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
+                <div className="text-[11px] text-slate-400">Última atualização geral</div>
+                <div className="font-bold text-slate-200 mt-0.5 truncate">
+                  {dailyStatus?.completedAt || dailyStatus?.startedAt
+                    ? formatCollectionDate(dailyStatus.completedAt || dailyStatus.startedAt)
+                    : 'Nenhuma realizada'}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
+                <div className="text-[11px] text-slate-400">Categorias processadas</div>
+                <div className="font-extrabold text-amber-300 mt-0.5">
+                  {dailyStatus ? `${dailyStatus.categoriesProcessed} / ${dailyStatus.totalCategories}` : '0 / 8'}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
+                <div className="text-[11px] text-slate-400">Próxima recomendada</div>
+                <div className="font-bold text-cyan-300 mt-0.5 truncate">
+                  {dailyStatus?.isCooldownActive && dailyStatus.cooldownRemainingSeconds > 0
+                    ? `Em ~${Math.ceil(dailyStatus.cooldownRemainingSeconds / 3600)} horas`
+                    : 'Pronta para atualizar'}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-3">
+                <div className="text-[11px] text-slate-400">Status atual</div>
+                <div className="font-bold mt-0.5 truncate">
+                  {isDailyRefreshing ? (
+                    <span className="text-amber-300 animate-pulse">🔄 Em andamento ({dailyStatus?.currentCategory || 'processando'})</span>
+                  ) : dailyStatus?.status === 'COMPLETED' ? (
+                    <span className="text-emerald-300">Base Ativa ✅</span>
+                  ) : dailyStatus?.status === 'PARTIAL_FAILED' ? (
+                    <span className="text-amber-400">Atualização Parcial ⚠️</span>
+                  ) : (
+                    <span className="text-slate-400">Pronta para atualização</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {dailyStatus?.isCooldownActive ? (
+              <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>A base de dados já passou pela atualização diária recomendada. A proteção de 24 horas está ativa no backend.</span>
+              </div>
+            ) : null}
           </div>
 
           {collectorNotice ? (
@@ -1243,6 +1395,67 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     Confirmar e Atualizar
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Modal de Confirmação da Atualização Diária */}
+      {showDailyConfirmModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-950 p-6 shadow-2xl shadow-amber-950/40 space-y-5">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+
+                <div>
+                  <h3 className="font-extrabold text-lg text-white">
+                    Confirmar Atualização Diária
+                  </h3>
+                  <p className="text-xs text-amber-300 font-medium">
+                    Coleta sequencial das 8 categorias
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowDailyConfirmModal(false)}
+                className="text-slate-500 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
+              <p className="text-sm font-bold text-amber-200 leading-snug">
+                Esta ação atualizará as 8 categorias oficiais do Geração Z Pro, utilizando até 90 produtos por categoria e podendo consumir até 24 créditos SocialCrawl. As categorias serão processadas uma por vez. Continuar?
+              </p>
+
+              <div className="text-xs text-slate-300 space-y-1.5 pt-2 border-t border-amber-500/20">
+                <div>• <strong>Categorias:</strong> Beleza, Casa, Moda, Cozinha, Eletrônicos, Fitness, Bebê e Pet.</div>
+                <div>• <strong>Profundidade:</strong> Até 90 produtos (3 páginas de 30) por categoria.</div>
+                <div>• <strong>Consumo Máximo:</strong> Até 24 créditos (3 por categoria).</div>
+                <div>• <strong>Proteção:</strong> Execução sequencial com progresso em tempo real e proteção de 24 horas no backend.</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={() => setShowDailyConfirmModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 text-xs font-bold"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={handleStartDailyRefresh}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-amber-950/30"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Confirmar Atualização
               </button>
             </div>
           </div>
