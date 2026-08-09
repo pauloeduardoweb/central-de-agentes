@@ -4,7 +4,7 @@ import {
   MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap, RefreshCw,
   Layers, ShieldCheck, AlertCircle, CheckCircle2, X, Sparkles, Home, Shirt, Utensils,
   Cpu, Dumbbell, Baby, Dog, Copy, Check, Video, Download, FileText, BarChart3, Wand2, Filter,
-  Trophy, ThumbsUp, SlidersHorizontal, ChevronDown, ChevronUp,
+  Trophy, ThumbsUp, SlidersHorizontal, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   BadgeDollarSign, Clock3, Rocket, Clapperboard, Gauge
 } from 'lucide-react';
 import {
@@ -58,6 +58,7 @@ export interface ClassificationItem {
   id: ClassificationType;
   label: string;
   imgUrl: string;
+  spriteIndex?: number;
   fallbackIcon: React.ReactNode;
 }
 
@@ -93,36 +94,41 @@ const CLASSIFICATIONS: ClassificationItem[] = [
     imgUrl: 'https://i.postimg.cc/767qSPKN/coração.jpg',
     fallbackIcon: <Heart className="w-6 h-6 text-rose-500" />,
   },
-  // 6-10: Geração Z Pro Exclusive Intelligence
+  // 6-10: Geração Z Pro Exclusive Intelligence (using sprite image strip asset)
   {
     id: 'highest_commission',
     label: 'Maior Comissão',
-    imgUrl: '',
-    fallbackIcon: <BadgeDollarSign className="w-6 h-6 text-amber-600" />,
+    spriteIndex: 0,
+    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    fallbackIcon: <BadgeDollarSign className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'sales_24h',
     label: 'Vendas 24h',
-    imgUrl: '',
-    fallbackIcon: <Clock3 className="w-6 h-6 text-amber-600" />,
+    spriteIndex: 1,
+    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    fallbackIcon: <Clock3 className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'spiking',
     label: 'Disparando',
-    imgUrl: '',
-    fallbackIcon: <Rocket className="w-6 h-6 text-amber-600" />,
+    spriteIndex: 2,
+    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    fallbackIcon: <Rocket className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'viral_video',
     label: 'Vídeo Viral',
-    imgUrl: '',
-    fallbackIcon: <Clapperboard className="w-6 h-6 text-amber-600" />,
+    spriteIndex: 3,
+    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    fallbackIcon: <Clapperboard className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'score_geraz',
     label: 'Score Geração Z Pro',
-    imgUrl: '',
-    fallbackIcon: <Gauge className="w-6 h-6 text-amber-600" />,
+    spriteIndex: 4,
+    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    fallbackIcon: <Gauge className="w-6 h-6 text-amber-500" />,
   },
 ];
 
@@ -454,6 +460,27 @@ function matchesSubcategoryFilter(
 
 const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive: boolean }> = ({ item, isActive }) => {
   const [imgError, setImgError] = useState(false);
+
+  // If spriteIndex is provided and image is valid, render background sprite crop
+  if (typeof item.spriteIndex === 'number' && item.imgUrl && !imgError) {
+    const spritePositions = ['0% 0%', '25% 0%', '50% 0%', '75% 0%', '100% 0%'];
+    return (
+      <div
+        className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full transition-all flex items-center justify-center shrink-0 border-2 overflow-hidden ${
+          isActive
+            ? 'border-amber-500 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
+            : 'border-slate-300 bg-slate-900 hover:border-amber-500/50'
+        }`}
+        style={{
+          backgroundImage: `url(${item.imgUrl})`,
+          backgroundSize: '500% 100%',
+          backgroundPosition: spritePositions[item.spriteIndex] || '0% 0%',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+    );
+  }
+
   const hasValidImage = Boolean(item.imgUrl) && !imgError;
 
   if (hasValidImage) {
@@ -1022,6 +1049,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
+  const subcatScrollRef = React.useRef<HTMLDivElement>(null);
+  const scrollContainer = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
+    if (ref.current) {
+      ref.current.scrollBy({
+        left: direction === 'left' ? -240 : 240,
+        behavior: 'smooth',
+      });
+    }
+  };
+
   const activeCategoryConfig = useMemo(
     () => CATEGORY_CONFIG.find((c) => c.filterKey === selectedCategory),
     [selectedCategory]
@@ -1371,15 +1408,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-              Minerar Produtos TikTok Shop
-            </h1>
-            <div className="mt-1.5 h-0.5 w-16 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" />
+            <div className="inline-flex items-center px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-2xl border-2 border-amber-500 bg-white shadow-2xs">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+                Minerar Produtos TikTok Shop
+              </h1>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 text-[11px]">
             <span className="px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold">
-              🇧🇷 Região BR
+              Região BR
             </span>
           </div>
         </div>
@@ -1560,33 +1598,56 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </button>
               ) : null}
             </div>
-            <div
-              className="w-full overflow-x-auto overflow-y-hidden scrollbar-none pb-1"
-              onWheel={(e) => {
-                if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
-                  e.currentTarget.scrollLeft += e.deltaY;
-                }
-              }}
-            >
-              <div className="flex w-max min-w-max items-center gap-1.5 pr-6">
-                {activeCategoryConfig.subcategories.map((subcat) => {
-                  const isSubActive = selectedSubcategory === subcat;
-                  return (
-                    <button
-                      key={subcat}
-                      type="button"
-                      onClick={() => setSelectedSubcategory(subcat)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 border transition-all whitespace-nowrap ${
-                        isSubActive
-                          ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
-                      }`}
-                    >
-                      {subcat}
-                    </button>
-                  );
-                })}
+            <div className="relative group/subnav">
+              {/* Desktop Scroll Left Arrow */}
+              <button
+                type="button"
+                onClick={() => scrollContainer(subcatScrollRef, 'left')}
+                className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+                title="Rolar para esquerda"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div
+                ref={subcatScrollRef}
+                className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1"
+                onWheel={(e) => {
+                  if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                    e.currentTarget.scrollLeft += e.deltaY;
+                  }
+                }}
+              >
+                <div className="flex w-max min-w-max items-center gap-1.5 pr-12 sm:pr-24">
+                  {activeCategoryConfig.subcategories.map((subcat) => {
+                    const isSubActive = selectedSubcategory === subcat;
+                    return (
+                      <button
+                        key={subcat}
+                        type="button"
+                        onClick={() => setSelectedSubcategory(subcat)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 border transition-all whitespace-nowrap ${
+                          isSubActive
+                            ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
+                        }`}
+                      >
+                        {subcat}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Desktop Scroll Right Arrow */}
+              <button
+                type="button"
+                onClick={() => scrollContainer(subcatScrollRef, 'right')}
+                className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+                title="Rolar para direita"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         ) : null}
