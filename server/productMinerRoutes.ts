@@ -114,11 +114,20 @@ productMinerRouter.get('/ranking', async (req, res) => {
     )
       ? (requestedSort as ProductRankingSort)
       : 'opportunities';
-    const result = await getProductMinerRanking(Number(req.query.limit || 50), sort);
+    const limit = Number(req.query.limit || 150);
+    const result = await getProductMinerRanking(limit, sort);
     return res.json({ success: true, ...result });
   } catch (error: any) {
-    console.error('[Product Miner Ranking Error]:', error?.message || error);
-    return res.status(500).json({ error: 'PRODUCT_MINER_RANKING_ERROR' });
+    console.error('[Product Miner Ranking Route Error]:', {
+      message: error?.message || String(error),
+      stack: error?.stack,
+      query: req.query,
+      timestamp: new Date().toISOString(),
+    });
+    return res.status(500).json({
+      error: 'PRODUCT_MINER_RANKING_ERROR',
+      detail: 'Não foi possível carregar o ranking no momento. Tente novamente.',
+    });
   }
 });
 

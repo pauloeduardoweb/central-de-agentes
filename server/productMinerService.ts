@@ -1048,7 +1048,7 @@ export async function getProductMinerRanking(limit = 50, sort: ProductRankingSor
     return { products: [], meta: { trackedProducts: 0, with24h: 0, with7d: 0, sort } };
   }
   await ensureProductMinerTables();
-  const safeLimit = Math.max(1, Math.min(Number(limit || 50), 100));
+  const safeLimit = Math.max(1, Math.min(Number(limit || 50), 200));
   const [rows]: any = await db.query(
     `SELECT p.*
      FROM tiktok_shop_products p
@@ -1085,7 +1085,7 @@ export async function getProductMinerRanking(limit = 50, sort: ProductRankingSor
 
   let visible = sorted;
   if (sort === 'opportunities') {
-    visible = sorted.slice(0, 20); // Limit to TOP 20 for Melhores Oportunidades
+    visible = sorted.slice(0, safeLimit);
   } else if (sort === '24h') {
     visible = sorted.filter((product) => product.sales24h !== null && product.sales24h !== undefined).slice(0, safeLimit);
   } else if (sort === '7d') {
