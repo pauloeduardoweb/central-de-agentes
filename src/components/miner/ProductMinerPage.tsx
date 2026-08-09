@@ -94,40 +94,35 @@ const CLASSIFICATIONS: ClassificationItem[] = [
     imgUrl: 'https://i.postimg.cc/767qSPKN/coração.jpg',
     fallbackIcon: <Heart className="w-6 h-6 text-rose-500" />,
   },
-  // 6-10: Geração Z Pro Exclusive Intelligence (using sprite image strip asset)
+  // 6-10: Geração Z Pro Exclusive Intelligence (Individual direct image assets)
   {
     id: 'highest_commission',
     label: 'Maior Comissão',
-    spriteIndex: 0,
-    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    imgUrl: 'https://i.postimg.cc/vBQxqGhF/maior_comissão.png',
     fallbackIcon: <BadgeDollarSign className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'sales_24h',
     label: 'Vendas 24h',
-    spriteIndex: 1,
-    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    imgUrl: 'https://i.postimg.cc/C1mB99PW/vendas24h.png',
     fallbackIcon: <Clock3 className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'spiking',
     label: 'Disparando',
-    spriteIndex: 2,
-    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    imgUrl: 'https://i.postimg.cc/262bggcJ/Disparando.png',
     fallbackIcon: <Rocket className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'viral_video',
     label: 'Vídeo Viral',
-    spriteIndex: 3,
-    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    imgUrl: 'https://i.postimg.cc/nz0jNNRy/Vídeo_Viral.png',
     fallbackIcon: <Clapperboard className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'score_geraz',
     label: 'Score Geração Z Pro',
-    spriteIndex: 4,
-    imgUrl: 'https://i.postimg.cc/SN2tkySL/Chat-GPT-Image-9-de-ago-de-2026-15-02-25.png',
+    imgUrl: 'https://i.postimg.cc/4dB7jjLj/Score_Geração_Z_Pro.png',
     fallbackIcon: <Gauge className="w-6 h-6 text-amber-500" />,
   },
 ];
@@ -460,27 +455,6 @@ function matchesSubcategoryFilter(
 
 const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive: boolean }> = ({ item, isActive }) => {
   const [imgError, setImgError] = useState(false);
-
-  // If spriteIndex is provided and image is valid, render background sprite crop
-  if (typeof item.spriteIndex === 'number' && item.imgUrl && !imgError) {
-    const spritePositions = ['0% 0%', '25% 0%', '50% 0%', '75% 0%', '100% 0%'];
-    return (
-      <div
-        className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full transition-all flex items-center justify-center shrink-0 border-2 overflow-hidden ${
-          isActive
-            ? 'border-amber-500 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
-            : 'border-slate-300 bg-slate-900 hover:border-amber-500/50'
-        }`}
-        style={{
-          backgroundImage: `url(${item.imgUrl})`,
-          backgroundSize: '500% 100%',
-          backgroundPosition: spritePositions[item.spriteIndex] || '0% 0%',
-          backgroundRepeat: 'no-repeat',
-        }}
-      />
-    );
-  }
-
   const hasValidImage = Boolean(item.imgUrl) && !imgError;
 
   if (hasValidImage) {
@@ -523,6 +497,8 @@ const MobileProductCard: React.FC<{
   position?: number;
   rankingSort?: ProductRankingSort;
   isMentor?: boolean;
+  isFavorite?: boolean;
+  onToggleFavorite?: (p: ProductMinerProduct) => void;
   onOpenScriptModal?: (p: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
   onOpenDownloadModal?: (p: ProductMinerProduct) => void;
@@ -531,22 +507,12 @@ const MobileProductCard: React.FC<{
   position,
   rankingSort,
   isMentor,
+  isFavorite = false,
+  onToggleFavorite,
   onOpenScriptModal,
   onOpenAnalysisModal,
   onOpenDownloadModal,
 }) => {
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  const handleCopyVideoLink = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (product.video?.url) {
-      navigator.clipboard.writeText(product.video.url);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    }
-  };
-
   return (
     <article className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm hover:shadow-md hover:border-amber-400/60 transition-all flex gap-3 relative overflow-hidden text-slate-900">
       {/* Ranking position tag */}
@@ -558,6 +524,21 @@ const MobileProductCard: React.FC<{
 
       {/* Product Image */}
       <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleFavorite?.(product);
+          }}
+          className={`absolute top-1 left-1 z-20 p-1 rounded-full bg-white/90 shadow transition-all ${
+            isFavorite ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'
+          }`}
+          title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
+        >
+          <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current text-rose-500' : ''}`} />
+        </button>
+
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
@@ -690,6 +671,8 @@ const ProductCard: React.FC<{
   position?: number;
   rankingSort?: ProductRankingSort;
   isMentor?: boolean;
+  isFavorite?: boolean;
+  onToggleFavorite?: (p: ProductMinerProduct) => void;
   onOpenScriptModal?: (p: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
   onOpenDownloadModal?: (p: ProductMinerProduct) => void;
@@ -698,29 +681,34 @@ const ProductCard: React.FC<{
   position,
   rankingSort,
   isMentor,
+  isFavorite = false,
+  onToggleFavorite,
   onOpenScriptModal,
   onOpenAnalysisModal,
   onOpenDownloadModal,
 }) => {
-  const [linkCopied, setLinkCopied] = useState(false);
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
   const isSpikingRanking = rankingSort === 'spiking';
-  const isVideoPrepared = Boolean(product.videoDownload?.isPrepared);
-
-  const handleCopyVideoLink = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (product.video?.url) {
-      navigator.clipboard.writeText(product.video.url);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    }
-  };
 
   return (
-    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900">
+    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative">
       <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden shrink-0 border-b border-slate-100">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleFavorite?.(product);
+          }}
+          className={`absolute top-2 ${product.discountPercent ? 'right-12' : 'right-2'} z-20 p-2 rounded-full bg-white/90 shadow-md transition-all hover:scale-110 ${
+            isFavorite ? 'text-rose-500 bg-white' : 'text-slate-400 hover:text-rose-500'
+          }`}
+          title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
+        >
+          <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current text-rose-500' : ''}`} />
+        </button>
+
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
@@ -914,48 +902,17 @@ const ProductCard: React.FC<{
                 </button>
               </div>
 
-              <div className={`grid ${isMentor ? 'grid-cols-3' : 'grid-cols-2'} gap-1 text-[10px]`}>
-                {product.video.url ? (
-                  <a
-                    href={product.video.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="py-1 px-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:text-slate-900 font-bold flex items-center justify-center gap-1 truncate"
-                  >
-                    <Play className="w-3 h-3 text-amber-600" />
-                    Assistir
-                  </a>
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={handleCopyVideoLink}
-                  className="py-1 px-1.5 rounded-md bg-white border border-slate-200 text-slate-700 hover:text-slate-900 font-bold flex items-center justify-center gap-1 truncate"
+              {product.video.url ? (
+                <a
+                  href={product.video.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-amber-900 hover:border-amber-300 font-bold flex items-center justify-center gap-1.5 transition-all text-[11px]"
                 >
-                  {linkCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-slate-400" />}
-                  {linkCopied ? 'Copiado' : 'Copiar'}
-                </button>
-
-                {isMentor ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenDownloadModal?.(product)}
-                    className={`py-1 px-1.5 rounded-md border font-bold flex items-center justify-center gap-1 truncate transition-all ${
-                      isVideoPrepared
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                        : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900'
-                    }`}
-                    title={
-                      isVideoPrepared
-                        ? 'Baixar vídeo (.mp4)'
-                        : 'Preparar download do vídeo'
-                    }
-                  >
-                    <Download className={`w-3 h-3 ${isVideoPrepared ? 'text-emerald-600' : 'text-amber-600'}`} />
-                    {isVideoPrepared ? 'Baixar' : 'Preparar'}
-                  </button>
-                ) : null}
-              </div>
+                  <Play className="w-3.5 h-3.5 text-amber-600 fill-amber-500/20" />
+                  Assistir Vídeo
+                </a>
+              ) : null}
             </div>
           </div>
         ) : (
@@ -996,17 +953,49 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   const [selectedClassification, setSelectedClassification] = useState<ClassificationType>('best_sellers');
 
-  const [mode, setModeState] = useState<'search' | 'ranking' | 'collector'>(() => {
+  const [favorites, setFavorites] = useState<ProductMinerProduct[]>(() => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('gzp_miner_favorites');
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const toggleFavorite = (product: ProductMinerProduct) => {
+    setFavorites((prev) => {
+      const exists = prev.some((p) => p.productId === product.productId);
+      let updated: ProductMinerProduct[];
+      if (exists) {
+        updated = prev.filter((p) => p.productId !== product.productId);
+      } else {
+        updated = [product, ...prev];
+      }
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('gzp_miner_favorites', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const isFavorited = (productId: string) => {
+    return favorites.some((p) => p.productId === productId);
+  };
+
+  const [mode, setModeState] = useState<'search' | 'ranking' | 'collector' | 'favorites'>(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('gzp_miner_mode');
-      if (saved === 'search' || saved === 'ranking' || saved === 'collector') {
+      if (saved === 'search' || saved === 'ranking' || saved === 'collector' || saved === 'favorites') {
         return saved;
       }
     }
     return 'search';
   });
 
-  const setMode = (newMode: 'search' | 'ranking' | 'collector') => {
+  const setMode = (newMode: 'search' | 'ranking' | 'collector' | 'favorites') => {
     setModeState(newMode);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('gzp_miner_mode', newMode);
@@ -1123,7 +1112,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   /* Unified Display List applying Category Filter + Subcategory Filter + Classification Order */
   const displayProducts = useMemo(() => {
-    let list = mode === 'ranking' ? ranking : products;
+    let list = mode === 'favorites' ? favorites : mode === 'ranking' ? ranking : products;
 
     // 1. Filter by TikTok main category
     list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory));
@@ -1408,7 +1397,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-2xl border-2 border-amber-500 bg-white shadow-2xs">
+            <div className="inline-flex items-center px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl border border-amber-500 bg-amber-400 text-slate-900 shadow-sm">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
                 Minerar Produtos TikTok Shop
               </h1>
@@ -1657,7 +1646,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* 3 — MODES & ADVANCED FILTERS BAR                   */}
       {/* ================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="inline-flex p-1 rounded-xl border border-slate-200 bg-white shadow-sm self-start">
+        <div className="inline-flex p-1 rounded-xl border border-slate-200 bg-white shadow-sm self-start flex-wrap gap-1">
           <button
             onClick={() => setMode('search')}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
@@ -1692,9 +1681,26 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-amber-600" />
-              Coletor
+              Adquirir Produtos
             </button>
           ) : null}
+
+          <button
+            onClick={() => setMode('favorites')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              mode === 'favorites'
+                ? 'bg-rose-500/15 text-rose-800 font-black border border-rose-300/60'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Heart className={`w-3.5 h-3.5 ${favorites.length > 0 ? 'text-rose-500 fill-current' : 'text-slate-500'}`} />
+            Meus Favoritos
+            {favorites.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-black">
+                {favorites.length}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -1731,7 +1737,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-md animate-fade-in">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-amber-500" /> Filtros e Métricas Adicionais
+              <Filter className="w-3.5 h-3.5 text-amber-500" /> Filtros de Vídeo e Desempenho
             </span>
             <button
               onClick={() => {
@@ -1739,67 +1745,60 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 setSelectedSubcategory('Todas');
                 setHasVideoOnly(false);
                 setViralVideoOnly(false);
+                if (rankingSort === '7d') setRankingSort('opportunities');
               }}
               className="text-[11px] text-rose-600 hover:underline font-bold"
             >
-              Limpar Todos
+              Limpar Filtros
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Sort mode selector for ranking */}
-            {mode === 'ranking' ? (
-              <div className="space-y-1.5">
-                <span className="text-[11px] text-slate-600 font-bold">Métrica do Ranking:</span>
-                <div className="flex gap-1.5 flex-wrap">
-                  {RANKING_FILTERS.map((f) => (
-                    <button
-                      key={f.id}
-                      onClick={() => setRankingSort(f.id)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                        rankingSort === f.id
-                          ? 'border-amber-400 bg-amber-50 text-amber-800'
-                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+          <div className="flex gap-2 flex-wrap pt-1">
+            <button
+              type="button"
+              onClick={() => setHasVideoOnly((p) => !p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                hasVideoOnly
+                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <Play className="w-3 h-3 text-amber-600 fill-current" />
+              Apenas com vídeo
+            </button>
 
-            {/* Video filters */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-slate-600 font-bold">Filtros de Vídeo:</span>
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setHasVideoOnly((p) => !p)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                    hasVideoOnly
-                      ? 'border-amber-300 bg-amber-50 text-amber-900'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <Play className="w-3 h-3 text-amber-600 fill-current" />
-                  Apenas com vídeo
-                </button>
+            <button
+              type="button"
+              onClick={() => setViralVideoOnly((p) => !p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                viralVideoOnly
+                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <Flame className="w-3 h-3 text-amber-500 fill-current" />
+              Vídeo viral (1M+ views)
+            </button>
 
-                <button
-                  type="button"
-                  onClick={() => setViralVideoOnly((p) => !p)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                    viralVideoOnly
-                      ? 'border-amber-400 bg-amber-50 text-amber-800'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <Flame className="w-3 h-3 text-amber-500 fill-current" />
-                  Vídeo viral (1M+ views)
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (rankingSort === '7d') {
+                  setRankingSort('opportunities');
+                } else {
+                  setMode('ranking');
+                  setRankingSort('7d');
+                }
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                rankingSort === '7d'
+                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <TrendingUp className="w-3 h-3 text-amber-600" />
+              Vendas 7 dias
+            </button>
           </div>
         </div>
       ) : null}
@@ -1807,7 +1806,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       {/* 4 — LISTA / FEED DE PRODUTOS                       */}
       {/* ================================================== */}
-      {mode === 'search' || mode === 'ranking' ? (
+      {mode === 'search' || mode === 'ranking' || mode === 'favorites' ? (
         <>
           {(loading || rankingLoading) ? (
             <div className="py-16 flex justify-center">
@@ -1883,8 +1882,21 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             </div>
           ) : null}
 
+          {/* Estado de Meus Favoritos Vazio */}
+          {mode === 'favorites' && displayProducts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-rose-300 bg-rose-50/40 py-16 px-5 text-center space-y-2">
+              <Heart className="w-10 h-10 text-rose-400 mx-auto" />
+              <h2 className="font-bold text-slate-800 text-base">
+                Você ainda não possui produtos em Meus Favoritos.
+              </h2>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Navegue pela Pesquisa ou pelo Ranking e clique no ícone de coração nos cards dos produtos para salvá-los aqui para fácil acesso posterior.
+              </p>
+            </div>
+          ) : null}
+
           {/* Estado de Lista Vazia por Filtros (Somente quando NÃO houver Erro) */}
-          {!(loading || rankingLoading) && !error && displayProducts.length === 0 ? (
+          {mode !== 'favorites' && !(loading || rankingLoading) && !error && displayProducts.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 px-5 text-center space-y-2">
               <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
               <h2 className="font-bold text-slate-700">
@@ -1923,6 +1935,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       position={globalPos}
                       rankingSort={rankingSort}
                       isMentor={canRefresh}
+                      isFavorite={isFavorited(product.productId)}
+                      onToggleFavorite={toggleFavorite}
                       onOpenScriptModal={(p) => setScriptModalProduct(p)}
                       onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
                       onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
@@ -1942,6 +1956,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       position={globalPos}
                       rankingSort={rankingSort}
                       isMentor={canRefresh}
+                      isFavorite={isFavorited(product.productId)}
+                      onToggleFavorite={toggleFavorite}
                       onOpenScriptModal={(p) => setScriptModalProduct(p)}
                       onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
                       onOpenDownloadModal={(p) => setDownloadModalProduct(p)}
