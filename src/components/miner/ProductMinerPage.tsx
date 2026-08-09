@@ -272,9 +272,13 @@ function matchesSubcategoryFilter(
     return true;
   }
 
+  // 1. MAIN CATEGORY CHECK FIRST (Requirement 6: Never test subcategory on products outside main category)
+  if (!matchesCategoryFilter(productCatRaw || null, selectedCat)) {
+    return false;
+  }
+
   const catStr = (productCatRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const titleStr = (productTitleRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const fullText = `${catStr} ${titleStr}`;
 
   const sub = selectedSubcat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
@@ -308,7 +312,7 @@ function matchesSubcategoryFilter(
 
     // Beleza e Cuidados Pessoais
     'maquiagem': ['maquiagem', 'batom', 'base', 'corretivo', 'rimel', 'pincel', 'sombra', 'gloss', 'delineador', 'blush', 'iluminador'],
-    'cuidados capilares': ['cabelo', 'shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'tintura', 'creme de pentear', 'reparador'],
+    'cuidados capilares': ['cabelo', 'capilar', 'shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'tintura', 'creme de pentear', 'reparador'],
     'perfumes': ['perfume', 'fragrancia', 'colonia', 'body splash', 'eau de parfum', 'decant'],
     'cuidados com o corpo': ['corpo', 'hidratante', 'sabonete', 'desodorante', 'esfoliante', 'locao corporal', 'óleo corporal'],
     'cuidados masculinos': ['masculinos', 'masculino', 'barba', 'pos barba', 'locao', 'gel de barbear', 'pomada capilar', 'balm'],
@@ -318,7 +322,7 @@ function matchesSubcategoryFilter(
     'fitness': ['fitness', 'academia', 'haltere', 'elastico', 'corda', 'colchonete', 'whey', 'suplemento', 'halter', 'faixa elastica', 'pesos'],
     'equipamentos para lazer': ['lazer', 'camping', 'barraca', 'pesca', 'piscina', 'patins', 'skate', 'boia', 'lanterna'],
     'roupas esportivas': ['roupas esportivas', 'roupa esportiva', 'top esportivo', 'legging', 'bermuda treino', 'dry fit', 'regata treino', 'conjunto fitness'],
-    'acessorios para esportes': ['acessorios para esportes', 'garrafa', 'squeeze', 'luva academia', 'faixa', 'joelheira', 'bolsa academia', 'caneleira'],
+    'acessorios para esportes': ['acessorios para esportes', 'garrafa', 'squeeze', 'luva academia', 'joelheira', 'bolsa academia', 'caneleira'],
     'calcados esportivos': ['calcados esportivos', 'tenis corrida', 'chuteira', 'tenis treino', 'tenis academia'],
 
     // Brinquedos e Pets
@@ -329,18 +333,80 @@ function matchesSubcategoryFilter(
     'health nutrition': ['nutrition', 'nutricao', 'suplemento', 'vitamina', 'whey', 'creatina', 'colageno', 'omega 3', 'protein', 'termogenico', 'pre treino'],
   };
 
-  const keywords = KEYWORD_MAP[sub];
-  if (keywords && keywords.length > 0) {
-    const hasMatch = keywords.some((kw) => fullText.includes(kw));
-    if (hasMatch) return true;
+  const currentKeywords = KEYWORD_MAP[sub] || [sub];
+
+  // 2. PRIORITY 1: OFFICIAL CATEGORY TAXONOMY DATA
+  // Check if official category string (productCatRaw) explicitly contains the subcategory name or taxonomy terms
+  const officialCategoryMatch = currentKeywords.some((kw) => catStr.includes(kw));
+  if (officialCategoryMatch) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[SubcategoryFilter Debug]', {
+        product: productTitleRaw,
+        officialCategory: productCatRaw,
+        selectedCategory: selectedCat,
+        selectedSubcategory: selectedSubcat,
+        matchReason: 'PRIORITY_1_OFFICIAL_CATEGORY_TAXONOMY_MATCH',
+      });
+    }
+    return true;
   }
 
-  const subWords = sub.split(/\s+/).filter((w) => w.length > 3 && w !== 'para' && w !== 'com');
-  if (subWords.length > 0) {
-    return subWords.some((word) => fullText.includes(word));
+  // 3. PRIORITY 2: CHECK FOR CONFLICTING OFFICIAL CATEGORY DATA
+  // If the product HAS a detailed official category path, check if it belongs to another subcategory of the same main category.
+  const activeMainConfig = CATEGORY_CONFIG.find((c) => c.filterKey === selectedCat);
+  if (activeMainConfig && catStr.length > 0) {
+    for (const sib of activeMainConfig.subcategories) {
+      if (sib === 'Todas' || sib === selectedSubcat) continue;
+      const sibNorm = sib.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const sibKeywords = KEYWORD_MAP[sibNorm] || [sibNorm];
+      const isExplicitSiblingCategory = sibKeywords.some((kw) => catStr.includes(kw));
+
+      if (isExplicitSiblingCategory) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[SubcategoryFilter Debug]', {
+            product: productTitleRaw,
+            officialCategory: productCatRaw,
+            selectedCategory: selectedCat,
+            selectedSubcategory: selectedSubcat,
+            rejectedReason: `PRIORITY_2_CONFLICTING_OFFICIAL_CATEGORY (Official category belongs to sibling subcategory '${sib}')`,
+          });
+        }
+        return false; // Structured data wins over title keyword!
+      }
+    }
   }
 
-  return fullText.includes(sub);
+  // 4. PRIORITY 3: DEFENSIVE TITLE KEYWORD FALLBACK
+  // Only if official category data didn't explicitly match a sibling or this subcategory, check product title defensively.
+  const titleMatch = currentKeywords.some((kw) => {
+    if (kw.length <= 3) return false; // Ignore short ambiguous terms
+    return titleStr.includes(kw);
+  });
+
+  if (titleMatch) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[SubcategoryFilter Debug]', {
+        product: productTitleRaw,
+        officialCategory: productCatRaw,
+        selectedCategory: selectedCat,
+        selectedSubcategory: selectedSubcat,
+        matchReason: 'PRIORITY_3_DEFENSIVE_TITLE_KEYWORD_FALLBACK',
+      });
+    }
+    return true;
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[SubcategoryFilter Debug]', {
+      product: productTitleRaw,
+      officialCategory: productCatRaw,
+      selectedCategory: selectedCat,
+      selectedSubcategory: selectedSubcat,
+      rejectedReason: 'NO_MATCH_OFFICIAL_OR_TITLE',
+    });
+  }
+
+  return false;
 }
 
 const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive: boolean }> = ({ item, isActive }) => {
