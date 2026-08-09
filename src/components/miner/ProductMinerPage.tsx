@@ -1,5 +1,3 @@
-
-quarta-feira 8:35
 vou te mandar as informações do meu app e vamos atualizar ele sempre juntos, segue as informações do outro bate papo: Perfeito. Vou assumir esse contexto como se estivesse dando continuidade ao projeto.
 
 Entendi o estilo de desenvolvimento que você espera e vou seguir essas regras durante toda esta conversa.
