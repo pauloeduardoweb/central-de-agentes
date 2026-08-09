@@ -54,6 +54,12 @@ export type MinedProduct = {
     shares: number | null;
     saves: number | null;
   };
+  videoDownload?: null | {
+    isPrepared: boolean;
+    directMediaUrl?: string | null;
+    preparedAt?: string | null;
+    status?: string | null;
+  };
 };
 
 type SnapshotPoint = {
@@ -407,7 +413,7 @@ async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduc
     snapshots.set(productId, list);
   }
 
-  return products.map((product) => {
+  const enrichedProductsWithScore = products.map((product) => {
     const list = snapshots.get(product.productId) || [];
     const baseline24h = chooseBaseline(list, 24, 18, 48);
     const baseline7d = chooseBaseline(list, 168, 120, 216);
@@ -428,11 +434,238 @@ async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduc
 
     const score = calculateScoreGeracaoZPro(enrichedProduct);
 
-    return {
+    const enrichedProductWithScore = {
       ...enrichedProduct,
       score,
     };
+
+    return enrichedProductWithScore;
   });
+
+  return attachVideoDownloads(enrichedProductsWithScore);
+}
+
+export async function attachVideoDownloads(products: MinedProduct[]): Promise<MinedProduct[]> {
+  if (!isDatabaseConfigured() || products.length === 0) return products;
+  const productIds = products.map((p) => p.productId).filter(Boolean);
+  if (productIds.length === 0) return products;
+
+  try {
+    await ensureProductMinerTables();
+    const placeholders = productIds.map(() => '?').join(',');
+    const [rows]: any = await db.query(
+      `SELECT product_id, direct_media_url, status, prepared_at
+       FROM tiktok_shop_video_downloads
+       WHERE product_id IN (${placeholders})`,
+      productIds
+    );
+
+    const map = new Map<string, { isPrepared: boolean; directMediaUrl: string | null; preparedAt: string | null; status: string }>();
+    if (Array.isArray(rows)) {
+      for (const r of rows) {
+        map.set(String(r.product_id), {
+          isPrepared: r.status === 'COMPLETED' && Boolean(r.direct_media_url),
+          directMediaUrl: r.direct_media_url || null,
+          preparedAt: r.prepared_at ? new Date(r.prepared_at).toISOString() : null,
+          status: String(r.status),
+        });
+      }
+    }
+
+    return products.map((p) => ({
+      ...p,
+      videoDownload: map.get(p.productId) || null,
+    }));
+  } catch (err: any) {
+    console.warn('[attachVideoDownloads Warning]:', err?.message || err);
+    return products;
+  }
+}
+
+export async function prepareVideoDownload(productId: string): Promise<{
+  success: boolean;
+  prepared?: boolean;
+  directMediaUrl?: string;
+  error?: string;
+  message?: string;
+}> {
+  if (!productId) {
+    return { success: false, error: 'MISSING_PRODUCT_ID', message: 'ID do produto não informado.' };
+  }
+  if (!isDatabaseConfigured()) {
+    return { success: false, error: 'DATABASE_NOT_CONFIGURED', message: 'Banco de dados não configurado.' };
+  }
+
+  await ensureProductMinerTables();
+
+  // 1. Check if already prepared or preparing
+  const [existingRows]: any = await db.query(
+    `SELECT direct_media_url, status, updated_at
+     FROM tiktok_shop_video_downloads
+     WHERE product_id = ?
+     LIMIT 1`,
+    [productId]
+  );
+
+  const existing = Array.isArray(existingRows) && existingRows[0];
+  if (existing) {
+    if (existing.status === 'COMPLETED' && existing.direct_media_url) {
+      return {
+        success: true,
+        prepared: true,
+        directMediaUrl: String(existing.direct_media_url),
+      };
+    }
+
+    if (existing.status === 'PREPARING') {
+      const updatedAtMs = new Date(existing.updated_at).getTime();
+      const nowMs = Date.now();
+      if (nowMs - updatedAtMs < 120_000) {
+        return {
+          success: false,
+          error: 'PREPARING_IN_PROGRESS',
+          message: 'O vídeo já está sendo preparado por outro processo. Aguarde alguns segundos.',
+        };
+      }
+    }
+  }
+
+  // 2. Locate video_url for product
+  let videoUrl: string | null = null;
+  const [prodRows]: any = await db.query(
+    `SELECT video_url FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
+    [productId]
+  );
+
+  if (Array.isArray(prodRows) && prodRows[0]?.video_url) {
+    videoUrl = String(prodRows[0].video_url);
+  }
+
+  if (!videoUrl) {
+    const [cacheRows]: any = await db.query(
+      `SELECT payload_json FROM tiktok_shop_search_cache LIMIT 50`
+    );
+    if (Array.isArray(cacheRows)) {
+      for (const row of cacheRows) {
+        try {
+          const payload = JSON.parse(row.payload_json);
+          const item = payload.data?.items?.find((i: any) => String(i.product_id || i.productId) === productId);
+          if (item?.video?.url || item?.video_url) {
+            videoUrl = item?.video?.url || item?.video_url;
+            break;
+          }
+        } catch {}
+      }
+    }
+  }
+
+  if (!videoUrl) {
+    return {
+      success: false,
+      error: 'NO_VIDEO_URL',
+      message: 'Nenhum vídeo do TikTok associado a este produto.',
+    };
+  }
+
+  // 3. Set lock 'PREPARING'
+  await db.query(
+    `INSERT INTO tiktok_shop_video_downloads (product_id, video_page_url, status, updated_at)
+     VALUES (?, ?, 'PREPARING', NOW())
+     ON DUPLICATE KEY UPDATE status = 'PREPARING', updated_at = NOW()`,
+    [productId, videoUrl]
+  );
+
+  // 4. Request SocialCrawl endpoint GET /v1/tiktok/post?url=...&download_media=true
+  try {
+    const apiKey = getSocialCrawlApiKey();
+    const scUrl = new URL('https://www.socialcrawl.dev/v1/tiktok/post');
+    scUrl.searchParams.set('url', videoUrl);
+    scUrl.searchParams.set('download_media', 'true');
+
+    const scRes = await fetch(scUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'x-api-key': apiKey,
+        'Accept': 'application/json',
+        'User-Agent': 'GeracaoZPro/1.0',
+      },
+      signal: AbortSignal.timeout(30000),
+    });
+
+    const rawText = await scRes.text();
+    let jsonPayload: any = null;
+    try {
+      jsonPayload = JSON.parse(rawText);
+    } catch {
+      throw new Error(`SOCIALCRAWL_INVALID_JSON_${scRes.status}`);
+    }
+
+    if (!scRes.ok || jsonPayload?.success === false) {
+      const msg = jsonPayload?.message || jsonPayload?.error || `HTTP_${scRes.status}`;
+      throw new Error(`SOCIALCRAWL_FAILED: ${msg}`);
+    }
+
+    const ext = jsonPayload?.data?.post?.ext || jsonPayload?.post?.ext;
+    const downloadMediaUrls = ext?.download_media_urls || [];
+
+    let mediaItem: any = null;
+    if (Array.isArray(downloadMediaUrls)) {
+      mediaItem = downloadMediaUrls.find((m: any) => m && m.cdn_url);
+    }
+
+    if (!mediaItem || !mediaItem.cdn_url) {
+      await db.query(
+        `UPDATE tiktok_shop_video_downloads
+         SET status = 'FAILED', error_message = 'A SocialCrawl não retornou uma mídia utilizável.'
+         WHERE product_id = ?`,
+        [productId]
+      );
+      return {
+        success: false,
+        error: 'NO_MEDIA_FOUND',
+        message: 'Não foi possível preparar este vídeo. A SocialCrawl não retornou uma mídia utilizável.',
+      };
+    }
+
+    const cdnUrl = String(mediaItem.cdn_url);
+    const postId = String(mediaItem.post_id || jsonPayload?.data?.post?.id || '');
+    const mediaType = String(mediaItem.type || 'video');
+    const isCached = Boolean(mediaItem.cached);
+
+    await db.query(
+      `UPDATE tiktok_shop_video_downloads
+       SET direct_media_url = ?,
+           video_post_id = ?,
+           media_type = ?,
+           provider = 'socialcrawl',
+           provider_cached = ?,
+           prepared_at = NOW(),
+           status = 'COMPLETED',
+           error_message = NULL
+       WHERE product_id = ?`,
+      [cdnUrl, postId, mediaType, isCached ? 1 : 0, productId]
+    );
+
+    return {
+      success: true,
+      prepared: true,
+      directMediaUrl: cdnUrl,
+    };
+  } catch (err: any) {
+    console.error('[Product Miner Prepare Video Download Error]:', err?.message || err);
+    await db.query(
+      `UPDATE tiktok_shop_video_downloads
+       SET status = 'FAILED', error_message = ?
+       WHERE product_id = ?`,
+      [String(err?.message || 'Erro de conexão com a SocialCrawl'), productId]
+    ).catch(() => {});
+
+    return {
+      success: false,
+      error: 'SOCIALCRAWL_ERROR',
+      message: `Não foi possível preparar este vídeo (${err?.message || 'Falha na SocialCrawl'}).`,
+    };
+  }
 }
 
 export async function searchTikTokShopProducts(params: {

@@ -1,7 +1,8 @@
 import express from 'express';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
-import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, ProductRankingSort } from './productMinerService.js';
+import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, ProductRankingSort } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
+import { db, isDatabaseConfigured } from './database.js';
 
 export const productMinerRouter = express.Router();
 
@@ -137,6 +138,26 @@ productMinerRouter.get('/collector/categories', async (req, res) => {
 productMinerRouter.post('/generate-script', async (req, res) => {
   if (!requireProductMinerAccess(req, res)) return;
   try {
+    const userRole = getRequesterType(req);
+    const rawCode = req.body.studentCode || req.header('x-access-code') || req.header('x-student-access-code') || '';
+    const studentCode = normalizeAccessCode(rawCode) || 'STUDENT';
+
+    if (userRole === 'STUDENT' && isDatabaseConfigured()) {
+      const [rows]: any = await db.query(
+        `SELECT COUNT(*) as cnt FROM product_miner_script_logs
+         WHERE student_code = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+        [studentCode]
+      );
+      const count = Number(Array.isArray(rows) ? rows[0]?.cnt || 0 : 0);
+      if (count >= 20) {
+        return res.json({
+          success: false,
+          error: 'DAILY_LIMIT_EXCEEDED',
+          script: 'Você atingiu o limite diário de gerações de roteiro. Tente novamente mais tarde.',
+        });
+      }
+    }
+
     const { product, scriptType = 'roteiro_completo', customPrompt, variantSeed } = req.body || {};
     if (!product || !product.title) {
       return res.status(400).json({ error: 'PRODUCT_DATA_REQUIRED' });
@@ -214,6 +235,10 @@ DIRETRIZES OBRIGATÓRIAS:
 - Sem promessas falsas ou características inventadas.
 - Formato Markdown bem estruturado, limpo e legível.`;
 
+    if (userRole === 'STUDENT' && isDatabaseConfigured()) {
+      await db.query(`INSERT INTO product_miner_script_logs (student_code) VALUES (?)`, [studentCode]).catch(() => {});
+    }
+
     try {
       const ai = getGeminiClient();
       const response = await ai.models.generateContent({
@@ -248,6 +273,92 @@ Mostre o produto em uso close-up. Destaque a alta avaliação de ${product.ratin
   } catch (error: any) {
     console.error('[Product Miner Script Route Error]:', error?.message || error);
     return res.status(500).json({ error: 'GENERATE_SCRIPT_ERROR' });
+  }
+});
+
+// Video Download Preparation (Mentor Only)
+productMinerRouter.post('/videos/prepare-download', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const { productId } = req.body || {};
+    if (!productId) {
+      return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto é obrigatório.' });
+    }
+
+    const result = await prepareVideoDownload(String(productId));
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    return res.json(result);
+  } catch (error: any) {
+    console.error('[Prepare Video Download Route Error]:', error?.message || error);
+    return res.status(500).json({
+      success: false,
+      error: 'PREPARE_VIDEO_DOWNLOAD_ERROR',
+      message: 'Ocorreu um erro interno ao preparar o vídeo.',
+    });
+  }
+});
+
+// Video Download Delivery/Proxy (Mentor Only)
+productMinerRouter.get('/videos/:productId/download', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const { productId } = req.params;
+    if (!productId) {
+      return res.status(400).json({ error: 'MISSING_PRODUCT_ID' });
+    }
+
+    if (!isDatabaseConfigured()) {
+      return res.status(503).json({ error: 'DATABASE_NOT_CONFIGURED' });
+    }
+
+    const [rows]: any = await db.query(
+      `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? LIMIT 1`,
+      [productId]
+    );
+
+    const record = Array.isArray(rows) && rows[0];
+    if (!record || record.status !== 'COMPLETED' || !record.direct_media_url) {
+      return res.status(404).json({
+        error: 'VIDEO_NOT_PREPARED',
+        message: 'Download de vídeo ainda não preparado.',
+      });
+    }
+
+    const cdnUrl = String(record.direct_media_url);
+
+    try {
+      const mediaResponse = await fetch(cdnUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      });
+
+      if (mediaResponse.ok && mediaResponse.body) {
+        res.setHeader('Content-Type', mediaResponse.headers.get('content-type') || 'video/mp4');
+        res.setHeader('Content-Disposition', `attachment; filename="tiktok_video_${productId}.mp4"`);
+        const length = mediaResponse.headers.get('content-length');
+        if (length) res.setHeader('Content-Length', length);
+
+        const reader = (mediaResponse.body as any).getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+        }
+        return res.end();
+      }
+    } catch (streamErr) {
+      console.warn('[Video Proxy Stream Warning, falling back to redirect]:', streamErr);
+    }
+
+    // Fallback redirect if streaming fails
+    return res.redirect(302, cdnUrl);
+  } catch (error: any) {
+    console.error('[Product Miner Video Download Route Error]:', error?.message || error);
+    return res.status(500).json({ error: 'VIDEO_DOWNLOAD_ERROR' });
   }
 });
 

@@ -1068,6 +1068,32 @@ export function ensureProductMinerTables(): Promise<void> {
           INDEX idx_tssc_expires (expires_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS tiktok_shop_video_downloads (
+          product_id VARCHAR(128) PRIMARY KEY,
+          video_page_url VARCHAR(500),
+          video_post_id VARCHAR(128),
+          direct_media_url TEXT,
+          media_type VARCHAR(50) DEFAULT 'video',
+          provider VARCHAR(50) DEFAULT 'socialcrawl',
+          provider_cached TINYINT DEFAULT 0,
+          prepared_at DATETIME DEFAULT NULL,
+          status VARCHAR(50) NOT NULL,
+          error_message TEXT DEFAULT NULL,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_tsv_downloads_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS product_miner_script_logs (
+          id BIGINT AUTO_INCREMENT PRIMARY KEY,
+          student_code VARCHAR(100) NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_pmsl_code_time (student_code, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
     })().catch((err: any) => {
       productMinerTablesPromise = null;
       console.warn('[MySQL ensureProductMinerTables Error]:', err?.message || err);
