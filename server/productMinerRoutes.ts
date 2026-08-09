@@ -102,10 +102,16 @@ productMinerRouter.post('/refresh', async (req, res) => {
 productMinerRouter.get('/ranking', async (req, res) => {
   if (!requireProductMinerAccess(req, res)) return;
   try {
-    const requestedSort = String(req.query.sort || 'total');
-    const sort: ProductRankingSort = requestedSort === '24h' || requestedSort === '7d' || requestedSort === 'spiking'
-      ? requestedSort
-      : 'total';
+    const requestedSort = String(req.query.sort || 'opportunities');
+    const sort: ProductRankingSort = (
+      requestedSort === 'opportunities' ||
+      requestedSort === '24h' ||
+      requestedSort === '7d' ||
+      requestedSort === 'spiking' ||
+      requestedSort === 'total'
+    )
+      ? (requestedSort as ProductRankingSort)
+      : 'opportunities';
     const result = await getProductMinerRanking(Number(req.query.limit || 50), sort);
     return res.json({ success: true, ...result });
   } catch (error: any) {

@@ -18,7 +18,7 @@ type SocialCrawlSearchResponse = {
   message?: string;
 };
 
-export type ProductRankingSort = 'total' | '24h' | '7d' | 'spiking';
+export type ProductRankingSort = 'opportunities' | 'total' | '24h' | '7d' | 'spiking';
 
 export type MinedProduct = {
   productId: string;
@@ -35,6 +35,7 @@ export type MinedProduct = {
   growth24hPercent?: number | null;
   growth7dPercent?: number | null;
   trendScore?: number | null;
+  score?: number | null;
   sellerId: string | null;
   sellerName: string | null;
   productUrl: string | null;
@@ -318,9 +319,69 @@ function calculateWindowMetric(currentSold: number, baseline: SnapshotPoint | nu
   return { sales: normalizedSales, growth };
 }
 
+export function calculateScoreGeracaoZPro(product: MinedProduct): number {
+  let score = 0;
+
+  // 1. Growth & Recent Sales (24h/7d) - Max 35 pts
+  if (product.sales24h !== null && product.sales24h !== undefined && product.sales24h > 0) {
+    const sales24Pts = Math.min(20, Math.log10(1 + product.sales24h) * 8);
+    const growth24Pts = Math.min(15, Math.max(0, product.growth24hPercent || 0) / 10);
+    score += (sales24Pts + growth24Pts);
+  } else if (product.sales7d !== null && product.sales7d !== undefined && product.sales7d > 0) {
+    const sales7Pts = Math.min(20, Math.log10(1 + (product.sales7d / 7)) * 8);
+    const growth7Pts = Math.min(15, Math.max(0, product.growth7dPercent || 0) / 15);
+    score += (sales7Pts + growth7Pts);
+  } else if (product.trendScore && product.trendScore > 0) {
+    score += Math.min(30, Math.log10(1 + product.trendScore) * 10);
+  } else if (product.soldCount > 0) {
+    score += Math.min(15, Math.log10(1 + product.soldCount) * 4);
+  }
+
+  // 2. Associated Video Strength & Engagement - Max 30 pts
+  if (product.video) {
+    score += 5; // Base boost for having a video
+    const views = Number(product.video.views || 0);
+    if (views > 0) {
+      score += Math.min(10, Math.log10(1 + views) * 2);
+    }
+
+    const likes = Number(product.video.likes || 0);
+    const comments = Number(product.video.comments || 0);
+    const shares = Number(product.video.shares || 0);
+    const saves = Number(product.video.saves || 0);
+    const engagement = likes + (comments * 2) + (shares * 3) + (saves * 2);
+    if (engagement > 0) {
+      score += Math.min(10, Math.log10(1 + engagement) * 2.5);
+    }
+
+    const followers = Number(product.video.authorFollowers || 0);
+    if (followers > 0) {
+      score += Math.min(5, Math.log10(1 + followers) * 1);
+    }
+  }
+
+  // 3. Total Sales Volume - Max 20 pts
+  if (product.soldCount > 0) {
+    score += Math.min(20, Math.log10(1 + product.soldCount) * 5);
+  }
+
+  // 4. Product Rating - Max 15 pts
+  if (product.rating !== null && product.rating !== undefined && product.rating > 0) {
+    const normRating = Math.min(5, Math.max(0, product.rating));
+    score += (normRating / 5) * 15;
+  } else {
+    score += 7.5; // Neutral rating fallback
+  }
+
+  return Math.min(100, Math.max(0, Math.round(score)));
+}
+
 async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduct[]> {
   if (!isDatabaseConfigured() || products.length === 0) {
-    return products.map((product) => ({ ...product, sales24h: null, sales7d: null, growth24hPercent: null, growth7dPercent: null, trendScore: null }));
+    return products.map((product) => {
+      const baseProduct = { ...product, sales24h: null, sales7d: null, growth24hPercent: null, growth7dPercent: null, trendScore: null };
+      return { ...baseProduct, score: calculateScoreGeracaoZPro(baseProduct) };
+    });
   }
 
   await ensureProductMinerTables();
@@ -356,13 +417,20 @@ async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduc
       ? null
       : Math.round(metric24h.sales * (1 + Math.min(Math.max(metric24h.growth || 0, 0), 300) / 100));
 
-    return {
+    const enrichedProduct: MinedProduct = {
       ...product,
       sales24h: metric24h.sales,
       sales7d: metric7d.sales,
       growth24hPercent: metric24h.growth,
       growth7dPercent: metric7d.growth,
       trendScore,
+    };
+
+    const score = calculateScoreGeracaoZPro(enrichedProduct);
+
+    return {
+      ...enrichedProduct,
+      score,
     };
   });
 }
@@ -546,7 +614,7 @@ export async function refreshMultiPageTikTokShopProducts(params: {
   const region = String(params.region || DEFAULT_REGION).trim().toUpperCase();
 
   // Validate maxProducts (allowed: 30, 90, 150, 300; strictly capped at 300)
-  let rawMax = Number(params.maxProducts || 300);
+  let rawMax = Number(params.maxProducts || 90);
   if (!Number.isFinite(rawMax) || rawMax < 30) rawMax = 30;
   if (rawMax > 300) rawMax = 300;
 
@@ -643,7 +711,7 @@ export function rowToProduct(row: any): MinedProduct {
   };
 }
 
-export async function getProductMinerRanking(limit = 50, sort: ProductRankingSort = 'total'): Promise<{
+export async function getProductMinerRanking(limit = 50, sort: ProductRankingSort = 'opportunities'): Promise<{
   products: MinedProduct[];
   meta: { trackedProducts: number; with24h: number; with7d: number; sort: ProductRankingSort };
 }> {
@@ -663,6 +731,11 @@ export async function getProductMinerRanking(limit = 50, sort: ProductRankingSor
   const enriched = await attachTrendMetrics(baseProducts);
 
   const sorted = [...enriched].sort((a, b) => {
+    if (sort === 'opportunities') {
+      const as = a.score ?? 0;
+      const bs = b.score ?? 0;
+      return bs - as || b.soldCount - a.soldCount;
+    }
     if (sort === '24h') {
       const av = a.sales24h ?? -1;
       const bv = b.sales24h ?? -1;
@@ -681,16 +754,21 @@ export async function getProductMinerRanking(limit = 50, sort: ProductRankingSor
     return b.soldCount - a.soldCount || String(b.lastSeenAt || '').localeCompare(String(a.lastSeenAt || ''));
   });
 
-  const visible = sort === '24h'
-    ? sorted.filter((product) => product.sales24h !== null && product.sales24h !== undefined)
-    : sort === '7d'
-      ? sorted.filter((product) => product.sales7d !== null && product.sales7d !== undefined)
-      : sort === 'spiking'
-        ? sorted.filter((product) => product.trendScore !== null && product.trendScore !== undefined)
-        : sorted;
+  let visible = sorted;
+  if (sort === 'opportunities') {
+    visible = sorted.slice(0, 20); // Limit to TOP 20 for Melhores Oportunidades
+  } else if (sort === '24h') {
+    visible = sorted.filter((product) => product.sales24h !== null && product.sales24h !== undefined).slice(0, safeLimit);
+  } else if (sort === '7d') {
+    visible = sorted.filter((product) => product.sales7d !== null && product.sales7d !== undefined).slice(0, safeLimit);
+  } else if (sort === 'spiking') {
+    visible = sorted.filter((product) => product.trendScore !== null && product.trendScore !== undefined).slice(0, safeLimit);
+  } else {
+    visible = sorted.slice(0, safeLimit);
+  }
 
   return {
-    products: visible.slice(0, safeLimit),
+    products: visible,
     meta: {
       trackedProducts: enriched.length,
       with24h: enriched.filter((product) => product.sales24h !== null && product.sales24h !== undefined).length,
