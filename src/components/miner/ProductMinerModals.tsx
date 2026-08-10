@@ -445,34 +445,19 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
           </div>
         </div>
 
-        {/* Zero-credit note */}
-        <div className="mt-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
-            Análise realizada instantaneamente com dados do MySQL — <strong>0 Créditos Consumidos</strong>.
-          </span>
-        </div>
-
         {/* Modal Actions */}
-        <div className="mt-5 flex gap-2">
+        <div className="mt-5">
           {product.video?.url ? (
             <a
               href={product.video.url}
               target="_blank"
               rel="noreferrer"
-              className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
             >
               <Play className="w-4 h-4 fill-current text-white" />
               Assistir Vídeo no TikTok
             </a>
           ) : null}
-
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold"
-          >
-            Fechar
-          </button>
         </div>
       </div>
     </div>

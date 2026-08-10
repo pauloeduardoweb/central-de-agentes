@@ -2193,7 +2193,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <div className="flex items-center gap-2 text-xs shrink-0">
                 <span className="px-3.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 font-extrabold flex items-center gap-1.5 shadow-sm">
                   <Layers className="w-4 h-4 text-amber-600" />
-                  7 Categorias Oficiais
+                  8 Categorias do Minerador
                 </span>
               </div>
             </div>
@@ -2223,7 +2223,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 }`}
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>🔄 Atualizar Base (Reciclar 7 Categorias)</span>
+                <span>🔄 Atualizar Base (Reciclar 8 Categorias)</span>
               </button>
             </div>
           </div>
@@ -2279,7 +2279,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div>
                     <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-amber-600" /> 2. Selecionar Escopo de Categorias (7 Oficiais)
+                      <Layers className="w-4 h-4 text-amber-600" /> 2. Selecionar Escopo de Categorias (8 Categorias do Minerador)
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Marque as categorias que deseja expandir ou abra o menu de subcategorias para direcionar o foco
@@ -2293,7 +2293,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   >
                     {selectedExpansionCategories.length === CATEGORY_CONFIG.length
                       ? 'Desmarcar Todas'
-                      : 'Selecionar Todas (7)'}
+                      : 'Selecionar Todas (8)'}
                   </button>
                 </div>
 
@@ -2479,13 +2479,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   <div>
                     <div className="flex items-center gap-2 text-amber-700 text-xs font-black uppercase tracking-wider">
                       <RefreshCw className={`w-4 h-4 text-amber-600 ${isDailyRefreshing ? 'animate-spin' : ''}`} />
-                      Atualização Diária da Base • 7 Categorias
+                      Atualização Diária da Base • 8 Categorias
                     </div>
                     <h3 className="mt-1 text-lg font-black text-slate-900">
                       Atualizar Todas as Categorias em Sequência
                     </h3>
                     <p className="mt-1 text-xs text-slate-600 max-w-2xl">
-                      Varre e recicla as 7 categorias oficiais do TikTok Shop em lote (Moda, Itens para Casa, Eletrônicos, Beleza e Cuidados Pessoais, Esportes e Lazer, Brinquedos e Pets, Health), mantendo ranking, score e ordenações atualizados.
+                      Varre e recicla as 8 categorias do Minerador no TikTok Shop em lote (Moda, Itens para Casa, Eletrônicos, Beleza e Cuidados Pessoais, Esportes e Lazer, Brinquedos e Pets, Health, Infantil), mantendo ranking, score e ordenações atualizados.
                     </p>
                   </div>
 
@@ -2504,7 +2504,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     {isDailyRefreshing ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Atualizando base ({dailyStatus?.categoriesProcessed ?? 0}/7)...</span>
+                        <span>Atualizando base ({dailyStatus?.categoriesProcessed ?? 0}/8)...</span>
                       </>
                     ) : dailyStatus?.isCooldownActive ? (
                       <>
@@ -2514,7 +2514,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     ) : (
                       <>
                         <RefreshCw className="w-4 h-4" />
-                        <span>🔄 Atualizar 7 Categorias Diárias (~70 créditos)</span>
+                        <span>🔄 Atualizar 8 Categorias Diárias (~80 créditos)</span>
                       </>
                     )}
                   </button>
@@ -2533,7 +2533,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3">
                     <div className="text-[11px] text-slate-500">Categorias processadas</div>
                     <div className="font-extrabold text-amber-700 mt-0.5">
-                      {dailyStatus ? `${dailyStatus.categoriesProcessed} / ${dailyStatus.totalCategories}` : '0 / 7'}
+                      {dailyStatus ? `${dailyStatus.categoriesProcessed} / ${dailyStatus.totalCategories}` : '0 / 8'}
                     </div>
                   </div>
 
@@ -2594,7 +2594,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
                 <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-amber-600" /> Status e Cobertura por Categoria (7 Categorias Oficiais)
+                  <BarChart3 className="w-4 h-4 text-amber-600" /> Status e Cobertura por Categoria (8 Categorias do Minerador)
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Acompanhe a distribuição de produtos e subcategorias armazenadas no banco
