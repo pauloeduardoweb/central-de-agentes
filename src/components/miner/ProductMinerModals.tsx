@@ -42,22 +42,6 @@ function getOfficialProductUrl(product: { productUrl?: string | null; productId?
   if (!product) return null;
 
   const rawUrl = product.productUrl ? String(product.productUrl).trim() : '';
-  const cleanId = product.productId ? String(product.productId).trim() : '';
-
-  if (cleanId.length > 0 && /^[a-zA-Z0-9_-]+$/.test(cleanId)) {
-    if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
-      const isSearchUrl = rawUrl.includes('/search') ||
-                          rawUrl.includes('/query') ||
-                          rawUrl.includes('/store/search') ||
-                          rawUrl.includes('q=') ||
-                          rawUrl.includes('search_id=') ||
-                          rawUrl.includes('keyword=');
-      if (!isSearchUrl && (rawUrl.includes(`/product/${cleanId}`) || rawUrl.includes('/view/product/'))) {
-        return rawUrl;
-      }
-    }
-    return `https://shop.tiktok.com/view/product/${cleanId}`;
-  }
 
   if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
     const isSearchUrl = rawUrl.includes('/search') ||
