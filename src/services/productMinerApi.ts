@@ -29,7 +29,6 @@ export interface ProductMinerProduct {
   growth24hPercent?: number | null;
   growth7dPercent?: number | null;
   trendScore?: number | null;
-  score?: number | null;
   sellerId: string | null;
   sellerName: string | null;
   productUrl: string | null;
@@ -164,11 +163,20 @@ export async function refreshProducts(
   return data as CollectorRefreshResponse;
 }
 
+export interface CollectorSubcategoryStat {
+  subcategory: string;
+  productCount: number;
+  isLowBase: boolean;
+}
+
 export interface CollectorCategoryStat {
   category: string;
   productCount: number;
   lastCollectedAt: string | null;
   status: 'Ativa' | 'Pendente';
+  subcategories?: CollectorSubcategoryStat[];
+  coverageCount?: number;
+  totalSubcategories?: number;
 }
 
 export async function fetchCollectorCategories(studentCode: string): Promise<CollectorCategoryStat[]> {
