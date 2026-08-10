@@ -44,23 +44,31 @@ function getOfficialProductUrl(product: { productUrl?: string | null; productId?
   const rawUrl = product.productUrl ? String(product.productUrl).trim() : '';
   const cleanId = product.productId ? String(product.productId).trim() : '';
 
-  const isSearchUrl = Boolean(
-    rawUrl && (
-      rawUrl.includes('/search') ||
-      rawUrl.includes('/query') ||
-      rawUrl.includes('/store/search') ||
-      rawUrl.includes('q=') ||
-      rawUrl.includes('search_id=') ||
-      rawUrl.includes('keyword=')
-    )
-  );
-
-  if (rawUrl && !isSearchUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
-    return rawUrl;
+  if (cleanId.length > 0 && /^[a-zA-Z0-9_-]+$/.test(cleanId)) {
+    if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
+      const isSearchUrl = rawUrl.includes('/search') ||
+                          rawUrl.includes('/query') ||
+                          rawUrl.includes('/store/search') ||
+                          rawUrl.includes('q=') ||
+                          rawUrl.includes('search_id=') ||
+                          rawUrl.includes('keyword=');
+      if (!isSearchUrl && (rawUrl.includes(`/product/${cleanId}`) || rawUrl.includes('/view/product/'))) {
+        return rawUrl;
+      }
+    }
+    return `https://shop.tiktok.com/view/product/${cleanId}`;
   }
 
-  if (cleanId.length > 0 && /^[a-zA-Z0-9_-]+$/.test(cleanId)) {
-    return `https://shop.tiktok.com/view/product/${cleanId}`;
+  if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
+    const isSearchUrl = rawUrl.includes('/search') ||
+                        rawUrl.includes('/query') ||
+                        rawUrl.includes('/store/search') ||
+                        rawUrl.includes('q=') ||
+                        rawUrl.includes('search_id=') ||
+                        rawUrl.includes('keyword=');
+    if (!isSearchUrl) {
+      return rawUrl;
+    }
   }
 
   return null;
@@ -685,7 +693,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   rel="noreferrer"
                   className="sm:hidden w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
                 >
-                  Pesquisar este produto no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
+                  Abrir este produto no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               ) : null}
 
