@@ -2407,8 +2407,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     const isDrawerOpen = Boolean(openCategoryDrawers[catConfig.filterKey]);
                     const selectedSubs = selectedSubcategoriesMap[catConfig.filterKey] || [];
                     const stat = collectorCategories.find((c) => c.category === catConfig.filterKey);
-                    const productCount = stat?.productCount ?? 0;
-                    const coverageCount = stat?.coverageCount ?? 0;
+                    const subtotalFromSubs = stat?.subcategories?.reduce((acc, s) => acc + (s.productCount || 0), 0) || 0;
+                    const productCount = Math.max(stat?.productCount ?? 0, subtotalFromSubs);
+                    const activeSubCount = stat?.subcategories?.filter((s) => (s.productCount || 0) > 0).length || 0;
+                    const coverageCount = Math.max(stat?.coverageCount ?? 0, activeSubCount);
                     const isActive = productCount > 0 || stat?.status === 'Ativa';
 
                     return (
