@@ -456,6 +456,7 @@ function matchesSubcategoryFilter(
 const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive: boolean }> = ({ item, isActive }) => {
   const [imgError, setImgError] = useState(false);
   const hasValidImage = Boolean(item.imgUrl) && !imgError;
+  const isNewIcon = ['highest_commission', 'sales_24h', 'spiking', 'viral_video', 'score_geraz'].includes(item.id);
 
   if (hasValidImage) {
     return (
@@ -470,7 +471,7 @@ const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive
           src={item.imgUrl}
           alt={item.label}
           onError={() => setImgError(true)}
-          className="w-full h-full object-cover"
+          className={`w-full h-full object-cover transition-transform ${isNewIcon ? 'scale-[1.32]' : ''}`}
         />
       </div>
     );
@@ -1509,12 +1510,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+          <span className="text-xs sm:text-sm md:text-base font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
             Classificações de Produtos
-          </span>
-          <span className="text-[10px] font-bold text-slate-400">
-            10 inteligências
           </span>
         </div>
 
@@ -1542,7 +1540,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 >
                   <ClassificationIconComponent item={c} isActive={isActive} />
                   <span
-                    className={`text-[11px] font-bold text-center mt-1.5 leading-tight max-w-[84px] transition-colors ${
+                    className={`text-[11px] sm:text-xs md:text-sm font-bold text-center mt-1.5 leading-tight max-w-[84px] sm:max-w-[92px] md:max-w-[100px] transition-colors ${
                       isActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
                     }`}
                   >
@@ -1560,7 +1558,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-sm">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-600">Categorias:</span>
+          <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">Categorias:</span>
           {selectedCategory && selectedCategory !== 'Todos' ? (
             <button
               type="button"
@@ -1568,7 +1566,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 setSelectedCategory('Todos');
                 setSelectedSubcategory('Todas');
               }}
-              className="text-[10px] font-bold text-rose-600 hover:underline"
+              className="text-[10px] sm:text-xs font-bold text-rose-600 hover:underline"
             >
               Limpar filtro
             </button>
@@ -1600,7 +1598,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       setSelectedSubcategory('Todas');
                     }
                   }}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all whitespace-nowrap ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap ${
                     isActive
                       ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
                       : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-200/80'
@@ -1617,14 +1615,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         {activeCategoryConfig ? (
           <div className="pt-2 border-t border-slate-100 space-y-1.5 animate-fade-in">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <span className="text-[10px] sm:text-xs md:text-xs font-bold uppercase tracking-wider text-slate-500">
                 Subcategorias de <span className="font-black text-slate-800">{activeCategoryConfig.label}</span>:
               </span>
               {selectedSubcategory && selectedSubcategory !== 'Todas' ? (
                 <button
                   type="button"
                   onClick={() => setSelectedSubcategory('Todas')}
-                  className="text-[10px] font-bold text-amber-700 hover:underline"
+                  className="text-[10px] sm:text-xs font-bold text-amber-700 hover:underline"
                 >
                   Ver todas de {activeCategoryConfig.label}
                 </button>
@@ -1658,7 +1656,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         key={subcat}
                         type="button"
                         onClick={() => setSelectedSubcategory(subcat)}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold shrink-0 border transition-all whitespace-nowrap ${
+                        className={`px-3 py-1 rounded-lg text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap ${
                           isSubActive
                             ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
                             : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
@@ -1692,7 +1690,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         <div className="inline-flex p-1 rounded-xl border border-slate-200 bg-white shadow-sm self-start flex-wrap gap-1">
           <button
             onClick={() => setMode('search')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
               mode === 'search'
                 ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
                 : 'text-slate-600 hover:text-slate-900'
@@ -1704,7 +1702,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           <button
             onClick={() => setMode('ranking')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
               mode === 'ranking'
                 ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
                 : 'text-slate-600 hover:text-slate-900'
@@ -1717,7 +1715,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           {canRefresh ? (
             <button
               onClick={() => setMode('collector')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
                 mode === 'collector'
                   ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
                   : 'text-slate-600 hover:text-slate-900'
@@ -1730,7 +1728,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           <button
             onClick={() => setMode('favorites')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
               mode === 'favorites'
                 ? 'bg-rose-500/15 text-rose-800 font-black border border-rose-300/60'
                 : 'text-slate-600 hover:text-slate-900'
@@ -1751,7 +1749,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           <button
             type="button"
             onClick={() => setShowAdvancedFilters((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
               showAdvancedFilters || activeFilterCount > 0
                 ? 'border-amber-400 bg-amber-50 text-amber-800'
                 : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900'
@@ -1766,12 +1764,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             ) : null}
             {showAdvancedFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
-
-          {credits && mode === 'search' ? (
-            <span className="text-[11px] text-slate-500 hidden md:inline">
-              {credits.source === 'provider' ? `${credits.used} crédito` : '0 crédito'}
-            </span>
-          ) : null}
         </div>
       </div>
 
