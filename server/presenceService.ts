@@ -333,6 +333,9 @@ export interface KeyStatusInfo {
   reactivatedBy?: string;
   lastAdminAction?: string;
   lastAdminActionAt?: string;
+  productMinerEnabled?: boolean;
+  productMinerEnabledAt?: string | null;
+  productMinerEnabledBy?: string | null;
   usado?: boolean | number;
 }
 
@@ -344,7 +347,7 @@ export interface AuditLogEntry {
   id: number;
   targetAccessKeyId?: number;
   targetMaskedKey: string;
-  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK';
+  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK' | 'ACTIVATED_MINER' | 'DEACTIVATED_MINER';
   reason?: string;
   adminIdentifier: string;
   ipAddress: string;
@@ -424,7 +427,7 @@ loadKeyStatusStore();
 
 export async function recordAdminAuditAction(
   targetKey: string,
-  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK',
+  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK' | 'ACTIVATED_MINER' | 'DEACTIVATED_MINER',
   reason?: string,
   ipAddress?: string
 ): Promise<void> {
@@ -1219,8 +1222,8 @@ export async function getCentralPresenceData() {
         }
       }
 
-      // Also query suspended and banned keys from codigos_acesso so they appear in Suspensos/Banidos tabs
-      const [blockedRows]: any = await db.query(`
+      // Also query all keys from codigos_acesso so keys without active sessions appear as administrative rows
+      const [allKeyRows]: any = await db.query(`
         SELECT
           ca.id AS key_id,
           ca.codigo,
@@ -1248,11 +1251,10 @@ export async function getCentralPresenceData() {
         FROM codigos_acesso ca
         LEFT JOIN sessoes s ON ca.codigo = s.codigo
         LEFT JOIN perfis_alunos pf ON ca.codigo = pf.codigo
-        WHERE ca.access_status IN ('SUSPENDED', 'BANNED')
       `);
 
-      if (Array.isArray(blockedRows)) {
-        for (const r of blockedRows) {
+      if (Array.isArray(allKeyRows)) {
+        for (const r of allKeyRows) {
           if (!r.codigo || isMasterKey(r.codigo)) continue;
           const normCode = normalizeAccessCode(r.codigo);
           if (usersMapByCode.has(normCode)) {
@@ -1264,12 +1266,17 @@ export async function getCentralPresenceData() {
             existing.bannedReason = r.banned_reason || existing.bannedReason;
             existing.bannedAt = r.banned_at ? new Date(r.banned_at).toISOString() : existing.bannedAt;
             existing.bannedBy = r.banned_by || existing.bannedBy;
+            existing.reactivatedAt = r.reactivated_at ? new Date(r.reactivated_at).toISOString() : existing.reactivatedAt;
+            existing.reactivatedBy = r.reactivated_by || existing.reactivatedBy;
+            existing.lastAdminAction = r.last_admin_action || existing.lastAdminAction;
+            existing.lastAdminActionAt = r.last_admin_action_at ? new Date(r.last_admin_action_at).toISOString() : existing.lastAdminActionAt;
+            if (r.key_id && !existing.accessKeyId) existing.accessKeyId = Number(r.key_id);
           } else {
             const accStat = (r.access_status || 'ACTIVE').toUpperCase();
             const { deviceType, operatingSystem, browserName } = parseUserAgent(r.user_agent);
             const devStr = r.device_type && r.browser_name
               ? `${r.operating_system || operatingSystem} • ${r.browser_name || browserName}`
-              : `${operatingSystem} • ${browserName}`;
+              : (r.operating_system || r.browser_name ? `${operatingSystem} • ${browserName}` : '—');
 
             usersMapByCode.set(normCode, {
               accessKeyId: r.key_id ? Number(r.key_id) : null,
@@ -1293,15 +1300,19 @@ export async function getCentralPresenceData() {
               reactivatedBy: r.reactivated_by || null,
               lastAdminAction: r.last_admin_action || null,
               lastAdminActionAt: r.last_admin_action_at ? new Date(r.last_admin_action_at).toISOString() : null,
-              currentPage: r.current_page || 'Desconectado',
-              deviceType: r.device_type || deviceType,
-              operatingSystem: r.operating_system || operatingSystem,
-              browserName: r.browser_name || browserName,
+              currentPage: accStat === 'SUSPENDED' ? 'Acesso Suspenso' : accStat === 'BANNED' ? 'Acesso Banido' : (r.current_page || 'Sem sessão ativa'),
+              deviceType: r.device_type || deviceType || '—',
+              operatingSystem: r.operating_system || operatingSystem || '—',
+              browserName: r.browser_name || browserName || '—',
               device: devStr,
-              maskedIp: maskIpAddress(r.ip_address),
-              loginAt: new Date().toISOString(),
-              lastActivity: r.last_heartbeat_at ? new Date(r.last_heartbeat_at).toISOString() : new Date().toISOString(),
-              connectedTime: '-',
+              maskedIp: r.ip_address ? maskIpAddress(r.ip_address) : '—',
+              loginAt: null,
+              lastActivity: r.last_heartbeat_at ? new Date(r.last_heartbeat_at).toISOString() : (r.last_admin_action_at ? new Date(r.last_admin_action_at).toISOString() : null),
+              connectedTime: '—',
+              tempoOnlineSeconds: 0,
+              tempoOnlineFormatted: '—',
+              lastActivityFormatted: r.last_heartbeat_at ? formatLastActivity(new Date(r.last_heartbeat_at).getTime()) : (r.last_admin_action_at ? formatLastActivity(new Date(r.last_admin_action_at).getTime()) : '—'),
+              recentAction: accStat === 'SUSPENDED' ? 'Suspenso' : accStat === 'BANNED' ? 'Banido' : (r.last_admin_action === 'DISCONNECT' ? 'Encerrado pelo Mentor' : 'Offline'),
             });
           }
         }
@@ -1357,6 +1368,54 @@ export async function getCentralPresenceData() {
           connectedTime: formatConnectedTime(memSession.startedAt),
         });
       }
+    }
+  }
+
+  // Fallback for static STUDENT_KEYS list to ensure all registered student keys are present
+  for (const rawCode of STUDENT_KEYS) {
+    const normCode = normalizeAccessCode(rawCode);
+    if (!normCode || isMasterKey(normCode)) continue;
+
+    if (!usersMapByCode.has(normCode)) {
+      const memKeyInfo = memoryKeyStatusMap.get(normCode);
+      const accStat = memKeyInfo?.accessStatus || 'ACTIVE';
+
+      usersMapByCode.set(normCode, {
+        accessKeyId: null,
+        sessionRecordId: null,
+        id: normCode,
+        _fullCode: normCode,
+        username: `Aluno ${maskStudentCode(normCode)}`,
+        avatar: null,
+        maskedKey: maskKeyForAdmin(normCode),
+        status: 'Offline',
+        presenceStatus: 'Offline',
+        hasActiveSession: false,
+        accessStatus: accStat,
+        suspensionReason: memKeyInfo?.suspensionReason || null,
+        suspendedAt: memKeyInfo?.suspendedAt || null,
+        suspendedBy: memKeyInfo?.suspendedBy || null,
+        bannedReason: memKeyInfo?.bannedReason || null,
+        bannedAt: memKeyInfo?.bannedAt || null,
+        bannedBy: memKeyInfo?.bannedBy || null,
+        reactivatedAt: memKeyInfo?.reactivatedAt || null,
+        reactivatedBy: memKeyInfo?.reactivatedBy || null,
+        lastAdminAction: memKeyInfo?.lastAdminAction || null,
+        lastAdminActionAt: memKeyInfo?.lastAdminActionAt || null,
+        currentPage: accStat === 'SUSPENDED' ? 'Acesso Suspenso' : accStat === 'BANNED' ? 'Acesso Banido' : 'Sem sessão ativa',
+        deviceType: '—',
+        operatingSystem: '—',
+        browserName: '—',
+        device: '—',
+        maskedIp: '—',
+        loginAt: null,
+        lastActivity: null,
+        connectedTime: '—',
+        tempoOnlineSeconds: 0,
+        tempoOnlineFormatted: '—',
+        lastActivityFormatted: '—',
+        recentAction: accStat === 'SUSPENDED' ? 'Suspenso' : accStat === 'BANNED' ? 'Banido' : 'Offline',
+      });
     }
   }
 
@@ -1925,13 +1984,19 @@ export async function getAdminOnlineUsersHandler(req: express.Request, res: expr
     let usersList = central.users;
 
     if (search) {
+      const rawSearch = search.trim().toLowerCase();
+      const cleanSearch = rawSearch.replace(/[\s-]/g, '');
+
       usersList = usersList.filter((u) => {
-        const codeMatch = u._fullCode && String(u._fullCode).toLowerCase().includes(search);
-        const maskedKeyMatch = u.maskedKey && String(u.maskedKey).toLowerCase().includes(search);
-        const usernameMatch = u.username && String(u.username).toLowerCase().includes(search);
-        const pageMatch = u.currentPage && String(u.currentPage).toLowerCase().includes(search);
-        const deviceMatch = u.device && String(u.device).toLowerCase().includes(search);
-        const ipMatch = u.maskedIp && String(u.maskedIp).toLowerCase().includes(search);
+        const cleanFullCode = (u._fullCode || '').toLowerCase().replace(/[\s-]/g, '');
+
+        const codeMatch = (u._fullCode && String(u._fullCode).toLowerCase().includes(rawSearch)) ||
+                          (cleanFullCode && cleanSearch && cleanFullCode.includes(cleanSearch));
+        const maskedKeyMatch = u.maskedKey && String(u.maskedKey).toLowerCase().includes(rawSearch);
+        const usernameMatch = u.username && String(u.username).toLowerCase().includes(rawSearch);
+        const pageMatch = u.currentPage && String(u.currentPage).toLowerCase().includes(rawSearch);
+        const deviceMatch = u.device && String(u.device).toLowerCase().includes(rawSearch);
+        const ipMatch = u.maskedIp && String(u.maskedIp).toLowerCase().includes(rawSearch);
 
         return codeMatch || maskedKeyMatch || usernameMatch || pageMatch || deviceMatch || ipMatch;
       });
@@ -2207,79 +2272,76 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
       });
     }
 
-    const rawIdParam = req.params.id || req.body?.sessionRecordId || req.body?.id;
-    const sessionRecordId = Number(rawIdParam);
+    const clientIp = getClientIp(req);
+    let targetCode: string | null = null;
+    let targetSessionId: number | null = null;
+
+    // 1. Resolve code/ID from body / params
+    const rawTargetCode = String(
+      req.body?.targetCode ||
+      req.body?.codigo ||
+      req.body?.accessCode ||
+      req.body?._fullCode ||
+      ''
+    ).trim();
+
+    if (rawTargetCode && !rawTargetCode.includes('*')) {
+      targetCode = normalizeAccessCode(rawTargetCode);
+    }
+
+    const rawIdParam = req.params.id || req.body?.sessionRecordId || req.body?.accessKeyId || req.body?.id;
+    const numericId = Number(rawIdParam);
 
     if (isDatabaseConfigured()) {
       await ensureSessionsTable();
       await ensureCodigosAcessoTable();
 
-      let targetRow: any = null;
-
-      if (!isNaN(sessionRecordId) && sessionRecordId > 0) {
-        const [rows]: any = await db.query(
-          `SELECT id, codigo, active_session_id, expires_at, logout_at FROM sessoes WHERE id = ? LIMIT 1`,
-          [sessionRecordId]
+      // If targetCode not yet found, try numeric ID
+      if (!targetCode && !isNaN(numericId) && numericId > 0) {
+        // First check if numericId matches a session ID
+        const [sessRows]: any = await db.query(
+          `SELECT id, codigo FROM sessoes WHERE id = ? LIMIT 1`,
+          [numericId]
         );
-        if (Array.isArray(rows) && rows.length > 0) {
-          targetRow = rows[0];
-        }
-      }
-
-      if (!targetRow) {
-        const rawCode = String(req.body?.targetCode || req.body?.codigo || req.params.id || '').trim();
-        if (rawCode && !rawCode.includes('*')) {
-          const normCode = normalizeAccessCode(rawCode);
-          const [rows]: any = await db.query(
-            `SELECT id, codigo, active_session_id, expires_at, logout_at FROM sessoes WHERE codigo = ? LIMIT 1`,
-            [normCode]
+        if (Array.isArray(sessRows) && sessRows.length > 0) {
+          targetCode = normalizeAccessCode(sessRows[0].codigo);
+          targetSessionId = Number(sessRows[0].id);
+        } else {
+          // Check if numericId matches a key ID in codigos_acesso
+          const [keyRows]: any = await db.query(
+            `SELECT id, codigo FROM codigos_acesso WHERE id = ? LIMIT 1`,
+            [numericId]
           );
-          if (Array.isArray(rows) && rows.length > 0) {
-            targetRow = rows[0];
+          if (Array.isArray(keyRows) && keyRows.length > 0) {
+            targetCode = normalizeAccessCode(keyRows[0].codigo);
           }
         }
       }
 
-      if (!targetRow) {
-        return res.status(404).json({
-          success: false,
-          error: 'SESSION_NOT_FOUND',
-          message: 'Sessão não encontrada.',
-        });
-      }
-
-      if (!targetRow.active_session_id) {
-        // Check if there is an active session row for the same codigo
-        const [activeRows]: any = await db.query(
-          `SELECT id, codigo, active_session_id, expires_at, logout_at FROM sessoes WHERE codigo = ? AND active_session_id IS NOT NULL ORDER BY last_heartbeat_at DESC LIMIT 1`,
-          [targetRow.codigo]
-        );
-        if (Array.isArray(activeRows) && activeRows.length > 0) {
-          targetRow = activeRows[0];
-        } else {
-          return res.status(409).json({
-            success: false,
-            error: 'SESSION_NOT_ACTIVE',
-            message: 'Esta sessão já está encerrada.',
-          });
+      // Fallback: if rawIdParam is a string code
+      if (!targetCode && typeof req.params.id === 'string' && req.params.id.trim()) {
+        const rawParamCode = req.params.id.trim();
+        if (!rawParamCode.includes('*')) {
+          targetCode = normalizeAccessCode(rawParamCode);
         }
       }
 
-      if (isMasterKey(targetRow.codigo)) {
+      if (!targetCode) {
+        return res.status(400).json({
+          success: false,
+          error: 'INVALID_TARGET',
+          message: 'Chave de acesso não identificada para desconexão.',
+        });
+      }
+
+      if (isMasterKey(targetCode)) {
         return res.status(403).json({
           error: 'MASTER_KEY_PROTECTED',
           message: 'Ações administrativas sobre chaves mestras são estritamente proibidas.',
         });
       }
 
-      console.log('[DISCONNECT TARGET]', {
-        sessionRecordId: targetRow.id,
-        codigo: targetRow.codigo,
-        activeSessionIdBefore: targetRow.active_session_id,
-      });
-
-      const clientIp = getClientIp(req);
-
+      // Close ALL sessions for targetCode in sessoes
       const [updateRes]: any = await db.query(
         `UPDATE sessoes
          SET
@@ -2291,67 +2353,35 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
            disconnected_at = NOW(),
            disconnect_source = 'MENTOR_SINGLE',
            updated_at = NOW()
-         WHERE id = ?
-           AND active_session_id IS NOT NULL`,
-        [targetRow.id]
+         WHERE codigo = ?`,
+        [targetCode]
       );
 
       const affectedRows = updateRes && typeof updateRes.affectedRows === 'number' ? updateRes.affectedRows : 0;
 
-      if (affectedRows < 1) {
-        return res.status(409).json({
-          success: false,
-          error: 'SESSION_NOT_ACTIVE',
-          message: 'Esta sessão já está encerrada.',
-        });
-      }
-
+      // Mark last_admin_action in codigos_acesso
       await db.query(
         `UPDATE codigos_acesso
          SET
            last_admin_action = 'DISCONNECT',
            last_admin_action_at = NOW()
          WHERE codigo = ?`,
-        [targetRow.codigo]
+        [targetCode]
       );
 
-      memorySessionsMap.delete(targetRow.codigo);
+      memorySessionsMap.delete(targetCode);
 
-      // Verify DB disconnect result
-      const [checkRows]: any = await db.query(
-        `SELECT id, codigo, active_session_id, disconnect_source, disconnected_at, logout_at FROM sessoes WHERE id = ? LIMIT 1`,
-        [targetRow.id]
-      );
-      const rowAfter = (Array.isArray(checkRows) && checkRows.length > 0) ? checkRows[0] : null;
-      const activeSessionIdAfter = rowAfter?.active_session_id ?? null;
-      const disconnectSourceAfter = rowAfter?.disconnect_source ?? null;
-      const disconnectedAtAfter = rowAfter?.disconnected_at ? new Date(rowAfter.disconnected_at).toISOString() : null;
-
-      console.log('[DISCONNECT RESULT]', {
-        affectedRows,
-        activeSessionIdAfter,
-        disconnectSourceAfter,
-        disconnectedAtAfter,
-      });
-
-      if (activeSessionIdAfter !== null || disconnectSourceAfter !== 'MENTOR_SINGLE' || !disconnectedAtAfter) {
-        return res.status(500).json({
-          success: false,
-          presenceVersion: PRESENCE_VERSION,
-          error: 'DISCONNECT_FAILED',
-          message: 'Falha ao validar o encerramento da sessão no banco de dados.',
-          activeSessionIdAfter,
-          disconnectSourceAfter,
-          disconnectedAtAfter,
-        });
-      }
-
-      // Record audit log safely without allowing audit errors to rollback disconnection
+      // Record audit log and history safely
       try {
-        await recordAdminAuditAction(targetRow.codigo, 'DISCONNECT', 'Desconexão administrativa efetuada pelo Mentor', clientIp);
+        await recordAdminAuditAction(
+          targetCode,
+          'DISCONNECT',
+          `Desconexão administrativa efetuada pelo Mentor (${affectedRows} sessão(ões) encerrada(s))`,
+          clientIp
+        );
         await recordSessionHistoryEvent({
-          codigo: targetRow.codigo,
-          sessionId: targetRow.id,
+          codigo: targetCode,
+          sessionId: targetSessionId || 0,
           eventType: 'MENTOR_DISCONNECT',
           ip: clientIp,
           details: 'Login encerrado pelo Mentor',
@@ -2363,26 +2393,30 @@ export async function adminDisconnectSessionHandler(req: express.Request, res: e
       return res.json({
         success: true,
         presenceVersion: PRESENCE_VERSION,
-        disconnectedCount: 1,
+        disconnectedCount: affectedRows > 0 ? affectedRows : 1,
         affectedRows,
-        sessionRecordId: targetRow.id,
+        targetCode,
+        sessionRecordId: targetSessionId,
         activeSessionIdAfter: null,
         disconnectSource: 'MENTOR_SINGLE',
-        message: '1 login encerrado com sucesso.',
+        message: affectedRows > 0
+          ? `${affectedRows} ${affectedRows === 1 ? 'sessão encerrada' : 'sessões encerradas'} com sucesso.`
+          : 'Sessão desconectada com sucesso.',
       });
     }
 
-    // In-memory fallback if DB not configured
-    const rawCode = String(req.body?.targetCode || req.body?.codigo || req.params.id || '').trim();
-    const normCode = normalizeAccessCode(rawCode);
-    if (normCode && memorySessionsMap.has(normCode)) {
-      memorySessionsMap.delete(normCode);
+    // Memory fallback if DB not configured
+    if (!targetCode && typeof req.params.id === 'string') {
+      targetCode = normalizeAccessCode(req.params.id);
+    }
+    if (targetCode) {
+      memorySessionsMap.delete(targetCode);
       return res.json({
         success: true,
         presenceVersion: PRESENCE_VERSION,
         disconnectedCount: 1,
         affectedRows: 1,
-        sessionRecordId: sessionRecordId || 1,
+        targetCode,
         activeSessionIdAfter: null,
         disconnectSource: 'MENTOR_SINGLE',
         message: '1 login encerrado com sucesso.',
