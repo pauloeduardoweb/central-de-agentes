@@ -51,8 +51,7 @@ export type ClassificationType =
   | 'highest_commission'
   | 'sales_24h'
   | 'spiking'
-  | 'viral_video'
-  | 'score_geraz';
+  | 'viral_video';
 
 export interface ClassificationItem {
   id: ClassificationType;
@@ -94,7 +93,7 @@ const CLASSIFICATIONS: ClassificationItem[] = [
     imgUrl: 'https://i.postimg.cc/767qSPKN/coração.jpg',
     fallbackIcon: <Heart className="w-6 h-6 text-rose-500" />,
   },
-  // 6-10: Geração Z Pro Exclusive Intelligence (Individual direct image assets)
+  // 6-9: Geração Z Pro Exclusive Intelligence
   {
     id: 'highest_commission',
     label: 'Maior Comissão',
@@ -118,12 +117,6 @@ const CLASSIFICATIONS: ClassificationItem[] = [
     label: 'Vídeo Viral',
     imgUrl: 'https://i.postimg.cc/H8kGDVkH/videoviral.png',
     fallbackIcon: <Clapperboard className="w-6 h-6 text-amber-500" />,
-  },
-  {
-    id: 'score_geraz',
-    label: 'Score Geração Z Pro',
-    imgUrl: 'https://i.postimg.cc/1V3xhf3m/scoregeracaozpro.png',
-    fallbackIcon: <Gauge className="w-6 h-6 text-amber-500" />,
   },
 ];
 
@@ -483,12 +476,12 @@ function matchesSubcategoryFilter(
 const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive: boolean }> = ({ item, isActive }) => {
   const [imgError, setImgError] = useState(false);
   const hasValidImage = Boolean(item.imgUrl) && !imgError;
-  const isNewIcon = ['highest_commission', 'sales_24h', 'spiking', 'viral_video', 'score_geraz'].includes(item.id);
+  const isNewIcon = ['highest_commission', 'sales_24h', 'spiking', 'viral_video'].includes(item.id);
 
   if (hasValidImage) {
     return (
       <div
-        className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
+        className={`relative w-14 h-14 sm:w-16 sm:h-16 lg:w-16 lg:h-16 xl:w-20 xl:h-20 rounded-full overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
           isActive
             ? 'border-amber-500 bg-gradient-to-br from-amber-400/30 to-orange-400/30 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
             : 'border-slate-200 bg-slate-100 hover:border-slate-300 hover:bg-slate-200/80'
@@ -506,13 +499,13 @@ const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive
 
   return (
     <div
-      className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-full transition-all flex items-center justify-center shrink-0 border-2 ${
+      className={`relative w-14 h-14 sm:w-16 sm:h-16 lg:w-16 lg:h-16 xl:w-20 xl:h-20 rounded-full transition-all flex items-center justify-center shrink-0 border-2 ${
         isActive
           ? 'border-amber-500 bg-slate-900 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
           : 'border-slate-800 bg-slate-900/95 hover:border-amber-500/50 hover:bg-slate-900'
       }`}
     >
-      <div className="text-amber-400 flex items-center justify-center">
+      <div className="text-amber-400 flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6 lg:[&>svg]:w-7 lg:[&>svg]:h-7 xl:[&>svg]:w-8 xl:[&>svg]:h-8">
         {item.fallbackIcon}
       </div>
     </div>
@@ -1345,13 +1338,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         if (vB !== vA) return vB - vA;
         return (b.soldCount || 0) - (a.soldCount || 0);
       });
-    } else if (selectedClassification === 'score_geraz') {
-      copy.sort((a, b) => {
-        const scB = b.score ?? 0;
-        const scA = a.score ?? 0;
-        if (scB !== scA) return scB - scA;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
     }
 
     return copy;
@@ -1551,7 +1537,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   return (
     <section className="space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
       {/* ================================================== */}
-      {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (10 CLASSIFICATIONS)*/}
+      {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (9 CLASSIFICATIONS)  */}
       {/* ================================================== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
@@ -1561,16 +1547,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           </span>
         </div>
 
-        {/* Horizontal scrollable row of classification icons (~4 visible on mobile + scrollable) */}
+        {/* Horizontal scrollable row on mobile/tablet, 9-column full-width grid on desktop */}
         <div
-          className="w-full overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1"
+          className="w-full overflow-x-auto lg:overflow-x-visible overflow-y-hidden scrollbar-none pb-2 pt-1"
           onWheel={(e) => {
             if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
               e.currentTarget.scrollLeft += e.deltaY;
             }
           }}
         >
-          <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 pr-6">
+          <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 pr-6 lg:pr-0 lg:w-full lg:min-w-0 lg:grid lg:grid-cols-9 lg:gap-2 lg:justify-items-center">
             {CLASSIFICATIONS.map((c) => {
               const isActive = selectedClassification === c.id;
               return (
@@ -1581,11 +1567,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     setSelectedClassification(c.id);
                     setPage(1);
                   }}
-                  className="flex flex-col items-center shrink-0 w-[80px] sm:w-[92px] group focus:outline-none"
+                  className="flex flex-col items-center shrink-0 w-[80px] sm:w-[92px] lg:w-full group focus:outline-none"
                 >
                   <ClassificationIconComponent item={c} isActive={isActive} />
                   <span
-                    className={`text-[11px] sm:text-xs md:text-sm font-bold text-center mt-1.5 leading-tight max-w-[84px] sm:max-w-[92px] md:max-w-[100px] transition-colors ${
+                    className={`text-[11px] sm:text-xs lg:text-xs xl:text-sm font-bold text-center mt-1.5 lg:mt-2 leading-tight max-w-[84px] sm:max-w-[92px] lg:max-w-none transition-colors ${
                       isActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
                     }`}
                   >
