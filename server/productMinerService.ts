@@ -117,18 +117,49 @@ function normalizeProduct(item: any): MinedProduct {
     category = item?.category_path || item?.category_name || item?.category || null;
   }
 
-  const commInfo = item?.commission_info || item?.affiliate_info || item?.commission || {};
-  let commRate = parseRating(commInfo?.commission_rate || item?.commission_rate || item?.commission_percent || item?.commission_rate_percent);
+  const commInfo = item?.commission_info || item?.affiliate_info || item?.commission || item?.promotion_info || item?.collaboration_info || item?.creator_commission_info || {};
+  let commRate = parseRating(
+    commInfo?.commission_rate ??
+    commInfo?.commission_percent ??
+    commInfo?.rate ??
+    item?.commission_rate ??
+    item?.commission_percent ??
+    item?.commission_rate_percent ??
+    item?.affiliate_commission_rate ??
+    item?.creator_commission_rate
+  );
   if (commRate !== null && commRate > 0 && commRate <= 1) {
     commRate = Math.round(commRate * 100);
   }
-  let commCents = parsePriceCents(commInfo?.commission_amount || item?.commission_amount || item?.estimated_commission || item?.estimated_commission_cents);
+  let commCents = parsePriceCents(
+    commInfo?.commission_amount ??
+    commInfo?.estimated_commission ??
+    commInfo?.commission ??
+    item?.commission_amount ??
+    item?.estimated_commission ??
+    item?.estimated_commission_cents ??
+    item?.affiliate_commission_amount ??
+    item?.earn_amount ??
+    item?.earnings
+  );
   if (commCents === null && commRate !== null && commRate > 0) {
     const pCents = parsePriceCents(price?.sale_price_decimal);
     if (pCents) {
       commCents = Math.round((pCents * commRate) / 100);
     }
   }
+
+  const resolvedProductUrl = item?.seo_url?.canonical_url
+    ? String(item.seo_url.canonical_url)
+    : item?.product_url
+    ? String(item.product_url)
+    : item?.pdp_url
+    ? String(item.pdp_url)
+    : item?.detail_url
+    ? String(item.detail_url)
+    : item?.product_id
+    ? `https://shop.tiktok.com/view/product/${item.product_id}`
+    : null;
 
   return {
     productId: String(item?.product_id || ''),
@@ -144,7 +175,7 @@ function normalizeProduct(item: any): MinedProduct {
     soldCount: parseInteger(item?.sold_info?.sold_count) || 0,
     sellerId: item?.seller_info?.seller_id ? String(item.seller_info.seller_id) : null,
     sellerName: item?.seller_info?.shop_name ? String(item.seller_info.shop_name) : null,
-    productUrl: item?.seo_url?.canonical_url ? String(item.seo_url.canonical_url) : null,
+    productUrl: resolvedProductUrl,
     category,
     estimatedCommissionCents: commCents && commCents > 0 ? commCents : null,
     commissionRatePercent: commRate && commRate > 0 ? commRate : null,
@@ -985,7 +1016,7 @@ export function rowToProduct(row: any): MinedProduct {
     soldCount: Number(row.sold_count || 0),
     sellerId: row.seller_id,
     sellerName: row.seller_name,
-    productUrl: row.product_url,
+    productUrl: row.product_url || (row.product_id ? `https://shop.tiktok.com/view/product/${row.product_id}` : null),
     category: row.category_path,
     lastSeenAt: row.last_seen_at,
     estimatedCommissionCents: row.estimated_commission_cents === null || row.estimated_commission_cents === undefined ? null : Number(row.estimated_commission_cents),
