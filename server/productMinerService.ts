@@ -705,6 +705,44 @@ export async function prepareVideoDownload(productId: string): Promise<{
   }
 }
 
+function getCategoryWhereClause(query: string): { whereSql: string; params: any[] } {
+  const norm = query.toLowerCase().trim();
+  const like = `%${query}%`;
+
+  if (norm === 'infantil') {
+    return {
+      whereSql: `(
+        LOWER(p.query_source) = 'infantil'
+        OR LOWER(p.category_path) LIKE '%infantil%'
+        OR LOWER(p.category_path) LIKE '%bebe%'
+        OR LOWER(p.category_path) LIKE '%baby%'
+        OR LOWER(p.category_path) LIKE '%kids%'
+        OR LOWER(p.category_path) LIKE '%maternidade%'
+        OR LOWER(p.title) LIKE '%infantil%'
+        OR LOWER(p.title) LIKE '%bebe%'
+        OR LOWER(p.title) LIKE '%bebes%'
+        OR LOWER(p.title) LIKE '%baby%'
+        OR LOWER(p.title) LIKE '%crianca%'
+        OR LOWER(p.title) LIKE '%criancas%'
+        OR LOWER(p.title) LIKE '%recem nascido%'
+        OR LOWER(p.title) LIKE '%maternidade%'
+        OR LOWER(p.title) LIKE '%fralda%'
+        OR LOWER(p.title) LIKE '%mamadeira%'
+        OR LOWER(p.title) LIKE '%chupeta%'
+        OR LOWER(p.title) LIKE '%carrinho de bebe%'
+        OR LOWER(p.title) LIKE '%berco%'
+        OR LOWER(p.title) LIKE '%brinquedo%'
+      )`,
+      params: [],
+    };
+  }
+
+  return {
+    whereSql: `(p.title LIKE ? OR p.seller_name LIKE ? OR p.category_path LIKE ? OR p.query_source LIKE ?)`,
+    params: [like, like, like, like],
+  };
+}
+
 export async function searchTikTokShopProducts(params: {
   query: string;
   page?: number;
@@ -802,11 +840,10 @@ export async function searchTikTokShopProducts(params: {
       const storedNext = await getStoredPayload(query, region, page + 1);
       let localHasMore = Boolean(storedNext);
       if (!localHasMore && isDatabaseConfigured()) {
-        const like = `%${query}%`;
+        const { whereSql, params: sqlParams } = getCategoryWhereClause(query);
         const [countRows]: any = await db.query(
-          `SELECT COUNT(*) as total FROM tiktok_shop_products p
-           WHERE p.title LIKE ? OR p.seller_name LIKE ? OR p.category_path LIKE ? OR p.query_source LIKE ?`,
-          [like, like, like, like]
+          `SELECT COUNT(*) as total FROM tiktok_shop_products p WHERE ${whereSql}`,
+          sqlParams
         );
         const total = Number(Array.isArray(countRows) ? countRows[0]?.total || 0 : 0);
         localHasMore = total > page * 30;
@@ -832,20 +869,18 @@ export async function searchTikTokShopProducts(params: {
       await ensureProductMinerTables();
       const safePageSize = 30;
       const offset = (page - 1) * safePageSize;
-      const like = `%${query}%`;
+      const { whereSql, params: sqlParams } = getCategoryWhereClause(query);
+
       const [rows]: any = await db.query(
         `SELECT p.*
          FROM tiktok_shop_products p
-         WHERE p.title LIKE ?
-            OR p.seller_name LIKE ?
-            OR p.category_path LIKE ?
-            OR p.query_source LIKE ?
+         WHERE ${whereSql}
          ORDER BY
            CASE WHEN LOWER(p.query_source) = LOWER(?) THEN 0 ELSE 1 END,
            p.sold_count DESC,
            p.last_seen_at DESC
          LIMIT ? OFFSET ?`,
-        [like, like, like, like, query, safePageSize + 1, offset]
+        [...sqlParams, query, safePageSize + 1, offset]
       );
       const localRows = Array.isArray(rows) ? rows : [];
       let hasMore = localRows.length > safePageSize;
@@ -856,16 +891,13 @@ export async function searchTikTokShopProducts(params: {
         const [fallbackRows]: any = await db.query(
           `SELECT p.*
            FROM tiktok_shop_products p
-           WHERE p.title LIKE ?
-              OR p.seller_name LIKE ?
-              OR p.category_path LIKE ?
-              OR p.query_source LIKE ?
+           WHERE ${whereSql}
            ORDER BY
              CASE WHEN LOWER(p.query_source) = LOWER(?) THEN 0 ELSE 1 END,
              p.sold_count DESC,
              p.last_seen_at DESC
            LIMIT ? OFFSET 0`,
-          [like, like, like, like, query, safePageSize + 1]
+          [...sqlParams, query, safePageSize + 1]
         );
         const fRows = Array.isArray(fallbackRows) ? fallbackRows : [];
         hasMore = fRows.length > safePageSize;
@@ -903,8 +935,11 @@ export async function searchTikTokShopProducts(params: {
     };
   }
 
+  const isInfantil = query.toLowerCase() === 'infantil';
+  const providerQuery = isInfantil ? 'moda infantil' : query;
+
   const url = new URL(`${SOCIALCRAWL_BASE_URL}/tiktokshop/search`);
-  url.searchParams.set('query', query);
+  url.searchParams.set('query', providerQuery);
   url.searchParams.set('region', region);
   url.searchParams.set('page', String(page));
 
@@ -1000,14 +1035,37 @@ export async function refreshMultiPageTikTokShopProducts(params: {
   let hasMore = true;
   let partialError: string | null = null;
 
+  const INFANTIL_EXPANSION_TERMS = [
+    'moda infantil',
+    'brinquedo infantil',
+    'bebê',
+    'maternidade',
+    'calçado infantil',
+    'roupa infantil',
+    'acessórios infantis',
+    'cuidados para bebê',
+  ];
+
   for (let p = startPage; p <= maxPages; p++) {
     try {
+      const isInfantil = query.toLowerCase() === 'infantil';
+      const actualQuery = isInfantil
+        ? INFANTIL_EXPANSION_TERMS[(p - 1) % INFANTIL_EXPANSION_TERMS.length]
+        : query;
+      const actualPage = isInfantil
+        ? Math.floor((p - 1) / INFANTIL_EXPANSION_TERMS.length) + 1
+        : p;
+
       const res = await searchTikTokShopProducts({
-        query,
-        page: p,
+        query: actualQuery,
+        page: actualPage,
         region,
         forceRefresh: true,
       });
+
+      if (isInfantil && res.products.length > 0) {
+        await persistProducts(res.products, 'Infantil').catch(() => {});
+      }
 
       pagesConsulted++;
       totalCreditsUsed += res.creditsUsed;
@@ -1024,7 +1082,7 @@ export async function refreshMultiPageTikTokShopProducts(params: {
       }
 
       if (!hasMore || res.products.length === 0) {
-        break;
+        if (!isInfantil) break;
       }
     } catch (err: any) {
       console.warn(`[MultiPage Collection Partial Failure on page ${p} for query "${query}"]:`, err?.message || err);
@@ -1212,6 +1270,14 @@ export const OFFICIAL_TIKTOK_TAXONOMY: Record<string, string[]> = {
   'Health': [
     'Health Nutrition',
   ],
+  'Infantil': [
+    'Bebês',
+    'Moda Infantil',
+    'Calçados',
+    'Brinquedos',
+    'Cuidados',
+    'Acessórios',
+  ],
 };
 
 export const COLLECTOR_CATEGORIES = Object.keys(OFFICIAL_TIKTOK_TAXONOMY);
@@ -1306,6 +1372,16 @@ function matchSubcategory(p: { title?: string; category_path?: string; query_sou
     case 'Health Nutrition':
       return text.includes('health') || text.includes('nutrition') || text.includes('suplemento') || text.includes('whey') || text.includes('creatina') || text.includes('vitamina') || text.includes('saúde');
 
+    // Infantil
+    case 'Bebês':
+      return text.includes('bebe') || text.includes('baby') || text.includes('maternidade') || text.includes('recem nascido') || text.includes('fralda') || text.includes('mamadeira') || text.includes('chupeta') || text.includes('berco') || text.includes('carrinho de bebe') || text.includes('ninho');
+    case 'Moda Infantil':
+      return text.includes('moda infantil') || text.includes('roupa infantil') || text.includes('vestido infantil') || text.includes('conjunto infantil') || text.includes('pijama infantil') || text.includes('camisa infantil') || text.includes('macacao') || text.includes('body') || text.includes('pijama bebe') || text.includes('romper');
+    case 'Brinquedos':
+      return text.includes('brinquedo') || text.includes('jogos') || text.includes('boneca') || text.includes('carrinho') || text.includes('pelucia') || text.includes('lego') || text.includes('mordedor') || text.includes('chocalho');
+    case 'Cuidados':
+      return text.includes('cuidado') || text.includes('higiene') || text.includes('banho') || text.includes('sabonete') || text.includes('shampoo bebe') || text.includes('pomada') || text.includes('lenco umedecido') || text.includes('termometro');
+
     default: {
       const norm = subName.toLowerCase().replace(/^(cuidados|produtos|artigos|itens|suprimentos)\s*(com\s*o?|para)?\s*/i, '');
       return path.includes(norm) || title.includes(norm) || query.includes(norm);
@@ -1369,10 +1445,39 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
           return query.includes('esporte') || query.includes('fitness') || path.includes('esporte') || path.includes('fitness') || path.includes('lazer') || title.includes('treino') || title.includes('academia');
         }
         if (cat === 'Brinquedos e Pets') {
-          return query.includes('pet') || query.includes('bebe') || path.includes('pet') || path.includes('brinquedo') || path.includes('bebe') || title.includes('racao') || title.includes('infantil');
+          return query.includes('pet') || path.includes('pet') || title.includes('racao') || title.includes('coleira');
         }
         if (cat === 'Health') {
           return query.includes('health') || path.includes('health') || path.includes('saude') || path.includes('suplemento') || title.includes('vitamina') || title.includes('whey');
+        }
+        if (cat === 'Infantil') {
+          return (
+            query.includes('infantil') ||
+            query.includes('bebe') ||
+            query.includes('baby') ||
+            query.includes('kids') ||
+            query.includes('crianca') ||
+            path.includes('infantil') ||
+            path.includes('bebe') ||
+            path.includes('baby') ||
+            path.includes('kids') ||
+            path.includes('crianca') ||
+            path.includes('maternidade') ||
+            title.includes('infantil') ||
+            title.includes('bebe') ||
+            title.includes('bebes') ||
+            title.includes('baby') ||
+            title.includes('crianca') ||
+            title.includes('criancas') ||
+            title.includes('recem nascido') ||
+            title.includes('maternidade') ||
+            title.includes('fralda') ||
+            title.includes('mamadeira') ||
+            title.includes('chupeta') ||
+            title.includes('carrinho de bebe') ||
+            title.includes('berco') ||
+            title.includes('brinquedo')
+          );
         }
         return path.includes(cat.toLowerCase()) || query.includes(cat.toLowerCase());
       });
