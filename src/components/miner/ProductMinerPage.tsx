@@ -1722,20 +1722,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             Pesquisa
           </button>
 
-          {canRefresh ? (
-            <button
-              onClick={() => setMode('collector')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
-                mode === 'collector'
-                  ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5 text-amber-600" />
-              Adquirir Produtos
-            </button>
-          ) : null}
-
           <button
             onClick={() => setMode('favorites')}
             className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
@@ -1752,6 +1738,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </span>
             )}
           </button>
+
+          {canRefresh ? (
+            <button
+              onClick={() => setMode('collector')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
+                mode === 'collector'
+                  ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-600" />
+              Adquirir Produtos
+            </button>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">
