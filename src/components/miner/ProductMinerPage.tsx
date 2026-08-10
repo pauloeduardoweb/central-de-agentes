@@ -2492,7 +2492,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                             <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
                               {catConfig.subcategories.map((subName) => {
                                 const isSubChecked = selectedSubs.includes(subName);
-                                const subStat = stat?.subcategories?.find((s) => s.name === subName);
+                                const subStat = stat?.subcategories?.find((s) => s.subcategory === subName || (s as any).name === subName);
                                 const count = subStat?.productCount ?? 0;
 
                                 return (
