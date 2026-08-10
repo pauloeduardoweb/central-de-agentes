@@ -1603,7 +1603,7 @@ export function classifyProductToCategoryAndSubcategory(product: {
 
   const has = (...terms: string[]) => terms.some((t) => text.includes(removeAccents(t)));
 
-  // 1. INFANTIL (EXPLICIT KIDS EVIDENCE REQUIRED)
+  // 1. INFANTIL (EXPLICIT KIDS EVIDENCE REQUIRED + ADULT EXCLUSION LAYER)
   // Strip synthesized category prefixes ("Infantil > ...", "Infantil") and query_source ("Infantil")
   // to avoid self-reinforcing classification loops on already-tagged items.
   const cleanCatPath = (product.category_path || '')
@@ -1611,28 +1611,42 @@ export function classifyProductToCategoryAndSubcategory(product: {
     .replace(/^Infantil$/i, '');
   const cleanQuerySource = (product.query_source || '').toLowerCase() === 'infantil' ? '' : (product.query_source || '');
 
-  const textForKids = removeAccents(`${product.title || ''} ${cleanCatPath} ${cleanQuerySource} ${product.seller_name || ''}`);
+  const textForKidsRaw = removeAccents(`${product.title || ''} ${cleanCatPath} ${cleanQuerySource} ${product.seller_name || ''}`);
 
-  const kidsRegex = /\b(infantil|infantis|crianca|criancas|kids|kid|menino|meninos|menina|meninas|bebe|bebes|baby|babies|juvenil|juvenis|recem nascido|recem-nascido|recem nascidos|recem-nascidos|toddler|toddlers|maternidade|fralda|fraldas|mamadeira|mamadeiras|chupeta|chupetas|berco|bercos|chocalho|chocalhos|mordedor|mordedores|ninho bebe|carrinho de bebe)\b/i;
+  // Step 1: Adult / Negative terms check (Higher priority than any child evidence)
+  const adultTermsRegex = /\b(adulto|adulta|adultos|adultas|mulher|mulheres|homem|homens)\b/i;
+  const isAdultProduct = adultTermsRegex.test(textForKidsRaw);
 
-  if (kidsRegex.test(textForKids)) {
-    const testKidsMatch = (pattern: RegExp) => pattern.test(textForKids);
+  if (!isAdultProduct) {
+    // Step 2: Remove false positive adult expressions ("baby doll", "babydoll", "baby look", "babylook") before checking baby keywords
+    const sanitizedTextForKids = textForKidsRaw
+      .replace(/\bbaby[\s-]*dolls?\b/gi, '')
+      .replace(/\bbabydolls?\b/gi, '')
+      .replace(/\bbaby[\s-]*looks?\b/gi, '')
+      .replace(/\bbabylooks?\b/gi, '');
 
-    let sub = 'Moda Infantil';
-    if (testKidsMatch(/\b(brinquedo|brinquedos|jogo|jogos|boneca|bonecas|pelucia|pelucias|lego|mordedor|mordedores|chocalho|chocalhos)\b/i)) {
-      sub = 'Brinquedos';
-    } else if (testKidsMatch(/\b(tenis|sapato|sapatos|sandalia|sandalias|chinelo|chinelos|bota|botas|pantufa|pantufas|calcado|calcados|sapatilha|sapatilhas)\b/i)) {
-      sub = 'Calçados';
-    } else if (testKidsMatch(/\b(higiene|banho|sabonete|shampoo|pomada|lenco umedecido|lencos umedecidos|termometro|cuidado|cuidados|assadura)\b/i)) {
-      sub = 'Cuidados';
-    } else if (testKidsMatch(/\b(bebe|bebes|baby|babies|maternidade|recem nascido|recem-nascido|fralda|fraldas|mamadeira|mamadeiras|chupeta|chupetas|berco|bercos|ninho bebe|carrinho de bebe)\b/i)) {
-      sub = 'Bebês';
-    } else if (testKidsMatch(/\b(laco|lacos|tiara|tiaras|babador|babadores|touca|toucas|mochila|mochilas|mala|malas|bolsa|bolsas|acessorio|acessorios)\b/i)) {
-      sub = 'Acessórios';
-    } else {
-      sub = 'Moda Infantil';
+    // Step 3 & 4: Positive child evidence check
+    const kidsRegex = /\b(infantil|infantis|crianca|criancas|kids|kid|menino|meninos|menina|meninas|bebe|bebes|baby|babies|juvenil|juvenis|recem nascido|recem-nascido|recem nascidos|recem-nascidos|toddler|toddlers|maternidade|fralda|fraldas|mamadeira|mamadeiras|chupeta|chupetas|berco|bercos|chocalho|chocalhos|mordedor|mordedores|ninho bebe|carrinho de bebe)\b/i;
+
+    if (kidsRegex.test(sanitizedTextForKids)) {
+      const testKidsMatch = (pattern: RegExp) => pattern.test(sanitizedTextForKids);
+
+      let sub = 'Moda Infantil';
+      if (testKidsMatch(/\b(brinquedo|brinquedos|jogo|jogos|boneca|bonecas|pelucia|pelucias|lego|mordedor|mordedores|chocalho|chocalhos)\b/i)) {
+        sub = 'Brinquedos';
+      } else if (testKidsMatch(/\b(tenis|sapato|sapatos|sandalia|sandalias|chinelo|chinelos|bota|botas|pantufa|pantufas|calcado|calcados|sapatilha|sapatilhas)\b/i)) {
+        sub = 'Calçados';
+      } else if (testKidsMatch(/\b(higiene|banho|sabonete|shampoo|pomada|lenco umedecido|lencos umedecidos|termometro|cuidado|cuidados|assadura)\b/i)) {
+        sub = 'Cuidados';
+      } else if (testKidsMatch(/\b(bebe|bebes|baby|babies|maternidade|recem nascido|recem-nascido|fralda|fraldas|mamadeira|mamadeiras|chupeta|chupetas|berco|bercos|ninho bebe|carrinho de bebe)\b/i)) {
+        sub = 'Bebês';
+      } else if (testKidsMatch(/\b(laco|lacos|tiara|tiaras|babador|babadores|touca|toucas|mochila|mochilas|mala|malas|bolsa|bolsas|acessorio|acessorios)\b/i)) {
+        sub = 'Acessórios';
+      } else {
+        sub = 'Moda Infantil';
+      }
+      return { category: 'Infantil', subcategory: sub };
     }
-    return { category: 'Infantil', subcategory: sub };
   }
 
   // 2. HEALTH (Health vence Beleza quando for suplemento, vitamina ou ingestão)
