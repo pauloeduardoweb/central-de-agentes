@@ -1292,18 +1292,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   const availableSubcategories = useMemo(() => {
     if (!activeCategoryConfig) return ['Todas'];
-    if (selectedCategory !== 'Infantil') return activeCategoryConfig.subcategories;
-
-    const baseList = mode === 'favorites' ? favorites : products;
-    const catProducts = baseList.filter((p) => matchesCategoryFilter(p.category, selectedCategory, p.title));
-
-    const matched = activeCategoryConfig.subcategories.filter((subcat) => {
-      if (subcat === 'Todas') return true;
-      return catProducts.some((p) => matchesSubcategoryFilter(p.category, p.title, subcat, selectedCategory));
-    });
-
-    return matched.length > 1 ? matched : ['Todas'];
-  }, [activeCategoryConfig, selectedCategory, mode, favorites, products]);
+    return activeCategoryConfig.subcategories;
+  }, [activeCategoryConfig]);
 
   useEffect(() => {
     if (selectedSubcategory && selectedSubcategory !== 'Todas' && !availableSubcategories.includes(selectedSubcategory)) {
@@ -1372,24 +1362,26 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const displayProducts = useMemo(() => {
     let list = mode === 'favorites' ? favorites : products;
 
-    // 0. Filter by text search query (dynamic search on current base)
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter((p) => {
-        const titleMatch = p.title ? p.title.toLowerCase().includes(q) : false;
-        const categoryMatch = p.category ? p.category.toLowerCase().includes(q) : false;
-        const sellerMatch = p.sellerName ? p.sellerName.toLowerCase().includes(q) : false;
-        const idMatch = p.productId ? p.productId.toLowerCase().includes(q) : false;
-        return titleMatch || categoryMatch || sellerMatch || idMatch;
-      });
-    }
+    if (mode === 'favorites') {
+      // 0. Filter by text search query (dynamic search on current base)
+      if (query.trim()) {
+        const q = query.trim().toLowerCase();
+        list = list.filter((p) => {
+          const titleMatch = p.title ? p.title.toLowerCase().includes(q) : false;
+          const categoryMatch = p.category ? p.category.toLowerCase().includes(q) : false;
+          const sellerMatch = p.sellerName ? p.sellerName.toLowerCase().includes(q) : false;
+          const idMatch = p.productId ? p.productId.toLowerCase().includes(q) : false;
+          return titleMatch || categoryMatch || sellerMatch || idMatch;
+        });
+      }
 
-    // 1. Filter by TikTok main category
-    list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory, p.title));
+      // 1. Filter by TikTok main category
+      list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory, p.title));
 
-    // 1b. Filter by subcategory
-    if (selectedSubcategory && selectedSubcategory !== 'Todas' && selectedSubcategory !== 'Todos') {
-      list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedSubcategory, selectedCategory));
+      // 1b. Filter by subcategory
+      if (selectedSubcategory && selectedSubcategory !== 'Todas' && selectedSubcategory !== 'Todos') {
+        list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedSubcategory, selectedCategory));
+      }
     }
 
     // 2. Filter by video options
@@ -1602,8 +1594,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   const runSearch = async (
     targetQuery = query,
-    targetPage = 1,
+    targetPage = page,
     refresh = false,
+    targetCategory = selectedCategory,
+    targetSubcategory = selectedSubcategory,
   ) => {
     const clean = targetQuery.trim();
 
@@ -1616,7 +1610,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     try {
       const data = refresh
         ? await refreshProducts(studentCode, clean, targetPage)
-        : await searchProducts(studentCode, clean, targetPage);
+        : await searchProducts(studentCode, clean, targetPage, targetCategory, targetSubcategory);
 
       setQuery(clean);
       setProducts(data.products || []);
@@ -1641,10 +1635,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   };
 
   useEffect(() => {
-    if (mode === 'search' && products.length === 0 && !loading) {
-      runSearch('', 1, false);
+    if (mode === 'search') {
+      runSearch(query, page, false, selectedCategory, selectedSubcategory);
     }
-  }, [mode]);
+  }, [mode, selectedCategory, selectedSubcategory, page]);
 
   const activeFilterCount =
     (selectedCategory !== 'Todos' ? 1 : 0) +
