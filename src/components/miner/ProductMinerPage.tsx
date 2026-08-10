@@ -2566,7 +2566,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
                         <div className="text-[11px] text-slate-500 font-medium">Categorias Ativas</div>
                         <div className="font-black text-amber-900 text-sm mt-0.5">
-                          {totalCats} de 7 selecionadas
+                          {totalCats} de {CATEGORY_CONFIG.length} selecionadas
                         </div>
                       </div>
 
@@ -2858,7 +2858,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <div className="grid grid-cols-2 gap-3 text-left text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <div className="text-[11px] text-slate-500">Categorias Processadas</div>
-                <div className="font-black text-slate-900 text-sm mt-0.5">{batchSummaryModal.categoriesProcessed} de 7</div>
+                <div className="font-black text-slate-900 text-sm mt-0.5">{batchSummaryModal.categoriesProcessed} de {CATEGORY_CONFIG.length}</div>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
