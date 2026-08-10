@@ -121,8 +121,16 @@ export async function getProductMinerAccess(studentCode: string): Promise<Produc
 }
 
 // Free: reads only our own database/cache.
-export async function searchProducts(studentCode: string, query: string, page = 1): Promise<ProductSearchResponse> {
+export async function searchProducts(
+  studentCode: string,
+  query: string,
+  page = 1,
+  category?: string,
+  subcategory?: string
+): Promise<ProductSearchResponse> {
   const params = new URLSearchParams({ query, page: String(page) });
+  if (category && category !== 'Todos' && category !== 'Todas') params.set('category', category);
+  if (subcategory && subcategory !== 'Todas' && subcategory !== 'Todos') params.set('subcategory', subcategory);
   const response = await fetch(`/api/product-miner/search?${params.toString()}`, {
     headers: authHeaders(studentCode),
   });
