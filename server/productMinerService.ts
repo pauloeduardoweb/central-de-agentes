@@ -1827,7 +1827,24 @@ export type ReclassificationReport = {
 
 export async function reclassifyExistingDatabaseProducts(): Promise<ReclassificationReport> {
   if (!isDatabaseConfigured()) {
-    throw new Error('DATABASE_NOT_CONFIGURED');
+    return {
+      totalAnalyzed: 0,
+      totalClassified: 0,
+      totalUnclassified: 0,
+      categoryCounts: {
+        'Moda': 0,
+        'Itens para Casa': 0,
+        'Eletrônicos': 0,
+        'Beleza e Cuidados Pessoais': 0,
+        'Esportes e Lazer': 0,
+        'Brinquedos e Pets': 0,
+        'Health': 0,
+        'Infantil': 0,
+      },
+      subcategoryCounts: {},
+      socialCrawlCalled: false,
+      creditsConsumed: 0,
+    };
   }
   await ensureProductMinerTables();
 
