@@ -112,16 +112,16 @@ function parseRating(value: unknown): number | null {
 
 function getPriceCascadeDetails(item: any, priceObj: any) {
   const saleCascade: Array<{ name: string; val: any }> = [
-    { name: 'product_price_info.sale_price_decimal', val: priceObj?.sale_price_decimal },
     { name: 'product_price_info.real_price_decimal', val: priceObj?.real_price_decimal },
-    { name: 'product_price_info.sale_price', val: priceObj?.sale_price },
     { name: 'product_price_info.real_price', val: priceObj?.real_price },
-    { name: 'product_price_info.min_price_decimal', val: priceObj?.min_price_decimal },
-    { name: 'product_price_info.min_price', val: priceObj?.min_price },
+    { name: 'product_price_info.sale_price_decimal', val: priceObj?.sale_price_decimal },
+    { name: 'product_price_info.sale_price', val: priceObj?.sale_price },
     { name: 'product_price_info.price_decimal', val: priceObj?.price_decimal },
     { name: 'product_price_info.price', val: priceObj?.price },
-    { name: 'item.sale_price', val: item?.sale_price },
+    { name: 'product_price_info.min_price_decimal', val: priceObj?.min_price_decimal },
+    { name: 'product_price_info.min_price', val: priceObj?.min_price },
     { name: 'item.real_price', val: item?.real_price },
+    { name: 'item.sale_price', val: item?.sale_price },
     { name: 'item.price', val: item?.price },
   ];
 
@@ -167,16 +167,16 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
     category = item?.category_path || item?.category_name || item?.category || null;
   }
 
-  const rawSalePrice = priceObj?.sale_price_decimal ??
-                       priceObj?.real_price_decimal ??
-                       priceObj?.sale_price ??
+  const rawSalePrice = priceObj?.real_price_decimal ??
                        priceObj?.real_price ??
-                       priceObj?.min_price_decimal ??
-                       priceObj?.min_price ??
+                       priceObj?.sale_price_decimal ??
+                       priceObj?.sale_price ??
                        priceObj?.price_decimal ??
                        priceObj?.price ??
-                       item?.sale_price ??
+                       priceObj?.min_price_decimal ??
+                       priceObj?.min_price ??
                        item?.real_price ??
+                       item?.sale_price ??
                        item?.price;
 
   const rawOriginPrice = priceObj?.origin_price_decimal ??
@@ -238,17 +238,31 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
     || item?.pdp_url
     || item?.detail_url;
 
+  const cleanProductId = item?.product_id ? String(item.product_id).trim() : '';
+
   let resolvedProductUrl: string | null = null;
   if (rawProductUrl && typeof rawProductUrl === 'string') {
     const trimmed = rawProductUrl.trim();
-    const isSearch = trimmed.includes('/search') || trimmed.includes('/query') || trimmed.includes('/store/search') || trimmed.includes('q=') || trimmed.includes('search_id=');
+    const isSearch = trimmed.includes('/search') ||
+                     trimmed.includes('/query') ||
+                     trimmed.includes('/store/search') ||
+                     trimmed.includes('q=') ||
+                     trimmed.includes('search_id=') ||
+                     trimmed.includes('keyword=');
     if (!isSearch && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
       resolvedProductUrl = trimmed;
     }
   }
 
-  if (!resolvedProductUrl && item?.product_id) {
-    resolvedProductUrl = `https://shop.tiktok.com/view/product/${String(item.product_id).trim()}`;
+  if (cleanProductId.length > 0) {
+    const isDirectPdp = resolvedProductUrl && (
+      resolvedProductUrl.includes(`/product/${cleanProductId}`) ||
+      resolvedProductUrl.includes('/view/product/') ||
+      resolvedProductUrl.includes('/pdp/')
+    );
+    if (!isDirectPdp) {
+      resolvedProductUrl = `https://shop.tiktok.com/view/product/${cleanProductId}`;
+    }
   }
 
   const isDebug = process.env.NODE_ENV !== 'production' || process.env.MINER_DEBUG === 'true';
