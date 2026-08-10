@@ -121,21 +121,26 @@ productMinerRouter.get('/admin/students', async (req, res) => {
           ca.product_miner_enabled_at,
           ca.product_miner_enabled_by,
           ca.criado_em,
-          pf.nome_usuario,
-          pf.nickname
+          pf.nome_usuario AS name,
+          cp.nickname AS nickname
         FROM codigos_acesso ca
         LEFT JOIN perfis_alunos pf ON ca.codigo = pf.codigo
+        LEFT JOIN chat_profiles cp ON ca.codigo = cp.codigo
         ORDER BY ca.product_miner_enabled DESC, ca.id DESC
       `;
       const [rows]: any = await db.query(query);
       if (Array.isArray(rows)) {
         students = rows.map((r: any) => {
           const norm = normalizeAccessCode(r.codigo);
+          const name = r.name || `Aluno ${norm.slice(-4)}`;
+          const nickname = r.nickname || null;
           return {
             accessKeyId: r.accessKeyId,
             codigo: r.codigo,
             maskedKey: maskKeyForAdmin(norm),
-            username: r.nickname || r.nome_usuario || `Aluno ${norm.slice(-4)}`,
+            name,
+            nickname,
+            username: nickname ? `${name} (@${nickname})` : name,
             productMinerEnabled: Boolean(r.product_miner_enabled),
             productMinerEnabledAt: r.product_miner_enabled_at ? new Date(r.product_miner_enabled_at).toISOString() : null,
             productMinerEnabledBy: r.product_miner_enabled_by || null,
