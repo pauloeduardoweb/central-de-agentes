@@ -2378,15 +2378,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </div>
               </div>
 
-              {/* Card 2: Select Categories & Subcategories */}
+              {/* Card 2: Select Categories & Subcategories (Single Source of Truth) */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div>
                     <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-amber-600" /> 2. Selecionar Escopo de Categorias (8 Categorias do Minerador)
+                      <Layers className="w-4 h-4 text-amber-600" /> 2. Avanço e Cobertura das 8 Categorias do Minerador
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Marque as categorias que deseja expandir ou abra o menu de subcategorias para direcionar o foco
+                      Monitore a quantidade armazenada, cobertura de subcategorias e selecione os escopos para expansão
                     </p>
                   </div>
 
@@ -2407,6 +2407,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     const isDrawerOpen = Boolean(openCategoryDrawers[catConfig.filterKey]);
                     const selectedSubs = selectedSubcategoriesMap[catConfig.filterKey] || [];
                     const stat = collectorCategories.find((c) => c.category === catConfig.filterKey);
+                    const productCount = stat?.productCount ?? 0;
+                    const coverageCount = stat?.coverageCount ?? 0;
+                    const isActive = productCount > 0 || stat?.status === 'Ativa';
 
                     return (
                       <div
@@ -2436,22 +2439,47 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                             </div>
                           </label>
 
-                          <button
-                            type="button"
-                            onClick={() => toggleCategoryDrawer(catConfig.filterKey)}
-                            className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-amber-700 text-[11px] font-bold flex items-center gap-1 shrink-0"
-                          >
-                            <span>Subcategorias ({catConfig.subcategories.length})</span>
-                            {isDrawerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${
+                                isActive
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                  : 'border-amber-200 bg-amber-50 text-amber-800'
+                              }`}
+                            >
+                              {isActive ? 'Base Ativa ✅' : 'Pendente ⚠️'}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleCategoryDrawer(catConfig.filterKey)}
+                              className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-amber-700 text-[11px] font-bold flex items-center gap-1"
+                            >
+                              <span>Subcats ({catConfig.subcategories.length})</span>
+                              {isDrawerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
                         </div>
 
                         {/* Status bar */}
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-                          <span>Armazenados: <strong className="text-slate-800">{stat?.productCount ?? 0} prods</strong></span>
+                        <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-slate-100">
+                          <span>Armazenados: <strong className="text-slate-900 font-extrabold">{productCount} prods</strong></span>
                           <span>
-                            Cobertura: <strong className="text-amber-700">{stat?.coverageCount ?? 0}/{catConfig.subcategories.length} subcats</strong>
+                            Cobertura: <strong className="text-amber-700 font-extrabold">{coverageCount}/{catConfig.subcategories.length} subcats</strong>
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmModalCategory(catConfig.filterKey)}
+                            disabled={refreshingCategory === catConfig.filterKey}
+                            className="text-amber-700 hover:text-amber-900 font-bold hover:underline text-[10px] flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {refreshingCategory === catConfig.filterKey ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3 h-3" />
+                            )}
+                            <span>Atualizar</span>
+                          </button>
                         </div>
 
                         {/* Subcategories Accordion Drawer */}
@@ -2693,144 +2721,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             </div>
           ) : null}
 
-          {/* SECTION 3: CATEGORY COVERAGE BREAKDOWN GRID */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-amber-600" /> Status e Cobertura por Categoria (8 Categorias do Minerador)
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Acompanhe a distribuição de produtos e subcategorias armazenadas no banco
-                </p>
-              </div>
-            </div>
-
-            {collectorLoading ? (
-              <div className="py-16 flex justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {collectorCategories.map((cat) => {
-                  const isDrawerOpen = Boolean(openCategoryDrawers[cat.category]);
-                  const catConfig = CATEGORY_CONFIG.find((c) => c.filterKey === cat.category);
-                  const totalSubCount = catConfig?.subcategories.length || cat.totalSubcategories || 0;
-
-                  return (
-                    <div
-                      key={cat.category}
-                      className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col justify-between space-y-4 hover:border-amber-300 shadow-sm transition-all"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 shrink-0">
-                              {getCategoryIcon(cat.category)}
-                            </div>
-
-                            <h3 className="font-extrabold text-sm text-slate-900 truncate">
-                              {cat.category}
-                            </h3>
-                          </div>
-
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border shrink-0 ${
-                              cat.status === 'Ativa'
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                                : 'border-amber-200 bg-amber-50 text-amber-800'
-                            }`}
-                          >
-                            {cat.status === 'Ativa' ? 'Base Ativa' : 'Pendente'}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1 bg-slate-50 border border-slate-100 p-2.5 rounded-xl">
-                          <div className="text-xs text-slate-900 font-extrabold">
-                            {cat.productCount} {cat.productCount === 1 ? 'produto armazenado' : 'produtos armazenados'}
-                          </div>
-
-                          <div className="text-[11px] text-amber-800 font-bold">
-                            Cobertura: {cat.coverageCount || 0} de {totalSubCount} subcategorias
-                          </div>
-
-                          <div className="text-[10px] text-slate-400 font-medium">
-                            {formatCollectionDate(cat.lastCollectedAt)}
-                          </div>
-                        </div>
-
-                        {/* Subcategories Accordion Button */}
-                        <button
-                          type="button"
-                          onClick={() => toggleCategoryDrawer(cat.category)}
-                          className="w-full py-1.5 px-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[11px] font-bold flex items-center justify-between transition-all"
-                        >
-                          <span>Ver Subcategorias ({totalSubCount})</span>
-                          {isDrawerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
-
-                        {/* Drawer content */}
-                        {isDrawerOpen && (
-                          <div className="space-y-1.5 pt-1 border-t border-slate-100 animate-fade-in max-h-40 overflow-y-auto pr-1">
-                            {catConfig?.subcategories.map((subName) => {
-                              const subStat = cat.subcategories?.find((s) => s.name === subName);
-                              const subCount = subStat?.productCount ?? 0;
-
-                              return (
-                                <div
-                                  key={subName}
-                                  className="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-slate-50 border border-slate-200/60"
-                                >
-                                  <span className="truncate pr-1 text-slate-700 font-medium">{subName}</span>
-                                  {subCount < 15 ? (
-                                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 shrink-0">
-                                      ⚠️ {subCount} prods
-                                    </span>
-                                  ) : (
-                                    <span className="text-[9px] font-bold text-emerald-700 shrink-0">
-                                      ✅ {subCount} prods
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-100">
-                        <button
-                          type="button"
-                          onClick={() => setConfirmModalCategory(cat.category)}
-                          disabled={refreshingCategory === cat.category}
-                          className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-black flex items-center justify-center gap-1 transition-all disabled:opacity-50"
-                        >
-                          {refreshingCategory === cat.category ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <RefreshCw className="w-3 h-3" />
-                          )}
-                          <span>Atualizar</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedExpansionCategories([cat.category]);
-                            setCollectorSubTab('expand');
-                          }}
-                          className="py-2 px-2 rounded-xl border border-amber-500 bg-amber-500 text-white hover:bg-amber-600 text-[11px] font-black flex items-center justify-center gap-1 transition-all"
-                        >
-                          <Rocket className="w-3 h-3" />
-                          <span>Expandir</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {/* SINGLE SOURCE OF TRUTH CATEGORY CONTROL IS CARD 2 ABOVE */}
         </div>
       ) : null}
 
