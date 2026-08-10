@@ -227,6 +227,23 @@ function formatMoney(cents: number | null | undefined, symbol = 'R$') {
   return `${symbol} ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function getCommissionText(product: ProductMinerProduct): string | null {
+  const hasAmount = Boolean(product.estimatedCommissionCents && product.estimatedCommissionCents > 0);
+  const hasPercent = Boolean(product.commissionRatePercent && product.commissionRatePercent > 0);
+
+  if (!hasAmount && !hasPercent) return null;
+
+  if (hasAmount && hasPercent) {
+    const moneyStr = formatMoney(product.estimatedCommissionCents!, product.currencySymbol);
+    return `Comissão ${moneyStr} · ${product.commissionRatePercent}%`;
+  }
+  if (hasAmount) {
+    const moneyStr = formatMoney(product.estimatedCommissionCents!, product.currencySymbol);
+    return `Comissão ${moneyStr}`;
+  }
+  return `Comissão ${product.commissionRatePercent}%`;
+}
+
 function compactNumber(value: number | null | undefined) {
   if (value === null || value === undefined) return '—';
   return new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
@@ -524,21 +541,6 @@ const MobileProductCard: React.FC<{
 
       {/* Product Image */}
       <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onToggleFavorite?.(product);
-          }}
-          className={`absolute top-1 left-1 z-20 p-1 rounded-full bg-white/90 shadow transition-all ${
-            isFavorite ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'
-          }`}
-          title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
-        >
-          <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current text-rose-500' : ''}`} />
-        </button>
-
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
@@ -586,16 +588,16 @@ const MobileProductCard: React.FC<{
             ) : null}
           </div>
 
-          {/* Ganho Afiliado / Comissão */}
-          {product.estimatedCommissionCents ? (
-            <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
-              Ganhe {formatMoney(product.estimatedCommissionCents, product.currencySymbol)}
-            </div>
-          ) : product.commissionRatePercent ? (
-            <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
-              Comissão {product.commissionRatePercent}%
-            </div>
-          ) : null}
+          {/* Comissão Real */}
+          {(() => {
+            const commText = getCommissionText(product);
+            if (!commText) return null;
+            return (
+              <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
+                {commText}
+              </div>
+            );
+          })()}
 
           {/* Price */}
           <div className="flex items-center gap-1.5 mt-1">
@@ -610,10 +612,26 @@ const MobileProductCard: React.FC<{
           </div>
         </div>
 
-        {/* Single Action: "Ver" */}
-        <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1 text-[10px]">
-          <div className="truncate max-w-[100px] text-[10px] text-slate-500">
-            {product.sellerName || 'TikTok Shop'}
+        {/* Bottom Bar: Seller Name + Favorite Heart & "Ver" */}
+        <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5 text-[10px]">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className="truncate text-[10px] text-slate-500 font-medium">
+              {product.sellerName || 'TikTok Shop'}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleFavorite?.(product);
+              }}
+              className={`p-1 rounded-full transition-all shrink-0 hover:scale-110 ${
+                isFavorite ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'
+              }`}
+              title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
+            >
+              <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current text-rose-500' : ''}`} />
+            </button>
           </div>
 
           <button
@@ -622,7 +640,7 @@ const MobileProductCard: React.FC<{
               e.stopPropagation();
               onOpenDetailModal?.(product);
             }}
-            className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black shadow-sm flex items-center gap-1 transition-all"
+            className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black shadow-sm flex items-center gap-1 transition-all shrink-0"
           >
             Ver <ExternalLink className="w-3 h-3" />
           </button>
@@ -726,15 +744,15 @@ const ProductCard: React.FC<{
         </h3>
 
         {/* Ganho Afiliado / Comissão (se disponível) */}
-        {product.estimatedCommissionCents ? (
-          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
-            Ganhe {formatMoney(product.estimatedCommissionCents, product.currencySymbol)} por venda
-          </div>
-        ) : product.commissionRatePercent ? (
-          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
-            Comissão {product.commissionRatePercent}%
-          </div>
-        ) : null}
+        {(() => {
+          const commText = getCommissionText(product);
+          if (!commText) return null;
+          return (
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
+              {commText}
+            </div>
+          );
+        })()}
 
         <div className="flex items-end justify-between gap-3">
           <div>
