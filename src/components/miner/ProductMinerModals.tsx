@@ -698,9 +698,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   href={officialProductUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                  className="sm:hidden w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
                 >
-                  🛍️ Ver Produto no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
+                  Pesquisar este produto no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               ) : null}
 
