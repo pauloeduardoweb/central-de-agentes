@@ -21,6 +21,33 @@ function formatMoney(cents: number | null, symbol = 'R$') {
   return `${symbol} ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function getCommissionText(product: ProductMinerProduct): string | null {
+  const hasAmount = Boolean(product.estimatedCommissionCents && product.estimatedCommissionCents > 0);
+  const hasPercent = Boolean(product.commissionRatePercent && product.commissionRatePercent > 0);
+
+  if (!hasAmount && !hasPercent) return null;
+
+  if (hasAmount && hasPercent) {
+    const moneyStr = formatMoney(product.estimatedCommissionCents!, product.currencySymbol);
+    return `Comissão ${moneyStr} · ${product.commissionRatePercent}%`;
+  }
+  if (hasAmount) {
+    const moneyStr = formatMoney(product.estimatedCommissionCents!, product.currencySymbol);
+    return `Comissão ${moneyStr}`;
+  }
+  return `Comissão ${product.commissionRatePercent}%`;
+}
+
+function getOfficialProductUrl(product: { productUrl?: string | null; productId?: string | null }): string | null {
+  if (product.productUrl && product.productUrl.trim().length > 0) {
+    return product.productUrl.trim();
+  }
+  if (product.productId && product.productId.trim().length > 0) {
+    return `https://shop.tiktok.com/view/product/${product.productId.trim()}`;
+  }
+  return null;
+}
+
 // ==========================================
 // 1. SCRIPT GENERATOR MODAL (AI ROTEIRO/COPY)
 // ==========================================
@@ -462,6 +489,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
+  const officialProductUrl = getOfficialProductUrl(product);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
@@ -537,15 +565,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 ) : null}
               </div>
 
-              {product.estimatedCommissionCents ? (
-                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100/80 border border-emerald-300 text-emerald-900 text-xs font-black">
-                  💰 Ganhe {formatMoney(product.estimatedCommissionCents, product.currencySymbol)} por venda
-                </div>
-              ) : product.commissionRatePercent ? (
-                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100/80 border border-emerald-300 text-emerald-900 text-xs font-black">
-                  💰 Comissão de {product.commissionRatePercent}%
-                </div>
-              ) : null}
+              {(() => {
+                const commText = getCommissionText(product);
+                if (!commText) return null;
+                return (
+                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-100/80 border border-emerald-300 text-emerald-900 text-xs font-black">
+                    💰 {commText}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -663,14 +691,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </a>
               ) : null}
 
-              {product.productUrl ? (
+              {officialProductUrl ? (
                 <a
-                  href={product.productUrl}
+                  href={officialProductUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
                 >
-                  🛍️ Ver no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
+                  🛍️ Ver Produto no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               ) : null}
 

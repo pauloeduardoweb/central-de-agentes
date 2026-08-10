@@ -244,6 +244,16 @@ function getCommissionText(product: ProductMinerProduct): string | null {
   return `Comissão ${product.commissionRatePercent}%`;
 }
 
+function getOfficialProductUrl(product: { productUrl?: string | null; productId?: string | null }): string | null {
+  if (product.productUrl && product.productUrl.trim().length > 0) {
+    return product.productUrl.trim();
+  }
+  if (product.productId && product.productId.trim().length > 0) {
+    return `https://shop.tiktok.com/view/product/${product.productId.trim()}`;
+  }
+  return null;
+}
+
 function compactNumber(value: number | null | undefined) {
   if (value === null || value === undefined) return '—';
   return new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
@@ -527,6 +537,8 @@ const MobileProductCard: React.FC<{
   onToggleFavorite,
   onOpenDetailModal,
 }) => {
+  const targetProductUrl = getOfficialProductUrl(product);
+
   return (
     <article
       onClick={() => onOpenDetailModal?.(product)}
@@ -612,7 +624,7 @@ const MobileProductCard: React.FC<{
           </div>
         </div>
 
-        {/* Bottom Bar: Seller Name + Favorite Heart & "Ver" */}
+        {/* Bottom Bar: Seller Name + Favorite Heart & "Ver" + "Produto" */}
         <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5 text-[10px]">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <span className="truncate text-[10px] text-slate-500 font-medium">
@@ -634,16 +646,30 @@ const MobileProductCard: React.FC<{
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenDetailModal?.(product);
-            }}
-            className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black shadow-sm flex items-center gap-1 transition-all shrink-0"
-          >
-            Ver <ExternalLink className="w-3 h-3" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetailModal?.(product);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 text-[10px] transition-all"
+            >
+              Ver
+            </button>
+
+            {targetProductUrl ? (
+              <a
+                href={targetProductUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] shadow-sm flex items-center gap-1 transition-all"
+              >
+                Produto <ExternalLink className="w-3 h-3" />
+              </a>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>
@@ -674,6 +700,7 @@ const ProductCard: React.FC<{
   onOpenDownloadModal,
   onOpenDetailModal,
 }) => {
+  const targetProductUrl = getOfficialProductUrl(product);
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
   const isSpikingRanking = rankingSort === 'spiking';
@@ -919,9 +946,9 @@ const ProductCard: React.FC<{
             Detalhes
           </button>
 
-          {product.productUrl ? (
+          {targetProductUrl ? (
             <a
-              href={product.productUrl}
+              href={targetProductUrl}
               target="_blank"
               rel="noreferrer"
               className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3 py-2 text-xs font-bold shadow-sm"
