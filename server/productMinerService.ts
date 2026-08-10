@@ -2036,6 +2036,8 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
 
     // Subcategories breakdown strictly from category_path
     let coveredCount = 0;
+    let pathTotalForCat = 0;
+
     const subStats: CollectorSubcategoryStat[] = subNames.map((subName) => {
       let subCount = 0;
       const expectedExact = `${cat} > ${subName}`;
@@ -2058,13 +2060,21 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
       };
     });
 
+    for (const [cp, count] of Object.entries(pathCountsMap)) {
+      if (cp === cat || cp.startsWith(`${cat} >`) || cp.startsWith(`${cat}>`)) {
+        pathTotalForCat += count;
+      }
+    }
+
+    const subProductsSum = subStats.reduce((sum, s) => sum + s.productCount, 0);
+    const finalProductCount = Math.max(productCount, pathTotalForCat, subProductsSum);
     const lastCollectedAt = lastSeenMap[cat] || null;
 
     statsList.push({
       category: cat,
-      productCount,
+      productCount: finalProductCount,
       lastCollectedAt,
-      status: productCount > 0 ? 'Ativa' : 'Pendente',
+      status: finalProductCount > 0 ? 'Ativa' : 'Pendente',
       subcategories: subStats,
       coverageCount: coveredCount,
       totalSubcategories: subNames.length,
