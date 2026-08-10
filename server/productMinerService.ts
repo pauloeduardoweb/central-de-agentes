@@ -1650,11 +1650,11 @@ export function classifyProductToCategoryAndSubcategory(product: {
 
   const has = (...terms: string[]) => terms.some((t) => text.includes(removeAccents(t)));
 
-  // 1. INFANTIL (HIGHEST PRIORITY)
+  // 1. INFANTIL (HIGHEST PRIORITY - Infantil vence Moda e outras categorias quando o produto for claramente infantil)
   if (
     has(
       'bebe', 'bebes', 'baby', 'infantil', 'infantis', 'crianca', 'criancas', 'menino', 'menina',
-      'kids', 'toddler', 'maternidade', 'recem nascido', 'fralda', 'mamadeira', 'chupeta',
+      'kids', 'toddler', 'maternidade', 'recem nascido', 'escolar infantil', 'fralda', 'mamadeira', 'chupeta',
       'berco', 'carrinho de bebe', 'carrinho bebe', 'ninho bebe', 'macacao bebe', 'body bebe',
       'pijama infantil', 'roupa infantil', 'vestido infantil', 'conjunto infantil', 'sapato infantil',
       'tenis infantil', 'sandalia infantil', 'brinquedo infantil', 'mordedor', 'chocalho',
@@ -1678,19 +1678,35 @@ export function classifyProductToCategoryAndSubcategory(product: {
     return { category: 'Infantil', subcategory: sub };
   }
 
-  // 2. HEALTH
+  // 2. HEALTH (Health vence Beleza quando for suplemento, vitamina ou ingestão)
   if (
     has(
       'creatina', 'suplemento', 'suplementos', 'vitamina', 'vitaminas', 'capsulas', 'capsula',
-      'proteina', 'proteinas', 'whey', 'whey protein', 'magnesio', 'colageno', 'omega 3',
-      'multivitaminico', 'termogenico', 'coenzima q10', 'melatonina', 'glutamina', 'bcaa',
+      'proteina', 'proteinas', 'whey', 'whey protein', 'magnesio', 'colageno', 'omega', 'omega 3',
+      'saude', 'bem estar', 'multivitaminico', 'termogenico', 'coenzima q10', 'melatonina', 'glutamina', 'bcaa',
       'pre treino', 'health nutrition', 'morfina', 'emagrecentro', 'saude e nutricao'
     )
   ) {
     return { category: 'Health', subcategory: 'Health Nutrition' };
   }
 
-  // 3. BELEZA E CUIDADOS PESSOAIS
+  // 3. BRINQUEDOS E PETS (Pets vence Casa quando for claramente para cachorro/gato)
+  if (
+    has(
+      'pet', 'pets', 'cachorro', 'gato', 'cao', 'caes', 'racao', 'coleira', 'peitoral', 'caminha pet',
+      'brinquedo animal', 'comedouro', 'areia sanitaria', 'arranhador', 'tapete higienico', 'aquario', 'petisco', 'guia', 'brinquedo pet'
+    )
+  ) {
+    let sub = 'Produtos para Pets';
+    if (has('guia', 'petisco', 'aquario', 'suprimento', 'comedouro', 'areia sanitaria')) {
+      sub = 'Suprimentos para Pets';
+    } else {
+      sub = 'Produtos para Pets';
+    }
+    return { category: 'Brinquedos e Pets', subcategory: sub };
+  }
+
+  // 4. BELEZA E CUIDADOS PESSOAIS
   if (
     has(
       'maquiagem', 'skincare', 'perfume', 'perfumes', 'cabelo', 'cabelos', 'cosmetico', 'cosmeticos',
@@ -1719,10 +1735,10 @@ export function classifyProductToCategoryAndSubcategory(product: {
     return { category: 'Beleza e Cuidados Pessoais', subcategory: sub };
   }
 
-  // 4. ELETRÔNICOS
+  // 5. ELETRÔNICOS
   if (
     has(
-      'fone', 'headphone', 'headset', 'earphone', 'celular', 'smartphone', 'iphone', 'samsung',
+      'fone', 'fones', 'headphone', 'headset', 'earphone', 'celular', 'smartphone', 'iphone', 'samsung',
       'xiaomi', 'caixa de som', 'smartwatch', 'relogio inteligente', 'carregador', 'cabo usb',
       'power bank', 'gadget', 'eletronico', 'eletronicos', 'bluetooth', 'livro', 'revista',
       'kindle', 'ebook', 'automotivo', 'carro', 'suporte celular', 'veiculo', 'computador',
@@ -1750,7 +1766,31 @@ export function classifyProductToCategoryAndSubcategory(product: {
     return { category: 'Eletrônicos', subcategory: sub };
   }
 
-  // 5. ITENS PARA CASA
+  // 6. ESPORTES E LAZER (Esportes vence Moda quando for claramente equipamento esportivo/treino)
+  if (
+    has(
+      'academia', 'fitness', 'treino', 'exercicio', 'elastico', 'peso', 'halter', 'kettlebell',
+      'yoga', 'camping', 'barraca', 'pesca', 'vara', 'anzol', 'esportiva', 'esportivo',
+      'legging', 'short treino', 'regata', 'joelheira', 'tornozeleira', 'garrafa academia',
+      'chuteira', 'ciclismo', 'bicicleta', 'esporte', 'natacao', 'esportes'
+    )
+  ) {
+    let sub = 'Fitness';
+    if (has('lazer', 'camping', 'barraca', 'pesca', 'jogo')) {
+      sub = 'Equipamentos para Lazer';
+    } else if (has('esportiva', 'esportivo', 'legging', 'regata', 'short treino')) {
+      sub = 'Roupas Esportivas';
+    } else if (has('garrafa', 'luva', 'faixa', 'joelheira', 'tornozeleira')) {
+      sub = 'Acessórios para Esportes';
+    } else if (has('chuteira', 'ciclismo', 'tenis corrida')) {
+      sub = 'Calçados Esportivos';
+    } else {
+      sub = 'Fitness';
+    }
+    return { category: 'Esportes e Lazer', subcategory: sub };
+  }
+
+  // 7. ITENS PARA CASA
   if (
     has(
       'panela', 'utensilio', 'utensilios', 'cozinha', 'organizacao', 'organizador', 'decoracao',
@@ -1787,46 +1827,6 @@ export function classifyProductToCategoryAndSubcategory(product: {
     return { category: 'Itens para Casa', subcategory: sub };
   }
 
-  // 6. ESPORTES E LAZER
-  if (
-    has(
-      'academia', 'fitness', 'treino', 'exercicio', 'elastico', 'peso', 'halter', 'kettlebell',
-      'yoga', 'camping', 'barraca', 'pesca', 'vara', 'anzol', 'esportiva', 'esportivo',
-      'legging', 'short treino', 'regata', 'joelheira', 'tornozeleira', 'garrafa academia',
-      'chuteira', 'ciclismo', 'bicicleta', 'esporte'
-    )
-  ) {
-    let sub = 'Fitness';
-    if (has('lazer', 'camping', 'barraca', 'pesca', 'jogo')) {
-      sub = 'Equipamentos para Lazer';
-    } else if (has('esportiva', 'esportivo', 'legging', 'regata', 'short treino')) {
-      sub = 'Roupas Esportivas';
-    } else if (has('garrafa', 'luva', 'faixa', 'joelheira', 'tornozeleira')) {
-      sub = 'Acessórios para Esportes';
-    } else if (has('chuteira', 'ciclismo', 'tenis corrida')) {
-      sub = 'Calçados Esportivos';
-    } else {
-      sub = 'Fitness';
-    }
-    return { category: 'Esportes e Lazer', subcategory: sub };
-  }
-
-  // 7. BRINQUEDOS E PETS
-  if (
-    has(
-      'pet', 'pets', 'cachorro', 'gato', 'cao', 'caes', 'racao', 'coleira', 'guia',
-      'arranhador', 'cama pet', 'tapete higienico', 'aquario', 'petisco'
-    )
-  ) {
-    let sub = 'Produtos para Pets';
-    if (has('guia', 'petisco', 'aquario', 'suprimento')) {
-      sub = 'Suprimentos para Pets';
-    } else {
-      sub = 'Produtos para Pets';
-    }
-    return { category: 'Brinquedos e Pets', subcategory: sub };
-  }
-
   // 8. MODA
   if (
     has(
@@ -1836,7 +1836,7 @@ export function classifyProductToCategoryAndSubcategory(product: {
       'pochete', 'calcado', 'tenis', 'sapato', 'sandalia', 'bota', 'chinelo', 'salto',
       'rasteirinha', 'mocassim', 'brinco', 'colar', 'anel', 'pulseira', 'oculos', 'relogio',
       'cinto', 'bone', 'touca', 'chapeu', 'cachecol', 'joia', 'bijuteria', 'moda', 'vestuario',
-      'roupa', 'look'
+      'roupa', 'look', 'roupas adultas'
     )
   ) {
     let sub = 'Moda Feminina';
@@ -1957,154 +1957,118 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
 
   await ensureProductMinerTables();
 
-  // Fast auto-reclassify check if any products remain unclassified
+  // 1. Direct READ-ONLY SQL query for main category product counts via query_source
+  const categoryCountsMap: Record<string, number> = {};
+  const lastSeenMap: Record<string, string | null> = {};
+
   try {
-    const [unclassRows]: any = await db.query(
-      `SELECT COUNT(*) as cnt FROM tiktok_shop_products
-       WHERE category_path IS NULL OR category_path = '' OR query_source IS NULL OR query_source = ''
-          OR query_source NOT IN ('Moda', 'Itens para Casa', 'Eletrônicos', 'Beleza e Cuidados Pessoais', 'Esportes e Lazer', 'Brinquedos e Pets', 'Health', 'Infantil')`
+    const [qRows]: any = await db.query(
+      `SELECT TRIM(query_source) AS query_source,
+              COUNT(*) AS productCount,
+              MAX(last_seen_at) AS max_seen,
+              MAX(updated_at) AS max_updated
+       FROM tiktok_shop_products
+       WHERE query_source IS NOT NULL AND query_source != ''
+       GROUP BY TRIM(query_source)`
     );
-    if (Array.isArray(unclassRows) && Number(unclassRows[0]?.cnt || 0) > 0) {
-      await reclassifyExistingDatabaseProducts().catch((e) => console.warn('[Auto Reclassify Warning]:', e));
-    }
-  } catch (err) {
-    console.warn('[Auto Reclassify Check Error]:', err);
-  }
 
-  const statsList: CollectorCategoryStat[] = [];
+    if (Array.isArray(qRows)) {
+      for (const row of qRows) {
+        const q = String(row.query_source || '').trim();
+        const cnt = Number(row.productCount || 0);
+        if (q) {
+          categoryCountsMap[q] = (categoryCountsMap[q] || 0) + cnt;
 
-  let allProducts: any[] = [];
-  try {
-    const [rows]: any = await db.query(
-      `SELECT product_id, title, category_path, query_source, last_seen_at, updated_at FROM tiktok_shop_products`
-    );
-    allProducts = Array.isArray(rows) ? rows : [];
-  } catch (err: any) {
-    console.warn('[Collector Stats Query Warning]:', err?.message || err);
-  }
-
-  for (const cat of COLLECTOR_CATEGORIES) {
-    try {
-      const subNames = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
-      const catNorm = removeAccents(cat);
-
-      // Filter products belonging to this official category
-      const catProducts = allProducts.filter((p) => {
-        const queryNorm = removeAccents(p.query_source || '');
-        const pathNorm = removeAccents(p.category_path || '');
-        const titleNorm = removeAccents(p.title || '');
-
-        if (queryNorm === catNorm || pathNorm.startsWith(catNorm) || pathNorm.includes(catNorm)) {
-          return true;
-        }
-
-        if (cat === 'Moda') {
-          return queryNorm.includes('moda') || pathNorm.includes('moda') || pathNorm.includes('vestuario') || pathNorm.includes('calcado') || titleNorm.includes('vestido') || titleNorm.includes('bolsa') || titleNorm.includes('tenis');
-        }
-        if (cat === 'Itens para Casa') {
-          return queryNorm.includes('casa') || queryNorm.includes('cozinha') || pathNorm.includes('casa') || pathNorm.includes('cozinha') || pathNorm.includes('lar') || pathNorm.includes('decoracao') || titleNorm.includes('panela') || titleNorm.includes('utensilio');
-        }
-        if (cat === 'Eletrônicos') {
-          return queryNorm.includes('eletr') || pathNorm.includes('eletr') || pathNorm.includes('gadget') || pathNorm.includes('celular') || titleNorm.includes('fone') || titleNorm.includes('cabo');
-        }
-        if (cat === 'Beleza e Cuidados Pessoais') {
-          return queryNorm.includes('beleza') || pathNorm.includes('beleza') || pathNorm.includes('pessoal') || pathNorm.includes('cosmetico') || titleNorm.includes('maquiagem') || titleNorm.includes('skincare') || titleNorm.includes('perfume');
-        }
-        if (cat === 'Esportes e Lazer') {
-          return queryNorm.includes('esporte') || queryNorm.includes('fitness') || pathNorm.includes('esporte') || pathNorm.includes('fitness') || pathNorm.includes('lazer') || titleNorm.includes('treino') || titleNorm.includes('academia');
-        }
-        if (cat === 'Brinquedos e Pets') {
-          return queryNorm.includes('brinquedo') || queryNorm.includes('pet') || pathNorm.includes('brinquedo') || pathNorm.includes('pet') || titleNorm.includes('racao') || titleNorm.includes('coleira') || titleNorm.includes('cachorro') || titleNorm.includes('gato');
-        }
-        if (cat === 'Health') {
-          return queryNorm.includes('health') || pathNorm.includes('health') || pathNorm.includes('saude') || pathNorm.includes('suplemento') || titleNorm.includes('vitamina') || titleNorm.includes('whey');
-        }
-        if (cat === 'Infantil') {
-          return queryNorm.includes('infantil') || queryNorm.includes('bebe') || queryNorm.includes('baby') || pathNorm.includes('infantil') || pathNorm.includes('bebe') || pathNorm.includes('baby') || titleNorm.includes('infantil') || titleNorm.includes('bebe');
-        }
-        return false;
-      });
-
-      // Subcategory breakdown
-      let coveredCount = 0;
-      const subStats: CollectorSubcategoryStat[] = subNames.map((subName) => {
-        const subNorm = removeAccents(subName);
-        const matched = catProducts.filter((p) => {
-          const pathNorm = removeAccents(p.category_path || '');
-          if (pathNorm.includes(`> ${subNorm}`) || pathNorm.includes(`>${subNorm}`) || pathNorm.endsWith(subNorm)) {
-            return true;
-          }
-          return matchSubcategory(p, subName);
-        });
-        const count = matched.length;
-        if (count > 0) coveredCount++;
-        return {
-          subcategory: subName,
-          productCount: count,
-          isLowBase: count < 15,
-        };
-      });
-
-      // Retrieve last collection timestamp from cache / snapshots / products
-      const [cacheRows]: any = await db.query(
-        `SELECT updated_at FROM tiktok_shop_search_cache
-         WHERE LOWER(search_query) = LOWER(?) AND region = 'BR'
-         ORDER BY updated_at DESC LIMIT 1`,
-        [cat]
-      ).catch(() => [[]]);
-
-      const [snapshotTimeRows]: any = await db.query(
-        `SELECT MAX(captured_at) as max_captured
-         FROM tiktok_shop_product_snapshots
-         WHERE LOWER(query_source) = LOWER(?)`,
-        [cat]
-      ).catch(() => [[]]);
-
-      let lastCollectedAt: string | null = null;
-      if (Array.isArray(cacheRows) && cacheRows[0]?.updated_at) {
-        lastCollectedAt = new Date(cacheRows[0].updated_at).toISOString();
-      }
-      if (Array.isArray(snapshotTimeRows) && snapshotTimeRows[0]?.max_captured) {
-        const snapDate = new Date(snapshotTimeRows[0].max_captured).toISOString();
-        if (!lastCollectedAt || snapDate > lastCollectedAt) {
-          lastCollectedAt = snapDate;
-        }
-      }
-
-      if (!lastCollectedAt) {
-        for (const p of catProducts) {
-          const dt = p.last_seen_at || p.updated_at;
-          if (dt) {
-            const iso = new Date(dt).toISOString();
-            if (!lastCollectedAt || iso > lastCollectedAt) {
-              lastCollectedAt = iso;
+          const maxDate = row.max_seen || row.max_updated;
+          if (maxDate) {
+            const iso = new Date(maxDate).toISOString();
+            if (!lastSeenMap[q] || iso > lastSeenMap[q]!) {
+              lastSeenMap[q] = iso;
             }
           }
         }
       }
-
-      statsList.push({
-        category: cat,
-        productCount: catProducts.length,
-        lastCollectedAt,
-        status: catProducts.length > 0 ? 'Ativa' : 'Pendente',
-        subcategories: subStats,
-        coverageCount: coveredCount,
-        totalSubcategories: subNames.length,
-      });
-    } catch (err: any) {
-      console.warn(`[Collector Stats Error for ${cat}]:`, err?.message || err);
-      const subNames = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
-      statsList.push({
-        category: cat,
-        productCount: 0,
-        lastCollectedAt: null,
-        status: 'Pendente',
-        subcategories: subNames.map((s) => ({ subcategory: s, productCount: 0, isLowBase: true })),
-        coverageCount: 0,
-        totalSubcategories: subNames.length,
-      });
     }
+  } catch (err: any) {
+    console.warn('[getCollectorCategoriesStats SQL Query Error]:', err?.message || err);
+  }
+
+  // 2. Direct READ-ONLY SQL query for subcategory breakdown via category_path
+  const pathCountsMap: Record<string, number> = {};
+  try {
+    const [pRows]: any = await db.query(
+      `SELECT TRIM(category_path) AS category_path, COUNT(*) AS subCount
+       FROM tiktok_shop_products
+       WHERE category_path IS NOT NULL AND category_path != ''
+       GROUP BY TRIM(category_path)`
+    );
+
+    if (Array.isArray(pRows)) {
+      for (const row of pRows) {
+        const cp = String(row.category_path || '').trim();
+        const cnt = Number(row.subCount || 0);
+        if (cp) {
+          pathCountsMap[cp] = (pathCountsMap[cp] || 0) + cnt;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('[getCollectorCategoriesStats Subcategory SQL Query Error]:', err?.message || err);
+  }
+
+  // 3. Assemble stats for each of the 8 OFFICIAL COLLECTOR CATEGORIES
+  const statsList: CollectorCategoryStat[] = [];
+
+  for (const cat of COLLECTOR_CATEGORIES) {
+    const subNames = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
+
+    // Exact count from query_source directly in MySQL
+    let productCount = categoryCountsMap[cat] || 0;
+    // Case-insensitive / normalized fallback if exact key case/accents vary
+    if (productCount === 0) {
+      const lowerCat = cat.toLowerCase();
+      for (const [k, v] of Object.entries(categoryCountsMap)) {
+        if (k.toLowerCase() === lowerCat) {
+          productCount += v;
+        }
+      }
+    }
+
+    // Subcategories breakdown strictly from category_path
+    let coveredCount = 0;
+    const subStats: CollectorSubcategoryStat[] = subNames.map((subName) => {
+      let subCount = 0;
+      const expectedExact = `${cat} > ${subName}`;
+      const expectedEnd = `> ${subName}`;
+
+      for (const [cp, count] of Object.entries(pathCountsMap)) {
+        if (cp === expectedExact || cp.endsWith(expectedEnd) || cp.includes(`> ${subName} >`) || cp === subName) {
+          subCount += count;
+        }
+      }
+
+      if (subCount > 0) {
+        coveredCount++;
+      }
+
+      return {
+        subcategory: subName,
+        productCount: subCount,
+        isLowBase: subCount < 15,
+      };
+    });
+
+    const lastCollectedAt = lastSeenMap[cat] || null;
+
+    statsList.push({
+      category: cat,
+      productCount,
+      lastCollectedAt,
+      status: productCount > 0 ? 'Ativa' : 'Pendente',
+      subcategories: subStats,
+      coverageCount: coveredCount,
+      totalSubcategories: subNames.length,
+    });
   }
 
   return statsList;
