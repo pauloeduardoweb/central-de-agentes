@@ -88,15 +88,21 @@ function parseInteger(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parsePriceCents(value: unknown): number | null {
+function parseCurrencyToCents(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const raw = String(value).trim().replace(',', '.');
-  if (/^\d+$/.test(raw)) {
-    const cents = Number.parseInt(raw, 10);
-    return Number.isFinite(cents) ? Math.max(0, cents) : null;
-  }
-  const decimal = Number(raw);
-  return Number.isFinite(decimal) ? Math.max(0, Math.round(decimal * 100)) : null;
+  const num = Number(raw);
+  if (!Number.isFinite(num) || num < 0) return null;
+  // Convert currency units (e.g. 154 or 154.50 BRL) to cents (15400 or 15450)
+  return Math.round(num * 100);
+}
+
+function parseCents(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const raw = String(value).trim().replace(',', '.');
+  const num = Number(raw);
+  if (!Number.isFinite(num) || num < 0) return null;
+  return Math.round(num);
 }
 
 function parseRating(value: unknown): number | null {
@@ -105,7 +111,7 @@ function parseRating(value: unknown): number | null {
 }
 
 function normalizeProduct(item: any): MinedProduct {
-  const price = item?.product_price_info || {};
+  const priceObj = item?.product_price_info || item?.price_info || item?.price || item?.price_range || {};
   const video = item?.video || null;
   const stats = video?.statistics || {};
   const author = video?.author || {};
@@ -115,6 +121,38 @@ function normalizeProduct(item: any): MinedProduct {
 
   if (!category) {
     category = item?.category_path || item?.category_name || item?.category || null;
+  }
+
+  const rawSalePrice = priceObj?.sale_price_decimal ??
+                       priceObj?.real_price_decimal ??
+                       priceObj?.sale_price ??
+                       priceObj?.real_price ??
+                       priceObj?.min_price_decimal ??
+                       priceObj?.min_price ??
+                       priceObj?.price_decimal ??
+                       priceObj?.price ??
+                       item?.sale_price ??
+                       item?.real_price ??
+                       item?.price;
+
+  const rawOriginPrice = priceObj?.origin_price_decimal ??
+                         priceObj?.original_price_decimal ??
+                         priceObj?.origin_price ??
+                         priceObj?.original_price ??
+                         priceObj?.max_price_decimal ??
+                         priceObj?.max_price ??
+                         item?.origin_price ??
+                         item?.original_price;
+
+  const priceCents = parseCurrencyToCents(rawSalePrice);
+  const originalPriceCents = parseCurrencyToCents(rawOriginPrice);
+
+  let discountPercent = priceObj?.discount_decimal !== undefined && priceObj?.discount_decimal !== null
+    ? Math.round(Number(priceObj.discount_decimal) * 100)
+    : null;
+
+  if ((discountPercent === null || discountPercent === 0) && priceCents && originalPriceCents && originalPriceCents > priceCents) {
+    discountPercent = Math.round(((originalPriceCents - priceCents) / originalPriceCents) * 100);
   }
 
   const commInfo = item?.commission_info || item?.affiliate_info || item?.commission || item?.promotion_info || item?.collaboration_info || item?.creator_commission_info || {};
@@ -131,46 +169,52 @@ function normalizeProduct(item: any): MinedProduct {
   if (commRate !== null && commRate > 0 && commRate <= 1) {
     commRate = Math.round(commRate * 100);
   }
-  let commCents = parsePriceCents(
+  let commCents = parseCents(
     commInfo?.commission_amount ??
-    commInfo?.estimated_commission ??
-    commInfo?.commission ??
+    commInfo?.estimated_commission_cents ??
     item?.commission_amount ??
-    item?.estimated_commission ??
     item?.estimated_commission_cents ??
     item?.affiliate_commission_amount ??
     item?.earn_amount ??
     item?.earnings
   );
-  if (commCents === null && commRate !== null && commRate > 0) {
-    const pCents = parsePriceCents(price?.sale_price_decimal);
-    if (pCents) {
-      commCents = Math.round((pCents * commRate) / 100);
+  if (commCents === null) {
+    commCents = parseCurrencyToCents(
+      commInfo?.estimated_commission ??
+      commInfo?.commission ??
+      item?.estimated_commission
+    );
+  }
+  if (commCents === null && commRate !== null && commRate > 0 && priceCents) {
+    commCents = Math.round((priceCents * commRate) / 100);
+  }
+
+  const rawProductUrl = item?.seo_url?.canonical_url
+    || item?.product_url
+    || item?.pdp_url
+    || item?.detail_url;
+
+  let resolvedProductUrl: string | null = null;
+  if (rawProductUrl && typeof rawProductUrl === 'string') {
+    const trimmed = rawProductUrl.trim();
+    const isSearch = trimmed.includes('/search') || trimmed.includes('/query') || trimmed.includes('/store/search') || trimmed.includes('q=') || trimmed.includes('search_id=');
+    if (!isSearch && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+      resolvedProductUrl = trimmed;
     }
   }
 
-  const resolvedProductUrl = item?.seo_url?.canonical_url
-    ? String(item.seo_url.canonical_url)
-    : item?.product_url
-    ? String(item.product_url)
-    : item?.pdp_url
-    ? String(item.pdp_url)
-    : item?.detail_url
-    ? String(item.detail_url)
-    : item?.product_id
-    ? `https://shop.tiktok.com/view/product/${item.product_id}`
-    : null;
+  if (!resolvedProductUrl && item?.product_id) {
+    resolvedProductUrl = `https://shop.tiktok.com/view/product/${String(item.product_id).trim()}`;
+  }
 
   return {
     productId: String(item?.product_id || ''),
     title: String(item?.title || 'Produto sem nome'),
     imageUrl: item?.image?.url_list?.[0] || null,
-    priceCents: parsePriceCents(price?.sale_price_decimal),
-    originalPriceCents: parsePriceCents(price?.origin_price_decimal),
-    discountPercent: price?.discount_decimal !== undefined && price?.discount_decimal !== null
-      ? Math.round(Number(price.discount_decimal) * 100)
-      : null,
-    currencySymbol: String(price?.currency_symbol || 'R$'),
+    priceCents,
+    originalPriceCents,
+    discountPercent,
+    currencySymbol: String(priceObj?.currency_symbol || item?.currency_symbol || item?.currency || 'R$'),
     rating: parseRating(item?.rate_info?.score),
     soldCount: parseInteger(item?.sold_info?.sold_count) || 0,
     sellerId: item?.seller_info?.seller_id ? String(item.seller_info.seller_id) : null,
