@@ -55,20 +55,12 @@ function getOfficialProductUrl(product: { productUrl?: string | null; productId?
     )
   );
 
-  // If we have a productId, direct PDP URL is always preferred over search/missing/non-PDP URLs
-  if (cleanId.length > 0) {
-    if (!rawUrl || isSearchUrl || (!rawUrl.includes('/pdp/') && !rawUrl.includes('/product/'))) {
-      return `https://shop.tiktok.com/view/product/${cleanId}`;
-    }
-  }
-
-  // If URL is a search URL and we don't have a valid productId, return null (never open search listing)
-  if (isSearchUrl) {
-    return null;
-  }
-
-  if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
+  if (rawUrl && !isSearchUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
     return rawUrl;
+  }
+
+  if (cleanId.length > 0 && /^[a-zA-Z0-9_-]+$/.test(cleanId)) {
+    return `https://shop.tiktok.com/view/product/${cleanId}`;
   }
 
   return null;

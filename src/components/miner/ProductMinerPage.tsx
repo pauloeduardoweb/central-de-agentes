@@ -254,20 +254,12 @@ function getOfficialProductUrl(product: { productUrl?: string | null; productId?
     )
   );
 
-  // If we have a productId, direct PDP URL is always preferred over search/missing/non-PDP URLs
-  if (cleanId.length > 0) {
-    if (!rawUrl || isSearchUrl || (!rawUrl.includes('/pdp/') && !rawUrl.includes('/product/'))) {
-      return `https://shop.tiktok.com/view/product/${cleanId}`;
-    }
-  }
-
-  // If URL is a search URL and we don't have a valid productId, return null (never open search listing)
-  if (isSearchUrl) {
-    return null;
-  }
-
-  if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
+  if (rawUrl && !isSearchUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
     return rawUrl;
+  }
+
+  if (cleanId.length > 0 && /^[a-zA-Z0-9_-]+$/.test(cleanId)) {
+    return `https://shop.tiktok.com/view/product/${cleanId}`;
   }
 
   return null;
@@ -538,7 +530,7 @@ const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive
   );
 };
 
-/* Compact Mobile Card (TikTok Shop list style) */
+/* Compact Mobile Card (TikTok Shop 2-column grid style) */
 const MobileProductCard: React.FC<{
   product: ProductMinerProduct;
   position?: number;
@@ -561,92 +553,95 @@ const MobileProductCard: React.FC<{
   return (
     <article
       onClick={() => onOpenDetailModal?.(product)}
-      className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm hover:shadow-md hover:border-amber-400/60 transition-all flex gap-3 relative overflow-hidden text-slate-900 cursor-pointer"
+      className="group rounded-xl border border-slate-200/90 bg-white shadow-xs hover:shadow-md hover:border-amber-400/60 transition-all flex flex-col h-full relative overflow-hidden text-slate-900 cursor-pointer p-2"
     >
-      {/* Ranking position tag */}
-      {position ? (
-        <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded-md bg-white/95 border border-amber-400/70 text-amber-700 text-[10px] font-black shadow-sm">
-          #{position}
-        </div>
-      ) : null}
-
-      {/* Product Image */}
-      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt={product.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-400">
-            <ShoppingBag className="w-8 h-8" />
+      {/* Product Image Container - 1:1 Aspect ratio with object-contain to prevent cropping */}
+      <div className="relative aspect-square w-full rounded-lg bg-slate-50 border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center p-1">
+        {/* Ranking position tag */}
+        {position ? (
+          <div className="absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded bg-white/95 border border-amber-400/80 text-amber-800 text-[9px] font-black shadow-xs">
+            #{position}
           </div>
-        )}
+        ) : null}
 
+        {/* Discount Tag */}
         {product.discountPercent ? (
-          <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black">
+          <div className="absolute top-1 right-1 z-10 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black shadow-xs">
             -{product.discountPercent}%
           </div>
         ) : null}
 
+        {/* Video Associated Indicator */}
         {product.video?.url ? (
-          <div className="absolute top-1 right-1 p-1 rounded-full bg-amber-500 text-white shadow" title="Possui vídeo">
+          <div className="absolute bottom-1 left-1 z-10 p-1 rounded-full bg-amber-500 text-white shadow-xs" title="Possui vídeo">
             <Play className="w-2.5 h-2.5 fill-current" />
           </div>
         ) : null}
+
+        {/* Image */}
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.title}
+            className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-200"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-300">
+            <ShoppingBag className="w-8 h-8" />
+          </div>
+        )}
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col justify-between space-y-1">
-        <div>
-          {/* Title */}
-          <h3 className="font-extrabold text-xs text-slate-900 leading-snug line-clamp-2">
+      <div className="flex-1 flex flex-col justify-between pt-2 space-y-1">
+        <div className="space-y-1">
+          {/* Title - Max 2 lines */}
+          <h3 className="font-bold text-[11px] text-slate-900 leading-tight line-clamp-2 min-h-[28px]">
             {product.title}
           </h3>
 
           {/* Vendas & Rating */}
-          <div className="flex items-center gap-2 mt-1 text-[11px] flex-wrap">
-            <span className="font-black text-amber-700">
-              {compactNumber(product.soldCount)} vendidos
+          <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600">
+            <span className="font-extrabold text-amber-700 truncate">
+              {compactNumber(product.soldCount)} sold
             </span>
 
             {product.rating ? (
-              <span className="font-bold text-amber-600 flex items-center gap-0.5">
-                <Star className="w-3 h-3 fill-current text-amber-400" />
+              <span className="font-bold text-amber-600 flex items-center gap-0.5 shrink-0">
+                <Star className="w-2.5 h-2.5 fill-current text-amber-400" />
                 {product.rating}
               </span>
             ) : null}
           </div>
 
-          {/* Comissão Real */}
+          {/* Real Commission Badge */}
           {(() => {
             const commText = getCommissionText(product);
             if (!commText) return null;
             return (
-              <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
+              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[9px] font-black max-w-full truncate">
                 {commText}
               </div>
             );
           })()}
 
           {/* Price */}
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-sm font-black text-emerald-700">
+          <div className="flex items-baseline gap-1 pt-0.5 flex-wrap">
+            <span className="text-xs font-black text-emerald-700">
               {formatMoney(product.priceCents, product.currencySymbol)}
             </span>
             {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-              <span className="text-[10px] text-slate-400 line-through">
+              <span className="text-[9px] text-slate-400 line-through">
                 {formatMoney(product.originalPriceCents, product.currencySymbol)}
               </span>
             ) : null}
           </div>
         </div>
 
-        {/* Bottom Bar: Seller Name + Favorite Heart & "Ver" + "Produto" */}
-        <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5 text-[10px]">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <span className="truncate text-[10px] text-slate-500 font-medium">
+        {/* Bottom Bar: Seller Name + Heart Favorite & Action Buttons */}
+        <div className="pt-1.5 border-t border-slate-100 space-y-1.5 mt-auto">
+          <div className="flex items-center justify-between gap-1 text-[10px]">
+            <span className="truncate text-[10px] text-slate-500 font-medium flex-1">
               {product.sellerName || 'TikTok Shop'}
             </span>
             <button
@@ -665,14 +660,14 @@ const MobileProductCard: React.FC<{
             </button>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="grid grid-cols-2 gap-1 text-[10px]">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenDetailModal?.(product);
               }}
-              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 text-[10px] transition-all"
+              className="w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 text-[10px] transition-all text-center"
             >
               Ver
             </button>
@@ -683,11 +678,15 @@ const MobileProductCard: React.FC<{
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] shadow-sm flex items-center gap-1 transition-all"
+                className="w-full py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-[10px] shadow-xs flex items-center justify-center gap-0.5 transition-all truncate"
               >
-                Produto <ExternalLink className="w-3 h-3" />
+                Produto <ExternalLink className="w-2.5 h-2.5 shrink-0" />
               </a>
-            ) : null}
+            ) : (
+              <span className="w-full py-1.5 rounded-lg bg-slate-50 text-slate-300 font-medium text-[10px] border border-slate-100 text-center cursor-not-allowed">
+                —
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -726,7 +725,7 @@ const ProductCard: React.FC<{
 
   return (
     <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative">
-      <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden shrink-0 border-b border-slate-100">
+      <div className="relative aspect-[4/3] bg-slate-50 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center p-2">
         <button
           type="button"
           onClick={(e) => {
@@ -746,7 +745,7 @@ const ProductCard: React.FC<{
           <img
             src={product.imageUrl}
             alt={product.title}
-            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+            className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-400">
@@ -2047,8 +2046,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           {!(loading || rankingLoading) && displayProducts.length > 0 ? (
             <>
-              {/* Mobile View: Compact Vertical List (TikTok Shop inspired layout) */}
-              <div className="block sm:hidden space-y-2.5">
+              {/* Mobile View: 2-Column Grid (TikTok Shop style) */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:hidden items-stretch">
                 {currentRenderProducts.map((product, index) => {
                   const globalPos = mode === 'ranking' ? (rankingPage - 1) * 30 + index + 1 : index + 1;
                   return (
