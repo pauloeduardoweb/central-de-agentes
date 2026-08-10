@@ -39,12 +39,38 @@ function getCommissionText(product: ProductMinerProduct): string | null {
 }
 
 function getOfficialProductUrl(product: { productUrl?: string | null; productId?: string | null }): string | null {
-  if (product.productUrl && product.productUrl.trim().length > 0) {
-    return product.productUrl.trim();
+  if (!product) return null;
+
+  const rawUrl = product.productUrl ? String(product.productUrl).trim() : '';
+  const cleanId = product.productId ? String(product.productId).trim() : '';
+
+  const isSearchUrl = Boolean(
+    rawUrl && (
+      rawUrl.includes('/search') ||
+      rawUrl.includes('/query') ||
+      rawUrl.includes('/store/search') ||
+      rawUrl.includes('q=') ||
+      rawUrl.includes('search_id=') ||
+      rawUrl.includes('keyword=')
+    )
+  );
+
+  // If we have a productId, direct PDP URL is always preferred over search/missing/non-PDP URLs
+  if (cleanId.length > 0) {
+    if (!rawUrl || isSearchUrl || (!rawUrl.includes('/pdp/') && !rawUrl.includes('/product/'))) {
+      return `https://shop.tiktok.com/view/product/${cleanId}`;
+    }
   }
-  if (product.productId && product.productId.trim().length > 0) {
-    return `https://shop.tiktok.com/view/product/${product.productId.trim()}`;
+
+  // If URL is a search URL and we don't have a valid productId, return null (never open search listing)
+  if (isSearchUrl) {
+    return null;
   }
+
+  if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) {
+    return rawUrl;
+  }
+
   return null;
 }
 
