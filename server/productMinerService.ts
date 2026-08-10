@@ -110,7 +110,51 @@ function parseRating(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function normalizeProduct(item: any): MinedProduct {
+function getPriceCascadeDetails(item: any, priceObj: any) {
+  const saleCascade: Array<{ name: string; val: any }> = [
+    { name: 'product_price_info.sale_price_decimal', val: priceObj?.sale_price_decimal },
+    { name: 'product_price_info.real_price_decimal', val: priceObj?.real_price_decimal },
+    { name: 'product_price_info.sale_price', val: priceObj?.sale_price },
+    { name: 'product_price_info.real_price', val: priceObj?.real_price },
+    { name: 'product_price_info.min_price_decimal', val: priceObj?.min_price_decimal },
+    { name: 'product_price_info.min_price', val: priceObj?.min_price },
+    { name: 'product_price_info.price_decimal', val: priceObj?.price_decimal },
+    { name: 'product_price_info.price', val: priceObj?.price },
+    { name: 'item.sale_price', val: item?.sale_price },
+    { name: 'item.real_price', val: item?.real_price },
+    { name: 'item.price', val: item?.price },
+  ];
+
+  const selectedSale = saleCascade.find((c) => c.val !== undefined && c.val !== null) || {
+    name: 'none',
+    val: undefined,
+  };
+
+  const originCascade: Array<{ name: string; val: any }> = [
+    { name: 'product_price_info.origin_price_decimal', val: priceObj?.origin_price_decimal },
+    { name: 'product_price_info.original_price_decimal', val: priceObj?.original_price_decimal },
+    { name: 'product_price_info.origin_price', val: priceObj?.origin_price },
+    { name: 'product_price_info.original_price', val: priceObj?.original_price },
+    { name: 'product_price_info.max_price_decimal', val: priceObj?.max_price_decimal },
+    { name: 'product_price_info.max_price', val: priceObj?.max_price },
+    { name: 'item.origin_price', val: item?.origin_price },
+    { name: 'item.original_price', val: item?.original_price },
+  ];
+
+  const selectedOrigin = originCascade.find((c) => c.val !== undefined && c.val !== null) || {
+    name: 'none',
+    val: undefined,
+  };
+
+  return {
+    selectedSaleField: selectedSale.name,
+    selectedSaleRawValue: selectedSale.val,
+    selectedOriginField: selectedOrigin.name,
+    selectedOriginRawValue: selectedOrigin.val,
+  };
+}
+
+function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provider'): MinedProduct {
   const priceObj = item?.product_price_info || item?.price_info || item?.price || item?.price_range || {};
   const video = item?.video || null;
   const stats = video?.statistics || {};
@@ -205,6 +249,39 @@ function normalizeProduct(item: any): MinedProduct {
 
   if (!resolvedProductUrl && item?.product_id) {
     resolvedProductUrl = `https://shop.tiktok.com/view/product/${String(item.product_id).trim()}`;
+  }
+
+  const isDebug = process.env.NODE_ENV !== 'production' || process.env.MINER_DEBUG === 'true';
+  if (isDebug) {
+    const cascade = getPriceCascadeDetails(item, priceObj);
+    const skus = item?.skus || item?.sku_list || item?.skus_list || item?.variants || null;
+
+    console.log(`[MINER DIAGNOSTIC LOG] ========================================`);
+    console.log(`product_id:`, String(item?.product_id || ''));
+    console.log(`title:`, String(item?.title || ''));
+    console.log(`seller:`, item?.seller_info?.shop_name || item?.seller_info?.seller_id || item?.seller_name || null);
+    console.log(`endpoint/origem:`, sourceEndpoint);
+    console.log(`currency_name:`, priceObj?.currency || item?.currency_name || item?.currency || null);
+    console.log(`currency_symbol:`, priceObj?.currency_symbol || item?.currency_symbol || item?.currency || null);
+    console.log(`product_price_info completo:`, item?.product_price_info ? JSON.stringify(item.product_price_info) : null);
+    console.log(`price_info completo:`, item?.price_info ? JSON.stringify(item.price_info) : null);
+    console.log(`price completo:`, item?.price ? JSON.stringify(item.price) : null);
+    console.log(`price_range completo:`, item?.price_range ? JSON.stringify(item.price_range) : null);
+    console.log(`item.sale_price:`, item?.sale_price ?? null);
+    console.log(`item.real_price:`, item?.real_price ?? null);
+    console.log(`item.price:`, item?.price ?? null);
+    if (skus) {
+      console.log(`skus / sku_list:`, JSON.stringify(skus));
+    }
+    console.log(`selectedPriceField:`, cascade.selectedSaleField);
+    console.log(`selectedPriceRawValue:`, cascade.selectedSaleRawValue);
+    console.log(`normalizedPriceCents (priceCents):`, priceCents);
+    console.log(`selectedOriginalPriceField:`, cascade.selectedOriginField);
+    console.log(`selectedOriginalPriceRawValue:`, cascade.selectedOriginRawValue);
+    console.log(`normalizedOriginalPriceCents:`, originalPriceCents);
+    console.log(`URL original recebida:`, rawProductUrl || null);
+    console.log(`URL final escolhida:`, resolvedProductUrl);
+    console.log(`================================================================`);
   }
 
   return {
@@ -743,6 +820,34 @@ function getCategoryWhereClause(query: string): { whereSql: string; params: any[
   };
 }
 
+function logMinerAcquisition(details: {
+  category?: string;
+  query: string;
+  page: number;
+  region: string;
+  endpoint: string;
+  requestUrl?: string;
+  requestExecuted: boolean;
+  httpStatus?: number | null;
+  itemsReceived?: number;
+  creditsUsed?: number | null;
+  skipReason?: string | null;
+}) {
+  console.log(`[MINER ACQUISITION] ========================================`);
+  if (details.category) console.log(`category: ${details.category}`);
+  console.log(`query: ${details.query}`);
+  console.log(`page: ${details.page}`);
+  console.log(`region: ${details.region}`);
+  console.log(`endpoint: ${details.endpoint}`);
+  if (details.requestUrl) console.log(`requestUrl: ${details.requestUrl}`);
+  console.log(`requestExecuted: ${details.requestExecuted}`);
+  if (details.skipReason) console.log(`skipReason: "${details.skipReason}"`);
+  if (details.httpStatus !== undefined && details.httpStatus !== null) console.log(`httpStatus: ${details.httpStatus}`);
+  if (details.itemsReceived !== undefined) console.log(`itemsReceived: ${details.itemsReceived}`);
+  if (details.creditsUsed !== undefined && details.creditsUsed !== null) console.log(`creditsUsed: ${details.creditsUsed}`);
+  console.log(`================================================================`);
+}
+
 export async function searchTikTokShopProducts(params: {
   query: string;
   page?: number;
@@ -761,8 +866,28 @@ export async function searchTikTokShopProducts(params: {
   requestId: string | null;
 }> {
   const query = String(params.query || '').trim();
-  if (query.length === 1) throw new Error('SEARCH_QUERY_TOO_SHORT');
-  if (query.length > 120) throw new Error('SEARCH_QUERY_TOO_LONG');
+  if (query.length === 1) {
+    logMinerAcquisition({
+      query,
+      page: 1,
+      region: params.region || DEFAULT_REGION,
+      endpoint: '/v1/tiktokshop/search',
+      requestExecuted: false,
+      skipReason: 'SEARCH_QUERY_TOO_SHORT',
+    });
+    throw new Error('SEARCH_QUERY_TOO_SHORT');
+  }
+  if (query.length > 120) {
+    logMinerAcquisition({
+      query,
+      page: 1,
+      region: params.region || DEFAULT_REGION,
+      endpoint: '/v1/tiktokshop/search',
+      requestExecuted: false,
+      skipReason: 'SEARCH_QUERY_TOO_LONG',
+    });
+    throw new Error('SEARCH_QUERY_TOO_LONG');
+  }
   const requestedPage = Number.parseInt(String(params.page || 1), 10);
   const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(requestedPage, 50)) : 1;
   const region = String(params.region || DEFAULT_REGION).trim().toUpperCase();
@@ -803,6 +928,16 @@ export async function searchTikTokShopProducts(params: {
         }
 
         const products = await attachTrendMetrics(localProducts);
+        logMinerAcquisition({
+          query,
+          page,
+          region,
+          endpoint: '/v1/tiktokshop/search',
+          requestExecuted: false,
+          skipReason: 'forceRefresh=false & empty query (served from local database)',
+          itemsReceived: products.length,
+          creditsUsed: 0,
+        });
         return {
           products,
           creditsUsed: 0,
@@ -816,6 +951,15 @@ export async function searchTikTokShopProducts(params: {
           requestId: null,
         };
       }
+
+      logMinerAcquisition({
+        query,
+        page,
+        region,
+        endpoint: '/v1/tiktokshop/search',
+        requestExecuted: false,
+        skipReason: 'forceRefresh=false & empty query & database not configured',
+      });
 
       return {
         products: [],
@@ -834,7 +978,9 @@ export async function searchTikTokShopProducts(params: {
     // 2. Query provided: check cache for this exact page
     const stored = await getStoredPayload(query, region, page);
     if (stored) {
-      const normalized = (stored.payload.data?.items || []).map(normalizeProduct).filter((item) => item.productId);
+      const normalized = (stored.payload.data?.items || [])
+        .map((raw) => normalizeProduct(raw, 'Stored Search Cache'))
+        .filter((item) => item.productId);
 
       // Check if page + 1 exists in cache or if DB has more items
       const storedNext = await getStoredPayload(query, region, page + 1);
@@ -850,6 +996,16 @@ export async function searchTikTokShopProducts(params: {
       }
 
       const products = await attachTrendMetrics(normalized);
+      logMinerAcquisition({
+        query,
+        page,
+        region,
+        endpoint: '/v1/tiktokshop/search',
+        requestExecuted: false,
+        skipReason: 'forceRefresh=false & cache hit',
+        itemsReceived: products.length,
+        creditsUsed: 0,
+      });
       return {
         products,
         creditsUsed: 0,
@@ -906,6 +1062,16 @@ export async function searchTikTokShopProducts(params: {
 
       if (localProducts.length > 0) {
         const products = await attachTrendMetrics(localProducts);
+        logMinerAcquisition({
+          query,
+          page,
+          region,
+          endpoint: '/v1/tiktokshop/search',
+          requestExecuted: false,
+          skipReason: 'forceRefresh=false & local DB hit',
+          itemsReceived: products.length,
+          creditsUsed: 0,
+        });
         return {
           products,
           creditsUsed: 0,
@@ -921,6 +1087,15 @@ export async function searchTikTokShopProducts(params: {
       }
     }
 
+    logMinerAcquisition({
+      query,
+      page,
+      region,
+      endpoint: '/v1/tiktokshop/search',
+      requestExecuted: false,
+      skipReason: 'forceRefresh=false & local DB empty',
+    });
+
     return {
       products: [],
       creditsUsed: 0,
@@ -935,6 +1110,22 @@ export async function searchTikTokShopProducts(params: {
     };
   }
 
+  // forceRefresh is true -> Prepare SocialCrawl API call
+  let apiKey = '';
+  try {
+    apiKey = getSocialCrawlApiKey();
+  } catch (keyErr: any) {
+    logMinerAcquisition({
+      query,
+      page,
+      region,
+      endpoint: '/v1/tiktokshop/search',
+      requestExecuted: false,
+      skipReason: 'SOCIALCRAWL_API_KEY_MISSING',
+    });
+    throw keyErr;
+  }
+
   const isInfantil = query.toLowerCase() === 'infantil';
   const providerQuery = isInfantil ? 'moda infantil' : query;
 
@@ -943,39 +1134,85 @@ export async function searchTikTokShopProducts(params: {
   url.searchParams.set('region', region);
   url.searchParams.set('page', String(page));
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'x-api-key': getSocialCrawlApiKey(),
-      'Accept': 'application/json',
-      'User-Agent': 'GeracaoZPro/1.0',
-    },
-    signal: AbortSignal.timeout(30000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-api-key': apiKey,
+        'Accept': 'application/json',
+        'User-Agent': 'GeracaoZPro/1.0',
+      },
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (fetchErr: any) {
+    logMinerAcquisition({
+      query: providerQuery,
+      page,
+      region,
+      endpoint: '/v1/tiktokshop/search',
+      requestUrl: url.toString(),
+      requestExecuted: false,
+      skipReason: `FETCH_ERROR: ${fetchErr?.message || String(fetchErr)}`,
+    });
+    throw fetchErr;
+  }
 
   const rawText = await response.text();
   let payload: SocialCrawlSearchResponse;
   try {
     payload = JSON.parse(rawText);
   } catch {
+    logMinerAcquisition({
+      query: providerQuery,
+      page,
+      region,
+      endpoint: '/v1/tiktokshop/search',
+      requestUrl: url.toString(),
+      requestExecuted: true,
+      httpStatus: response.status,
+      skipReason: `SOCIALCRAWL_INVALID_RESPONSE_${response.status}`,
+    });
     throw new Error(`SOCIALCRAWL_INVALID_RESPONSE_${response.status}`);
   }
 
   if (!response.ok || payload.success === false) {
     const detail = payload.message || payload.error || `HTTP_${response.status}`;
+    logMinerAcquisition({
+      query: providerQuery,
+      page,
+      region,
+      endpoint: '/v1/tiktokshop/search',
+      requestUrl: url.toString(),
+      requestExecuted: true,
+      httpStatus: response.status,
+      skipReason: `SOCIALCRAWL_REQUEST_FAILED:${detail}`,
+    });
     throw new Error(`SOCIALCRAWL_REQUEST_FAILED:${detail}`);
   }
 
   await saveCachedPayload(query, region, page, payload);
   const normalized = (payload.data?.items || [])
     .map((rawItem, idx) => {
-      const p = normalizeProduct(rawItem);
+      const p = normalizeProduct(rawItem, 'SocialCrawl Search API');
       p.collectionPosition = (page - 1) * 30 + (idx + 1);
       return p;
     })
     .filter((item) => item.productId);
   await persistProducts(normalized, query);
   const products = await attachTrendMetrics(normalized);
+
+  logMinerAcquisition({
+    query: providerQuery,
+    page,
+    region,
+    endpoint: '/v1/tiktokshop/search',
+    requestUrl: url.toString(),
+    requestExecuted: true,
+    httpStatus: response.status,
+    itemsReceived: (payload.data?.items || []).length,
+    creditsUsed: payload.credits_used ?? 0,
+  });
 
   return {
     products,
@@ -1646,9 +1883,31 @@ export async function executeDailyRefresh(): Promise<DailyRefreshStatusResult> {
 
   const currentStatus = await getDailyRefreshStatus();
   if (currentStatus?.isCooldownActive) {
+    for (const cat of COLLECTOR_CATEGORIES) {
+      logMinerAcquisition({
+        category: cat,
+        query: cat,
+        page: 1,
+        region: 'BR',
+        endpoint: '/v1/tiktokshop/search',
+        requestExecuted: false,
+        skipReason: '24h protection cooldown active',
+      });
+    }
     throw new Error('DAILY_REFRESH_COOLDOWN');
   }
   if (currentStatus?.isCurrentlyRunning) {
+    for (const cat of COLLECTOR_CATEGORIES) {
+      logMinerAcquisition({
+        category: cat,
+        query: cat,
+        page: 1,
+        region: 'BR',
+        endpoint: '/v1/tiktokshop/search',
+        requestExecuted: false,
+        skipReason: 'Daily refresh execution already in progress',
+      });
+    }
     throw new Error('DAILY_REFRESH_IN_PROGRESS');
   }
 
