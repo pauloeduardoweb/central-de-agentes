@@ -997,17 +997,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     return favorites.some((p) => p.productId === productId);
   };
 
-  const [mode, setModeState] = useState<'search' | 'ranking' | 'collector' | 'favorites'>(() => {
+  const [mode, setModeState] = useState<'search' | 'collector' | 'favorites'>(() => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem('gzp_miner_mode');
-      if (saved === 'search' || saved === 'ranking' || saved === 'collector' || saved === 'favorites') {
+      if (saved === 'search' || saved === 'collector' || saved === 'favorites') {
         return saved;
       }
     }
     return 'search';
   });
 
-  const setMode = (newMode: 'search' | 'ranking' | 'collector' | 'favorites') => {
+  const setMode = (newMode: 'search' | 'collector' | 'favorites') => {
     setModeState(newMode);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('gzp_miner_mode', newMode);
@@ -1247,7 +1247,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   /* Unified Display List applying Category Filter + Subcategory Filter + Classification Order */
   const displayProducts = useMemo(() => {
-    let list = mode === 'favorites' ? favorites : mode === 'ranking' ? ranking : products;
+    let list = mode === 'favorites' ? favorites : products;
 
     // 0. Filter by text search query (dynamic search on current base)
     if (query.trim()) {
@@ -1356,13 +1356,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
   }, [rankingPage, totalRankingPages]);
 
-  const currentRenderProducts = useMemo(() => {
-    if (mode === 'ranking') {
-      const start = (safeRankingPage - 1) * 30;
-      return displayProducts.slice(start, start + 30);
-    }
-    return displayProducts;
-  }, [displayProducts, mode, safeRankingPage]);
+  const currentRenderProducts = displayProducts;
 
   const loadDailyStatus = async () => {
     if (!canRefresh) return;
@@ -1728,18 +1722,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             Pesquisa
           </button>
 
-          <button
-            onClick={() => setMode('ranking')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
-              mode === 'ranking'
-                ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            Ranking
-          </button>
-
           {canRefresh ? (
             <button
               onClick={() => setMode('collector')}
@@ -1880,7 +1862,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 if (rankingSort === '7d') {
                   setRankingSort('opportunities');
                 } else {
-                  setMode('ranking');
                   setRankingSort('7d');
                 }
               }}
@@ -1900,7 +1881,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       {/* 4 — LISTA / FEED DE PRODUTOS                       */}
       {/* ================================================== */}
-      {mode === 'search' || mode === 'ranking' || mode === 'favorites' ? (
+      {mode === 'search' || mode === 'favorites' ? (
         <>
           {(loading || rankingLoading) ? (
             <div className="py-16 flex justify-center">
@@ -1984,7 +1965,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 Você ainda não possui produtos em Meus Favoritos.
               </h2>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Navegue pela Pesquisa ou pelo Ranking e clique no ícone de coração nos cards dos produtos para salvá-los aqui para fácil acesso posterior.
+                Navegue pela Pesquisa e clique no ícone de coração nos cards dos produtos para salvá-los aqui para fácil acesso posterior.
               </p>
             </div>
           ) : null}
@@ -2021,7 +2002,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               {/* Mobile View: 2-Column Grid (TikTok Shop style) */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:hidden items-stretch">
                 {currentRenderProducts.map((product, index) => {
-                  const globalPos = mode === 'ranking' ? (rankingPage - 1) * 30 + index + 1 : index + 1;
+                  const globalPos = index + 1;
                   return (
                     <MobileProductCard
                       key={product.productId}
@@ -2040,7 +2021,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               {/* Desktop View: Full Rich Grid */}
               <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                 {currentRenderProducts.map((product, index) => {
-                  const globalPos = mode === 'ranking' ? (rankingPage - 1) * 30 + index + 1 : index + 1;
+                  const globalPos = index + 1;
                   return (
                     <ProductCard
                       key={product.productId}
@@ -2080,37 +2061,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     disabled={!hasMore}
                     onClick={() => {
                       runSearch(query, page + 1, false);
-                      window.scrollTo({ top: 350, behavior: 'smooth' });
-                    }}
-                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm transition-all"
-                  >
-                    Próxima
-                  </button>
-                </div>
-              ) : null}
-
-              {/* Pagination controls for Ranking mode */}
-              {mode === 'ranking' && totalRankingPages > 1 ? (
-                <div className="flex items-center justify-center gap-3 pt-4">
-                  <button
-                    disabled={rankingPage <= 1}
-                    onClick={() => {
-                      setRankingPage((p) => Math.max(1, p - 1));
-                      window.scrollTo({ top: 350, behavior: 'smooth' });
-                    }}
-                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm transition-all"
-                  >
-                    Anterior
-                  </button>
-
-                  <span className="text-xs text-slate-600 font-semibold bg-white border border-slate-200 px-3.5 py-2 rounded-xl shadow-sm">
-                    Página {rankingPage} de {totalRankingPages}
-                  </span>
-
-                  <button
-                    disabled={rankingPage >= totalRankingPages}
-                    onClick={() => {
-                      setRankingPage((p) => Math.min(totalRankingPages, p + 1));
                       window.scrollTo({ top: 350, behavior: 'smooth' });
                     }}
                     className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 shadow-sm transition-all"
