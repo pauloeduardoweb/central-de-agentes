@@ -744,7 +744,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
     ['MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT'].includes(u.disconnectSource!);
   const isUserOnline = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Online';
   const isUserAusente = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Ausente';
-  const isUserOffline = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Offline';
+  const isUserOffline = (u: OnlineUser) => isUserActive(u) && (u.status === 'Offline' || !u.hasActiveSession);
 
   // Filter Users
   const filteredUsers = users.filter((u) => {
@@ -753,7 +753,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
 
     let statusMatch = true;
     if (statusFilter === 'ativos') statusMatch = isUserOnline(u) || isUserAusente(u);
-    else if (statusFilter === 'todos') statusMatch = isUserActive(u) && (Boolean(u.hasActiveSession) || isUserDesconectado(u));
+    else if (statusFilter === 'todos') statusMatch = isUserActive(u);
     else if (statusFilter === 'online') statusMatch = isUserOnline(u);
     else if (statusFilter === 'ausente') statusMatch = isUserAusente(u);
     else if (statusFilter === 'offline') statusMatch = isUserOffline(u);
