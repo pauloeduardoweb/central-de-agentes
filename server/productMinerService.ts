@@ -994,7 +994,6 @@ export async function searchTikTokShopProducts(params: {
       );
 
       const localRows = Array.isArray(rows) ? rows : [];
-      console.log('[DEBUG DB SEARCH]', { category, subcategory, query, whereSql, sqlParams, orderParams, rowsLength: localRows.length });
       let hasMore = localRows.length > safePageSize;
       let localProducts = localRows.slice(0, safePageSize).map(rowToProduct);
 
