@@ -366,10 +366,16 @@ export function calculateVideoAnalysis(video: ProductMinerProduct['video']) {
 
 export type ReclassificationReport = {
   totalAnalyzed: number;
+  totalChanged: number;
+  totalMaintained: number;
   totalClassified: number;
   totalUnclassified: number;
   categoryCounts: Record<string, number>;
   subcategoryCounts: Record<string, number>;
+  leftInfantil: number;
+  enteredInfantil: number;
+  remainedInInfantil: number;
+  movedFromInfantilTo: Record<string, number>;
   socialCrawlCalled: false;
   creditsConsumed: 0;
 };
