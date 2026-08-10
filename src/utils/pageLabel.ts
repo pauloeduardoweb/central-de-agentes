@@ -68,6 +68,7 @@ export function getCurrentPageLabel({
     if (mentorTab === 'codes') return 'Códigos de Acesso';
     if (mentorTab === 'sessions') return 'Sessões Ativas & Membros';
     if (mentorTab === 'stats') return 'Estatísticas';
+    if (mentorTab === 'miner-access') return 'Acesso ao Minerador';
     return 'Dashboard';
   }
 
