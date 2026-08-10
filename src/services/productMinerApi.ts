@@ -196,7 +196,7 @@ export interface DailyRefreshStatus {
   totalCategories: number;
   uniqueProductsCount: number;
   creditsUsed: number;
-  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED';
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED' | 'cooldown';
   currentCategory: string | null;
   failedCategories: string[];
   isCooldownActive: boolean;
@@ -214,10 +214,14 @@ export async function fetchDailyRefreshStatus(studentCode: string): Promise<Dail
   return (data.status || null) as DailyRefreshStatus | null;
 }
 
-export async function runDailyRefresh(studentCode: string): Promise<DailyRefreshStatus> {
+export async function runDailyRefresh(studentCode: string, force?: boolean): Promise<DailyRefreshStatus> {
   const response = await fetch('/api/product-miner/collector/daily-refresh', {
     method: 'POST',
-    headers: authHeaders(studentCode),
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ force: Boolean(force) }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw accessError(data);
