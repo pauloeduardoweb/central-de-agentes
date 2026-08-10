@@ -45,6 +45,13 @@ export default function App() {
     return typeof window !== 'undefined' ? window.location.pathname : '/';
   });
 
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   useEffect(() => {
     const handlePopState = () => {
       if (typeof window !== 'undefined') {
@@ -80,12 +87,24 @@ export default function App() {
   }, [studentCode, isMaster]);
 
   useEffect(() => {
-    if (activeView === 'miner' && !canAccessProductMiner) setActiveView('hub');
+    if (activeView === 'miner' && !canAccessProductMiner) {
+      setActiveView('hub');
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/miner')) {
+        window.history.replaceState({}, '', '/');
+      }
+      setCurrentPath('/');
+      triggerToast('Este recurso não está habilitado para sua conta.');
+    }
   }, [activeView, canAccessProductMiner]);
 
   const handleSelectView = (view: 'hub' | 'mentor' | 'chat' | 'miner') => {
     if (view === 'miner' && !canAccessProductMiner) {
       setActiveView('hub');
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/miner')) {
+        window.history.replaceState({}, '', '/');
+      }
+      setCurrentPath('/');
+      triggerToast('Este recurso não está habilitado para sua conta.');
       return;
     }
 
@@ -135,6 +154,7 @@ export default function App() {
         }
         setCurrentPath('/');
         setActiveView('hub');
+        triggerToast('Este recurso não está habilitado para sua conta.');
       }
     } else if (currentPath.startsWith('/mentor')) {
       if (isMaster) {
@@ -194,9 +214,6 @@ export default function App() {
       document.body.style.overflow = '';
     };
   }, [activeView]);
-
-  // Toast feedback
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loaded = getStoredAgents();
@@ -483,12 +500,6 @@ export default function App() {
     setSessionId('');
     setShowApiKeyModal(true);
     triggerToast('Código de acesso removido do navegador.');
-  };
-
-
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const updateAgentsList = (newAgents: Agent[]) => {
