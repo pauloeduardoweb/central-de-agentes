@@ -782,42 +782,106 @@ export async function prepareVideoDownload(productId: string): Promise<{
   }
 }
 
-function getCategoryWhereClause(query: string): { whereSql: string; params: any[] } {
-  const norm = query.toLowerCase().trim();
-  const like = `%${query}%`;
+export function buildProductSearchWhereClause(params: {
+  query?: string;
+  category?: string;
+  subcategory?: string;
+}): { whereSql: string; sqlParams: any[]; querySourceForOrder: string | null } {
+  const whereConditions: string[] = [];
+  const sqlParams: any[] = [];
 
-  if (norm === 'infantil') {
-    return {
-      whereSql: `(
-        LOWER(p.query_source) = 'infantil'
-        OR LOWER(p.category_path) LIKE '%infantil%'
-        OR LOWER(p.category_path) LIKE '%bebe%'
-        OR LOWER(p.category_path) LIKE '%baby%'
-        OR LOWER(p.category_path) LIKE '%kids%'
-        OR LOWER(p.category_path) LIKE '%maternidade%'
-        OR LOWER(p.title) LIKE '%infantil%'
-        OR LOWER(p.title) LIKE '%bebe%'
-        OR LOWER(p.title) LIKE '%bebes%'
-        OR LOWER(p.title) LIKE '%baby%'
-        OR LOWER(p.title) LIKE '%crianca%'
-        OR LOWER(p.title) LIKE '%criancas%'
-        OR LOWER(p.title) LIKE '%recem nascido%'
-        OR LOWER(p.title) LIKE '%maternidade%'
-        OR LOWER(p.title) LIKE '%fralda%'
-        OR LOWER(p.title) LIKE '%mamadeira%'
-        OR LOWER(p.title) LIKE '%chupeta%'
-        OR LOWER(p.title) LIKE '%carrinho de bebe%'
-        OR LOWER(p.title) LIKE '%berco%'
-        OR LOWER(p.title) LIKE '%brinquedo%'
-      )`,
-      params: [],
-    };
+  const rawQuery = String(params.query || '').trim();
+  const rawCategory = String(params.category || '').trim();
+  const rawSubcategory = String(params.subcategory || '').trim();
+
+  let categoryToUse = rawCategory;
+  if (categoryToUse.toLowerCase() === 'todos' || categoryToUse.toLowerCase() === 'todas') {
+    categoryToUse = '';
   }
 
+  let subcategoryToUse = rawSubcategory;
+  if (subcategoryToUse.toLowerCase() === 'todas' || subcategoryToUse.toLowerCase() === 'todos') {
+    subcategoryToUse = '';
+  }
+
+  // 1. Category Filter
+  if (categoryToUse) {
+    whereConditions.push(`(
+      TRIM(p.query_source) = ?
+      OR LOWER(TRIM(p.query_source)) = LOWER(?)
+      OR p.category_path = ?
+      OR p.category_path LIKE ?
+    )`);
+    sqlParams.push(categoryToUse, categoryToUse, categoryToUse, `${categoryToUse} >%`);
+  }
+
+  // 2. Subcategory Filter
+  if (subcategoryToUse) {
+    if (categoryToUse) {
+      whereConditions.push(`(
+        p.category_path = ?
+        OR p.category_path LIKE ?
+        OR p.category_path LIKE ?
+        OR p.category_path LIKE ?
+        OR p.category_path = ?
+      )`);
+      const exactPath = `${categoryToUse} > ${subcategoryToUse}`;
+      const prefixPath = `${categoryToUse} > ${subcategoryToUse} >%`;
+      const endPath = `%> ${subcategoryToUse}`;
+      const midPath = `%> ${subcategoryToUse} >%`;
+      sqlParams.push(exactPath, prefixPath, endPath, midPath, subcategoryToUse);
+    } else {
+      whereConditions.push(`(
+        p.category_path LIKE ?
+        OR p.category_path LIKE ?
+        OR p.category_path = ?
+      )`);
+      sqlParams.push(`%> ${subcategoryToUse}`, `%> ${subcategoryToUse} >%`, subcategoryToUse);
+    }
+  }
+
+  // 3. Search Query Filter
+  let querySourceForOrder: string | null = null;
+  if (rawQuery) {
+    const isMainCatName = COLLECTOR_CATEGORIES.some((c) => c.toLowerCase() === rawQuery.toLowerCase());
+    if (isMainCatName && !categoryToUse) {
+      whereConditions.push(`(
+        TRIM(p.query_source) = ?
+        OR LOWER(TRIM(p.query_source)) = LOWER(?)
+        OR p.category_path = ?
+        OR p.category_path LIKE ?
+        OR p.title LIKE ?
+        OR p.seller_name LIKE ?
+      )`);
+      const likeQ = `%${rawQuery}%`;
+      sqlParams.push(rawQuery, rawQuery, rawQuery, `${rawQuery} >%`, likeQ, likeQ);
+      querySourceForOrder = rawQuery;
+    } else {
+      whereConditions.push(`(
+        p.title LIKE ?
+        OR p.seller_name LIKE ?
+        OR p.category_path LIKE ?
+        OR p.query_source LIKE ?
+      )`);
+      const likeQ = `%${rawQuery}%`;
+      sqlParams.push(likeQ, likeQ, likeQ, likeQ);
+    }
+  } else if (categoryToUse) {
+    querySourceForOrder = categoryToUse;
+  }
+
+  const whereSql = whereConditions.length > 0 ? whereConditions.join(' AND ') : '1=1';
+
   return {
-    whereSql: `(p.title LIKE ? OR p.seller_name LIKE ? OR p.category_path LIKE ? OR p.query_source LIKE ?)`,
-    params: [like, like, like, like],
+    whereSql,
+    sqlParams,
+    querySourceForOrder,
   };
+}
+
+function getCategoryWhereClause(query: string): { whereSql: string; params: any[] } {
+  const { whereSql, sqlParams } = buildProductSearchWhereClause({ query });
+  return { whereSql, params: sqlParams };
 }
 
 function logMinerAcquisition(details: {
@@ -849,7 +913,9 @@ function logMinerAcquisition(details: {
 }
 
 export async function searchTikTokShopProducts(params: {
-  query: string;
+  query?: string;
+  category?: string;
+  subcategory?: string;
   page?: number;
   region?: string;
   forceRefresh?: boolean;
@@ -866,8 +932,12 @@ export async function searchTikTokShopProducts(params: {
   requestId: string | null;
 }> {
   const query = String(params.query || '').trim();
+  const category = String(params.category || '').trim();
+  const subcategory = String(params.subcategory || '').trim();
+
   if (query.length === 1) {
     logMinerAcquisition({
+      category,
       query,
       page: 1,
       region: params.region || DEFAULT_REGION,
@@ -879,6 +949,7 @@ export async function searchTikTokShopProducts(params: {
   }
   if (query.length > 120) {
     logMinerAcquisition({
+      category,
       query,
       page: 1,
       region: params.region || DEFAULT_REGION,
@@ -896,204 +967,87 @@ export async function searchTikTokShopProducts(params: {
   // Normal searches are ALWAYS free: first reuse any stored SocialCrawl result,
   // or query our MySQL database. Provider credits are spent only through an explicit mentor refresh.
   if (!forceRefresh) {
-    // 1. If query is empty, return top products from MySQL database
-    if (!query) {
-      if (isDatabaseConfigured()) {
-        await ensureProductMinerTables();
-        const safePageSize = 30;
-        const offset = (page - 1) * safePageSize;
-        const [rows]: any = await db.query(
-          `SELECT p.*
-           FROM tiktok_shop_products p
-           ORDER BY p.sold_count DESC, p.last_seen_at DESC
-           LIMIT ? OFFSET ?`,
-          [safePageSize + 1, offset]
-        );
-        const localRows = Array.isArray(rows) ? rows : [];
-        let hasMore = localRows.length > safePageSize;
-        let localProducts = localRows.slice(0, safePageSize).map(rowToProduct);
-
-        // Fallback: If requested page > 1 has no products, return page 1
-        if (localProducts.length === 0 && page > 1) {
-          const [fallbackRows]: any = await db.query(
-            `SELECT p.*
-             FROM tiktok_shop_products p
-             ORDER BY p.sold_count DESC, p.last_seen_at DESC
-             LIMIT ? OFFSET 0`,
-            [safePageSize + 1]
-          );
-          const fRows = Array.isArray(fallbackRows) ? fallbackRows : [];
-          hasMore = fRows.length > safePageSize;
-          localProducts = fRows.slice(0, safePageSize).map(rowToProduct);
-        }
-
-        const products = await attachTrendMetrics(localProducts);
-        logMinerAcquisition({
-          query,
-          page,
-          region,
-          endpoint: '/v1/tiktokshop/search',
-          requestExecuted: false,
-          skipReason: 'forceRefresh=false & empty query (served from local database)',
-          itemsReceived: products.length,
-          creditsUsed: 0,
-        });
-        return {
-          products,
-          creditsUsed: 0,
-          creditsRemaining: null,
-          hasMore,
-          pageSize: safePageSize,
-          fromCache: true,
-          source: 'database',
-          needsRefresh: false,
-          cacheExpired: false,
-          requestId: null,
-        };
-      }
-
-      logMinerAcquisition({
-        query,
-        page,
-        region,
-        endpoint: '/v1/tiktokshop/search',
-        requestExecuted: false,
-        skipReason: 'forceRefresh=false & empty query & database not configured',
-      });
-
-      return {
-        products: [],
-        creditsUsed: 0,
-        creditsRemaining: null,
-        hasMore: false,
-        pageSize: 0,
-        fromCache: true,
-        source: 'empty',
-        needsRefresh: false,
-        cacheExpired: false,
-        requestId: null,
-      };
-    }
-
-    // 2. Query provided: check cache for this exact page
-    const stored = await getStoredPayload(query, region, page);
-    if (stored) {
-      const normalized = (stored.payload.data?.items || [])
-        .map((raw) => normalizeProduct(raw, 'Stored Search Cache'))
-        .filter((item) => item.productId);
-
-      // Check if page + 1 exists in cache or if DB has more items
-      const storedNext = await getStoredPayload(query, region, page + 1);
-      let localHasMore = Boolean(storedNext);
-      if (!localHasMore && isDatabaseConfigured()) {
-        const { whereSql, params: sqlParams } = getCategoryWhereClause(query);
-        const [countRows]: any = await db.query(
-          `SELECT COUNT(*) as total FROM tiktok_shop_products p WHERE ${whereSql}`,
-          sqlParams
-        );
-        const total = Number(Array.isArray(countRows) ? countRows[0]?.total || 0 : 0);
-        localHasMore = total > page * 30;
-      }
-
-      const products = await attachTrendMetrics(normalized);
-      logMinerAcquisition({
-        query,
-        page,
-        region,
-        endpoint: '/v1/tiktokshop/search',
-        requestExecuted: false,
-        skipReason: 'forceRefresh=false & cache hit',
-        itemsReceived: products.length,
-        creditsUsed: 0,
-      });
-      return {
-        products,
-        creditsUsed: 0,
-        creditsRemaining: null,
-        hasMore: localHasMore,
-        pageSize: Number(stored.payload.pagination?.page_size || products.length),
-        fromCache: true,
-        source: 'cache',
-        needsRefresh: stored.expired,
-        cacheExpired: stored.expired,
-        requestId: stored.payload.request_id || null,
-      };
-    }
-
-    // 3. Not in cache for this page -> search MySQL database for matching products
     if (isDatabaseConfigured()) {
       await ensureProductMinerTables();
       const safePageSize = 30;
       const offset = (page - 1) * safePageSize;
-      const { whereSql, params: sqlParams } = getCategoryWhereClause(query);
+
+      const { whereSql, sqlParams, querySourceForOrder } = buildProductSearchWhereClause({
+        query,
+        category,
+        subcategory,
+      });
+
+      const orderClause = querySourceForOrder
+        ? `ORDER BY CASE WHEN LOWER(TRIM(p.query_source)) = LOWER(?) THEN 0 ELSE 1 END, p.sold_count DESC, p.last_seen_at DESC`
+        : `ORDER BY p.sold_count DESC, p.last_seen_at DESC`;
+
+      const orderParams = querySourceForOrder ? [querySourceForOrder] : [];
 
       const [rows]: any = await db.query(
         `SELECT p.*
          FROM tiktok_shop_products p
          WHERE ${whereSql}
-         ORDER BY
-           CASE WHEN LOWER(p.query_source) = LOWER(?) THEN 0 ELSE 1 END,
-           p.sold_count DESC,
-           p.last_seen_at DESC
+         ${orderClause}
          LIMIT ? OFFSET ?`,
-        [...sqlParams, query, safePageSize + 1, offset]
+        [...sqlParams, ...orderParams, safePageSize + 1, offset]
       );
+
       const localRows = Array.isArray(rows) ? rows : [];
+      console.log('[DEBUG DB SEARCH]', { category, subcategory, query, whereSql, sqlParams, orderParams, rowsLength: localRows.length });
       let hasMore = localRows.length > safePageSize;
       let localProducts = localRows.slice(0, safePageSize).map(rowToProduct);
 
-      // Fallback: If page > 1 returns 0 products, try page 1 for this query
+      // Fallback: If requested page > 1 has no products, return page 1
       if (localProducts.length === 0 && page > 1) {
         const [fallbackRows]: any = await db.query(
           `SELECT p.*
            FROM tiktok_shop_products p
            WHERE ${whereSql}
-           ORDER BY
-             CASE WHEN LOWER(p.query_source) = LOWER(?) THEN 0 ELSE 1 END,
-             p.sold_count DESC,
-             p.last_seen_at DESC
+           ${orderClause}
            LIMIT ? OFFSET 0`,
-          [...sqlParams, query, safePageSize + 1]
+          [...sqlParams, ...orderParams, safePageSize + 1]
         );
         const fRows = Array.isArray(fallbackRows) ? fallbackRows : [];
         hasMore = fRows.length > safePageSize;
         localProducts = fRows.slice(0, safePageSize).map(rowToProduct);
       }
 
-      if (localProducts.length > 0) {
-        const products = await attachTrendMetrics(localProducts);
-        logMinerAcquisition({
-          query,
-          page,
-          region,
-          endpoint: '/v1/tiktokshop/search',
-          requestExecuted: false,
-          skipReason: 'forceRefresh=false & local DB hit',
-          itemsReceived: products.length,
-          creditsUsed: 0,
-        });
-        return {
-          products,
-          creditsUsed: 0,
-          creditsRemaining: null,
-          hasMore,
-          pageSize: safePageSize,
-          fromCache: true,
-          source: 'database',
-          needsRefresh: true,
-          cacheExpired: false,
-          requestId: null,
-        };
-      }
+      const products = await attachTrendMetrics(localProducts);
+      logMinerAcquisition({
+        category,
+        query,
+        page,
+        region,
+        endpoint: '/v1/tiktokshop/search',
+        requestExecuted: false,
+        skipReason: 'forceRefresh=false & local DB hit',
+        itemsReceived: products.length,
+        creditsUsed: 0,
+      });
+
+      return {
+        products,
+        creditsUsed: 0,
+        creditsRemaining: null,
+        hasMore,
+        pageSize: safePageSize,
+        fromCache: true,
+        source: products.length > 0 ? 'database' : 'empty',
+        needsRefresh: false,
+        cacheExpired: false,
+        requestId: null,
+      };
     }
 
     logMinerAcquisition({
+      category,
       query,
       page,
       region,
       endpoint: '/v1/tiktokshop/search',
       requestExecuted: false,
-      skipReason: 'forceRefresh=false & local DB empty',
+      skipReason: 'forceRefresh=false & database not configured',
     });
 
     return {
@@ -1104,7 +1058,7 @@ export async function searchTikTokShopProducts(params: {
       pageSize: 0,
       fromCache: true,
       source: 'empty',
-      needsRefresh: true,
+      needsRefresh: false,
       cacheExpired: false,
       requestId: null,
     };
