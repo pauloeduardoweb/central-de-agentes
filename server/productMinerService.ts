@@ -1627,10 +1627,18 @@ export function classifyProductToCategoryAndSubcategory(product: {
   const hasDirectAdultTerms = directAdultRegex.test(titleRaw);
   const hasAdultGenderTerms = adultGenderRegex.test(titleRaw);
 
-  // Block from Infantil if direct adult terms are present OR if adult gender terms exist without explicit kids evidence in title
-  const isAdultProduct = hasDirectAdultTerms || (hasAdultGenderTerms && !hasKidsEvidenceInTitle);
+  // Step 4: Context priority overrides (Pets and Kitchen Appliances/Utensils win over secondary child mentions)
+  const isPetProduct = /\b(cachorro|cachorros|cao|caes|gato|gatos|pet|pets|canino|canina|felino|felina|racao|racaes|xixi cao|tapete higienico|fralda pet|arranhador|comedouro|bebedouro pet|coleira|peitoral|caminha pet)\b/i.test(titleRaw);
+  const isKitchenAppliance = /\b(processador|triturador|liquidificador|mixer|moedor|picador|multiprocessador|panela|frigideira|air fryer|airfryer|cafeteira|chaleira|utensilio|utensilios|batedeira|aspirador)\b/i.test(titleRaw);
 
-  if (hasKidsEvidenceInTitle && !isAdultProduct) {
+  // Block from Infantil if:
+  // - Direct adult terms are present OR adult gender terms exist without explicit kids evidence in title
+  // - Product is a Pet product (e.g. fralda pet, tapete higienico para cachorro)
+  // - Product is a Kitchen Appliance or Utensil (e.g. processador de alimentos para comida de bebe)
+  const isAdultProduct = hasDirectAdultTerms || (hasAdultGenderTerms && !hasKidsEvidenceInTitle);
+  const isBlockedFromInfantil = isAdultProduct || isPetProduct || isKitchenAppliance;
+
+  if (hasKidsEvidenceInTitle && !isBlockedFromInfantil) {
     const testKidsMatch = (pattern: RegExp) => pattern.test(sanitizedTitleForKids);
 
     let sub = 'Moda Infantil';
@@ -1773,7 +1781,8 @@ export function classifyProductToCategoryAndSubcategory(product: {
       'limpeza', 'mop', 'vassoura', 'esfregao', 'detergente', 'pano', 'esponja', 'quadro',
       'almofada', 'tapete', 'vaso', 'planta', 'cama', 'lencol', 'edredom', 'travesseiro',
       'coberta', 'fronha', 'garrafa termica', 'copo termico', 'pote', 'frigideira', 'faca',
-      'tabua', 'xicara', 'prato', 'copo', 'garrafa', 'cabide', 'lixeira', 'suporte', 'casa', 'lar'
+      'tabua', 'xicara', 'prato', 'copo', 'garrafa', 'cabide', 'lixeira', 'suporte', 'casa', 'lar',
+      'processador', 'triturador', 'moedor', 'picador', 'mixer'
     )
   ) {
     let sub = 'Utensílios de Cozinha';
