@@ -1603,27 +1603,31 @@ export function classifyProductToCategoryAndSubcategory(product: {
 
   const has = (...terms: string[]) => terms.some((t) => text.includes(removeAccents(t)));
 
-  // 1. INFANTIL (HIGHEST PRIORITY - Infantil vence Moda e outras categorias quando o produto for claramente infantil)
-  if (
-    has(
-      'bebe', 'bebes', 'baby', 'infantil', 'infantis', 'crianca', 'criancas', 'menino', 'menina',
-      'kids', 'toddler', 'maternidade', 'recem nascido', 'escolar infantil', 'fralda', 'mamadeira', 'chupeta',
-      'berco', 'carrinho de bebe', 'carrinho bebe', 'ninho bebe', 'macacao bebe', 'body bebe',
-      'pijama infantil', 'roupa infantil', 'vestido infantil', 'conjunto infantil', 'sapato infantil',
-      'tenis infantil', 'sandalia infantil', 'brinquedo infantil', 'mordedor', 'chocalho',
-      'sabonete bebe', 'shampoo bebe', 'pomada assadura', 'lenco umedecido'
-    )
-  ) {
+  // 1. INFANTIL (EXPLICIT KIDS EVIDENCE REQUIRED)
+  // Strip synthesized category prefixes ("Infantil > ...", "Infantil") and query_source ("Infantil")
+  // to avoid self-reinforcing classification loops on already-tagged items.
+  const cleanCatPath = (product.category_path || '')
+    .replace(/^Infantil\s*>\s*/i, '')
+    .replace(/^Infantil$/i, '');
+  const cleanQuerySource = (product.query_source || '').toLowerCase() === 'infantil' ? '' : (product.query_source || '');
+
+  const textForKids = removeAccents(`${product.title || ''} ${cleanCatPath} ${cleanQuerySource} ${product.seller_name || ''}`);
+
+  const kidsRegex = /\b(infantil|infantis|crianca|criancas|kids|kid|menino|meninos|menina|meninas|bebe|bebes|baby|babies|juvenil|juvenis|recem nascido|recem-nascido|recem nascidos|recem-nascidos|toddler|toddlers|maternidade|fralda|fraldas|mamadeira|mamadeiras|chupeta|chupetas|berco|bercos|chocalho|chocalhos|mordedor|mordedores|ninho bebe|carrinho de bebe)\b/i;
+
+  if (kidsRegex.test(textForKids)) {
+    const testKidsMatch = (pattern: RegExp) => pattern.test(textForKids);
+
     let sub = 'Moda Infantil';
-    if (has('bebe', 'baby', 'maternidade', 'recem nascido', 'fralda', 'mamadeira', 'chupeta', 'berco', 'carrinho de bebe', 'ninho bebe')) {
-      sub = 'Bebês';
-    } else if (has('tenis', 'sapato', 'sandalia', 'chinelo', 'bota', 'pantufa', 'calcado')) {
-      sub = 'Calçados';
-    } else if (has('brinquedo', 'jogo', 'boneca', 'pelucia', 'lego', 'mordedor', 'chocalho')) {
+    if (testKidsMatch(/\b(brinquedo|brinquedos|jogo|jogos|boneca|bonecas|pelucia|pelucias|lego|mordedor|mordedores|chocalho|chocalhos)\b/i)) {
       sub = 'Brinquedos';
-    } else if (has('higiene', 'banho', 'sabonete', 'shampoo', 'pomada', 'lenco umedecido', 'termometro', 'cuidado')) {
+    } else if (testKidsMatch(/\b(tenis|sapato|sapatos|sandalia|sandalias|chinelo|chinelos|bota|botas|pantufa|pantufas|calcado|calcados|sapatilha|sapatilhas)\b/i)) {
+      sub = 'Calçados';
+    } else if (testKidsMatch(/\b(higiene|banho|sabonete|shampoo|pomada|lenco umedecido|lencos umedecidos|termometro|cuidado|cuidados|assadura)\b/i)) {
       sub = 'Cuidados';
-    } else if (has('laco', 'tiara', 'babador', 'touca', 'mochila infantil', 'acessorio')) {
+    } else if (testKidsMatch(/\b(bebe|bebes|baby|babies|maternidade|recem nascido|recem-nascido|fralda|fraldas|mamadeira|mamadeiras|chupeta|chupetas|berco|bercos|ninho bebe|carrinho de bebe)\b/i)) {
+      sub = 'Bebês';
+    } else if (testKidsMatch(/\b(laco|lacos|tiara|tiaras|babador|babadores|touca|toucas|mochila|mochilas|mala|malas|bolsa|bolsas|acessorio|acessorios)\b/i)) {
       sub = 'Acessórios';
     } else {
       sub = 'Moda Infantil';
