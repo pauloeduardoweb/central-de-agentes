@@ -355,3 +355,23 @@ export function calculateVideoAnalysis(video: ProductMinerProduct['video']) {
     scorePercent,
   };
 }
+
+export type ReclassificationReport = {
+  totalAnalyzed: number;
+  totalClassified: number;
+  totalUnclassified: number;
+  categoryCounts: Record<string, number>;
+  subcategoryCounts: Record<string, number>;
+  socialCrawlCalled: false;
+  creditsConsumed: 0;
+};
+
+export async function runBaseReclassification(studentCode: string): Promise<ReclassificationReport> {
+  const response = await fetch('/api/product-miner/admin/reclassify', {
+    method: 'POST',
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data.report as ReclassificationReport;
+}
