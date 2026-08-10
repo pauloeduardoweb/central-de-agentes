@@ -427,6 +427,11 @@ function matchesSubcategoryFilter(
 
   const sub = selectedSubcat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
+  // 1b. DIRECT STRUCTURED CATEGORY_PATH MATCH
+  if (catStr.includes(`> ${sub}`) || catStr.includes(`>${sub}`) || catStr.endsWith(sub)) {
+    return true;
+  }
+
   const catKey = selectedCat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const mapKey = `${catKey}_${sub}`;
 
