@@ -23,6 +23,7 @@ import {
   ensureProductMinerTables,
 } from './server/database.js';
 import { tiktokRouter } from './server/tiktokRoutes.js';
+import { tiktokShopRouter } from './server/tiktokShopRoutes.js';
 import { productMinerRouter } from './server/productMinerRoutes.js';
 import {
   getGlobalRankingHandler,
@@ -138,6 +139,7 @@ import { getGeminiClient } from './server/geminiHelper.js';
 const apiRouter = express.Router();
 apiRouter.use(chatExtraRouter);
 apiRouter.use('/tiktok', tiktokRouter);
+apiRouter.use('/tiktok-shop', tiktokShopRouter);
 apiRouter.use('/product-miner', productMinerRouter);
 
 // Health check endpoint
