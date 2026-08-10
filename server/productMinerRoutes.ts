@@ -2,15 +2,12 @@ import express from 'express';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
 import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, ProductRankingSort } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
-import { db, isDatabaseConfigured } from './database.js';
+import { db, isDatabaseConfigured, ensureCodigosAcessoTable } from './database.js';
+import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin } from './presenceService.js';
 
 export const productMinerRouter = express.Router();
 
-function studentsEnabled(): boolean {
-  return String(process.env.PRODUCT_MINER_STUDENTS_ENABLED || '').trim().toLowerCase() === 'true';
-}
-
-function getRequesterType(req: express.Request): KeyCategory {
+function getRequesterCode(req: express.Request): string | null {
   const raw =
     req.header('x-access-code') ||
     req.header('x-student-access-code') ||
@@ -18,20 +15,63 @@ function getRequesterType(req: express.Request): KeyCategory {
     req.header('authorization')?.replace(/^Bearer\s+/i, '') ||
     '';
   const code = normalizeAccessCode(raw);
+  return code || null;
+}
+
+function getRequesterType(req: express.Request): KeyCategory {
+  const code = getRequesterCode(req);
   return code ? lookupKeyType(code) : 'INVALID';
 }
 
-function requireProductMinerAccess(req: express.Request, res: express.Response): KeyCategory | null {
-  const type = getRequesterType(req);
+export async function isProductMinerEnabledForCode(studentCode: string): Promise<boolean> {
+  const norm = normalizeAccessCode(studentCode);
+  if (!norm) return false;
+
+  // Master/Mentor key ALWAYS has access
+  if (lookupKeyType(norm) === 'MASTER') return true;
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureCodigosAcessoTable();
+      const [rows]: any = await db.query(
+        `SELECT product_miner_enabled FROM codigos_acesso WHERE codigo = ? LIMIT 1`,
+        [norm]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        return Boolean(rows[0].product_miner_enabled);
+      }
+    } catch (err) {
+      console.warn('[isProductMinerEnabledForCode Error]:', err);
+    }
+  }
+
+  // Memory store fallback
+  const mem = memoryKeyStatusMap.get(norm);
+  return Boolean(mem?.productMinerEnabled);
+}
+
+async function requireProductMinerAccess(req: express.Request, res: express.Response): Promise<KeyCategory | null> {
+  const code = getRequesterCode(req);
+  if (!code) {
+    res.status(401).json({ error: 'AUTH_REQUIRED' });
+    return null;
+  }
+  const type = lookupKeyType(code);
   if (type === 'INVALID') {
     res.status(401).json({ error: 'AUTH_REQUIRED' });
     return null;
   }
-  if (type === 'STUDENT' && !studentsEnabled()) {
-    res.status(403).json({ error: 'PRODUCT_MINER_STUDENTS_DISABLED' });
+  if (type === 'MASTER') return 'MASTER';
+
+  const enabled = await isProductMinerEnabledForCode(code);
+  if (!enabled) {
+    res.status(403).json({
+      error: 'PRODUCT_MINER_STUDENTS_DISABLED',
+      message: 'O Minerador de Produtos é um recurso opcional e não está liberado para sua conta. Entre em contato com seu Mentor.',
+    });
     return null;
   }
-  return type;
+  return 'STUDENT';
 }
 
 function requireMentorRefresh(req: express.Request, res: express.Response): boolean {
@@ -48,21 +88,149 @@ function requireMentorRefresh(req: express.Request, res: express.Response): bool
 }
 
 // Cheap access probe used by the frontend. Never calls SocialCrawl.
-productMinerRouter.get('/access', (req, res) => {
-  const type = getRequesterType(req);
+productMinerRouter.get('/access', async (req, res) => {
+  const code = getRequesterCode(req);
+  if (!code) return res.status(401).json({ error: 'AUTH_REQUIRED' });
+  const type = lookupKeyType(code);
   if (type === 'INVALID') return res.status(401).json({ error: 'AUTH_REQUIRED' });
-  const enabled = type === 'MASTER' || studentsEnabled();
+
+  const isMaster = type === 'MASTER';
+  const enabled = isMaster || (await isProductMinerEnabledForCode(code));
+
   return res.json({
     success: true,
     enabled,
-    canRefresh: type === 'MASTER',
-    role: type === 'MASTER' ? 'mentor' : 'student',
+    canRefresh: isMaster,
+    role: isMaster ? 'mentor' : 'student',
   });
+});
+
+// ADMIN: Get list of students and their Product Miner access status
+productMinerRouter.get('/admin/students', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    let students: any[] = [];
+    if (isDatabaseConfigured()) {
+      await ensureCodigosAcessoTable();
+      const query = `
+        SELECT 
+          ca.id AS accessKeyId,
+          ca.codigo,
+          ca.access_status,
+          ca.product_miner_enabled,
+          ca.product_miner_enabled_at,
+          ca.product_miner_enabled_by,
+          ca.criado_em,
+          pf.nome_usuario,
+          pf.nickname
+        FROM codigos_acesso ca
+        LEFT JOIN perfis_alunos pf ON ca.codigo = pf.codigo
+        ORDER BY ca.product_miner_enabled DESC, ca.id DESC
+      `;
+      const [rows]: any = await db.query(query);
+      if (Array.isArray(rows)) {
+        students = rows.map((r: any) => {
+          const norm = normalizeAccessCode(r.codigo);
+          return {
+            accessKeyId: r.accessKeyId,
+            codigo: r.codigo,
+            maskedKey: maskKeyForAdmin(norm),
+            username: r.nickname || r.nome_usuario || `Aluno ${norm.slice(-4)}`,
+            productMinerEnabled: Boolean(r.product_miner_enabled),
+            productMinerEnabledAt: r.product_miner_enabled_at ? new Date(r.product_miner_enabled_at).toISOString() : null,
+            productMinerEnabledBy: r.product_miner_enabled_by || null,
+            createdAt: r.criado_em ? new Date(r.criado_em).toISOString() : new Date().toISOString(),
+          };
+        });
+      }
+    } else {
+      // Memory fallback
+      for (const [code, mem] of memoryKeyStatusMap.entries()) {
+        const norm = normalizeAccessCode(code);
+        students.push({
+          accessKeyId: Math.abs(norm.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)),
+          codigo: norm,
+          maskedKey: maskKeyForAdmin(norm),
+          username: `Aluno ${norm.slice(-4)}`,
+          productMinerEnabled: Boolean(mem.productMinerEnabled),
+          productMinerEnabledAt: mem.productMinerEnabledAt || null,
+          productMinerEnabledBy: mem.productMinerEnabledBy || null,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+    return res.json({ success: true, students });
+  } catch (err: any) {
+    console.error('[Admin Miner Students List Error]:', err?.message || err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao listar alunos.' });
+  }
+});
+
+// ADMIN: Toggle Product Miner access for a student code
+productMinerRouter.post('/admin/toggle', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const { accessKeyId, codigo, enabled } = req.body || {};
+    const wantEnable = Boolean(enabled);
+
+    let targetCode = codigo ? normalizeAccessCode(codigo) : '';
+
+    if (isDatabaseConfigured()) {
+      await ensureCodigosAcessoTable();
+      if (!targetCode && accessKeyId) {
+        const [rows]: any = await db.query(`SELECT codigo FROM codigos_acesso WHERE id = ? LIMIT 1`, [accessKeyId]);
+        if (Array.isArray(rows) && rows.length > 0) {
+          targetCode = rows[0].codigo;
+        }
+      }
+
+      if (!targetCode) {
+        return res.status(404).json({ error: 'NOT_FOUND', message: 'Chave de acesso não encontrada.' });
+      }
+
+      await db.query(
+        `UPDATE codigos_acesso
+         SET 
+           product_miner_enabled = ?,
+           product_miner_enabled_at = IF(? = 1, NOW(), product_miner_enabled_at),
+           product_miner_enabled_by = IF(? = 1, 'SESSION_MASTER', NULL)
+         WHERE codigo = ? OR id = ?`,
+        [wantEnable ? 1 : 0, wantEnable ? 1 : 0, wantEnable ? 1 : 0, targetCode, accessKeyId || 0]
+      );
+    }
+
+    if (targetCode) {
+      const nowIso = new Date().toISOString();
+      const existingMem = memoryKeyStatusMap.get(targetCode) || { accessStatus: 'ACTIVE' };
+      memoryKeyStatusMap.set(targetCode, {
+        ...existingMem,
+        productMinerEnabled: wantEnable,
+        productMinerEnabledAt: wantEnable ? nowIso : existingMem.productMinerEnabledAt,
+        productMinerEnabledBy: wantEnable ? 'SESSION_MASTER' : existingMem.productMinerEnabledBy,
+      });
+
+      const clientIp = getClientIp(req);
+      const actionType = wantEnable ? 'ACTIVATED_MINER' : 'DEACTIVATED_MINER';
+      const reason = wantEnable ? 'Acesso ao Minerador ativado pelo Mentor' : 'Acesso ao Minerador desativado pelo Mentor';
+      await recordAdminAuditAction(targetCode, actionType, reason, clientIp).catch(() => {});
+    }
+
+    return res.json({
+      success: true,
+      productMinerEnabled: wantEnable,
+      message: wantEnable
+        ? 'Acesso ao Minerador ativado com sucesso para este aluno!'
+        : 'Acesso ao Minerador desativado com sucesso.',
+    });
+  } catch (err: any) {
+    console.error('[Admin Miner Toggle Access Error]:', err?.message || err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao alterar permissão do minerador.' });
+  }
 });
 
 // FREE search: reads only our MySQL/cache. It never consumes SocialCrawl credits.
 productMinerRouter.get('/search', async (req, res) => {
-  if (!requireProductMinerAccess(req, res)) return;
+  if (!await requireProductMinerAccess(req, res)) return;
   try {
     const query = String(req.query.query || req.query.q || '').trim();
     const page = Number(req.query.page || 1);
@@ -102,7 +270,7 @@ productMinerRouter.post('/refresh', async (req, res) => {
 });
 
 productMinerRouter.get('/ranking', async (req, res) => {
-  if (!requireProductMinerAccess(req, res)) return;
+  if (!await requireProductMinerAccess(req, res)) return;
   try {
     const requestedSort = String(req.query.sort || 'opportunities');
     const sort: ProductRankingSort = (
@@ -182,7 +350,7 @@ productMinerRouter.post('/collector/daily-refresh', async (req, res) => {
 
 // AI Script Generator Route for TikTok Shop
 productMinerRouter.post('/generate-script', async (req, res) => {
-  if (!requireProductMinerAccess(req, res)) return;
+  if (!await requireProductMinerAccess(req, res)) return;
   try {
     const userRole = getRequesterType(req);
     const rawCode = req.body.studentCode || req.header('x-access-code') || req.header('x-student-access-code') || '';
@@ -266,7 +434,6 @@ DADOS REAIS DO PRODUTO (NÃO invente recursos técnicos não presentes nos dados
 - Unidades Vendidas: ${product.soldCount || 0}
 - Avaliação: ${product.rating ? product.rating + '/5.0' : 'N/A'}
 - Categoria: ${product.category || 'Geral'}
-- Score Geração Z Pro: ${product.score || 'N/A'}/100
 ${videoDetails}
 
 ${customPrompt ? `ORIENTAÇÃO ADICIONAL DO ALUNO: "${customPrompt}"` : ''}
@@ -309,7 +476,7 @@ Mostre o ${product.title} na prática e explique a dor que ele resolve no dia a 
 Mostre o produto em uso close-up. Destaque a alta avaliação de ${product.rating || '4.8'}/5 e ${product.soldCount} unidades vendidas no TikTok Shop.
 
 **[CENA 3 - Prova Social]**
-"Olha só a praticidade! Por isso este produto é destaque no Geração Z Pro com Score ${product.score || '85'}/100."
+"Olha só a praticidade! Por isso este produto é um dos mais procurados da categoria."
 
 **[CTA - Chamada para Ação]**
 "Gostou? Clique no **carrinho amarelo** aqui no canto inferior do vídeo e aproveite antes que esgoste!"`;

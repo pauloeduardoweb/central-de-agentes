@@ -35,7 +35,6 @@ export type MinedProduct = {
   growth24hPercent?: number | null;
   growth7dPercent?: number | null;
   trendScore?: number | null;
-  score?: number | null;
   sellerId: string | null;
   sellerName: string | null;
   productUrl: string | null;
@@ -108,9 +107,13 @@ function normalizeProduct(item: any): MinedProduct {
   const video = item?.video || null;
   const stats = video?.statistics || {};
   const author = video?.author || {};
-  const category = Array.isArray(item?.category_breadcrumb)
-    ? item.category_breadcrumb.map((entry: any) => entry?.category_name).filter(Boolean).join(' > ')
+  let category = Array.isArray(item?.category_breadcrumb)
+    ? item.category_breadcrumb.map((entry: any) => entry?.category_name || entry?.name || entry).filter(Boolean).join(' > ')
     : null;
+
+  if (!category) {
+    category = item?.category_path || item?.category_name || item?.category || null;
+  }
 
   return {
     productId: String(item?.product_id || ''),
@@ -325,69 +328,16 @@ function calculateWindowMetric(currentSold: number, baseline: SnapshotPoint | nu
   return { sales: normalizedSales, growth };
 }
 
-export function calculateScoreGeracaoZPro(product: MinedProduct): number {
-  let score = 0;
-
-  // 1. Growth & Recent Sales (24h/7d) - Max 35 pts
-  if (product.sales24h !== null && product.sales24h !== undefined && product.sales24h > 0) {
-    const sales24Pts = Math.min(20, Math.log10(1 + product.sales24h) * 8);
-    const growth24Pts = Math.min(15, Math.max(0, product.growth24hPercent || 0) / 10);
-    score += (sales24Pts + growth24Pts);
-  } else if (product.sales7d !== null && product.sales7d !== undefined && product.sales7d > 0) {
-    const sales7Pts = Math.min(20, Math.log10(1 + (product.sales7d / 7)) * 8);
-    const growth7Pts = Math.min(15, Math.max(0, product.growth7dPercent || 0) / 15);
-    score += (sales7Pts + growth7Pts);
-  } else if (product.trendScore && product.trendScore > 0) {
-    score += Math.min(30, Math.log10(1 + product.trendScore) * 10);
-  } else if (product.soldCount > 0) {
-    score += Math.min(15, Math.log10(1 + product.soldCount) * 4);
-  }
-
-  // 2. Associated Video Strength & Engagement - Max 30 pts
-  if (product.video) {
-    score += 5; // Base boost for having a video
-    const views = Number(product.video.views || 0);
-    if (views > 0) {
-      score += Math.min(10, Math.log10(1 + views) * 2);
-    }
-
-    const likes = Number(product.video.likes || 0);
-    const comments = Number(product.video.comments || 0);
-    const shares = Number(product.video.shares || 0);
-    const saves = Number(product.video.saves || 0);
-    const engagement = likes + (comments * 2) + (shares * 3) + (saves * 2);
-    if (engagement > 0) {
-      score += Math.min(10, Math.log10(1 + engagement) * 2.5);
-    }
-
-    const followers = Number(product.video.authorFollowers || 0);
-    if (followers > 0) {
-      score += Math.min(5, Math.log10(1 + followers) * 1);
-    }
-  }
-
-  // 3. Total Sales Volume - Max 20 pts
-  if (product.soldCount > 0) {
-    score += Math.min(20, Math.log10(1 + product.soldCount) * 5);
-  }
-
-  // 4. Product Rating - Max 15 pts
-  if (product.rating !== null && product.rating !== undefined && product.rating > 0) {
-    const normRating = Math.min(5, Math.max(0, product.rating));
-    score += (normRating / 5) * 15;
-  } else {
-    score += 7.5; // Neutral rating fallback
-  }
-
-  return Math.min(100, Math.max(0, Math.round(score)));
-}
-
 async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduct[]> {
   if (!isDatabaseConfigured() || products.length === 0) {
-    return products.map((product) => {
-      const baseProduct = { ...product, sales24h: null, sales7d: null, growth24hPercent: null, growth7dPercent: null, trendScore: null };
-      return { ...baseProduct, score: calculateScoreGeracaoZPro(baseProduct) };
-    });
+    return products.map((product) => ({
+      ...product,
+      sales24h: null,
+      sales7d: null,
+      growth24hPercent: null,
+      growth7dPercent: null,
+      trendScore: null,
+    }));
   }
 
   await ensureProductMinerTables();
@@ -413,7 +363,7 @@ async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduc
     snapshots.set(productId, list);
   }
 
-  const enrichedProductsWithScore = products.map((product) => {
+  const enrichedProducts = products.map((product) => {
     const list = snapshots.get(product.productId) || [];
     const baseline24h = chooseBaseline(list, 24, 18, 48);
     const baseline7d = chooseBaseline(list, 168, 120, 216);
@@ -423,7 +373,7 @@ async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduc
       ? null
       : Math.round(metric24h.sales * (1 + Math.min(Math.max(metric24h.growth || 0, 0), 300) / 100));
 
-    const enrichedProduct: MinedProduct = {
+    return {
       ...product,
       sales24h: metric24h.sales,
       sales7d: metric7d.sales,
@@ -431,18 +381,9 @@ async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduc
       growth7dPercent: metric7d.growth,
       trendScore,
     };
-
-    const score = calculateScoreGeracaoZPro(enrichedProduct);
-
-    const enrichedProductWithScore = {
-      ...enrichedProduct,
-      score,
-    };
-
-    return enrichedProductWithScore;
   });
 
-  return attachVideoDownloads(enrichedProductsWithScore);
+  return attachVideoDownloads(enrichedProducts);
 }
 
 export async function attachVideoDownloads(products: MinedProduct[]): Promise<MinedProduct[]> {
@@ -1061,9 +1002,9 @@ export async function getProductMinerRanking(limit = 50, sort: ProductRankingSor
 
   const sorted = [...enriched].sort((a, b) => {
     if (sort === 'opportunities') {
-      const as = a.score ?? 0;
-      const bs = b.score ?? 0;
-      return bs - as || b.soldCount - a.soldCount;
+      const av = (a.sales24h ?? 0) * 10 + (a.growth24hPercent ?? 0) + (a.trendScore ?? 0) + (a.rating ? a.rating * 10 : 0);
+      const bv = (b.sales24h ?? 0) * 10 + (b.growth24hPercent ?? 0) + (b.trendScore ?? 0) + (b.rating ? b.rating * 10 : 0);
+      return bv - av || b.soldCount - a.soldCount;
     }
     if (sort === '24h') {
       const av = a.sales24h ?? -1;
@@ -1107,93 +1048,308 @@ export async function getProductMinerRanking(limit = 50, sort: ProductRankingSor
   };
 }
 
+export type CollectorSubcategoryStat = {
+  subcategory: string;
+  productCount: number;
+  isLowBase: boolean;
+};
+
 export type CollectorCategoryStat = {
   category: string;
   productCount: number;
   lastCollectedAt: string | null;
   status: 'Ativa' | 'Pendente';
+  subcategories?: CollectorSubcategoryStat[];
+  coverageCount?: number;
+  totalSubcategories?: number;
 };
 
-const COLLECTOR_CATEGORIES = ['Beleza', 'Casa', 'Moda', 'Cozinha', 'Eletrônicos', 'Fitness', 'Bebê', 'Pet'];
+export const OFFICIAL_TIKTOK_TAXONOMY: Record<string, string[]> = {
+  'Moda': [
+    'Acessórios',
+    'Malas e Mochilas',
+    'Moda Feminina',
+    'Moda Masculina',
+    'Calçados',
+  ],
+  'Itens para Casa': [
+    'Utensílios de Cozinha',
+    'Móveis',
+    'Ferramentas',
+    'Artigos para Festas',
+    'Reforma e Construção',
+    'Itens para Banheiro',
+    'Produtos de Limpeza',
+    'Decoração de Casa',
+    'Cama, Mesa e Banho',
+  ],
+  'Eletrônicos': [
+    'Celulares e Eletrônicos',
+    'Livros e Revistas',
+    'Automotivo',
+    'Computadores e Equipamentos',
+    'Dispositivos de Higiene',
+    'Eletrodomésticos',
+    'Livros e Áudio',
+  ],
+  'Beleza e Cuidados Pessoais': [
+    'Maquiagem',
+    'Cuidados Capilares',
+    'Perfumes',
+    'Cuidados com o Corpo',
+    'Cuidados Masculinos',
+    'Cuidados com a Pele',
+  ],
+  'Esportes e Lazer': [
+    'Fitness',
+    'Equipamentos para Lazer',
+    'Roupas Esportivas',
+    'Acessórios para Esportes',
+    'Calçados Esportivos',
+  ],
+  'Brinquedos e Pets': [
+    'Produtos para Pets',
+    'Suprimentos para Pets',
+  ],
+  'Health': [
+    'Health Nutrition',
+  ],
+};
+
+export const COLLECTOR_CATEGORIES = Object.keys(OFFICIAL_TIKTOK_TAXONOMY);
+
+function matchSubcategory(p: { title?: string; category_path?: string; query_source?: string }, subName: string): boolean {
+  if (!subName || subName === 'Todas') return false;
+  const path = String(p.category_path || '').toLowerCase();
+  const title = String(p.title || '').toLowerCase();
+  const query = String(p.query_source || '').toLowerCase();
+  const text = `${path} ${title} ${query}`;
+
+  switch (subName) {
+    // Moda
+    case 'Acessórios':
+      return text.includes('acessór') || text.includes('brinco') || text.includes('colar') || text.includes('anel') || text.includes('pulseira') || text.includes('óculos') || text.includes('relógio') || text.includes('cinto') || text.includes('joia');
+    case 'Malas e Mochilas':
+      return text.includes('mala') || text.includes('mochila') || text.includes('bolsa') || text.includes('carteira') || text.includes('pochete') || text.includes('necessaire');
+    case 'Moda Feminina':
+      return text.includes('feminin') || text.includes('vestido') || text.includes('saia') || text.includes('lingerie') || text.includes('sutiã') || text.includes('top') || text.includes('blusa');
+    case 'Moda Masculina':
+      return text.includes('masculin') || text.includes('camisa') || text.includes('bermuda') || text.includes('cueca') || text.includes('homem');
+    case 'Calçados':
+      return text.includes('calçado') || text.includes('tênis') || text.includes('sapato') || text.includes('sandália') || text.includes('bota') || text.includes('chinelo') || text.includes('salto');
+
+    // Itens para Casa
+    case 'Utensílios de Cozinha':
+      return text.includes('cozinha') || text.includes('panela') || text.includes('copo') || text.includes('xícara') || text.includes('faca') || text.includes('prato') || text.includes('talher') || text.includes('frigideira') || text.includes('pote') || text.includes('garrafa') || text.includes('abridor');
+    case 'Móveis':
+      return text.includes('móvel') || text.includes('móveis') || text.includes('cadeira') || text.includes('mesa') || text.includes('sofá') || text.includes('estante') || text.includes('armário') || text.includes('prateleira');
+    case 'Ferramentas':
+      return text.includes('ferramenta') || text.includes('furadeira') || text.includes('chave') || text.includes('alicate') || text.includes('martelo') || text.includes('trena');
+    case 'Artigos para Festas':
+      return text.includes('festa') || text.includes('balão') || text.includes('vela') || text.includes('aniversário') || text.includes('fantasia');
+    case 'Reforma e Construção':
+      return text.includes('reforma') || text.includes('construção') || text.includes('tinta') || text.includes('iluminação') || text.includes('lâmpada') || text.includes('fio') || text.includes('tomada') || text.includes('led');
+    case 'Itens para Banheiro':
+      return text.includes('banheiro') || text.includes('toalha') || text.includes('saboneteira') || text.includes('chuveiro') || text.includes('espelho') || text.includes('porta-escova');
+    case 'Produtos de Limpeza':
+      return text.includes('limpeza') || text.includes('detergente') || text.includes('sabão') || text.includes('mop') || text.includes('vassoura') || text.includes('pano') || text.includes('esponja') || text.includes('aspirador');
+    case 'Decoração de Casa':
+      return text.includes('decoração') || text.includes('decorat') || text.includes('quadro') || text.includes('almofada') || text.includes('tapete') || text.includes('vaso') || text.includes('planta') || text.includes('quadro');
+    case 'Cama, Mesa e Banho':
+      return text.includes('cama') || text.includes('lençol') || text.includes('edredom') || text.includes('travesseiro') || text.includes('coberta') || text.includes('morfina') || text.includes('fronha');
+
+    // Eletrônicos
+    case 'Celulares e Eletrônicos':
+      return text.includes('celular') || text.includes('smartphone') || text.includes('iphone') || text.includes('samsung') || text.includes('fone') || text.includes('carregador') || text.includes('cabo') || text.includes('gadget') || text.includes('eletrôn') || text.includes('bluetooth');
+    case 'Livros e Revistas':
+    case 'Livros e Áudio':
+      return text.includes('livro') || text.includes('revista') || text.includes('kindle') || text.includes('e-book') || text.includes('leitura') || text.includes('áudio');
+    case 'Automotivo':
+      return text.includes('automotiv') || text.includes('carro') || text.includes('veículo') || text.includes('moto') || text.includes('pneu') || text.includes('volante');
+    case 'Computadores e Equipamentos':
+      return text.includes('computador') || text.includes('notebook') || text.includes('pc') || text.includes('teclado') || text.includes('mouse') || text.includes('monitor') || text.includes('usb');
+    case 'Dispositivos de Higiene':
+      return text.includes('higiene') || text.includes('escova') || text.includes('barbeador') || text.includes('secador') || text.includes('prancha') || text.includes('depilador') || text.includes('aparador');
+    case 'Eletrodomésticos':
+      return text.includes('eletrodoméstico') || text.includes('air fryer') || text.includes('liquidificador') || text.includes('batedeira') || text.includes('aspirador') || text.includes('ventilador') || text.includes('cafeteira');
+
+    // Beleza e Cuidados Pessoais
+    case 'Maquiagem':
+      return text.includes('maquiagem') || text.includes('batom') || text.includes('rímel') || text.includes('base') || text.includes('corretivo') || text.includes('pó') || text.includes('sombra') || text.includes('pincel') || text.includes('gloss');
+    case 'Cuidados Capilares':
+      return text.includes('capilar') || text.includes('cabelo') || text.includes('shampoo') || text.includes('condicionador') || text.includes('máscara') || text.includes('óleo capilar') || text.includes('ampola');
+    case 'Perfumes':
+      return text.includes('perfume') || text.includes('colônia') || text.includes('fragrância') || text.includes('body splash');
+    case 'Cuidados com o Corpo':
+      return text.includes('corpo') || text.includes('corporal') || text.includes('hidratante') || text.includes('desodorante') || text.includes('sabonete') || text.includes('esfoliante');
+    case 'Cuidados Masculinos':
+      return text.includes('masculino') || text.includes('barba') || text.includes('pós-barba');
+    case 'Cuidados com a Pele':
+      return text.includes('pele') || text.includes('skincare') || text.includes('sérum') || text.includes('protetor') || text.includes('facial') || text.includes('creme') || text.includes('tônico');
+
+    // Esportes e Lazer
+    case 'Fitness':
+      return text.includes('fitness') || text.includes('academia') || text.includes('treino') || text.includes('suplemento') || text.includes('elástico') || text.includes('peso') || text.includes('halter');
+    case 'Equipamentos para Lazer':
+      return text.includes('lazer') || text.includes('camping') || text.includes('barraca') || text.includes('pesca') || text.includes('jogo');
+    case 'Roupas Esportivas':
+      return text.includes('esportiv') || text.includes('legging') || text.includes('short esportivo') || text.includes('regata');
+    case 'Acessórios para Esportes':
+      return text.includes('esporte') || text.includes('garrafa') || text.includes('luva') || text.includes('faixa') || text.includes('joelheira');
+    case 'Calçados Esportivos':
+      return text.includes('tênis esportivo') || text.includes('chuteira') || text.includes('sapatilha');
+
+    // Brinquedos e Pets
+    case 'Produtos para Pets':
+    case 'Suprimentos para Pets':
+      return text.includes('pet') || text.includes('cachorro') || text.includes('gato') || text.includes('ração') || text.includes('coleira') || text.includes('brinquedo pet') || text.includes('brinquedo') || text.includes('infantil') || text.includes('bebê');
+
+    // Health
+    case 'Health Nutrition':
+      return text.includes('health') || text.includes('nutrition') || text.includes('suplemento') || text.includes('whey') || text.includes('creatina') || text.includes('vitamina') || text.includes('saúde');
+
+    default: {
+      const norm = subName.toLowerCase().replace(/^(cuidados|produtos|artigos|itens|suprimentos)\s*(com\s*o?|para)?\s*/i, '');
+      return path.includes(norm) || title.includes(norm) || query.includes(norm);
+    }
+  }
+}
 
 export async function getCollectorCategoriesStats(): Promise<CollectorCategoryStat[]> {
   if (!isDatabaseConfigured()) {
-    return COLLECTOR_CATEGORIES.map((cat) => ({
-      category: cat,
-      productCount: 0,
-      lastCollectedAt: null,
-      status: 'Pendente',
-    }));
+    return COLLECTOR_CATEGORIES.map((cat) => {
+      const subs = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
+      return {
+        category: cat,
+        productCount: 0,
+        lastCollectedAt: null,
+        status: 'Pendente',
+        subcategories: subs.map((sub) => ({ subcategory: sub, productCount: 0, isLowBase: true })),
+        coverageCount: 0,
+        totalSubcategories: subs.length,
+      };
+    });
   }
 
   await ensureProductMinerTables();
 
   const statsList: CollectorCategoryStat[] = [];
 
+  let allProducts: any[] = [];
+  try {
+    const [rows]: any = await db.query(
+      `SELECT product_id, title, category_path, query_source, last_seen_at, updated_at FROM tiktok_shop_products`
+    );
+    allProducts = Array.isArray(rows) ? rows : [];
+  } catch (err: any) {
+    console.warn('[Collector Stats Query Warning]:', err?.message || err);
+  }
+
   for (const cat of COLLECTOR_CATEGORIES) {
     try {
-      // 1. Prefer exact category search query cache timestamp
+      const subNames = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
+
+      // Filter products belonging to this official category (including legacy category mapping)
+      const catProducts = allProducts.filter((p) => {
+        const path = String(p.category_path || '').toLowerCase();
+        const title = String(p.title || '').toLowerCase();
+        const query = String(p.query_source || '').toLowerCase();
+
+        if (cat === 'Moda') {
+          return query.includes('moda') || path.includes('moda') || path.includes('vestuario') || path.includes('calcado') || title.includes('vestido') || title.includes('bolsa') || title.includes('tenis');
+        }
+        if (cat === 'Itens para Casa') {
+          return query.includes('casa') || query.includes('cozinha') || path.includes('casa') || path.includes('cozinha') || path.includes('lar') || path.includes('decoracao') || title.includes('panela') || title.includes('utensilio');
+        }
+        if (cat === 'Eletrônicos') {
+          return query.includes('eletr') || path.includes('eletr') || path.includes('gadget') || path.includes('celular') || title.includes('fone') || title.includes('cabo');
+        }
+        if (cat === 'Beleza e Cuidados Pessoais') {
+          return query.includes('beleza') || path.includes('beleza') || path.includes('pessoal') || path.includes('cosmetico') || title.includes('maquiagem') || title.includes('skincare') || title.includes('perfume');
+        }
+        if (cat === 'Esportes e Lazer') {
+          return query.includes('esporte') || query.includes('fitness') || path.includes('esporte') || path.includes('fitness') || path.includes('lazer') || title.includes('treino') || title.includes('academia');
+        }
+        if (cat === 'Brinquedos e Pets') {
+          return query.includes('pet') || query.includes('bebe') || path.includes('pet') || path.includes('brinquedo') || path.includes('bebe') || title.includes('racao') || title.includes('infantil');
+        }
+        if (cat === 'Health') {
+          return query.includes('health') || path.includes('health') || path.includes('saude') || path.includes('suplemento') || title.includes('vitamina') || title.includes('whey');
+        }
+        return path.includes(cat.toLowerCase()) || query.includes(cat.toLowerCase());
+      });
+
+      // Subcategory breakdown
+      let coveredCount = 0;
+      const subStats: CollectorSubcategoryStat[] = subNames.map((subName) => {
+        const matched = catProducts.filter((p) => matchSubcategory(p, subName));
+        const count = matched.length;
+        if (count > 0) coveredCount++;
+        return {
+          subcategory: subName,
+          productCount: count,
+          isLowBase: count < 15,
+        };
+      });
+
+      // Retrieve last collection timestamp from cache / snapshots / products
       const [cacheRows]: any = await db.query(
         `SELECT updated_at FROM tiktok_shop_search_cache
          WHERE LOWER(search_query) = LOWER(?) AND region = 'BR'
          ORDER BY updated_at DESC LIMIT 1`,
         [cat]
-      );
+      ).catch(() => [[]]);
 
-      // 2. Exact category query snapshot timestamp
       const [snapshotTimeRows]: any = await db.query(
         `SELECT MAX(captured_at) as max_captured
          FROM tiktok_shop_product_snapshots
          WHERE LOWER(query_source) = LOWER(?)`,
         [cat]
-      );
-
-      // 3. Count products collected via this category query in snapshots and products table
-      const [snapshotCountRows]: any = await db.query(
-        `SELECT COUNT(DISTINCT product_id) as total_products
-         FROM tiktok_shop_product_snapshots
-         WHERE LOWER(query_source) = LOWER(?)`,
-        [cat]
-      );
-
-      const [productCountRows]: any = await db.query(
-        `SELECT COUNT(DISTINCT product_id) as total_products
-         FROM tiktok_shop_products
-         WHERE LOWER(query_source) = LOWER(?) OR category_path LIKE ?`,
-        [cat, `%${cat}%`]
-      );
-
-      const cacheRow = Array.isArray(cacheRows) ? cacheRows[0] : null;
-      const snapTimeRow = Array.isArray(snapshotTimeRows) ? snapshotTimeRows[0] : null;
-      const snapCount = Number(Array.isArray(snapshotCountRows) ? snapshotCountRows[0]?.total_products || 0 : 0);
-      const prodCount = Number(Array.isArray(productCountRows) ? productCountRows[0]?.total_products || 0 : 0);
-
-      const productCount = Math.max(snapCount, prodCount);
+      ).catch(() => [[]]);
 
       let lastCollectedAt: string | null = null;
-      if (cacheRow?.updated_at) {
-        lastCollectedAt = new Date(cacheRow.updated_at).toISOString();
+      if (Array.isArray(cacheRows) && cacheRows[0]?.updated_at) {
+        lastCollectedAt = new Date(cacheRows[0].updated_at).toISOString();
       }
-      if (snapTimeRow?.max_captured) {
-        const snapDate = new Date(snapTimeRow.max_captured).toISOString();
+      if (Array.isArray(snapshotTimeRows) && snapshotTimeRows[0]?.max_captured) {
+        const snapDate = new Date(snapshotTimeRows[0].max_captured).toISOString();
         if (!lastCollectedAt || snapDate > lastCollectedAt) {
           lastCollectedAt = snapDate;
         }
       }
 
+      if (!lastCollectedAt) {
+        for (const p of catProducts) {
+          const dt = p.last_seen_at || p.updated_at;
+          if (dt) {
+            const iso = new Date(dt).toISOString();
+            if (!lastCollectedAt || iso > lastCollectedAt) {
+              lastCollectedAt = iso;
+            }
+          }
+        }
+      }
+
       statsList.push({
         category: cat,
-        productCount,
+        productCount: catProducts.length,
         lastCollectedAt,
-        status: productCount > 0 ? 'Ativa' : 'Pendente',
+        status: catProducts.length > 0 ? 'Ativa' : 'Pendente',
+        subcategories: subStats,
+        coverageCount: coveredCount,
+        totalSubcategories: subNames.length,
       });
     } catch (err: any) {
       console.warn(`[Collector Stats Error for ${cat}]:`, err?.message || err);
+      const subNames = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
       statsList.push({
         category: cat,
         productCount: 0,
         lastCollectedAt: null,
         status: 'Pendente',
+        subcategories: subNames.map((s) => ({ subcategory: s, productCount: 0, isLowBase: true })),
+        coverageCount: 0,
+        totalSubcategories: subNames.length,
       });
     }
   }
