@@ -1598,20 +1598,15 @@ export function classifyProductToCategoryAndSubcategory(product: {
   query_source?: string;
   seller_name?: string;
 }): { category: string; subcategory: string } {
-  const rawText = `${product.title || ''} ${product.category_path || ''} ${product.query_source || ''} ${product.seller_name || ''}`;
+  // Rely strictly on real/original product fields (title and seller_name) for classification.
+  // category_path and query_source are intentionally excluded to prevent self-reinforcing loops on pre-tagged items.
+  const rawText = `${product.title || ''} ${product.seller_name || ''}`;
   const text = removeAccents(rawText);
 
   const has = (...terms: string[]) => terms.some((t) => text.includes(removeAccents(t)));
 
   // 1. INFANTIL (EXPLICIT KIDS EVIDENCE REQUIRED + ADULT EXCLUSION LAYER)
-  // Strip synthesized category prefixes ("Infantil > ...", "Infantil") and query_source ("Infantil")
-  // to avoid self-reinforcing classification loops on already-tagged items.
-  const cleanCatPath = (product.category_path || '')
-    .replace(/^Infantil\s*>\s*/i, '')
-    .replace(/^Infantil$/i, '');
-  const cleanQuerySource = (product.query_source || '').toLowerCase() === 'infantil' ? '' : (product.query_source || '');
-
-  const textForKidsRaw = removeAccents(`${product.title || ''} ${cleanCatPath} ${cleanQuerySource} ${product.seller_name || ''}`);
+  const textForKidsRaw = text;
 
   // Step 1: Adult / Negative terms check (Higher priority than any child evidence)
   const adultTermsRegex = /\b(adulto|adulta|adultos|adultas|mulher|mulheres|homem|homens)\b/i;
@@ -1803,7 +1798,7 @@ export function classifyProductToCategoryAndSubcategory(product: {
     has(
       'vestido', 'saia', 'blusa', 'camisa', 'camiseta', 'calca', 'jeans', 'short', 'bermuda',
       'casaco', 'jaqueta', 'moletom', 'cardigan', 'blazer', 'top', 'cropped', 'lingerie',
-      'sutia', 'cueca', 'pijama', 'meia', 'bolsa', 'carteira', 'mochila', 'mala', 'necessaire',
+      'sutia', 'cueca', 'pijama', 'pijamas', 'baby doll', 'babydoll', 'baby look', 'babylook', 'meia', 'bolsa', 'carteira', 'mochila', 'mala', 'necessaire',
       'pochete', 'calcado', 'tenis', 'sapato', 'sandalia', 'bota', 'chinelo', 'salto',
       'rasteirinha', 'mocassim', 'brinco', 'colar', 'anel', 'pulseira', 'oculos', 'relogio',
       'cinto', 'bone', 'touca', 'chapeu', 'cachecol', 'joia', 'bijuteria', 'moda', 'vestuario',
