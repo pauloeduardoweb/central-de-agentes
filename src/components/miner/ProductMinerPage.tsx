@@ -1504,12 +1504,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     setCollectorNotice(null);
 
     try {
-      const result = await runDailyRefresh(studentCode);
+      const result = await runDailyRefresh(studentCode, false);
       setDailyStatus(result);
       setIsDailyRefreshing(false);
 
-      const notice = `Atualização Diária concluída! ${result.categoriesProcessed} de ${result.totalCategories} categorias processadas (${result.uniqueProductsCount} produtos únicos, ${result.creditsUsed} créditos utilizados).`;
-      setCollectorNotice(notice);
+      if (result.status === 'cooldown') {
+        setCollectorNotice('Base já atualizada nas últimas 24 horas. Nenhuma nova consulta foi realizada.');
+      } else {
+        const notice = `Atualização Diária concluída! ${result.categoriesProcessed} de ${result.totalCategories} categorias processadas (${result.uniqueProductsCount} produtos únicos, ${result.creditsUsed} créditos utilizados).`;
+        setCollectorNotice(notice);
+      }
       loadCategories();
     } catch (err: any) {
       setIsDailyRefreshing(false);
