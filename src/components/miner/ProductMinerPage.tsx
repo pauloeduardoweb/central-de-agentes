@@ -1213,6 +1213,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const displayProducts = useMemo(() => {
     let list = mode === 'favorites' ? favorites : mode === 'ranking' ? ranking : products;
 
+    // 0. Filter by text search query (dynamic search on current base)
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter((p) => {
+        const titleMatch = p.title ? p.title.toLowerCase().includes(q) : false;
+        const categoryMatch = p.category ? p.category.toLowerCase().includes(q) : false;
+        const sellerMatch = p.sellerName ? p.sellerName.toLowerCase().includes(q) : false;
+        const idMatch = p.productId ? p.productId.toLowerCase().includes(q) : false;
+        return titleMatch || categoryMatch || sellerMatch || idMatch;
+      });
+    }
+
     // 1. Filter by TikTok main category
     list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory));
 
@@ -1297,7 +1309,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
 
     return copy;
-  }, [products, ranking, mode, selectedCategory, selectedSubcategory, hasVideoOnly, viralVideoOnly, selectedClassification]);
+  }, [products, ranking, favorites, mode, selectedCategory, selectedSubcategory, hasVideoOnly, viralVideoOnly, selectedClassification, query]);
 
   const totalRankingPages = useMemo(() => {
     if (mode !== 'ranking') return 1;
@@ -1492,74 +1504,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   return (
     <section className="space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
-      {/* Top Header Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl border border-amber-500 bg-amber-500 text-white shadow-sm">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
-                Minerar Produtos TikTok Shop
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px]">
-            <span className="px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 font-bold">
-              Região BR
-            </span>
-          </div>
-        </div>
-
-        {/* Search Input Bar */}
-        <div className="mt-4 flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === 'Enter' &&
-                runSearch(query, 1, false)
-              }
-              placeholder="Ex.: beleza, air fryer, vestido, relógio..."
-              className="w-full h-10 sm:h-11 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white focus:bg-white pl-10 pr-4 text-xs sm:text-sm text-slate-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 shadow-sm transition-all"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => runSearch(query, 1, false)}
-              disabled={loading || query.trim().length === 1}
-              className="flex-1 sm:flex-none h-10 sm:h-11 px-5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm transition-all"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
-              ) : (
-                <Database className="w-4 h-4 text-amber-600" />
-              )}
-              Pesquisar
-            </button>
-
-            {canRefresh ? (
-              <button
-                onClick={() => runSearch(query, 1, true)}
-                disabled={loading || query.trim().length < 2}
-                className="h-10 sm:h-11 px-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-black disabled:opacity-50 flex items-center justify-center gap-1.5 hover:bg-amber-100 transition-all"
-                title="Esta ação consulta a SocialCrawl e pode consumir 1 crédito."
-              >
-                <RefreshCw
-                  className={`w-3.5 h-3.5 ${
-                    loading ? 'animate-spin' : ''
-                  }`}
-                />
-                <span className="hidden md:inline">SocialCrawl • 1 crédito</span>
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
       {/* ================================================== */}
       {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (10 CLASSIFICATIONS)*/}
       {/* ================================================== */}
@@ -1830,6 +1774,37 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           ) : null}
         </div>
       </div>
+
+      {/* ================================================== */}
+      {/* 4 — CAMPO DE PESQUISA (SOMENTE NA ABA PESQUISA)     */}
+      {/* ================================================== */}
+      {mode === 'search' && (
+        <div className="relative w-full animate-fade-in">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                runSearch(query, 1, false);
+              }
+            }}
+            placeholder="Pesquisar produtos..."
+            className="w-full h-10 sm:h-11 rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 pl-10 pr-10 text-xs sm:text-sm text-slate-900 outline-none shadow-xs transition-all"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+              title="Limpar pesquisa"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
+        </div>
+      )}
 
       {/* Advanced Filters Drawer Panel */}
       {showAdvancedFilters ? (
