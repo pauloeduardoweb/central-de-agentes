@@ -65,6 +65,9 @@ export function ensureCodigosAcessoTable(): Promise<void> {
           reactivated_by VARCHAR(100) DEFAULT NULL,
           last_admin_action VARCHAR(50) DEFAULT NULL,
           last_admin_action_at DATETIME DEFAULT NULL,
+          product_miner_enabled TINYINT(1) DEFAULT 0,
+          product_miner_enabled_at DATETIME DEFAULT NULL,
+          product_miner_enabled_by VARCHAR(100) DEFAULT NULL,
           criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_codigo (codigo),
@@ -86,6 +89,9 @@ export function ensureCodigosAcessoTable(): Promise<void> {
         `ALTER TABLE codigos_acesso ADD COLUMN reactivated_by VARCHAR(100) DEFAULT NULL`,
         `ALTER TABLE codigos_acesso ADD COLUMN last_admin_action VARCHAR(50) DEFAULT NULL`,
         `ALTER TABLE codigos_acesso ADD COLUMN last_admin_action_at DATETIME DEFAULT NULL`,
+        `ALTER TABLE codigos_acesso ADD COLUMN product_miner_enabled TINYINT(1) DEFAULT 0`,
+        `ALTER TABLE codigos_acesso ADD COLUMN product_miner_enabled_at DATETIME DEFAULT NULL`,
+        `ALTER TABLE codigos_acesso ADD COLUMN product_miner_enabled_by VARCHAR(100) DEFAULT NULL`,
       ];
 
       for (const q of alterQueries) {
@@ -1008,6 +1014,8 @@ export function ensureProductMinerTables(): Promise<void> {
           video_comments BIGINT DEFAULT NULL,
           video_shares BIGINT DEFAULT NULL,
           video_saves BIGINT DEFAULT NULL,
+          estimated_commission_cents INT DEFAULT NULL,
+          commission_rate_percent INT DEFAULT NULL,
           query_source VARCHAR(120) DEFAULT NULL,
           first_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,

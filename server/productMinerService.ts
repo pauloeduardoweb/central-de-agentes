@@ -41,6 +41,8 @@ export type MinedProduct = {
   category: string | null;
   collectionPosition?: number | null;
   lastSeenAt?: string | Date | null;
+  estimatedCommissionCents?: number | null;
+  commissionRatePercent?: number | null;
   video: null | {
     id: string | null;
     url: string | null;
@@ -115,6 +117,19 @@ function normalizeProduct(item: any): MinedProduct {
     category = item?.category_path || item?.category_name || item?.category || null;
   }
 
+  const commInfo = item?.commission_info || item?.affiliate_info || item?.commission || {};
+  let commRate = parseRating(commInfo?.commission_rate || item?.commission_rate || item?.commission_percent || item?.commission_rate_percent);
+  if (commRate !== null && commRate > 0 && commRate <= 1) {
+    commRate = Math.round(commRate * 100);
+  }
+  let commCents = parsePriceCents(commInfo?.commission_amount || item?.commission_amount || item?.estimated_commission || item?.estimated_commission_cents);
+  if (commCents === null && commRate !== null && commRate > 0) {
+    const pCents = parsePriceCents(price?.sale_price_decimal);
+    if (pCents) {
+      commCents = Math.round((pCents * commRate) / 100);
+    }
+  }
+
   return {
     productId: String(item?.product_id || ''),
     title: String(item?.title || 'Produto sem nome'),
@@ -131,6 +146,8 @@ function normalizeProduct(item: any): MinedProduct {
     sellerName: item?.seller_info?.shop_name ? String(item.seller_info.shop_name) : null,
     productUrl: item?.seo_url?.canonical_url ? String(item.seo_url.canonical_url) : null,
     category,
+    estimatedCommissionCents: commCents && commCents > 0 ? commCents : null,
+    commissionRatePercent: commRate && commRate > 0 ? commRate : null,
     video: video ? {
       id: video?.aweme_id ? String(video.aweme_id) : null,
       url: video?.share_url || null,
@@ -237,6 +254,8 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
     product.video?.comments || null,
     product.video?.shares || null,
     product.video?.saves || null,
+    product.estimatedCommissionCents || null,
+    product.commissionRatePercent || null,
     query,
   ]);
 
@@ -245,7 +264,7 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
       product_id, title, image_url, price_cents, original_price_cents, discount_percent,
       currency_symbol, rating, sold_count, seller_id, seller_name, product_url, category_path,
       video_id, video_url, video_author, video_author_followers, video_views, video_likes,
-      video_comments, video_shares, video_saves, query_source
+      video_comments, video_shares, video_saves, estimated_commission_cents, commission_rate_percent, query_source
     ) VALUES ?
     ON DUPLICATE KEY UPDATE
       title = VALUES(title), image_url = VALUES(image_url), price_cents = VALUES(price_cents),
@@ -255,7 +274,9 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
       category_path = VALUES(category_path), video_id = VALUES(video_id), video_url = VALUES(video_url),
       video_author = VALUES(video_author), video_author_followers = VALUES(video_author_followers),
       video_views = VALUES(video_views), video_likes = VALUES(video_likes), video_comments = VALUES(video_comments),
-      video_shares = VALUES(video_shares), video_saves = VALUES(video_saves), query_source = VALUES(query_source),
+      video_shares = VALUES(video_shares), video_saves = VALUES(video_saves),
+      estimated_commission_cents = VALUES(estimated_commission_cents), commission_rate_percent = VALUES(commission_rate_percent),
+      query_source = VALUES(query_source),
       last_seen_at = NOW()`,
     [productRows]
   );
@@ -967,6 +988,8 @@ export function rowToProduct(row: any): MinedProduct {
     productUrl: row.product_url,
     category: row.category_path,
     lastSeenAt: row.last_seen_at,
+    estimatedCommissionCents: row.estimated_commission_cents === null || row.estimated_commission_cents === undefined ? null : Number(row.estimated_commission_cents),
+    commissionRatePercent: row.commission_rate_percent === null || row.commission_rate_percent === undefined ? null : Number(row.commission_rate_percent),
     video: row.video_id || row.video_url ? {
       id: row.video_id,
       url: row.video_url,
