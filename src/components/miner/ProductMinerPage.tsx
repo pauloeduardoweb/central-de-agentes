@@ -17,9 +17,11 @@ import {
   fetchCollectorCategories,
   fetchDailyRefreshStatus,
   runDailyRefresh,
+  runBaseReclassification,
   type DailyRefreshStatus,
   type CollectorCategoryStat,
   type ProductSearchSource,
+  type ReclassificationReport,
 } from '../../services/productMinerApi';
 import {
   ScriptGeneratorModal,
@@ -1110,6 +1112,25 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [refreshingCategory, setRefreshingCategory] = useState<string | null>(null);
   const [confirmModalCategory, setConfirmModalCategory] = useState<string | null>(null);
   const [collectorNotice, setCollectorNotice] = useState<string | null>(null);
+
+  const [isReclassifying, setIsReclassifying] = useState(false);
+  const [reclassifyReport, setReclassifyReport] = useState<ReclassificationReport | null>(null);
+
+  const handleReclassifyBase = async () => {
+    setIsReclassifying(true);
+    setCollectorNotice(null);
+    try {
+      const report = await runBaseReclassification(studentCode);
+      setReclassifyReport(report);
+      const stats = await fetchCollectorCategories(studentCode);
+      setCollectorCategories(stats);
+      setCollectorNotice(`✨ ${report.totalClassified} de ${report.totalAnalyzed} produtos foram distribuídos nas 8 categorias com sucesso (0 créditos SocialCrawl consumidos)!`);
+    } catch (err: any) {
+      alert(`Erro ao reclassificar base: ${err?.message || 'Falha ao reclassificar'}`);
+    } finally {
+      setIsReclassifying(false);
+    }
+  };
 
   // Adquirir Produtos (Collector Expansion) State
   const [collectorSubTab, setCollectorSubTab] = useState<'expand' | 'update'>('expand');
@@ -2235,6 +2256,80 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           {/* TAB 1: EXPANDIR BASE */}
           {collectorSubTab === 'expand' && (
             <div className="space-y-5 animate-fade-in">
+              {/* Reclassify Existing Base Banner (Mentor Tool - Zero SocialCrawl Credits) */}
+              <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50/50 to-amber-50 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 text-amber-900 font-extrabold text-sm">
+                    <Database className="w-4 h-4 text-amber-600" />
+                    <span>Organização Automática da Base Existente (~1.495 produtos)</span>
+                  </div>
+                  <p className="text-xs text-amber-800/80 mt-1 max-w-2xl">
+                    Sua base possui produtos armazenados no MySQL. Clique para reclassificá-los e distribuí-los automaticamente entre as 8 categorias e subcategorias sem chamar o SocialCrawl (<strong>0 créditos consumidos</strong>).
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleReclassifyBase}
+                  disabled={isReclassifying || isBatchExecuting || isDailyRefreshing}
+                  className="px-5 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-600/20 shrink-0 transition-all hover:scale-[1.02] disabled:opacity-50"
+                >
+                  {isReclassifying ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Classificando base...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Layers className="w-4 h-4" />
+                      <span>📦 Reclassificar Base Existente</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {reclassifyReport && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 space-y-2 animate-fade-in text-xs text-emerald-950 shadow-sm">
+                  <div className="flex items-center justify-between font-black text-emerald-900 text-sm">
+                    <span className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" />
+                      Relatório de Reclassificação da Base
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReclassifyReport(null)}
+                      className="text-emerald-700 hover:text-emerald-950 font-extrabold text-xs px-2 py-1 rounded-lg hover:bg-emerald-100"
+                    >
+                      ✕ Fechar
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-emerald-200/80 font-medium">
+                    <div className="bg-white/80 p-2 rounded-xl border border-emerald-200">
+                      <div className="text-[10px] text-emerald-700 font-bold">Total Analisado</div>
+                      <div className="font-black text-slate-900 text-sm">{reclassifyReport.totalAnalyzed} prods</div>
+                    </div>
+
+                    <div className="bg-white/80 p-2 rounded-xl border border-emerald-200">
+                      <div className="text-[10px] text-emerald-700 font-bold">Classificados com Sucesso</div>
+                      <div className="font-black text-emerald-800 text-sm">{reclassifyReport.totalClassified} prods</div>
+                    </div>
+
+                    <div className="bg-white/80 p-2 rounded-xl border border-emerald-200">
+                      <div className="text-[10px] text-emerald-700 font-bold">Chamada SocialCrawl</div>
+                      <div className="font-black text-emerald-800 text-sm">NÃO (0 créditos)</div>
+                    </div>
+
+                    <div className="bg-white/80 p-2 rounded-xl border border-emerald-200">
+                      <div className="text-[10px] text-emerald-700 font-bold">Distribuição por Categoria</div>
+                      <div className="font-extrabold text-slate-800 text-[11px] truncate">
+                        {Object.keys(reclassifyReport.categoryCounts).length} categorias
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Card 1: Volume Target Selection */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
