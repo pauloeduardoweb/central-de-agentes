@@ -1521,76 +1521,82 @@ export const COLLECTOR_CATEGORIES = Object.keys(OFFICIAL_TIKTOK_TAXONOMY);
 
 function matchSubcategory(p: { title?: string; category_path?: string; query_source?: string }, subName: string): boolean {
   if (!subName || subName === 'Todas') return false;
-  const path = String(p.category_path || '').toLowerCase();
-  const title = String(p.title || '').toLowerCase();
-  const query = String(p.query_source || '').toLowerCase();
+  const path = removeAccents(p.category_path || '');
+  const title = removeAccents(p.title || '');
+  const query = removeAccents(p.query_source || '');
   const text = `${path} ${title} ${query}`;
+  const subNorm = removeAccents(subName);
+
+  // Direct structured check first
+  if (path.includes(`> ${subNorm}`) || path.includes(`>${subNorm}`) || path.endsWith(subNorm)) {
+    return true;
+  }
 
   switch (subName) {
     // Moda
     case 'Acessórios':
-      return text.includes('acessór') || text.includes('brinco') || text.includes('colar') || text.includes('anel') || text.includes('pulseira') || text.includes('óculos') || text.includes('relógio') || text.includes('cinto') || text.includes('joia');
+      return text.includes('acessorio') || text.includes('brinco') || text.includes('colar') || text.includes('anel') || text.includes('pulseira') || text.includes('oculos') || text.includes('relogio') || text.includes('cinto') || text.includes('joia');
     case 'Malas e Mochilas':
       return text.includes('mala') || text.includes('mochila') || text.includes('bolsa') || text.includes('carteira') || text.includes('pochete') || text.includes('necessaire');
     case 'Moda Feminina':
-      return text.includes('feminin') || text.includes('vestido') || text.includes('saia') || text.includes('lingerie') || text.includes('sutiã') || text.includes('top') || text.includes('blusa');
+      return text.includes('feminin') || text.includes('vestido') || text.includes('saia') || text.includes('lingerie') || text.includes('sutia') || text.includes('top') || text.includes('blusa');
     case 'Moda Masculina':
       return text.includes('masculin') || text.includes('camisa') || text.includes('bermuda') || text.includes('cueca') || text.includes('homem');
     case 'Calçados':
-      return text.includes('calçado') || text.includes('tênis') || text.includes('sapato') || text.includes('sandália') || text.includes('bota') || text.includes('chinelo') || text.includes('salto');
+      return text.includes('calcado') || text.includes('tenis') || text.includes('sapato') || text.includes('sandalia') || text.includes('bota') || text.includes('chinelo') || text.includes('salto');
 
     // Itens para Casa
     case 'Utensílios de Cozinha':
-      return text.includes('cozinha') || text.includes('panela') || text.includes('copo') || text.includes('xícara') || text.includes('faca') || text.includes('prato') || text.includes('talher') || text.includes('frigideira') || text.includes('pote') || text.includes('garrafa') || text.includes('abridor');
+      return text.includes('cozinha') || text.includes('panela') || text.includes('copo') || text.includes('xicara') || text.includes('faca') || text.includes('prato') || text.includes('talher') || text.includes('frigideira') || text.includes('pote') || text.includes('garrafa') || text.includes('abridor');
     case 'Móveis':
-      return text.includes('móvel') || text.includes('móveis') || text.includes('cadeira') || text.includes('mesa') || text.includes('sofá') || text.includes('estante') || text.includes('armário') || text.includes('prateleira');
+      return text.includes('movel') || text.includes('moveis') || text.includes('cadeira') || text.includes('mesa') || text.includes('sofa') || text.includes('estante') || text.includes('armario') || text.includes('prateleira');
     case 'Ferramentas':
       return text.includes('ferramenta') || text.includes('furadeira') || text.includes('chave') || text.includes('alicate') || text.includes('martelo') || text.includes('trena');
     case 'Artigos para Festas':
-      return text.includes('festa') || text.includes('balão') || text.includes('vela') || text.includes('aniversário') || text.includes('fantasia');
+      return text.includes('festa') || text.includes('balao') || text.includes('vela') || text.includes('aniversario') || text.includes('fantasia');
     case 'Reforma e Construção':
-      return text.includes('reforma') || text.includes('construção') || text.includes('tinta') || text.includes('iluminação') || text.includes('lâmpada') || text.includes('fio') || text.includes('tomada') || text.includes('led');
+      return text.includes('reforma') || text.includes('construcao') || text.includes('tinta') || text.includes('iluminacao') || text.includes('lampada') || text.includes('fio') || text.includes('tomada') || text.includes('led');
     case 'Itens para Banheiro':
       return text.includes('banheiro') || text.includes('toalha') || text.includes('saboneteira') || text.includes('chuveiro') || text.includes('espelho') || text.includes('porta-escova');
     case 'Produtos de Limpeza':
-      return text.includes('limpeza') || text.includes('detergente') || text.includes('sabão') || text.includes('mop') || text.includes('vassoura') || text.includes('pano') || text.includes('esponja') || text.includes('aspirador');
+      return text.includes('limpeza') || text.includes('detergente') || text.includes('sabao') || text.includes('mop') || text.includes('vassoura') || text.includes('pano') || text.includes('esponja') || text.includes('aspirador');
     case 'Decoração de Casa':
-      return text.includes('decoração') || text.includes('decorat') || text.includes('quadro') || text.includes('almofada') || text.includes('tapete') || text.includes('vaso') || text.includes('planta');
+      return text.includes('decoracao') || text.includes('decorat') || text.includes('quadro') || text.includes('almofada') || text.includes('tapete') || text.includes('vaso') || text.includes('planta');
     case 'Cama, Mesa e Banho':
-      return text.includes('cama') || text.includes('lençol') || text.includes('edredom') || text.includes('travesseiro') || text.includes('coberta') || text.includes('fronha');
+      return text.includes('cama') || text.includes('lencol') || text.includes('edredom') || text.includes('travesseiro') || text.includes('coberta') || text.includes('fronha');
 
     // Eletrônicos
     case 'Celulares e Eletrônicos':
-      return text.includes('celular') || text.includes('smartphone') || text.includes('iphone') || text.includes('samsung') || text.includes('fone') || text.includes('carregador') || text.includes('cabo') || text.includes('gadget') || text.includes('eletrôn') || text.includes('bluetooth');
+      return text.includes('celular') || text.includes('smartphone') || text.includes('iphone') || text.includes('samsung') || text.includes('fone') || text.includes('carregador') || text.includes('cabo') || text.includes('gadget') || text.includes('eletron') || text.includes('bluetooth');
     case 'Livros e Revistas':
     case 'Livros e Áudio':
-      return text.includes('livro') || text.includes('revista') || text.includes('kindle') || text.includes('e-book') || text.includes('leitura') || text.includes('áudio');
+      return text.includes('livro') || text.includes('revista') || text.includes('kindle') || text.includes('e-book') || text.includes('leitura') || text.includes('audio');
     case 'Automotivo':
-      return text.includes('automotiv') || text.includes('carro') || text.includes('veículo') || text.includes('moto') || text.includes('pneu') || text.includes('volante');
+      return text.includes('automotiv') || text.includes('carro') || text.includes('veiculo') || text.includes('moto') || text.includes('pneu') || text.includes('volante');
     case 'Computadores e Equipamentos':
       return text.includes('computador') || text.includes('notebook') || text.includes('pc') || text.includes('teclado') || text.includes('mouse') || text.includes('monitor') || text.includes('usb');
     case 'Dispositivos de Higiene':
       return text.includes('higiene') || text.includes('escova') || text.includes('barbeador') || text.includes('secador') || text.includes('prancha') || text.includes('depilador') || text.includes('aparador');
     case 'Eletrodomésticos':
-      return text.includes('eletrodoméstico') || text.includes('air fryer') || text.includes('liquidificador') || text.includes('batedeira') || text.includes('aspirador') || text.includes('ventilador') || text.includes('cafeteira');
+      return text.includes('eletrodomestico') || text.includes('air fryer') || text.includes('liquidificador') || text.includes('batedeira') || text.includes('aspirador') || text.includes('ventilador') || text.includes('cafeteira');
 
     // Beleza e Cuidados Pessoais
     case 'Maquiagem':
-      return text.includes('maquiagem') || text.includes('batom') || text.includes('rímel') || text.includes('base') || text.includes('corretivo') || text.includes('pó') || text.includes('sombra') || text.includes('pincel') || text.includes('gloss');
+      return text.includes('maquiagem') || text.includes('batom') || text.includes('rimel') || text.includes('base') || text.includes('corretivo') || text.includes('po') || text.includes('sombra') || text.includes('pincel') || text.includes('gloss');
     case 'Cuidados Capilares':
-      return text.includes('capilar') || text.includes('cabelo') || text.includes('shampoo') || text.includes('condicionador') || text.includes('máscara') || text.includes('óleo capilar') || text.includes('ampola');
+      return text.includes('capilar') || text.includes('cabelo') || text.includes('shampoo') || text.includes('condicionador') || text.includes('mascara') || text.includes('oleo capilar') || text.includes('ampola');
     case 'Perfumes':
-      return text.includes('perfume') || text.includes('colônia') || text.includes('fragrância') || text.includes('body splash');
+      return text.includes('perfume') || text.includes('colonia') || text.includes('fragrancia') || text.includes('body splash');
     case 'Cuidados com o Corpo':
       return text.includes('corpo') || text.includes('corporal') || text.includes('hidratante') || text.includes('desodorante') || text.includes('sabonete') || text.includes('esfoliante');
     case 'Cuidados Masculinos':
-      return text.includes('masculino') || text.includes('barba') || text.includes('pós-barba');
+      return text.includes('masculino') || text.includes('barba') || text.includes('pos-barba');
     case 'Cuidados com a Pele':
-      return text.includes('pele') || text.includes('skincare') || text.includes('sérum') || text.includes('protetor') || text.includes('facial') || text.includes('creme') || text.includes('tônico');
+      return text.includes('pele') || text.includes('skincare') || text.includes('serum') || text.includes('protetor') || text.includes('facial') || text.includes('creme') || text.includes('tonico');
 
     // Esportes e Lazer
     case 'Fitness':
-      return text.includes('fitness') || text.includes('academia') || text.includes('treino') || text.includes('suplemento') || text.includes('elástico') || text.includes('peso') || text.includes('halter');
+      return text.includes('fitness') || text.includes('academia') || text.includes('treino') || text.includes('suplemento') || text.includes('elastico') || text.includes('peso') || text.includes('halter');
     case 'Equipamentos para Lazer':
       return text.includes('lazer') || text.includes('camping') || text.includes('barraca') || text.includes('pesca') || text.includes('jogo');
     case 'Roupas Esportivas':
@@ -1598,16 +1604,16 @@ function matchSubcategory(p: { title?: string; category_path?: string; query_sou
     case 'Acessórios para Esportes':
       return text.includes('esporte') || text.includes('garrafa') || text.includes('luva') || text.includes('faixa') || text.includes('joelheira');
     case 'Calçados Esportivos':
-      return text.includes('tênis esportivo') || text.includes('chuteira') || text.includes('sapatilha');
+      return text.includes('tenis esportivo') || text.includes('chuteira') || text.includes('sapatilha');
 
     // Brinquedos e Pets
     case 'Produtos para Pets':
     case 'Suprimentos para Pets':
-      return text.includes('pet') || text.includes('cachorro') || text.includes('gato') || text.includes('ração') || text.includes('coleira') || text.includes('brinquedo pet');
+      return text.includes('pet') || text.includes('cachorro') || text.includes('gato') || text.includes('racao') || text.includes('coleira') || text.includes('brinquedo pet') || text.includes('peitoral');
 
     // Health
     case 'Health Nutrition':
-      return text.includes('health') || text.includes('nutrition') || text.includes('suplemento') || text.includes('whey') || text.includes('creatina') || text.includes('vitamina') || text.includes('saúde');
+      return text.includes('health') || text.includes('nutrition') || text.includes('suplemento') || text.includes('whey') || text.includes('creatina') || text.includes('vitamina') || text.includes('saude');
 
     // Infantil
     case 'Bebês':
@@ -1620,7 +1626,7 @@ function matchSubcategory(p: { title?: string; category_path?: string; query_sou
       return text.includes('cuidado') || text.includes('higiene') || text.includes('banho') || text.includes('sabonete') || text.includes('shampoo bebe') || text.includes('pomada') || text.includes('lenco umedecido') || text.includes('termometro');
 
     default: {
-      const norm = subName.toLowerCase().replace(/^(cuidados|produtos|artigos|itens|suprimentos)\s*(com\s*o?|para)?\s*/i, '');
+      const norm = subNorm.replace(/^(cuidados|produtos|artigos|itens|suprimentos)\s*(com\s*o?|para)?\s*/i, '');
       return path.includes(norm) || title.includes(norm) || query.includes(norm);
     }
   }
@@ -1887,21 +1893,39 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
   const subcategoryCounts: Record<string, number> = {};
   let classifiedCount = 0;
 
+  // Group products by (category, subcategory) to batch update SQL queries
+  const groupMap = new Map<string, { category: string; subcategory: string; ids: string[] }>();
+
   for (const p of products) {
     const { category, subcategory } = classifyProductToCategoryAndSubcategory(p);
-    const newPath = `${category} > ${subcategory}`;
-    const newQuerySource = category;
+    const key = `${category}|||${subcategory}`;
 
-    await db.query(
-      `UPDATE tiktok_shop_products
-       SET category_path = ?, query_source = ?
-       WHERE product_id = ?`,
-      [newPath, newQuerySource, p.product_id]
-    );
+    if (!groupMap.has(key)) {
+      groupMap.set(key, { category, subcategory, ids: [] });
+    }
+    groupMap.get(key)!.ids.push(String(p.product_id));
 
     classifiedCount++;
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     subcategoryCounts[subcategory] = (subcategoryCounts[subcategory] || 0) + 1;
+  }
+
+  // Execute bulk updates in chunks of 200 IDs for maximum speed
+  for (const group of groupMap.values()) {
+    const newPath = `${group.category} > ${group.subcategory}`;
+    const newQuerySource = group.category;
+    const ids = group.ids;
+
+    for (let i = 0; i < ids.length; i += 200) {
+      const chunk = ids.slice(i, i + 200);
+      const placeholders = chunk.map(() => '?').join(',');
+      await db.query(
+        `UPDATE tiktok_shop_products
+         SET category_path = ?, query_source = ?
+         WHERE product_id IN (${placeholders})`,
+        [newPath, newQuerySource, ...chunk]
+      );
+    }
   }
 
   return {
@@ -1933,7 +1957,7 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
 
   await ensureProductMinerTables();
 
-  // Auto-reclassify any unclassified products so stats are immediately 100% accurate
+  // Fast auto-reclassify check if any products remain unclassified
   try {
     const [unclassRows]: any = await db.query(
       `SELECT COUNT(*) as cnt FROM tiktok_shop_products
@@ -1962,70 +1986,56 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
   for (const cat of COLLECTOR_CATEGORIES) {
     try {
       const subNames = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
+      const catNorm = removeAccents(cat);
 
-      // Filter products belonging to this official category (including legacy category mapping)
+      // Filter products belonging to this official category
       const catProducts = allProducts.filter((p) => {
-        const path = String(p.category_path || '').toLowerCase();
-        const title = String(p.title || '').toLowerCase();
-        const query = String(p.query_source || '').toLowerCase();
+        const queryNorm = removeAccents(p.query_source || '');
+        const pathNorm = removeAccents(p.category_path || '');
+        const titleNorm = removeAccents(p.title || '');
+
+        if (queryNorm === catNorm || pathNorm.startsWith(catNorm) || pathNorm.includes(catNorm)) {
+          return true;
+        }
 
         if (cat === 'Moda') {
-          return query.includes('moda') || path.includes('moda') || path.includes('vestuario') || path.includes('calcado') || title.includes('vestido') || title.includes('bolsa') || title.includes('tenis');
+          return queryNorm.includes('moda') || pathNorm.includes('moda') || pathNorm.includes('vestuario') || pathNorm.includes('calcado') || titleNorm.includes('vestido') || titleNorm.includes('bolsa') || titleNorm.includes('tenis');
         }
         if (cat === 'Itens para Casa') {
-          return query.includes('casa') || query.includes('cozinha') || path.includes('casa') || path.includes('cozinha') || path.includes('lar') || path.includes('decoracao') || title.includes('panela') || title.includes('utensilio');
+          return queryNorm.includes('casa') || queryNorm.includes('cozinha') || pathNorm.includes('casa') || pathNorm.includes('cozinha') || pathNorm.includes('lar') || pathNorm.includes('decoracao') || titleNorm.includes('panela') || titleNorm.includes('utensilio');
         }
         if (cat === 'Eletrônicos') {
-          return query.includes('eletr') || path.includes('eletr') || path.includes('gadget') || path.includes('celular') || title.includes('fone') || title.includes('cabo');
+          return queryNorm.includes('eletr') || pathNorm.includes('eletr') || pathNorm.includes('gadget') || pathNorm.includes('celular') || titleNorm.includes('fone') || titleNorm.includes('cabo');
         }
         if (cat === 'Beleza e Cuidados Pessoais') {
-          return query.includes('beleza') || path.includes('beleza') || path.includes('pessoal') || path.includes('cosmetico') || title.includes('maquiagem') || title.includes('skincare') || title.includes('perfume');
+          return queryNorm.includes('beleza') || pathNorm.includes('beleza') || pathNorm.includes('pessoal') || pathNorm.includes('cosmetico') || titleNorm.includes('maquiagem') || titleNorm.includes('skincare') || titleNorm.includes('perfume');
         }
         if (cat === 'Esportes e Lazer') {
-          return query.includes('esporte') || query.includes('fitness') || path.includes('esporte') || path.includes('fitness') || path.includes('lazer') || title.includes('treino') || title.includes('academia');
+          return queryNorm.includes('esporte') || queryNorm.includes('fitness') || pathNorm.includes('esporte') || pathNorm.includes('fitness') || pathNorm.includes('lazer') || titleNorm.includes('treino') || titleNorm.includes('academia');
         }
         if (cat === 'Brinquedos e Pets') {
-          return query.includes('pet') || path.includes('pet') || title.includes('racao') || title.includes('coleira');
+          return queryNorm.includes('brinquedo') || queryNorm.includes('pet') || pathNorm.includes('brinquedo') || pathNorm.includes('pet') || titleNorm.includes('racao') || titleNorm.includes('coleira') || titleNorm.includes('cachorro') || titleNorm.includes('gato');
         }
         if (cat === 'Health') {
-          return query.includes('health') || path.includes('health') || path.includes('saude') || path.includes('suplemento') || title.includes('vitamina') || title.includes('whey');
+          return queryNorm.includes('health') || pathNorm.includes('health') || pathNorm.includes('saude') || pathNorm.includes('suplemento') || titleNorm.includes('vitamina') || titleNorm.includes('whey');
         }
         if (cat === 'Infantil') {
-          return (
-            query.includes('infantil') ||
-            query.includes('bebe') ||
-            query.includes('baby') ||
-            query.includes('kids') ||
-            query.includes('crianca') ||
-            path.includes('infantil') ||
-            path.includes('bebe') ||
-            path.includes('baby') ||
-            path.includes('kids') ||
-            path.includes('crianca') ||
-            path.includes('maternidade') ||
-            title.includes('infantil') ||
-            title.includes('bebe') ||
-            title.includes('bebes') ||
-            title.includes('baby') ||
-            title.includes('crianca') ||
-            title.includes('criancas') ||
-            title.includes('recem nascido') ||
-            title.includes('maternidade') ||
-            title.includes('fralda') ||
-            title.includes('mamadeira') ||
-            title.includes('chupeta') ||
-            title.includes('carrinho de bebe') ||
-            title.includes('berco') ||
-            title.includes('brinquedo')
-          );
+          return queryNorm.includes('infantil') || queryNorm.includes('bebe') || queryNorm.includes('baby') || pathNorm.includes('infantil') || pathNorm.includes('bebe') || pathNorm.includes('baby') || titleNorm.includes('infantil') || titleNorm.includes('bebe');
         }
-        return path.includes(cat.toLowerCase()) || query.includes(cat.toLowerCase());
+        return false;
       });
 
       // Subcategory breakdown
       let coveredCount = 0;
       const subStats: CollectorSubcategoryStat[] = subNames.map((subName) => {
-        const matched = catProducts.filter((p) => matchSubcategory(p, subName));
+        const subNorm = removeAccents(subName);
+        const matched = catProducts.filter((p) => {
+          const pathNorm = removeAccents(p.category_path || '');
+          if (pathNorm.includes(`> ${subNorm}`) || pathNorm.includes(`>${subNorm}`) || pathNorm.endsWith(subNorm)) {
+            return true;
+          }
+          return matchSubcategory(p, subName);
+        });
         const count = matched.length;
         if (count > 0) coveredCount++;
         return {
