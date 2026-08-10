@@ -254,17 +254,6 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
     }
   }
 
-  if (cleanProductId.length > 0) {
-    const isDirectPdp = resolvedProductUrl && (
-      resolvedProductUrl.includes(`/product/${cleanProductId}`) ||
-      resolvedProductUrl.includes('/view/product/') ||
-      resolvedProductUrl.includes('/pdp/')
-    );
-    if (!isDirectPdp) {
-      resolvedProductUrl = `https://shop.tiktok.com/view/product/${cleanProductId}`;
-    }
-  }
-
   const isDebug = process.env.NODE_ENV !== 'production' || process.env.MINER_DEBUG === 'true';
   if (isDebug) {
     const cascade = getPriceCascadeDetails(item, priceObj);
@@ -433,10 +422,17 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
       video_comments, video_shares, video_saves, estimated_commission_cents, commission_rate_percent, query_source
     ) VALUES ?
     ON DUPLICATE KEY UPDATE
-      title = VALUES(title), image_url = VALUES(image_url), price_cents = VALUES(price_cents),
-      original_price_cents = VALUES(original_price_cents), discount_percent = VALUES(discount_percent),
-      currency_symbol = VALUES(currency_symbol), rating = VALUES(rating), sold_count = VALUES(sold_count),
-      seller_id = VALUES(seller_id), seller_name = VALUES(seller_name), product_url = VALUES(product_url),
+      title = VALUES(title),
+      image_url = VALUES(image_url),
+      price_cents = IF(VALUES(price_cents) IS NOT NULL AND VALUES(price_cents) > 0, VALUES(price_cents), price_cents),
+      original_price_cents = IF(VALUES(original_price_cents) IS NOT NULL AND VALUES(original_price_cents) > 0, VALUES(original_price_cents), original_price_cents),
+      discount_percent = VALUES(discount_percent),
+      currency_symbol = VALUES(currency_symbol),
+      rating = VALUES(rating),
+      sold_count = VALUES(sold_count),
+      seller_id = VALUES(seller_id),
+      seller_name = VALUES(seller_name),
+      product_url = IF(VALUES(product_url) IS NOT NULL AND VALUES(product_url) != '', VALUES(product_url), product_url),
       category_path = VALUES(category_path), video_id = VALUES(video_id), video_url = VALUES(video_url),
       video_author = VALUES(video_author), video_author_followers = VALUES(video_author_followers),
       video_views = VALUES(video_views), video_likes = VALUES(video_likes), video_comments = VALUES(video_comments),
