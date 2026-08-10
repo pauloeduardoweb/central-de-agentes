@@ -1831,10 +1831,16 @@ export function classifyProductToCategoryAndSubcategory(product: {
 
 export type ReclassificationReport = {
   totalAnalyzed: number;
+  totalChanged: number;
+  totalMaintained: number;
   totalClassified: number;
   totalUnclassified: number;
   categoryCounts: Record<string, number>;
   subcategoryCounts: Record<string, number>;
+  leftInfantil: number;
+  enteredInfantil: number;
+  remainedInInfantil: number;
+  movedFromInfantilTo: Record<string, number>;
   socialCrawlCalled: false;
   creditsConsumed: 0;
 };
@@ -1843,6 +1849,8 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
   if (!isDatabaseConfigured()) {
     return {
       totalAnalyzed: 0,
+      totalChanged: 0,
+      totalMaintained: 0,
       totalClassified: 0,
       totalUnclassified: 0,
       categoryCounts: {
@@ -1856,6 +1864,10 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
         'Infantil': 0,
       },
       subcategoryCounts: {},
+      leftInfantil: 0,
+      enteredInfantil: 0,
+      remainedInInfantil: 0,
+      movedFromInfantilTo: {},
       socialCrawlCalled: false,
       creditsConsumed: 0,
     };
@@ -1879,26 +1891,57 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
   };
 
   const subcategoryCounts: Record<string, number> = {};
-  let classifiedCount = 0;
+  const movedFromInfantilTo: Record<string, number> = {};
 
-  // Group products by (category, subcategory) to batch update SQL queries
+  let classifiedCount = 0;
+  let totalChanged = 0;
+  let totalMaintained = 0;
+  let leftInfantil = 0;
+  let enteredInfantil = 0;
+  let remainedInInfantil = 0;
+
+  // Group products by (category, subcategory) to batch update SQL queries ONLY for products that changed
   const groupMap = new Map<string, { category: string; subcategory: string; ids: string[] }>();
 
   for (const p of products) {
-    const { category, subcategory } = classifyProductToCategoryAndSubcategory(p);
-    const key = `${category}|||${subcategory}`;
+    const oldPath = String(p.category_path || '');
+    const oldQuerySource = String(p.query_source || '');
+    const isOldInfantil = oldQuerySource === 'Infantil' || oldPath.startsWith('Infantil') || oldPath.includes('Infantil');
 
-    if (!groupMap.has(key)) {
-      groupMap.set(key, { category, subcategory, ids: [] });
-    }
-    groupMap.get(key)!.ids.push(String(p.product_id));
+    const { category, subcategory } = classifyProductToCategoryAndSubcategory(p);
+    const newPath = `${category} > ${subcategory}`;
+    const newQuerySource = category;
+    const isNewInfantil = category === 'Infantil';
 
     classifiedCount++;
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     subcategoryCounts[subcategory] = (subcategoryCounts[subcategory] || 0) + 1;
+
+    // Track movement in/out/staying in Infantil
+    if (isOldInfantil && !isNewInfantil) {
+      leftInfantil++;
+      movedFromInfantilTo[category] = (movedFromInfantilTo[category] || 0) + 1;
+    } else if (isOldInfantil && isNewInfantil) {
+      remainedInInfantil++;
+    } else if (!isOldInfantil && isNewInfantil) {
+      enteredInfantil++;
+    }
+
+    const hasChanged = oldPath !== newPath || oldQuerySource !== newQuerySource;
+
+    if (hasChanged) {
+      totalChanged++;
+      const key = `${category}|||${subcategory}`;
+      if (!groupMap.has(key)) {
+        groupMap.set(key, { category, subcategory, ids: [] });
+      }
+      groupMap.get(key)!.ids.push(String(p.product_id));
+    } else {
+      totalMaintained++;
+    }
   }
 
-  // Execute bulk updates in chunks of 200 IDs for maximum speed
+  // Execute bulk updates in chunks of 200 IDs for maximum speed & safety
   for (const group of groupMap.values()) {
     const newPath = `${group.category} > ${group.subcategory}`;
     const newQuerySource = group.category;
@@ -1918,10 +1961,16 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
 
   return {
     totalAnalyzed: products.length,
+    totalChanged,
+    totalMaintained,
     totalClassified: classifiedCount,
     totalUnclassified: products.length - classifiedCount,
     categoryCounts,
     subcategoryCounts,
+    leftInfantil,
+    enteredInfantil,
+    remainedInInfantil,
+    movedFromInfantilTo,
     socialCrawlCalled: false,
     creditsConsumed: 0,
   };
