@@ -178,7 +178,7 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
               ) : null}
             </div>
             <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500">
-              <span className="font-bold text-emerald-700">{formatMoney(product.priceCents, product.currencySymbol)}</span>
+              <span className="font-bold text-emerald-700">A partir de {formatMoney(product.priceCents, product.currencySymbol)}</span>
               <span>• {compactNumber(product.soldCount)} vendas</span>
               {product.video?.views ? <span>• {compactNumber(product.video.views)} views no vídeo</span> : null}
             </div>
@@ -552,12 +552,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <ShoppingBag className="w-12 h-12" />
                 </div>
               )}
-
-              {product.discountPercent ? (
-                <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-rose-600 text-white text-xs font-black shadow">
-                  -{product.discountPercent}%
-                </div>
-              ) : null}
             </div>
 
             <div className="flex-1 min-w-0 space-y-2 w-full">
@@ -572,15 +566,20 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {product.title}
               </h3>
 
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-lg sm:text-xl font-black text-emerald-700">
-                  {formatMoney(product.priceCents, product.currencySymbol)}
+              <div>
+                <span className="text-xs text-slate-500 font-medium block leading-none mb-0.5">
+                  A partir de
                 </span>
-                {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-                  <span className="text-xs text-slate-400 line-through">
-                    {formatMoney(product.originalPriceCents, product.currencySymbol)}
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-lg sm:text-xl font-black text-emerald-700">
+                    {formatMoney(product.priceCents, product.currencySymbol)}
                   </span>
-                ) : null}
+                  {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
+                    <span className="text-xs text-slate-400 line-through">
+                      {formatMoney(product.originalPriceCents, product.currencySymbol)}
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
               {(() => {

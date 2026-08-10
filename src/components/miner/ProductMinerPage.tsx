@@ -564,13 +564,6 @@ const MobileProductCard: React.FC<{
           </div>
         ) : null}
 
-        {/* Discount Tag */}
-        {product.discountPercent ? (
-          <div className="absolute top-1 right-1 z-10 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black shadow-xs">
-            -{product.discountPercent}%
-          </div>
-        ) : null}
-
         {/* Video Associated Indicator */}
         {product.video?.url ? (
           <div className="absolute bottom-1 left-1 z-10 p-1 rounded-full bg-amber-500 text-white shadow-xs" title="Possui vídeo">
@@ -603,7 +596,7 @@ const MobileProductCard: React.FC<{
           {/* Vendas & Rating */}
           <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600">
             <span className="font-extrabold text-amber-700 truncate">
-              {compactNumber(product.soldCount)} sold
+              {compactNumber(product.soldCount)} vendidos
             </span>
 
             {product.rating ? (
@@ -626,15 +619,20 @@ const MobileProductCard: React.FC<{
           })()}
 
           {/* Price */}
-          <div className="flex items-baseline gap-1 pt-0.5 flex-wrap">
-            <span className="text-xs font-black text-emerald-700">
-              {formatMoney(product.priceCents, product.currencySymbol)}
+          <div className="pt-0.5 space-y-0.5">
+            <span className="text-[10px] text-slate-500 font-medium block leading-none">
+              A partir de
             </span>
-            {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-              <span className="text-[9px] text-slate-400 line-through">
-                {formatMoney(product.originalPriceCents, product.currencySymbol)}
+            <div className="flex items-baseline gap-1 flex-wrap">
+              <span className="text-xs font-black text-emerald-700">
+                {formatMoney(product.priceCents, product.currencySymbol)}
               </span>
-            ) : null}
+              {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
+                <span className="text-[9px] text-slate-400 line-through">
+                  {formatMoney(product.originalPriceCents, product.currencySymbol)}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -733,7 +731,7 @@ const ProductCard: React.FC<{
             e.stopPropagation();
             onToggleFavorite?.(product);
           }}
-          className={`absolute top-2 ${product.discountPercent ? 'right-12' : 'right-2'} z-20 p-2 rounded-full bg-white/90 shadow-md transition-all hover:scale-110 ${
+          className={`absolute top-2 right-2 z-20 p-2 rounded-full bg-white/90 shadow-md transition-all hover:scale-110 ${
             isFavorite ? 'text-rose-500 bg-white' : 'text-slate-400 hover:text-rose-500'
           }`}
           title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
@@ -756,12 +754,6 @@ const ProductCard: React.FC<{
         {position ? (
           <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-white/95 border border-amber-400 text-amber-700 text-xs font-black shadow-sm">
             #{position}
-          </div>
-        ) : null}
-
-        {product.discountPercent ? (
-          <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-rose-600 text-white text-xs font-black shadow-sm">
-            -{product.discountPercent}%
           </div>
         ) : null}
 
@@ -801,15 +793,20 @@ const ProductCard: React.FC<{
 
         <div className="flex items-end justify-between gap-3">
           <div>
-            <div className="text-lg font-black text-emerald-700">
-              {formatMoney(product.priceCents, product.currencySymbol)}
-            </div>
+            <span className="text-[11px] text-slate-500 font-medium block leading-none mb-0.5">
+              A partir de
+            </span>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-lg font-black text-emerald-700">
+                {formatMoney(product.priceCents, product.currencySymbol)}
+              </span>
 
-            {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-              <div className="text-[11px] text-slate-400 line-through">
-                {formatMoney(product.originalPriceCents, product.currencySymbol)}
-              </div>
-            ) : null}
+              {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
+                <span className="text-[11px] text-slate-400 line-through">
+                  {formatMoney(product.originalPriceCents, product.currencySymbol)}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           <div className="text-right">
