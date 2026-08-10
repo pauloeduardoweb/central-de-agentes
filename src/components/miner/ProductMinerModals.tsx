@@ -455,22 +455,21 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
 
         {/* Modal Actions */}
         <div className="mt-5 flex gap-2">
-          {onOpenScriptModal ? (
-            <button
-              onClick={() => {
-                onClose();
-                onOpenScriptModal(product);
-              }}
-              className="flex-1 py-2.5 rounded-xl bg-white border border-slate-200 text-amber-800 hover:bg-slate-50 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+          {product.video?.url ? (
+            <a
+              href={product.video.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
             >
-              <Sparkles className="w-4 h-4 text-amber-600" />
-              ✨ Gerar Roteiro Deste Vídeo
-            </button>
+              <Play className="w-4 h-4 fill-current text-white" />
+              Assistir Vídeo no TikTok
+            </a>
           ) : null}
 
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold"
+            className="px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold"
           >
             Fechar
           </button>
@@ -669,31 +668,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div className="pt-2 border-t border-slate-100 space-y-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {product.video ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onOpenScriptModal?.(product);
-                    }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Sparkles className="w-4 h-4 text-white" />
-                    ✨ Gerar Roteiro AI
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onOpenAnalysisModal?.(product);
-                    }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <BarChart3 className="w-4 h-4 text-amber-600" />
-                    🔍 Analisar Vídeo
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAnalysisModal?.(product);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                >
+                  <BarChart3 className="w-4 h-4 text-amber-600" />
+                  🔍 Analisar Vídeo
+                </button>
               ) : null}
 
               {product.video?.url ? (

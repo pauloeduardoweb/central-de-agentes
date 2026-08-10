@@ -911,37 +911,28 @@ const ProductCard: React.FC<{
 
             {/* Video Action Buttons Area */}
             <div className="pt-2 border-t border-amber-200/40 space-y-1.5">
-              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                <button
-                  type="button"
-                  onClick={() => onOpenScriptModal?.(product)}
-                  className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-amber-800 hover:bg-slate-50 font-bold flex items-center justify-center gap-1 transition-all shadow-sm"
-                >
-                  <Sparkles className="w-3 h-3 text-amber-600" />
-                  ✨ Gerar Roteiro
-                </button>
-
+              <div className={`grid ${product.video.url ? 'grid-cols-2' : 'grid-cols-1'} gap-1.5 text-[10px]`}>
                 <button
                   type="button"
                   onClick={() => onOpenAnalysisModal?.(product)}
-                  className="py-1.5 px-2 rounded-lg bg-white border border-amber-200 text-slate-800 hover:bg-amber-50 font-bold flex items-center justify-center gap-1 transition-all"
+                  className="w-full py-1.5 px-2 rounded-lg bg-white border border-amber-200 text-slate-800 hover:bg-amber-50 font-bold flex items-center justify-center gap-1 transition-all shadow-xs"
                 >
                   <BarChart3 className="w-3 h-3 text-amber-600" />
                   🔍 Analisar
                 </button>
-              </div>
 
-              {product.video.url ? (
-                <a
-                  href={product.video.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-amber-900 hover:border-amber-300 font-bold flex items-center justify-center gap-1.5 transition-all text-[11px]"
-                >
-                  <Play className="w-3.5 h-3.5 text-amber-600 fill-amber-500/20" />
-                  Assistir Vídeo
-                </a>
-              ) : null}
+                {product.video.url ? (
+                  <a
+                    href={product.video.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-amber-900 hover:border-amber-300 font-bold flex items-center justify-center gap-1 transition-all shadow-xs"
+                  >
+                    <Play className="w-3 h-3 text-amber-600 fill-amber-500/20" />
+                    Assistir Vídeo
+                  </a>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : (
