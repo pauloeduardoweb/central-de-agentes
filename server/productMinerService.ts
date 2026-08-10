@@ -1318,7 +1318,7 @@ export function rowToProduct(row: any): MinedProduct {
     soldCount: Number(row.sold_count || 0),
     sellerId: row.seller_id,
     sellerName: row.seller_name,
-    productUrl: row.product_url || (row.product_id ? `https://shop.tiktok.com/view/product/${row.product_id}` : null),
+    productUrl: row.product_url ? String(row.product_url).trim() : null,
     category: row.category_path,
     lastSeenAt: row.last_seen_at,
     estimatedCommissionCents: row.estimated_commission_cents === null || row.estimated_commission_cents === undefined ? null : Number(row.estimated_commission_cents),
