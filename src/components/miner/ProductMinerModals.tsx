@@ -522,7 +522,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 Detalhes do Produto
               </h2>
               <p className="text-[11px] text-slate-500 truncate">
-                {product.sellerName || 'TikTok Shop'}
+                Loja: {product.sellerName || 'TikTok Shop'}
               </p>
             </div>
           </div>

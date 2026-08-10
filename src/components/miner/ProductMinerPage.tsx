@@ -211,6 +211,19 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
       'Health Nutrition',
     ],
   },
+  {
+    filterKey: 'Infantil',
+    label: 'Infantil',
+    subcategories: [
+      'Todas',
+      'Bebês',
+      'Moda Infantil',
+      'Calçados',
+      'Brinquedos',
+      'Cuidados',
+      'Acessórios',
+    ],
+  },
 ];
 
 const TIKTOK_CATEGORIES = CATEGORY_CONFIG.map((c) => ({ filterKey: c.filterKey, label: c.label }));
@@ -307,17 +320,65 @@ function getCategoryIcon(catName: string) {
   if (norm.includes('cozinha')) return <Utensils className="w-5 h-5 text-orange-300" />;
   if (norm.includes('eletrônicos') || norm.includes('eletronicos')) return <Cpu className="w-5 h-5 text-blue-300" />;
   if (norm.includes('fitness')) return <Dumbbell className="w-5 h-5 text-emerald-300" />;
-  if (norm.includes('bebê') || norm.includes('bebe')) return <Baby className="w-5 h-5 text-pink-300" />;
+  if (norm.includes('bebê') || norm.includes('bebe') || norm.includes('infantil')) return <Baby className="w-5 h-5 text-pink-300" />;
   if (norm.includes('pet')) return <Dog className="w-5 h-5 text-purple-300" />;
   return <ShoppingBag className="w-5 h-5 text-cyan-300" />;
 }
 
-function matchesCategoryFilter(productCatRaw: string | null, selectedCat: string): boolean {
+function matchesCategoryFilter(
+  productCatRaw: string | null,
+  selectedCat: string,
+  productTitleRaw?: string | null
+): boolean {
   if (!selectedCat || selectedCat === 'Todos') return true;
-  if (!productCatRaw) return false;
 
-  const cat = productCatRaw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const target = selectedCat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  if (target === 'infantil') {
+    const cat = (productCatRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // 1. Structured category metadata check
+    const structuredMatch =
+      cat.includes('infantil') ||
+      cat.includes('bebe') ||
+      cat.includes('bebes') ||
+      cat.includes('crianca') ||
+      cat.includes('criancas') ||
+      cat.includes('kids') ||
+      cat.includes('baby') ||
+      cat.includes('maternidade');
+
+    if (structuredMatch) return true;
+
+    // 2. Unambiguous title terms fallback
+    const title = (productTitleRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const titleMatch =
+      title.includes('infantil') ||
+      title.includes('bebe') ||
+      title.includes('bebes') ||
+      title.includes('crianca') ||
+      title.includes('criancas') ||
+      title.includes('recem nascido') ||
+      title.includes('recem-nascido') ||
+      title.includes('maternidade') ||
+      title.includes('body bebe') ||
+      title.includes('macacao bebe') ||
+      title.includes('sapatinho bebe') ||
+      title.includes('mamadeira') ||
+      title.includes('chupeta') ||
+      title.includes('fralda') ||
+      title.includes('carrinho de bebe') ||
+      title.includes('berco') ||
+      title.includes('moda infantil') ||
+      title.includes('calcado infantil') ||
+      title.includes('brinquedo infantil') ||
+      title.includes('roupa infantil');
+
+    return titleMatch;
+  }
+
+  if (!productCatRaw) return false;
+  const cat = productCatRaw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   if (target === 'moda') {
     return cat.includes('moda') || cat.includes('vestuario') || cat.includes('roupa') || cat.includes('calçado');
@@ -363,6 +424,9 @@ function matchesSubcategoryFilter(
   const titleStr = (productTitleRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   const sub = selectedSubcat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  const catKey = selectedCat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const mapKey = `${catKey}_${sub}`;
 
   const KEYWORD_MAP: Record<string, string[]> = {
     // Moda
@@ -413,9 +477,17 @@ function matchesSubcategoryFilter(
 
     // Health
     'health nutrition': ['nutrition', 'nutricao', 'suplemento', 'vitamina', 'whey', 'creatina', 'colageno', 'omega 3', 'protein', 'termogenico', 'pre treino'],
+
+    // Infantil Specific Keys
+    'infantil_bebes': ['bebe', 'bebes', 'baby', 'recem nascido', 'maternidade', 'fralda', 'mamadeira', 'chupeta', 'berco', 'carrinho de bebe', 'ninho'],
+    'infantil_moda infantil': ['moda infantil', 'roupa infantil', 'vestido infantil', 'conjunto infantil', 'pijama infantil', 'camisa infantil', 'macacao', 'body', 'roupa bebe', 'pijama bebe', 'romper'],
+    'infantil_calcados': ['calcado', 'sapato', 'tenis', 'sandalia', 'chinelo', 'pantufa', 'sapatinho', 'crocs infantil', 'galocha'],
+    'infantil_brinquedos': ['brinquedo', 'jogos', 'boneca', 'carrinho', 'pelucia', 'lego', 'quebra cabeca', 'mordedor', 'chocalho', 'tapete de atividades'],
+    'infantil_cuidados': ['cuidado', 'higiene', 'banho', 'sabonete bebe', 'shampoo bebe', 'pomada', 'lenco umedecido', 'tesourinha', 'termometro'],
+    'infantil_acessorios': ['acessorio', 'laco', 'tiara', 'babador', 'mochila infantil', 'bolsa maternidade', 'copo infantil', 'pratinho', 'talher infantil'],
   };
 
-  const currentKeywords = KEYWORD_MAP[sub] || [sub];
+  const currentKeywords = KEYWORD_MAP[mapKey] || KEYWORD_MAP[sub] || [sub];
 
   // 2. PRIORITY 1: OFFICIAL CATEGORY TAXONOMY DATA
   // Check if official category string (productCatRaw) explicitly contains the subcategory name or taxonomy terms
@@ -639,8 +711,9 @@ const MobileProductCard: React.FC<{
         {/* Bottom Bar: Seller Name + Heart Favorite & Action Buttons */}
         <div className="pt-1.5 border-t border-slate-100 space-y-1.5 mt-auto">
           <div className="flex items-center justify-between gap-1 text-[10px]">
-            <span className="truncate text-[10px] text-slate-500 font-medium flex-1">
-              {product.sellerName || 'TikTok Shop'}
+            <span className="text-[10px] text-slate-500 font-medium flex-1 min-w-0 flex items-center">
+              <span className="shrink-0 mr-0.5">Loja:</span>
+              <span className="truncate">{product.sellerName || 'TikTok Shop'}</span>
             </span>
             <button
               type="button"
@@ -847,7 +920,10 @@ const ProductCard: React.FC<{
 
           <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2 text-slate-700 flex items-center gap-1.5 min-w-0 font-medium">
             <Store className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span className="truncate">{product.sellerName || 'Loja'}</span>
+            <span className="text-[11px] text-slate-700 font-medium flex items-center min-w-0">
+              <span className="shrink-0 mr-0.5">Loja:</span>
+              <span className="truncate">{product.sellerName || 'TikTok Shop'}</span>
+            </span>
           </div>
         </div>
 
@@ -1188,6 +1264,27 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     [selectedCategory]
   );
 
+  const availableSubcategories = useMemo(() => {
+    if (!activeCategoryConfig) return ['Todas'];
+    if (selectedCategory !== 'Infantil') return activeCategoryConfig.subcategories;
+
+    const baseList = mode === 'favorites' ? favorites : products;
+    const catProducts = baseList.filter((p) => matchesCategoryFilter(p.category, selectedCategory, p.title));
+
+    const matched = activeCategoryConfig.subcategories.filter((subcat) => {
+      if (subcat === 'Todas') return true;
+      return catProducts.some((p) => matchesSubcategoryFilter(p.category, p.title, subcat, selectedCategory));
+    });
+
+    return matched.length > 1 ? matched : ['Todas'];
+  }, [activeCategoryConfig, selectedCategory, mode, favorites, products]);
+
+  useEffect(() => {
+    if (selectedSubcategory && selectedSubcategory !== 'Todas' && !availableSubcategories.includes(selectedSubcategory)) {
+      setSelectedSubcategory('Todas');
+    }
+  }, [availableSubcategories, selectedSubcategory]);
+
   // Ranking Pagination State
   const [rankingPage, setRankingPage] = useState<number>(1);
 
@@ -1262,7 +1359,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
 
     // 1. Filter by TikTok main category
-    list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory));
+    list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory, p.title));
 
     // 1b. Filter by subcategory
     if (selectedSubcategory && selectedSubcategory !== 'Todas' && selectedSubcategory !== 'Todos') {
@@ -1671,7 +1768,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 }}
               >
                 <div className="flex w-max min-w-max items-center gap-1.5 pr-12 sm:pr-24">
-                  {activeCategoryConfig.subcategories.map((subcat) => {
+                  {availableSubcategories.map((subcat) => {
                     const isSubActive = selectedSubcategory === subcat;
                     return (
                       <button
