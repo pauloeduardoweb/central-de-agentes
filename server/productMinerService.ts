@@ -1555,9 +1555,9 @@ function matchSubcategory(p: { title?: string; category_path?: string; query_sou
     case 'Produtos de Limpeza':
       return text.includes('limpeza') || text.includes('detergente') || text.includes('sabão') || text.includes('mop') || text.includes('vassoura') || text.includes('pano') || text.includes('esponja') || text.includes('aspirador');
     case 'Decoração de Casa':
-      return text.includes('decoração') || text.includes('decorat') || text.includes('quadro') || text.includes('almofada') || text.includes('tapete') || text.includes('vaso') || text.includes('planta') || text.includes('quadro');
+      return text.includes('decoração') || text.includes('decorat') || text.includes('quadro') || text.includes('almofada') || text.includes('tapete') || text.includes('vaso') || text.includes('planta');
     case 'Cama, Mesa e Banho':
-      return text.includes('cama') || text.includes('lençol') || text.includes('edredom') || text.includes('travesseiro') || text.includes('coberta') || text.includes('morfina') || text.includes('fronha');
+      return text.includes('cama') || text.includes('lençol') || text.includes('edredom') || text.includes('travesseiro') || text.includes('coberta') || text.includes('fronha');
 
     // Eletrônicos
     case 'Celulares e Eletrônicos':
@@ -1603,7 +1603,7 @@ function matchSubcategory(p: { title?: string; category_path?: string; query_sou
     // Brinquedos e Pets
     case 'Produtos para Pets':
     case 'Suprimentos para Pets':
-      return text.includes('pet') || text.includes('cachorro') || text.includes('gato') || text.includes('ração') || text.includes('coleira') || text.includes('brinquedo pet') || text.includes('brinquedo') || text.includes('infantil') || text.includes('bebê');
+      return text.includes('pet') || text.includes('cachorro') || text.includes('gato') || text.includes('ração') || text.includes('coleira') || text.includes('brinquedo pet');
 
     // Health
     case 'Health Nutrition':
@@ -1626,6 +1626,295 @@ function matchSubcategory(p: { title?: string; category_path?: string; query_sou
   }
 }
 
+function removeAccents(str: string): string {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+export function classifyProductToCategoryAndSubcategory(product: {
+  title?: string;
+  category_path?: string;
+  query_source?: string;
+  seller_name?: string;
+}): { category: string; subcategory: string } {
+  const rawText = `${product.title || ''} ${product.category_path || ''} ${product.query_source || ''} ${product.seller_name || ''}`;
+  const text = removeAccents(rawText);
+
+  const has = (...terms: string[]) => terms.some((t) => text.includes(removeAccents(t)));
+
+  // 1. INFANTIL (HIGHEST PRIORITY)
+  if (
+    has(
+      'bebe', 'bebes', 'baby', 'infantil', 'infantis', 'crianca', 'criancas', 'menino', 'menina',
+      'kids', 'toddler', 'maternidade', 'recem nascido', 'fralda', 'mamadeira', 'chupeta',
+      'berco', 'carrinho de bebe', 'carrinho bebe', 'ninho bebe', 'macacao bebe', 'body bebe',
+      'pijama infantil', 'roupa infantil', 'vestido infantil', 'conjunto infantil', 'sapato infantil',
+      'tenis infantil', 'sandalia infantil', 'brinquedo infantil', 'mordedor', 'chocalho',
+      'sabonete bebe', 'shampoo bebe', 'pomada assadura', 'lenco umedecido'
+    )
+  ) {
+    let sub = 'Moda Infantil';
+    if (has('bebe', 'baby', 'maternidade', 'recem nascido', 'fralda', 'mamadeira', 'chupeta', 'berco', 'carrinho de bebe', 'ninho bebe')) {
+      sub = 'Bebês';
+    } else if (has('tenis', 'sapato', 'sandalia', 'chinelo', 'bota', 'pantufa', 'calcado')) {
+      sub = 'Calçados';
+    } else if (has('brinquedo', 'jogo', 'boneca', 'pelucia', 'lego', 'mordedor', 'chocalho')) {
+      sub = 'Brinquedos';
+    } else if (has('higiene', 'banho', 'sabonete', 'shampoo', 'pomada', 'lenco umedecido', 'termometro', 'cuidado')) {
+      sub = 'Cuidados';
+    } else if (has('laco', 'tiara', 'babador', 'touca', 'mochila infantil', 'acessorio')) {
+      sub = 'Acessórios';
+    } else {
+      sub = 'Moda Infantil';
+    }
+    return { category: 'Infantil', subcategory: sub };
+  }
+
+  // 2. HEALTH
+  if (
+    has(
+      'creatina', 'suplemento', 'suplementos', 'vitamina', 'vitaminas', 'capsulas', 'capsula',
+      'proteina', 'proteinas', 'whey', 'whey protein', 'magnesio', 'colageno', 'omega 3',
+      'multivitaminico', 'termogenico', 'coenzima q10', 'melatonina', 'glutamina', 'bcaa',
+      'pre treino', 'health nutrition', 'morfina', 'emagrecentro', 'saude e nutricao'
+    )
+  ) {
+    return { category: 'Health', subcategory: 'Health Nutrition' };
+  }
+
+  // 3. BELEZA E CUIDADOS PESSOAIS
+  if (
+    has(
+      'maquiagem', 'skincare', 'perfume', 'perfumes', 'cabelo', 'cabelos', 'cosmetico', 'cosmeticos',
+      'creme', 'cremes', 'batom', 'rimel', 'base facial', 'corretivo', 'po compacto', 'sombra olhos',
+      'pincel maquiagem', 'gloss', 'shampoo', 'condicionador', 'mascara capilar', 'oleo capilar',
+      'ampola', 'colonia', 'fragrancia', 'body splash', 'hidratante', 'desodorante', 'sabonete',
+      'esfoliante', 'barba', 'pos barba', 'serum', 'protetor solar', 'creme facial', 'tonico',
+      'esmalte', 'unhas', 'delineador', 'lip balm', 'sabonete facial', 'gel de limpeza', 'cilios',
+      'progressiva', 'alisamento', 'pele'
+    )
+  ) {
+    let sub = 'Cuidados com a Pele';
+    if (has('maquiagem', 'batom', 'rimel', 'base', 'corretivo', 'po', 'sombra', 'pincel', 'gloss', 'delineador', 'cilios', 'esmalte', 'unhas')) {
+      sub = 'Maquiagem';
+    } else if (has('capilar', 'cabelo', 'shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'ampola', 'progressiva', 'alisamento', 'tonico capilar')) {
+      sub = 'Cuidados Capilares';
+    } else if (has('perfume', 'colonia', 'fragrancia', 'body splash')) {
+      sub = 'Perfumes';
+    } else if (has('corpo', 'corporal', 'hidratante', 'desodorante', 'sabonete', 'esfoliante')) {
+      sub = 'Cuidados com o Corpo';
+    } else if (has('barba', 'pos barba', 'masculino cuidados')) {
+      sub = 'Cuidados Masculinos';
+    } else {
+      sub = 'Cuidados com a Pele';
+    }
+    return { category: 'Beleza e Cuidados Pessoais', subcategory: sub };
+  }
+
+  // 4. ELETRÔNICOS
+  if (
+    has(
+      'fone', 'headphone', 'headset', 'earphone', 'celular', 'smartphone', 'iphone', 'samsung',
+      'xiaomi', 'caixa de som', 'smartwatch', 'relogio inteligente', 'carregador', 'cabo usb',
+      'power bank', 'gadget', 'eletronico', 'eletronicos', 'bluetooth', 'livro', 'revista',
+      'kindle', 'ebook', 'automotivo', 'carro', 'suporte celular', 'veiculo', 'computador',
+      'notebook', 'pc', 'teclado', 'mouse', 'monitor', 'webcam', 'barbeador eletrico',
+      'escova eletrica', 'secador', 'prancha', 'chapinha', 'depilador', 'aparador',
+      'eletrodomestico', 'eletrodomesticos', 'air fryer', 'liquidificador', 'batedeira',
+      'aspirador', 'ventilador', 'cafeteira', 'umidificador', 'ring light', 'tripe',
+      'microfone', 'camera'
+    )
+  ) {
+    let sub = 'Celulares e Eletrônicos';
+    if (has('livro', 'revista', 'kindle', 'ebook', 'leitura', 'audiobook', 'audio')) {
+      sub = 'Livros e Revistas';
+    } else if (has('automotivo', 'carro', 'veiculo', 'moto', 'pneu')) {
+      sub = 'Automotivo';
+    } else if (has('computador', 'notebook', 'pc', 'teclado', 'mouse', 'monitor', 'webcam', 'usb')) {
+      sub = 'Computadores e Equipamentos';
+    } else if (has('barbeador', 'escova eletrica', 'secador', 'prancha', 'chapinha', 'depilador', 'aparador')) {
+      sub = 'Dispositivos de Higiene';
+    } else if (has('eletrodomestico', 'air fryer', 'liquidificador', 'batedeira', 'aspirador', 'ventilador', 'cafeteira', 'umidificador')) {
+      sub = 'Eletrodomésticos';
+    } else {
+      sub = 'Celulares e Eletrônicos';
+    }
+    return { category: 'Eletrônicos', subcategory: sub };
+  }
+
+  // 5. ITENS PARA CASA
+  if (
+    has(
+      'panela', 'utensilio', 'utensilios', 'cozinha', 'organizacao', 'organizador', 'decoracao',
+      'movel', 'moveis', 'cadeira', 'mesa', 'sofa', 'estante', 'armario', 'prateleira',
+      'ferramenta', 'furadeira', 'chave', 'alicate', 'martelo', 'trena', 'festa', 'balao',
+      'vela', 'aniversario', 'reforma', 'construcao', 'iluminacao', 'lampada', 'led', 'fita led',
+      'tomada', 'banheiro', 'porta escova', 'saboneteira', 'toalha', 'chuveiro', 'espelho',
+      'limpeza', 'mop', 'vassoura', 'esfregao', 'detergente', 'pano', 'esponja', 'quadro',
+      'almofada', 'tapete', 'vaso', 'planta', 'cama', 'lencol', 'edredom', 'travesseiro',
+      'coberta', 'fronha', 'garrafa termica', 'copo termico', 'pote', 'frigideira', 'faca',
+      'tabua', 'xicara', 'prato', 'copo', 'garrafa', 'cabide', 'lixeira', 'suporte', 'casa', 'lar'
+    )
+  ) {
+    let sub = 'Utensílios de Cozinha';
+    if (has('movel', 'moveis', 'cadeira', 'mesa', 'sofa', 'estante', 'armario', 'prateleira')) {
+      sub = 'Móveis';
+    } else if (has('ferramenta', 'furadeira', 'chave', 'alicate', 'martelo', 'trena')) {
+      sub = 'Ferramentas';
+    } else if (has('festa', 'balao', 'vela', 'aniversario', 'fantasia')) {
+      sub = 'Artigos para Festas';
+    } else if (has('reforma', 'construcao', 'tinta', 'iluminacao', 'lampada', 'fio', 'tomada', 'led')) {
+      sub = 'Reforma e Construção';
+    } else if (has('banheiro', 'porta escova', 'saboneteira', 'chuveiro', 'espelho')) {
+      sub = 'Itens para Banheiro';
+    } else if (has('limpeza', 'detergente', 'sabao', 'mop', 'vassoura', 'esfregao', 'pano', 'esponja')) {
+      sub = 'Produtos de Limpeza';
+    } else if (has('decoracao', 'decorat', 'quadro', 'almofada', 'tapete', 'vaso', 'planta')) {
+      sub = 'Decoração de Casa';
+    } else if (has('cama', 'lencol', 'edredom', 'travesseiro', 'coberta', 'fronha')) {
+      sub = 'Cama, Mesa e Banho';
+    } else {
+      sub = 'Utensílios de Cozinha';
+    }
+    return { category: 'Itens para Casa', subcategory: sub };
+  }
+
+  // 6. ESPORTES E LAZER
+  if (
+    has(
+      'academia', 'fitness', 'treino', 'exercicio', 'elastico', 'peso', 'halter', 'kettlebell',
+      'yoga', 'camping', 'barraca', 'pesca', 'vara', 'anzol', 'esportiva', 'esportivo',
+      'legging', 'short treino', 'regata', 'joelheira', 'tornozeleira', 'garrafa academia',
+      'chuteira', 'ciclismo', 'bicicleta', 'esporte'
+    )
+  ) {
+    let sub = 'Fitness';
+    if (has('lazer', 'camping', 'barraca', 'pesca', 'jogo')) {
+      sub = 'Equipamentos para Lazer';
+    } else if (has('esportiva', 'esportivo', 'legging', 'regata', 'short treino')) {
+      sub = 'Roupas Esportivas';
+    } else if (has('garrafa', 'luva', 'faixa', 'joelheira', 'tornozeleira')) {
+      sub = 'Acessórios para Esportes';
+    } else if (has('chuteira', 'ciclismo', 'tenis corrida')) {
+      sub = 'Calçados Esportivos';
+    } else {
+      sub = 'Fitness';
+    }
+    return { category: 'Esportes e Lazer', subcategory: sub };
+  }
+
+  // 7. BRINQUEDOS E PETS
+  if (
+    has(
+      'pet', 'pets', 'cachorro', 'gato', 'cao', 'caes', 'racao', 'coleira', 'guia',
+      'arranhador', 'cama pet', 'tapete higienico', 'aquario', 'petisco'
+    )
+  ) {
+    let sub = 'Produtos para Pets';
+    if (has('guia', 'petisco', 'aquario', 'suprimento')) {
+      sub = 'Suprimentos para Pets';
+    } else {
+      sub = 'Produtos para Pets';
+    }
+    return { category: 'Brinquedos e Pets', subcategory: sub };
+  }
+
+  // 8. MODA
+  if (
+    has(
+      'vestido', 'saia', 'blusa', 'camisa', 'camiseta', 'calca', 'jeans', 'short', 'bermuda',
+      'casaco', 'jaqueta', 'moletom', 'cardigan', 'blazer', 'top', 'cropped', 'lingerie',
+      'sutia', 'cueca', 'pijama', 'meia', 'bolsa', 'carteira', 'mochila', 'mala', 'necessaire',
+      'pochete', 'calcado', 'tenis', 'sapato', 'sandalia', 'bota', 'chinelo', 'salto',
+      'rasteirinha', 'mocassim', 'brinco', 'colar', 'anel', 'pulseira', 'oculos', 'relogio',
+      'cinto', 'bone', 'touca', 'chapeu', 'cachecol', 'joia', 'bijuteria', 'moda', 'vestuario',
+      'roupa', 'look'
+    )
+  ) {
+    let sub = 'Moda Feminina';
+    if (has('mala', 'mochila', 'bolsa', 'carteira', 'pochete', 'necessaire')) {
+      sub = 'Malas e Mochilas';
+    } else if (has('calcado', 'tenis', 'sapato', 'sandalia', 'bota', 'chinelo', 'salto', 'rasteirinha', 'mocassim')) {
+      sub = 'Calçados';
+    } else if (has('brinco', 'colar', 'anel', 'pulseira', 'oculos', 'relogio', 'cinto', 'bone', 'chapeu', 'joia', 'bijuteria')) {
+      sub = 'Acessórios';
+    } else if (has('camisa', 'bermuda', 'cueca', 'homem', 'masculino', 'masculina')) {
+      sub = 'Moda Masculina';
+    } else {
+      sub = 'Moda Feminina';
+    }
+    return { category: 'Moda', subcategory: sub };
+  }
+
+  // FALLBACK
+  return { category: 'Itens para Casa', subcategory: 'Utensílios de Cozinha' };
+}
+
+export type ReclassificationReport = {
+  totalAnalyzed: number;
+  totalClassified: number;
+  totalUnclassified: number;
+  categoryCounts: Record<string, number>;
+  subcategoryCounts: Record<string, number>;
+  socialCrawlCalled: false;
+  creditsConsumed: 0;
+};
+
+export async function reclassifyExistingDatabaseProducts(): Promise<ReclassificationReport> {
+  if (!isDatabaseConfigured()) {
+    throw new Error('DATABASE_NOT_CONFIGURED');
+  }
+  await ensureProductMinerTables();
+
+  const [rows]: any = await db.query(
+    `SELECT product_id, title, category_path, query_source, seller_name FROM tiktok_shop_products`
+  );
+
+  const products = Array.isArray(rows) ? rows : [];
+  const categoryCounts: Record<string, number> = {
+    'Moda': 0,
+    'Itens para Casa': 0,
+    'Eletrônicos': 0,
+    'Beleza e Cuidados Pessoais': 0,
+    'Esportes e Lazer': 0,
+    'Brinquedos e Pets': 0,
+    'Health': 0,
+    'Infantil': 0,
+  };
+
+  const subcategoryCounts: Record<string, number> = {};
+  let classifiedCount = 0;
+
+  for (const p of products) {
+    const { category, subcategory } = classifyProductToCategoryAndSubcategory(p);
+    const newPath = `${category} > ${subcategory}`;
+    const newQuerySource = category;
+
+    await db.query(
+      `UPDATE tiktok_shop_products
+       SET category_path = ?, query_source = ?
+       WHERE product_id = ?`,
+      [newPath, newQuerySource, p.product_id]
+    );
+
+    classifiedCount++;
+    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    subcategoryCounts[subcategory] = (subcategoryCounts[subcategory] || 0) + 1;
+  }
+
+  return {
+    totalAnalyzed: products.length,
+    totalClassified: classifiedCount,
+    totalUnclassified: products.length - classifiedCount,
+    categoryCounts,
+    subcategoryCounts,
+    socialCrawlCalled: false,
+    creditsConsumed: 0,
+  };
+}
+
 export async function getCollectorCategoriesStats(): Promise<CollectorCategoryStat[]> {
   if (!isDatabaseConfigured()) {
     return COLLECTOR_CATEGORIES.map((cat) => {
@@ -1643,6 +1932,20 @@ export async function getCollectorCategoriesStats(): Promise<CollectorCategorySt
   }
 
   await ensureProductMinerTables();
+
+  // Auto-reclassify any unclassified products so stats are immediately 100% accurate
+  try {
+    const [unclassRows]: any = await db.query(
+      `SELECT COUNT(*) as cnt FROM tiktok_shop_products
+       WHERE category_path IS NULL OR category_path = '' OR query_source IS NULL OR query_source = ''
+          OR query_source NOT IN ('Moda', 'Itens para Casa', 'Eletrônicos', 'Beleza e Cuidados Pessoais', 'Esportes e Lazer', 'Brinquedos e Pets', 'Health', 'Infantil')`
+    );
+    if (Array.isArray(unclassRows) && Number(unclassRows[0]?.cnt || 0) > 0) {
+      await reclassifyExistingDatabaseProducts().catch((e) => console.warn('[Auto Reclassify Warning]:', e));
+    }
+  } catch (err) {
+    console.warn('[Auto Reclassify Check Error]:', err);
+  }
 
   const statsList: CollectorCategoryStat[] = [];
 

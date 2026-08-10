@@ -1,6 +1,6 @@
 import express from 'express';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
-import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, ProductRankingSort } from './productMinerService.js';
+import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, reclassifyExistingDatabaseProducts, ProductRankingSort } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
 import { db, isDatabaseConfigured, ensureCodigosAcessoTable } from './database.js';
 import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin } from './presenceService.js';
@@ -230,6 +230,29 @@ productMinerRouter.post('/admin/toggle', async (req, res) => {
   } catch (err: any) {
     console.error('[Admin Miner Toggle Access Error]:', err?.message || err);
     return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao alterar permissão do minerador.' });
+  }
+});
+
+// ADMIN: Reclassify existing local products into categories without calling SocialCrawl or consuming credits
+productMinerRouter.post('/admin/reclassify', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const report = await reclassifyExistingDatabaseProducts();
+    return res.json({ success: true, report });
+  } catch (error: any) {
+    console.error('[Admin Reclassify Error]:', error?.message || error);
+    return res.status(500).json({ error: 'RECLASSIFY_FAILED', message: error?.message || 'Falha ao reclassificar produtos.' });
+  }
+});
+
+productMinerRouter.get('/admin/reclassify', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const report = await reclassifyExistingDatabaseProducts();
+    return res.json({ success: true, report });
+  } catch (error: any) {
+    console.error('[Admin Reclassify Error]:', error?.message || error);
+    return res.status(500).json({ error: 'RECLASSIFY_FAILED', message: error?.message || 'Falha ao reclassificar produtos.' });
   }
 });
 
