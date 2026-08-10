@@ -658,33 +658,17 @@ const MobileProductCard: React.FC<{
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-1 text-[10px]">
+          <div className="pt-1">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenDetailModal?.(product);
               }}
-              className="w-full py-1.5 px-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 text-[10px] transition-all text-center truncate"
+              className="w-full py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold border border-slate-200/80 text-xs transition-all text-center flex items-center justify-center gap-1 shadow-2xs"
             >
               Mais informações
             </button>
-
-            {targetProductUrl ? (
-              <a
-                href={targetProductUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="w-full py-1.5 px-1 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-[10px] shadow-xs flex items-center justify-center gap-0.5 transition-all truncate"
-              >
-                <span>Pesquisar no TikTok Shop</span> <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-              </a>
-            ) : (
-              <span className="w-full py-1.5 rounded-lg bg-slate-50 text-slate-300 font-medium text-[10px] border border-slate-100 text-center cursor-not-allowed">
-                —
-              </span>
-            )}
           </div>
         </div>
       </div>
