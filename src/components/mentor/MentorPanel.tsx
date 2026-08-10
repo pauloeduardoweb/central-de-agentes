@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Crown,
   Video,
+  Flame,
 } from 'lucide-react';
 import { MentorStudentsList } from './MentorStudentsList';
 import { MentorOnlineMonitoring } from './MentorOnlineMonitoring';
@@ -15,6 +16,7 @@ import { MentorChallenges } from './MentorChallenges';
 import { MentorAccessCodes } from './MentorAccessCodes';
 import { MentorStats } from './MentorStats';
 import { TikTokIntegration } from './TikTokIntegration';
+import { MentorMinerAccess } from './MentorMinerAccess';
 
 interface MentorPanelProps {
   studentCode: string;
@@ -137,6 +139,16 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
       icon: Video,
       badge: 'Novo',
       badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40',
+      isAvailable: true,
+    },
+    {
+      id: 'miner-access',
+      title: 'Acesso ao Minerador',
+      shortDescription: 'Gerenciar Acesso dos Alunos',
+      description: 'Gerenciar quais alunos possuem acesso ao módulo Minerar Produtos.',
+      icon: Flame,
+      badge: 'ATIVO',
+      badgeColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40',
       isAvailable: true,
     },
   ];
@@ -285,6 +297,12 @@ export const MentorPanel: React.FC<MentorPanelProps> = ({ studentCode, onBackToH
         )}
         {activeTab === 'stats' && (
           <MentorStats studentCode={studentCode} />
+        )}
+        {activeTab === 'tiktok' && (
+          <TikTokIntegration studentCode={studentCode} />
+        )}
+        {activeTab === 'miner-access' && (
+          <MentorMinerAccess studentCode={studentCode} />
         )}
       </div>
 
