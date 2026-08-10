@@ -332,16 +332,11 @@ productMinerRouter.get('/collector/daily-status', async (req, res) => {
 productMinerRouter.post('/collector/daily-refresh', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
   try {
-    const status = await executeDailyRefresh();
+    const force = Boolean(req.body?.force);
+    const status = await executeDailyRefresh({ force });
     return res.json({ success: true, status });
   } catch (error: any) {
     const msg = error?.message || '';
-    if (msg === 'DAILY_REFRESH_COOLDOWN') {
-      return res.status(429).json({
-        error: 'DAILY_REFRESH_COOLDOWN',
-        message: 'A base já foi atualizada nas últimas 24 horas. Aguarde o período de intervalo para atualizar novamente.',
-      });
-    }
     if (msg === 'DAILY_REFRESH_IN_PROGRESS') {
       return res.status(409).json({
         error: 'DAILY_REFRESH_IN_PROGRESS',

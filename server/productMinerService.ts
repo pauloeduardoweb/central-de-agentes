@@ -1805,7 +1805,7 @@ export type DailyRefreshStatusResult = {
   totalCategories: number;
   uniqueProductsCount: number;
   creditsUsed: number;
-  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED';
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED' | 'cooldown';
   currentCategory: string | null;
   failedCategories: string[];
   isCooldownActive: boolean;
@@ -1874,7 +1874,7 @@ export async function getDailyRefreshStatus(): Promise<DailyRefreshStatusResult 
   }
 }
 
-export async function executeDailyRefresh(): Promise<DailyRefreshStatusResult> {
+export async function executeDailyRefresh(options?: { force?: boolean }): Promise<DailyRefreshStatusResult> {
   if (!isDatabaseConfigured()) {
     throw new Error('DATABASE_NOT_CONFIGURED');
   }
@@ -1882,20 +1882,6 @@ export async function executeDailyRefresh(): Promise<DailyRefreshStatusResult> {
   await ensureProductMinerTables();
 
   const currentStatus = await getDailyRefreshStatus();
-  if (currentStatus?.isCooldownActive) {
-    for (const cat of COLLECTOR_CATEGORIES) {
-      logMinerAcquisition({
-        category: cat,
-        query: cat,
-        page: 1,
-        region: 'BR',
-        endpoint: '/v1/tiktokshop/search',
-        requestExecuted: false,
-        skipReason: '24h protection cooldown active',
-      });
-    }
-    throw new Error('DAILY_REFRESH_COOLDOWN');
-  }
   if (currentStatus?.isCurrentlyRunning) {
     for (const cat of COLLECTOR_CATEGORIES) {
       logMinerAcquisition({
@@ -1909,6 +1895,36 @@ export async function executeDailyRefresh(): Promise<DailyRefreshStatusResult> {
       });
     }
     throw new Error('DAILY_REFRESH_IN_PROGRESS');
+  }
+
+  if (currentStatus?.isCooldownActive && !options?.force) {
+    for (const cat of COLLECTOR_CATEGORIES) {
+      logMinerAcquisition({
+        category: cat,
+        query: cat,
+        page: 1,
+        region: 'BR',
+        endpoint: '/v1/tiktokshop/search',
+        requestExecuted: false,
+        skipReason: '24h protection cooldown active (force=false)',
+      });
+    }
+    return {
+      id: currentStatus.id,
+      startedAt: currentStatus.startedAt,
+      completedAt: currentStatus.completedAt,
+      categoriesProcessed: 0,
+      totalCategories: COLLECTOR_CATEGORIES.length,
+      uniqueProductsCount: 0,
+      creditsUsed: 0,
+      status: 'cooldown',
+      currentCategory: null,
+      failedCategories: [],
+      isCooldownActive: true,
+      cooldownRemainingSeconds: currentStatus.cooldownRemainingSeconds,
+      nextRecommendedAt: currentStatus.nextRecommendedAt,
+      isCurrentlyRunning: false,
+    };
   }
 
   const [insertRes]: any = await db.query(
@@ -1945,10 +1961,10 @@ export async function executeDailyRefresh(): Promise<DailyRefreshStatusResult> {
         if (p.productId) seenProductIds.add(p.productId);
       }
 
-      categoriesProcessed++;
-
-      if (res.partialError) {
+      if (res.partialError || res.pagesConsulted === 0) {
         failedCategories.push(cat);
+      } else {
+        categoriesProcessed++;
       }
     } catch (catErr: any) {
       console.warn(`[Daily Refresh Failure for category ${cat}]:`, catErr?.message || catErr);
