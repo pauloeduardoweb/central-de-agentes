@@ -127,6 +127,7 @@ export interface VisualSubcategory {
   name: string;
   imageUrl: string;
   childCategories: string[];
+  imageClass?: string;
 }
 
 export interface CategoryConfigItem {
@@ -142,7 +143,145 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
     filterKey: 'Acessórios de moda',
     label: 'Acessórios de moda',
     imageUrl: 'https://i.postimg.cc/N5bQfc1f/Acessorios-de-moda.png',
-    subcategories: ['Todas'],
+    subcategories: [
+      'Todas',
+      'Acessórios para cabelos',
+      'Acessórios para roupas',
+      'Bijuterias e acessórios',
+      'Chapéus',
+      'Coleiras e broches',
+      'Extensões de cabelo e perucas',
+      'Óculos',
+      'Relógios e acessórios',
+      'Tecidos para costura',
+      'Acessórios para casamento',
+    ],
+    visualSubcategories: [
+      {
+        name: 'Acessórios para cabelos',
+        imageUrl: 'https://i.postimg.cc/NKQPd4k7/Acessorios-para-cabelos.jpg',
+        childCategories: [
+          'Todas',
+          'Grampos e alfinetes de cabelo',
+          'Faixas e elásticos de cabelo',
+          'Tiaras',
+          'Conjuntos de acessórios para cabelo',
+          'Acessórios de cabeça e coroas',
+          'Modeladores de cabelo',
+        ],
+      },
+      {
+        name: 'Acessórios para roupas',
+        imageUrl: 'https://i.postimg.cc/sM30Tc47/Acessorios-para-roupas.png',
+        childCategories: [
+          'Todas',
+          'Cintos',
+          'Cachecóis e xales',
+          'Gravatas e gravatas-borboleta',
+          'Luvas',
+          'Lenços',
+          'Abotoaduras',
+          'Protetores de ouvido',
+          'Máscaras e acessórios faciais',
+          'Conjuntos de acessórios de moda',
+        ],
+      },
+      {
+        name: 'Bijuterias e acessórios',
+        imageUrl: 'https://i.postimg.cc/Wdsf5nwm/Bijuterias-e-acessorios.jpg',
+        childCategories: [
+          'Todas',
+          'Colares',
+          'Chaveiros',
+          'Tornozeleiras',
+          'Pulseiras e braceletes',
+          'Conjuntos de joias',
+          'Brincos',
+          'Joias corporais',
+          'Anéis',
+          'Amuletos e pingentes',
+          'Ajustadores e protetores de joias',
+        ],
+      },
+      {
+        name: 'Chapéus',
+        imageUrl: 'https://i.postimg.cc/rDqYfJNW/Chapeus.jpg',
+        childCategories: ['Todas'],
+      },
+      {
+        name: 'Coleiras e broches',
+        imageUrl: 'https://i.postimg.cc/qzs5cYyc/Coleiras-e-broches.png',
+        childCategories: ['Todas', 'Coleiras', 'Broches'],
+      },
+      {
+        name: 'Extensões de cabelo e perucas',
+        imageUrl: 'https://i.postimg.cc/yD7rLPy0/Extensoes-de-cabelo-e-perucas.jpg',
+        childCategories: [
+          'Todas',
+          'Extensões de cabelo humano',
+          'Extensões sintéticas',
+          'Perucas de cabelo humano',
+          'Perucas sintéticas',
+          'Perucas frontais',
+          'Perucas de renda',
+          'Perucas para fantasias',
+        ],
+      },
+      {
+        name: 'Óculos',
+        imageUrl: 'https://i.postimg.cc/RWvbgRLT/Oculos.jpg',
+        childCategories: [
+          'Todas',
+          'Óculos de sol',
+          'Armações e óculos',
+          'Estojos e acessórios para óculos',
+        ],
+      },
+      {
+        name: 'Relógios e acessórios',
+        imageUrl: 'https://i.postimg.cc/WhGHmKg8/Relogios-e-acessorios.jpg',
+        childCategories: [
+          'Todas',
+          'Relógios masculinos',
+          'Relógios femininos',
+          'Relógios unissex',
+          'Relógios de casal',
+          'Acessórios para relógio',
+        ],
+      },
+      {
+        name: 'Tecidos para costura',
+        imageUrl: 'https://i.postimg.cc/9rdnPSZp/Tecidos-para-costura.jpg',
+        childCategories: [
+          'Todas',
+          'Veludo',
+          'Seda e cetim',
+          'Couro',
+          'Poliéster',
+          'Algodão',
+          'Renda',
+          'Batik',
+          'Tela',
+          'Jeans',
+          'Lã',
+        ],
+      },
+      {
+        name: 'Acessórios para casamento',
+        imageUrl: 'https://i.postimg.cc/KRPH7VB5/Wedding-Accessories.jpg',
+        childCategories: [
+          'Todas',
+          'Véus de noiva',
+          'Acessórios de cabeça para noiva',
+          'Jaquetas e capas para casamento',
+          'Luvas de noiva',
+          'Cintos de noiva',
+          'Corsages de pulso',
+          'Boutonnieres',
+          'Acessórios para noivo',
+        ],
+      },
+    ],
   },
   {
     filterKey: 'Alimentos e bebidas',
@@ -325,8 +464,9 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
       },
       {
         name: 'Leggings',
-        imageUrl: 'https://i.postimg.cc/ZBwR2jGm/Leggings.jpg',
+        imageUrl: 'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?auto=format&fit=crop&w=300&q=80',
         childCategories: ['Todas'],
+        imageClass: 'object-cover object-center',
       },
     ],
   },
@@ -796,6 +936,18 @@ function matchesSubcategoryFilter(
     'vestido tradicional': ['tradicional', 'etnico', 'kimono'],
     'fantasias e acessorios': ['fantasia', 'fantasias', 'cosplay', 'halloween'],
     'conjuntos de roupas para familia': ['conjunto familia', 'familia', 'pai e filho', 'mae e filha', 'pijama familia', 'look familia'],
+
+    // Acessórios de moda - Subcategorias
+    'acessorios para cabelos': ['presilha', 'tiara', 'chuchu', 'elastico', 'piranha', 'grampo', 'arquinho', 'faixa', 'turbante', 'coroa', 'pente'],
+    'acessorios para roupas': ['cinto', 'cachecol', 'xale', 'gravata', 'luva', 'lenco', 'abotoadura', 'protetor de ouvido', 'mascara'],
+    'bijuterias e acessorios': ['colar', 'brinco', 'pulseira', 'anel', 'tornozeleira', 'chaveiro', 'pingente', 'broche', 'bijuteria', 'joia'],
+    'chapeus': ['chapeu', 'bone', 'boina', 'gorro', 'vizeira', 'panama'],
+    'coleiras e broches': ['coleira', 'choker', 'broche', 'pin'],
+    'extensoes de cabelo e perucas': ['peruca', 'wig', 'megahair', 'mega hair', 'extensao', 'aplique', 'lace'],
+    'oculos': ['oculos', 'oculos de sol', 'armação', 'lente de contato'],
+    'relogios e acessorios': ['relogio', 'pulseira relogio', 'passador'],
+    'tecidos para costura': ['tecido', 'veludo', 'seda', 'cetim', 'couro', 'poliester', 'algodao', 'renda', 'batik', 'jeans', 'la'],
+    'acessorios para casamento': ['veu', 'grinalda', 'noiva', 'coroa noiva', 'luva noiva', 'boutonniere', 'corsage'],
 
     // Telefones e eletrônicos - Subcategorias
     'acessorios para telefone': ['capa', 'capinha', 'pelicula', 'carregador', 'suporte celular', 'suporte telefone', 'bateria portatil', 'powerbank', 'cabo usb', 'selfie', 'celular', 'telefone', 'alca celular'],
@@ -2381,7 +2533,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                                   src={sub.imageUrl}
                                   alt={sub.name}
                                   referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                  className={`w-full h-full object-cover transition-transform group-hover:scale-105 ${sub.imageClass || ''}`}
                                   loading="lazy"
                                   decoding="async"
                                   onError={(e) => {
