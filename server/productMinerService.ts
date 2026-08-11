@@ -18,6 +18,8 @@ type SocialCrawlSearchResponse = {
   message?: string;
 };
 
+export const MAX_ASSOCIATED_VIDEOS = 9;
+
 export type ProductRankingSort = 'opportunities' | 'total' | '24h' | '7d' | 'spiking';
 
 export type MinedVideo = {
@@ -290,6 +292,64 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
     console.log(`================================================================`);
   }
 
+  const rawVideoList: any[] = [];
+  if (item?.video && typeof item.video === 'object') {
+    rawVideoList.push(item.video);
+  }
+  if (Array.isArray(item?.videos)) {
+    rawVideoList.push(...item.videos);
+  }
+  if (Array.isArray(item?.associated_videos)) {
+    rawVideoList.push(...item.associated_videos);
+  }
+  if (Array.isArray(item?.associatedVideos)) {
+    rawVideoList.push(...item.associatedVideos);
+  }
+
+  const vMap = new Map<string, MinedVideo>();
+  for (const vItem of rawVideoList) {
+    if (!vItem) continue;
+    const awemeId = vItem?.aweme_id ? String(vItem.aweme_id) : (vItem?.id ? String(vItem.id) : null);
+    if (!awemeId) continue;
+    const vStats = vItem?.statistics || {};
+    const vAuthor = vItem?.author || {};
+    const videoObj: MinedVideo = {
+      id: awemeId,
+      url: vItem?.share_url || vItem?.url || null,
+      description: vItem?.desc || vItem?.description || null,
+      author: vAuthor?.unique_id || vAuthor?.nickname || (typeof vItem?.author === 'string' ? vItem.author : null),
+      authorFollowers: parseInteger(vAuthor?.follower_count || vAuthor?.followers),
+      views: parseInteger(vStats?.play_count || vStats?.views || vItem?.views || vItem?.play_count),
+      likes: parseInteger(vStats?.digg_count || vStats?.likes || vItem?.likes || vItem?.digg_count),
+      comments: parseInteger(vStats?.comment_count || vStats?.comments || vItem?.comments),
+      shares: parseInteger(vStats?.share_count || vStats?.shares || vItem?.shares),
+      saves: parseInteger(vStats?.collect_count || vStats?.saves || vItem?.saves),
+    };
+    const existing = vMap.get(awemeId);
+    if (!existing || compareMinedVideosDesc(videoObj, existing) < 0) {
+      vMap.set(awemeId, videoObj);
+    }
+  }
+
+  const associatedVideosList = Array.from(vMap.values())
+    .sort(compareMinedVideosDesc)
+    .slice(0, MAX_ASSOCIATED_VIDEOS);
+
+  const fallbackSingleVideo: MinedVideo | null = video ? {
+    id: video?.aweme_id ? String(video.aweme_id) : null,
+    url: video?.share_url || null,
+    description: video?.desc || null,
+    author: author?.unique_id || author?.nickname || null,
+    authorFollowers: parseInteger(author?.follower_count),
+    views: parseInteger(stats?.play_count),
+    likes: parseInteger(stats?.digg_count),
+    comments: parseInteger(stats?.comment_count),
+    shares: parseInteger(stats?.share_count),
+    saves: parseInteger(stats?.collect_count),
+  } : null;
+
+  const primaryVideo = associatedVideosList.length > 0 ? associatedVideosList[0] : fallbackSingleVideo;
+
   return {
     productId: String(item?.product_id || ''),
     title: String(item?.title || 'Produto sem nome'),
@@ -306,18 +366,8 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
     category,
     estimatedCommissionCents: commCents && commCents > 0 ? commCents : null,
     commissionRatePercent: commRate && commRate > 0 ? commRate : null,
-    video: video ? {
-      id: video?.aweme_id ? String(video.aweme_id) : null,
-      url: video?.share_url || null,
-      description: video?.desc || null,
-      author: author?.unique_id || author?.nickname || null,
-      authorFollowers: parseInteger(author?.follower_count),
-      views: parseInteger(stats?.play_count),
-      likes: parseInteger(stats?.digg_count),
-      comments: parseInteger(stats?.comment_count),
-      shares: parseInteger(stats?.share_count),
-      saves: parseInteger(stats?.collect_count),
-    } : null,
+    video: primaryVideo,
+    associatedVideos: associatedVideosList,
   };
 }
 
@@ -497,6 +547,24 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
   }
 }
 
+export function compareMinedVideosDesc(a: MinedVideo, b: MinedVideo): number {
+  const viewsA = a.views ?? 0;
+  const viewsB = b.views ?? 0;
+  if (viewsA !== viewsB) return viewsB - viewsA;
+
+  const likesA = a.likes ?? 0;
+  const likesB = b.likes ?? 0;
+  if (likesA !== likesB) return likesB - likesA;
+
+  const sharesA = a.shares ?? 0;
+  const sharesB = b.shares ?? 0;
+  if (sharesA !== sharesB) return sharesB - sharesA;
+
+  const savesA = a.saves ?? 0;
+  const savesB = b.saves ?? 0;
+  return savesB - savesA;
+}
+
 export async function saveVideosToProductVideosTable(productId: string, videos: MinedVideo[]): Promise<void> {
   if (!isDatabaseConfigured() || !productId || !videos || videos.length === 0) return;
   await ensureProductMinerTables();
@@ -550,21 +618,25 @@ export async function saveVideosToProductVideosTable(productId: string, videos: 
     });
   }
 
-  // Enforce Max 3 videos per product: keep top 3 by views/likes
+  // Enforce MAX_ASSOCIATED_VIDEOS per product: keep top MAX_ASSOCIATED_VIDEOS by views, likes, shares, saves
   const [existingRows]: any = await db.query(
     `SELECT video_id
      FROM tiktok_shop_product_videos
      WHERE product_id = ?
-     ORDER BY COALESCE(video_views, 0) DESC, COALESCE(video_likes, 0) DESC, id DESC`,
+     ORDER BY COALESCE(video_views, 0) DESC,
+              COALESCE(video_likes, 0) DESC,
+              COALESCE(video_shares, 0) DESC,
+              COALESCE(video_saves, 0) DESC,
+              id DESC`,
     [productId]
   ).catch(() => [[]]);
 
-  if (Array.isArray(existingRows) && existingRows.length > 3) {
-    const top3Ids = existingRows.slice(0, 3).map((r: any) => String(r.video_id));
+  if (Array.isArray(existingRows) && existingRows.length > MAX_ASSOCIATED_VIDEOS) {
+    const topIds = existingRows.slice(0, MAX_ASSOCIATED_VIDEOS).map((r: any) => String(r.video_id));
     await db.query(
       `DELETE FROM tiktok_shop_product_videos
        WHERE product_id = ? AND video_id NOT IN (?)`,
-      [productId, top3Ids]
+      [productId, topIds]
     ).catch(() => {});
   }
 }
@@ -582,7 +654,12 @@ export async function attachAssociatedVideos(products: MinedProduct[]): Promise<
               video_views, video_likes, video_comments, video_shares, video_saves, video_description
        FROM tiktok_shop_product_videos
        WHERE product_id IN (?)
-       ORDER BY product_id, COALESCE(video_views, 0) DESC, COALESCE(video_likes, 0) DESC, id DESC`,
+       ORDER BY product_id,
+                COALESCE(video_views, 0) DESC,
+                COALESCE(video_likes, 0) DESC,
+                COALESCE(video_shares, 0) DESC,
+                COALESCE(video_saves, 0) DESC,
+                id DESC`,
       [productIds]
     );
 
@@ -594,7 +671,7 @@ export async function attachAssociatedVideos(products: MinedProduct[]): Promise<
           videoMap.set(pId, []);
         }
         const currentList = videoMap.get(pId)!;
-        if (currentList.length < 3) {
+        if (currentList.length < MAX_ASSOCIATED_VIDEOS) {
           currentList.push({
             id: String(row.video_id),
             url: row.video_url,
@@ -702,35 +779,51 @@ export async function extractVideosFromSearchCachePayloads(): Promise<{
           if (!productId) continue;
           totalProductsFound++;
 
-          const v = item?.video;
-          const awemeId = v?.aweme_id ? String(v.aweme_id) : (v?.id ? String(v.id) : null);
-          if (!awemeId) continue;
-
-          totalVideosExtracted++;
-
-          const stats = v?.statistics || {};
-          const author = v?.author || {};
-
-          const videoObj: MinedVideo = {
-            id: awemeId,
-            url: v?.share_url || v?.url || null,
-            description: v?.desc || v?.description || null,
-            author: author?.unique_id || author?.nickname || v?.author || null,
-            authorFollowers: parseInteger(author?.follower_count || author?.followers),
-            views: parseInteger(stats?.play_count || stats?.views),
-            likes: parseInteger(stats?.digg_count || stats?.likes),
-            comments: parseInteger(stats?.comment_count || stats?.comments),
-            shares: parseInteger(stats?.share_count || stats?.shares),
-            saves: parseInteger(stats?.collect_count || stats?.saves),
-          };
-
-          if (!productVideosMap.has(productId)) {
-            productVideosMap.set(productId, new Map());
+          const rawVideoList: any[] = [];
+          if (item?.video && typeof item.video === 'object') {
+            rawVideoList.push(item.video);
           }
-          const vMap = productVideosMap.get(productId)!;
-          const existing = vMap.get(awemeId);
-          if (!existing || (videoObj.views && (!existing.views || videoObj.views > existing.views))) {
-            vMap.set(awemeId, videoObj);
+          if (Array.isArray(item?.videos)) {
+            rawVideoList.push(...item.videos);
+          }
+          if (Array.isArray(item?.associated_videos)) {
+            rawVideoList.push(...item.associated_videos);
+          }
+          if (Array.isArray(item?.associatedVideos)) {
+            rawVideoList.push(...item.associatedVideos);
+          }
+
+          for (const v of rawVideoList) {
+            if (!v) continue;
+            const awemeId = v?.aweme_id ? String(v.aweme_id) : (v?.id ? String(v.id) : null);
+            if (!awemeId) continue;
+
+            totalVideosExtracted++;
+
+            const stats = v?.statistics || {};
+            const author = v?.author || {};
+
+            const videoObj: MinedVideo = {
+              id: awemeId,
+              url: v?.share_url || v?.url || null,
+              description: v?.desc || v?.description || null,
+              author: author?.unique_id || author?.nickname || (typeof v?.author === 'string' ? v.author : null),
+              authorFollowers: parseInteger(author?.follower_count || author?.followers),
+              views: parseInteger(stats?.play_count || stats?.views || v?.views || v?.play_count),
+              likes: parseInteger(stats?.digg_count || stats?.likes || v?.likes || v?.digg_count),
+              comments: parseInteger(stats?.comment_count || stats?.comments || v?.comments),
+              shares: parseInteger(stats?.share_count || stats?.shares || v?.shares),
+              saves: parseInteger(stats?.collect_count || stats?.saves || v?.saves),
+            };
+
+            if (!productVideosMap.has(productId)) {
+              productVideosMap.set(productId, new Map());
+            }
+            const vMap = productVideosMap.get(productId)!;
+            const existing = vMap.get(awemeId);
+            if (!existing || compareMinedVideosDesc(videoObj, existing) < 0) {
+              vMap.set(awemeId, videoObj);
+            }
           }
         }
       }
@@ -740,7 +833,7 @@ export async function extractVideosFromSearchCachePayloads(): Promise<{
   }
 
   for (const [productId, vMap] of productVideosMap.entries()) {
-    const videoList = Array.from(vMap.values());
+    const videoList = Array.from(vMap.values()).sort(compareMinedVideosDesc);
     if (videoList.length > 0) {
       await saveVideosToProductVideosTable(productId, videoList);
       totalVideosInserted += videoList.length;
