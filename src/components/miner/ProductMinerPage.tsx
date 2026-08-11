@@ -474,7 +474,91 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
     filterKey: 'Roupas masculinas e roupas íntimas masculinas',
     label: 'Roupas masculinas e roupas íntimas masculinas',
     imageUrl: 'https://i.postimg.cc/hfMKPB9t/Roupas-masculinas-e-roupas-intimas-masculinas.png',
-    subcategories: ['Todas'],
+    subcategories: [
+      'Todas',
+      'Peças masculinas para parte superior',
+      'Peças masculinas para parte inferior',
+      'Ternos e macacões masculinos',
+      'Roupas íntimas masculinas',
+      'Moda masculina de dormir e lazer',
+      'Roupas especiais masculinas',
+      'Conjuntos',
+      'Ternos',
+      'Meias',
+      'Roupões, robes e macacões',
+    ],
+    visualSubcategories: [
+      {
+        name: 'Peças masculinas para parte superior',
+        imageUrl: 'https://i.postimg.cc/2VjCZ4Br/Pecas-masculinas-para-parte-superior.png',
+        childCategories: [
+          'Todas',
+          'Camisetas e regatas',
+          'Camisetas',
+          'Camisas polo',
+          'Camisas',
+          'Moletons e blusões',
+          'Malhas',
+          'Jaquetas e casacos',
+          'Coletes',
+        ],
+      },
+      {
+        name: 'Peças masculinas para parte inferior',
+        imageUrl: 'https://i.postimg.cc/xcj9zKbY/Pecas-masculinas-para-parte-inferior.jpg',
+        childCategories: ['Todas', 'Shorts', 'Calças', 'Jeans'],
+      },
+      {
+        name: 'Ternos e macacões masculinos',
+        imageUrl: 'https://i.postimg.cc/VdszCjbw/Ternos-e-macacoes-masculinos.jpg',
+        childCategories: ['Todas', 'Macacões'],
+      },
+      {
+        name: 'Roupas íntimas masculinas',
+        imageUrl: 'https://i.postimg.cc/9rXc7Gqh/Roupas-intimas-masculinas.jpg',
+        childCategories: [
+          'Todas',
+          'Roupas íntimas',
+          'Roupas íntimas térmicas',
+          'Modeladores masculinos',
+        ],
+      },
+      {
+        name: 'Moda masculina de dormir e lazer',
+        imageUrl: 'https://i.postimg.cc/2VjCZ4Bf/Moda-masculina-de-dormir-e-lazer.jpg',
+        childCategories: ['Todas', 'Pijamas', 'Camisas de dormir', 'Macacão'],
+      },
+      {
+        name: 'Roupas especiais masculinas',
+        imageUrl: 'https://i.postimg.cc/fJWM9x0Q/Roupas-especiais-masculinas.jpg',
+        childCategories: [
+          'Todas',
+          'Vestuário e uniformes de trabalho',
+          'Fantasias e acessórios',
+          'Vestido tradicional',
+        ],
+      },
+      {
+        name: 'Conjuntos',
+        imageUrl: 'https://i.postimg.cc/CzMwqjfT/Conjuntos.jpg',
+        childCategories: ['Todas'],
+      },
+      {
+        name: 'Ternos',
+        imageUrl: 'https://i.postimg.cc/dLQJy8Zb/Ternos.jpg',
+        childCategories: ['Todas'],
+      },
+      {
+        name: 'Meias',
+        imageUrl: 'https://i.postimg.cc/bsYqtQSK/Meias.jpg',
+        childCategories: ['Todas'],
+      },
+      {
+        name: 'Roupões, robes e macacões',
+        imageUrl: 'https://i.postimg.cc/8jkT6hfx/Roupoes-de-banho-e-robes-Macacao.jpg',
+        childCategories: ['Todas'],
+      },
+    ],
   },
   {
     filterKey: 'Sapatos',
@@ -936,6 +1020,15 @@ function matchesSubcategoryFilter(
     'vestido tradicional': ['tradicional', 'etnico', 'kimono'],
     'fantasias e acessorios': ['fantasia', 'fantasias', 'cosplay', 'halloween'],
     'conjuntos de roupas para familia': ['conjunto familia', 'familia', 'pai e filho', 'mae e filha', 'pijama familia', 'look familia'],
+
+    // Roupas masculinas - Subcategorias
+    'pecas masculinas para parte superior': ['camiseta', 'camisa', 'polo', 'moletom', 'regata', 'jaqueta', 'casaco', 'sueter', 'colete'],
+    'pecas masculinas para parte inferior': ['calca', 'bermuda', 'short', 'jeans', 'pantaloes'],
+    'ternos e macacoes masculinos': ['terno', 'blazer', 'macacao', 'paleto'],
+    'roupas intimas masculinas': ['cueca', 'cuecas', 'boxer', 'slip', 'sunga', 'modelador masculino'],
+    'moda masculina de dormir e lazer': ['pijama masculino', 'pijama', 'samba cancao'],
+    'roupas especiais masculinas': ['uniforme masculino', 'macacao trabalho', 'traje tradicional'],
+    'roupoes, robes e macacoes': ['roupao', 'robe', 'macacao'],
 
     // Acessórios de moda - Subcategorias
     'acessorios para cabelos': ['presilha', 'tiara', 'chuchu', 'elastico', 'piranha', 'grampo', 'arquinho', 'faixa', 'turbante', 'coroa', 'pente'],
