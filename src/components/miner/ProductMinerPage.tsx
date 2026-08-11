@@ -724,7 +724,7 @@ const MobileProductCard: React.FC<{
             const range = getProductPriceRange(product.priceCents, product.currencySymbol);
             if (!range) {
               return (
-                <div className="pt-0.5 space-y-0.5">
+                <div className="pt-0.5">
                   <span className="text-xs font-black text-emerald-700">
                     {formatMoney(product.priceCents, product.currencySymbol)}
                   </span>
@@ -732,18 +732,15 @@ const MobileProductCard: React.FC<{
               );
             }
             return (
-              <div className="pt-0.5 space-y-0.5">
+              <div className="pt-0.5 space-y-0.5 min-w-0">
                 <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60 inline-block leading-tight">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60 inline-block leading-tight whitespace-nowrap">
                     Faixa estimada
                   </span>
                 </div>
-                <div className="text-xs font-black text-emerald-700 leading-tight">
+                <div className="text-xs font-black text-emerald-700 leading-tight whitespace-nowrap truncate">
                   {range.formattedRange}
                 </div>
-                <span className="text-[9px] text-slate-500 font-medium block leading-tight">
-                  {range.auxiliaryText}
-                </span>
               </div>
             );
           })()}
@@ -867,12 +864,21 @@ const ProductCard: React.FC<{
       </div>
 
       <div className="p-4 space-y-3 flex-1 flex flex-col">
-        {product.score !== undefined && product.score !== null ? (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-normal self-start shadow-sm">
-            <Zap className="w-3.5 h-3.5 text-amber-500 fill-current" />
-            <span>Score Geração Z Pro: <span className="text-amber-950 font-medium">{product.score}</span>/100</span>
-          </div>
-        ) : null}
+        <div className="flex items-center justify-between gap-2">
+          {product.score !== undefined && product.score !== null ? (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-normal shadow-xs">
+              <Zap className="w-3.5 h-3.5 text-amber-500 fill-current" />
+              <span>Score Geração Z Pro: <span className="text-amber-950 font-medium">{product.score}</span>/100</span>
+            </div>
+          ) : <div />}
+
+          {product.rating ? (
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50/80 border border-amber-200/60 text-amber-800 text-xs font-extrabold shrink-0 shadow-2xs">
+              <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
+              <span>{product.rating}</span>
+            </div>
+          ) : null}
+        </div>
 
         <h3 className="font-extrabold text-sm text-slate-900 leading-snug line-clamp-2 min-h-[40px]">
           {product.title}
@@ -889,36 +895,33 @@ const ProductCard: React.FC<{
           );
         })()}
 
-        <div className="flex items-end justify-between gap-3">
+        <div className="flex items-end justify-between gap-3 min-w-0">
           {(() => {
             const range = getProductPriceRange(product.priceCents, product.currencySymbol);
             if (!range) {
               return (
-                <div>
-                  <span className="text-lg font-black text-emerald-700">
+                <div className="min-w-0">
+                  <span className="text-lg font-black text-emerald-700 whitespace-nowrap">
                     {formatMoney(product.priceCents, product.currencySymbol)}
                   </span>
                 </div>
               );
             }
             return (
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-1 mb-0.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block leading-none">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block leading-none whitespace-nowrap">
                     Faixa estimada
                   </span>
                 </div>
-                <div className="text-base sm:text-lg font-black text-emerald-700 leading-tight">
+                <div className="text-base sm:text-lg font-black text-emerald-700 leading-tight whitespace-nowrap">
                   {range.formattedRange}
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium block leading-tight mt-0.5">
-                  {range.auxiliaryText}
-                </span>
               </div>
             );
           })()}
 
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <div className="text-xs text-slate-500">Vendas totais</div>
             <div className="font-black text-amber-700">{compactNumber(product.soldCount)}</div>
           </div>
@@ -964,19 +967,12 @@ const ProductCard: React.FC<{
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-2 text-[11px]">
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2 text-slate-700 flex items-center gap-1.5 font-medium">
-            <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
-            {product.rating ?? '—'}
-          </div>
-
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2 text-slate-700 flex items-center gap-1.5 min-w-0 font-medium">
-            <Store className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span className="text-[11px] text-slate-700 font-medium flex items-center min-w-0">
-              <span className="shrink-0 mr-0.5">Loja:</span>
-              <span className="truncate">{product.sellerName || 'TikTok Shop'}</span>
-            </span>
-          </div>
+        <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2 text-slate-700 flex items-center gap-2 min-w-0 font-medium">
+          <Store className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="text-xs text-slate-700 font-medium truncate flex-1 min-w-0" title={product.sellerName || 'TikTok Shop'}>
+            <span className="text-slate-500 mr-1">Loja:</span>
+            <span className="font-bold text-slate-800">{product.sellerName || 'TikTok Shop'}</span>
+          </span>
         </div>
 
         {product.video ? (

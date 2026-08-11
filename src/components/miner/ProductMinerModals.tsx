@@ -562,16 +562,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 return (
                   <div>
                     <div className="flex items-center gap-1 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 inline-block leading-none">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 inline-block leading-none whitespace-nowrap">
                         Faixa estimada
                       </span>
                     </div>
-                    <div className="text-lg sm:text-xl font-black text-emerald-700 leading-tight">
+                    <div className="text-lg sm:text-xl font-black text-emerald-700 leading-tight whitespace-nowrap">
                       {range.formattedRange}
                     </div>
-                    <span className="text-xs text-slate-500 font-medium block leading-tight mt-1">
-                      {range.auxiliaryText}
-                    </span>
                   </div>
                 );
               })()}
@@ -695,7 +692,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   rel="noreferrer"
                   className="sm:hidden w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
                 >
-                  Abrir este produto no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
+                  Pesquisar no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               ) : null}
 
