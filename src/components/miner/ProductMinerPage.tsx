@@ -18,6 +18,7 @@ import {
   fetchDailyRefreshStatus,
   runDailyRefresh,
   runBaseReclassification,
+  trackProductInteraction,
   type DailyRefreshStatus,
   type CollectorCategoryStat,
   type ProductSearchSource,
@@ -2232,6 +2233,7 @@ const MobileProductCard: React.FC<{
   isFavorite?: boolean;
   onToggleFavorite?: (p: ProductMinerProduct) => void;
   onOpenDetailModal?: (p: ProductMinerProduct) => void;
+  onTrackClick?: (p: ProductMinerProduct) => void;
 }> = ({
   product,
   position,
@@ -2240,6 +2242,7 @@ const MobileProductCard: React.FC<{
   isFavorite = false,
   onToggleFavorite,
   onOpenDetailModal,
+  onTrackClick,
 }) => {
   const targetProductUrl = getOfficialProductUrl(product);
 
@@ -2391,6 +2394,7 @@ const ProductCard: React.FC<{
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
   onOpenDownloadModal?: (p: ProductMinerProduct) => void;
   onOpenDetailModal?: (p: ProductMinerProduct) => void;
+  onTrackClick?: (p: ProductMinerProduct) => void;
 }> = ({
   product,
   position,
@@ -2402,6 +2406,7 @@ const ProductCard: React.FC<{
   onOpenAnalysisModal,
   onOpenDownloadModal,
   onOpenDetailModal,
+  onTrackClick,
 }) => {
   const targetProductUrl = getOfficialProductUrl(product);
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
@@ -2626,6 +2631,7 @@ const ProductCard: React.FC<{
                     href={product.video.url}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={() => onTrackClick?.(product)}
                     className="w-full py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-amber-900 hover:border-amber-300 font-bold flex items-center justify-center gap-1 transition-all shadow-xs"
                   >
                     <Play className="w-3 h-3 text-amber-600 fill-amber-500/20" />
@@ -2657,6 +2663,7 @@ const ProductCard: React.FC<{
               href={targetProductUrl}
               target="_blank"
               rel="noreferrer"
+              onClick={() => onTrackClick?.(product)}
               className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3 py-2 text-xs font-bold shadow-sm"
             >
               Produto <ExternalLink className="w-3.5 h-3.5" />
@@ -3016,6 +3023,56 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
   const [analysisModalProduct, setAnalysisModalProduct] = useState<ProductMinerProduct | null>(null);
   const [detailModalProduct, setDetailModalProduct] = useState<ProductMinerProduct | null>(null);
+
+  const handleOpenDetailModal = useCallback(
+    (p: ProductMinerProduct | null) => {
+      setDetailModalProduct(p);
+      if (p?.productId && studentCode) {
+        trackProductInteraction(studentCode, {
+          productId: p.productId,
+          eventType: 'product_open',
+          query,
+          category: selectedCategory,
+          subcategory: selectedSubcategory,
+          childCategory: selectedChildCategory,
+        });
+      }
+    },
+    [studentCode, query, selectedCategory, selectedSubcategory, selectedChildCategory]
+  );
+
+  const handleOpenAnalysisModal = useCallback(
+    (p: ProductMinerProduct | null) => {
+      setAnalysisModalProduct(p);
+      if (p?.productId && studentCode) {
+        trackProductInteraction(studentCode, {
+          productId: p.productId,
+          eventType: 'product_open',
+          query,
+          category: selectedCategory,
+          subcategory: selectedSubcategory,
+          childCategory: selectedChildCategory,
+        });
+      }
+    },
+    [studentCode, query, selectedCategory, selectedSubcategory, selectedChildCategory]
+  );
+
+  const handleTrackProductClick = useCallback(
+    (p: ProductMinerProduct) => {
+      if (p?.productId && studentCode) {
+        trackProductInteraction(studentCode, {
+          productId: p.productId,
+          eventType: 'product_click',
+          query,
+          category: selectedCategory,
+          subcategory: selectedSubcategory,
+          childCategory: selectedChildCategory,
+        });
+      }
+    },
+    [studentCode, query, selectedCategory, selectedSubcategory, selectedChildCategory]
+  );
 
   useEffect(() => {
     if (mode !== 'ranking') return;
@@ -4128,7 +4185,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       isMentor={canRefresh}
                       isFavorite={isFavorited(product.productId)}
                       onToggleFavorite={toggleFavorite}
-                      onOpenDetailModal={(p) => setDetailModalProduct(p)}
+                      onOpenDetailModal={handleOpenDetailModal}
+                      onTrackClick={handleTrackProductClick}
                     />
                   );
                 })}
@@ -4148,8 +4206,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       isFavorite={isFavorited(product.productId)}
                       onToggleFavorite={toggleFavorite}
                       onOpenScriptModal={(p) => setScriptModalProduct(p)}
-                      onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
-                      onOpenDetailModal={(p) => setDetailModalProduct(p)}
+                      onOpenAnalysisModal={handleOpenAnalysisModal}
+                      onOpenDetailModal={handleOpenDetailModal}
+                      onTrackClick={handleTrackProductClick}
                     />
                   );
                 })}
@@ -5049,7 +5108,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         isFavorite={detailModalProduct ? isFavorited(detailModalProduct.productId) : false}
         onToggleFavorite={toggleFavorite}
         onOpenScriptModal={(p) => setScriptModalProduct(p)}
-        onOpenAnalysisModal={(p) => setAnalysisModalProduct(p)}
+        onOpenAnalysisModal={handleOpenAnalysisModal}
+        onTrackClick={handleTrackProductClick}
       />
     </section>
   );

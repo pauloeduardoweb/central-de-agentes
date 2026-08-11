@@ -463,6 +463,7 @@ interface ProductDetailModalProps {
   onToggleFavorite?: (p: ProductMinerProduct) => void;
   onOpenScriptModal?: (p: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
+  onTrackClick?: (p: ProductMinerProduct) => void;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
@@ -473,6 +474,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onToggleFavorite,
   onOpenScriptModal,
   onOpenAnalysisModal,
+  onTrackClick,
 }) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
@@ -804,6 +806,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   href={activeVideo.url}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => onTrackClick?.(product)}
                   className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Play className="w-4 h-4 text-amber-600 fill-amber-500" />
@@ -816,6 +819,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   href={officialProductUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => onTrackClick?.(product)}
                   className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                 >
                   Pesquisar no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
