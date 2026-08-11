@@ -1326,6 +1326,7 @@ export function rowToProduct(row: any): MinedProduct {
     video: row.video_id || row.video_url ? {
       id: row.video_id,
       url: row.video_url,
+      description: row.video_description || row.video_desc || row.description || null,
       author: row.video_author,
       authorFollowers: row.video_author_followers === null ? null : Number(row.video_author_followers),
       views: row.video_views === null ? null : Number(row.video_views),
