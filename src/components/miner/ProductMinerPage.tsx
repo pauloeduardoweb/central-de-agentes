@@ -2738,7 +2738,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [rankingMeta, setRankingMeta] = useState<ProductRankingMeta | null>(null);
   const [rankingSort, setRankingSort] = useState<ProductRankingSort>('opportunities');
 
-  const [selectedClassification, setSelectedClassification] = useState<ClassificationType>('best_sellers');
+  const [selectedClassification, setSelectedClassification] = useState<ClassificationType | null>('best_sellers');
 
   const [favorites, setFavorites] = useState<ProductMinerProduct[]>(() => {
     if (typeof localStorage !== 'undefined') {
@@ -3305,6 +3305,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     refresh = false,
     targetCategory = selectedCategory,
     targetSubcategory = selectedSubcategory,
+    targetChildCategory = selectedChildCategory,
+    targetClassification = selectedClassification
   ) => {
     const clean = targetQuery.trim();
 
@@ -3317,7 +3319,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     try {
       const data = refresh
         ? await refreshProducts(studentCode, clean, targetPage)
-        : await searchProducts(studentCode, clean, targetPage, targetCategory, targetSubcategory);
+        : await searchProducts(
+            studentCode,
+            clean,
+            targetPage,
+            targetCategory,
+            targetSubcategory,
+            targetChildCategory,
+            targetClassification
+          );
 
       setQuery(clean);
       setProducts(data.products || []);
@@ -3343,9 +3353,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   useEffect(() => {
     if (mode === 'search') {
-      runSearch(query, page, false, selectedCategory, selectedSubcategory);
+      runSearch(
+        query,
+        page,
+        false,
+        selectedCategory,
+        selectedSubcategory,
+        selectedChildCategory,
+        selectedClassification
+      );
     }
-  }, [mode, selectedCategory, selectedSubcategory, page]);
+  }, [mode, selectedCategory, selectedSubcategory, selectedChildCategory, selectedClassification, page]);
 
   const activeFilterCount =
     (selectedCategory !== 'Todos' ? 1 : 0) +
@@ -3383,7 +3401,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   key={c.id}
                   type="button"
                   onClick={() => {
-                    setSelectedClassification(c.id);
+                    if (selectedClassification === c.id) {
+                      setSelectedClassification(null);
+                    } else {
+                      setSelectedClassification(c.id);
+                    }
                     setPage(1);
                   }}
                   className="flex flex-col items-center shrink-0 w-[80px] sm:w-[92px] lg:w-full group focus:outline-none"
