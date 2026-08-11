@@ -875,7 +875,88 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
     filterKey: 'Malas e bolsas',
     label: 'Malas e bolsas',
     imageUrl: 'https://i.postimg.cc/KRQmv2nh/Malas-e-bolsas.png',
-    subcategories: ['Todas'],
+    subcategories: [
+      'Todas',
+      'Bolsas para mulheres',
+      'Bolsas para homens',
+      'Bolsas funcionais',
+      'Malas e bolsas de viagem',
+      'Acessórios para bolsas',
+    ],
+    visualSubcategories: [
+      {
+        name: 'Bolsas para mulheres',
+        imageUrl: 'https://i.postimg.cc/F1rynHfD/Bolsas-para-mulheres.png',
+        childCategories: [
+          'Todas',
+          'Sacolas',
+          'Bolsas',
+          'Carteiras',
+          'Bolsas tiracolo e de ombro',
+          'Clutches e pulseiras',
+          'Pochetes',
+          'Mochilas femininas',
+          'Porta-cartões e documentos femininos',
+          'Conjuntos de bolsas femininas',
+        ],
+      },
+      {
+        name: 'Bolsas para homens',
+        imageUrl: 'https://i.postimg.cc/0rkYHy6d/Bolsas-para-homens.jpg',
+        childCategories: [
+          'Todas',
+          'Carteiras',
+          'Sacolas',
+          'Bolsas tiracolo e de ombro',
+          'Pochetes',
+          'Clutches',
+          'Porta-cartões e documentos masculinos',
+          'Pastas',
+          'Conjuntos de bolsas masculinas',
+          'Mochilas masculinas',
+        ],
+      },
+      {
+        name: 'Bolsas funcionais',
+        imageUrl: 'https://i.postimg.cc/Z0b8D59x/Bolsas-funcionais.png',
+        childCategories: [
+          'Todas',
+          'Bolsas de maquiagem',
+          'Lancheiras',
+          'Bolsas para laptop',
+          'Mochilas',
+          'Bolsas de higiene',
+          'Bolsas térmicas',
+          'Sacolas de compras',
+        ],
+      },
+      {
+        name: 'Malas e bolsas de viagem',
+        imageUrl: 'https://i.postimg.cc/pyWf1L9K/Malas-e-bolsas-de-viagem.jpg',
+        childCategories: [
+          'Todas',
+          'Bagagem',
+          'Bolsas de viagem',
+          'Porta-passaportes e capas',
+          'Organizadores de viagem',
+          'Acessórios para bagagem',
+        ],
+      },
+      {
+        name: 'Acessórios para bolsas',
+        imageUrl: 'https://i.postimg.cc/23kQXSqd/Acessorios-para-bolsas.jpg',
+        childCategories: [
+          'Todas',
+          'Organizadores de bolsas',
+          'Decorações e lenços',
+          'Alças e correntes para bolsas',
+          'Cabides de bolsa',
+          'Acessórios para bolsas DIY',
+          'Limpeza e cuidados',
+          'Capas para bolsas',
+        ],
+      },
+    ],
   },
   {
     filterKey: 'Moda muçulmana',
@@ -3308,7 +3389,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         className={`flex w-max min-w-max items-start gap-3 sm:gap-4 flex-nowrap pt-1 ${
                           showDesktopArrows
                             ? 'px-8 sm:px-10'
-                            : 'px-8 sm:px-10 md:px-0 md:w-full md:min-w-0 md:justify-around lg:justify-between'
+                            : 'px-8 sm:px-10 md:px-0 md:w-auto md:min-w-0 md:justify-start md:gap-5 lg:gap-6'
                         }`}
                       >
                         {activeCategoryConfig.visualSubcategories.map((sub) => {
