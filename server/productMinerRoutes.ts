@@ -1,6 +1,6 @@
 import express from 'express';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
-import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, reclassifyExistingDatabaseProducts, backfillLegacyVideosToProductVideos, extractVideosFromSearchCachePayloads, ProductRankingSort } from './productMinerService.js';
+import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, reclassifyExistingDatabaseProducts, backfillLegacyVideosToProductVideos, extractVideosFromSearchCachePayloads, ProductRankingSort, logProductInteractionEvent } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
 import { db, isDatabaseConfigured, ensureCodigosAcessoTable } from './database.js';
 import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin } from './presenceService.js';
@@ -320,6 +320,34 @@ productMinerRouter.get('/search', async (req, res) => {
       return res.status(400).json({ error: message });
     }
     return res.status(500).json({ error: 'PRODUCT_MINER_SEARCH_ERROR', detail: message });
+  }
+});
+
+// Track real student interaction with a product
+productMinerRouter.post('/track-interaction', async (req, res) => {
+  try {
+    const studentCode = getRequesterCode(req) || undefined;
+    const productId = String(req.body?.productId || req.body?.product_id || '').trim();
+    const query = String(req.body?.query || '').trim();
+    const category = String(req.body?.category || '').trim();
+    const subcategory = String(req.body?.subcategory || '').trim();
+    const childCategory = String(req.body?.childCategory || '').trim();
+    const eventType = req.body?.eventType === 'product_click' ? 'product_click' : 'product_open';
+
+    if (productId) {
+      await logProductInteractionEvent({
+        studentCode,
+        productId,
+        query,
+        category,
+        subcategory,
+        childCategory,
+        eventType,
+      });
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'TRACK_INTERACTION_ERROR', message: err?.message });
   }
 });
 

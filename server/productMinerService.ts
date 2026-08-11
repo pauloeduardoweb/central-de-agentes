@@ -1449,20 +1449,25 @@ export async function logSearchEvent(params: {
   category?: string;
   subcategory?: string;
   childCategory?: string;
+  eventType?: 'text_search' | 'category_filter';
 }): Promise<void> {
   if (!isDatabaseConfigured()) return;
   const q = String(params.query || '').trim();
   const cat = String(params.category || '').trim();
+  const eventType = params.eventType || (q ? 'text_search' : 'category_filter');
+
+  // Do not log empty queries / filter actions without context
   if (!q && !cat) return;
 
   try {
     await ensureProductMinerTables();
     await db.query(
-      `INSERT INTO product_search_events (student_code, search_query, category, subcategory, child_category)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO product_search_events (student_code, search_query, event_type, category, subcategory, child_category)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         params.studentCode || null,
         q || cat,
+        eventType,
         cat || null,
         params.subcategory || null,
         params.childCategory || null,
@@ -1470,6 +1475,39 @@ export async function logSearchEvent(params: {
     );
   } catch (err: any) {
     console.warn('[logSearchEvent Error]:', err?.message || err);
+  }
+}
+
+export async function logProductInteractionEvent(params: {
+  studentCode?: string;
+  productId: string;
+  query?: string;
+  category?: string;
+  subcategory?: string;
+  childCategory?: string;
+  eventType?: 'product_open' | 'product_click';
+}): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  const productId = String(params.productId || '').trim();
+  if (!productId) return;
+
+  try {
+    await ensureProductMinerTables();
+    await db.query(
+      `INSERT INTO product_interaction_events (student_code, product_id, search_query, category, subcategory, child_category, event_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        params.studentCode || null,
+        productId,
+        params.query || null,
+        params.category || null,
+        params.subcategory || null,
+        params.childCategory || null,
+        params.eventType || 'product_open',
+      ]
+    );
+  } catch (err: any) {
+    console.warn('[logProductInteractionEvent Error]:', err?.message || err);
   }
 }
 
@@ -1559,9 +1597,9 @@ export async function searchTikTokShopProducts(params: {
       } else if (classification === 'highest_commission') {
         orderClause = `ORDER BY COALESCE(p.estimated_commission_cents, (p.price_cents * p.commission_rate_percent / 100), 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (classification === 'viral_video') {
-        // 3. VÍDEO VIRAL: Usa a tabela relacional tiktok_shop_product_videos
-        // Agrupado por product_id para selecionar o MELHOR vídeo e garantir 1 produto = 1 linha (sem duplicação).
-        // Score viral = views (1.0) + shares (10.0) + saves (5.0) + comments (3.0) + likes (0.5)
+        // VÍDEO VIRAL: Usa a tabela relacional tiktok_shop_product_videos
+        // Agrupado por product_id para selecionar o MELHOR vídeo (1 produto = 1 linha)
+        // Score viral = views * 1.0 + shares * 10.0 + saves * 5.0 + comments * 3.0 + likes * 0.5
         joinClause = `
           LEFT JOIN (
             SELECT 
@@ -1587,38 +1625,73 @@ export async function searchTikTokShopProducts(params: {
             COALESCE(p.video_comments, 0) * 3.0 + 
             COALESCE(p.video_likes, 0) * 0.5
           )
-        ) DESC, p.sold_count DESC`;
+        ) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (classification === 'sales_24h') {
-        // 1. VENDAS 24H: Variação real de sold_count nas últimas 24h via tiktok_shop_product_snapshots.
-        // Nunca utiliza video_views como substituto silencioso de vendas.
+        // VENDAS 24H: Variação real de sold_count nas últimas 24h via snapshot
         joinClause = `
           LEFT JOIN (
-            SELECT product_id, sold_count AS snap_sold
-            FROM tiktok_shop_product_snapshots s1
-            WHERE s1.id = (
-              SELECT id FROM tiktok_shop_product_snapshots s2
-              WHERE s2.product_id = s1.product_id AND s2.captured_at <= NOW() - INTERVAL 24 HOUR
-              ORDER BY s2.captured_at DESC LIMIT 1
-            )
+            SELECT s.product_id, s.sold_count AS sold_24h
+            FROM tiktok_shop_product_snapshots s
+            INNER JOIN (
+              SELECT product_id, MAX(captured_at) AS max_cap
+              FROM tiktok_shop_product_snapshots
+              WHERE captured_at <= NOW() - INTERVAL 24 HOUR
+              GROUP BY product_id
+            ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
           ) snap24 ON snap24.product_id = p.product_id
         `;
-        orderClause = `ORDER BY (p.sold_count - COALESCE(snap24.snap_sold, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
+        orderClause = `ORDER BY (p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'spiking') {
-        // 4. DISPARANDO: Mede aceleração recente (vendas/dia online desde a primeira captura + engajamento visual)
+        // DISPARANDO: Mede ACELERAÇÃO recente real = sales_last_24h - sales_previous_24h
         joinClause = `
           LEFT JOIN (
-            SELECT product_id, MAX(video_views) AS max_v_views
-            FROM tiktok_shop_product_videos
-            GROUP BY product_id
-          ) pv ON pv.product_id = p.product_id
+            SELECT s.product_id, s.sold_count AS sold_24h
+            FROM tiktok_shop_product_snapshots s
+            INNER JOIN (
+              SELECT product_id, MAX(captured_at) AS max_cap
+              FROM tiktok_shop_product_snapshots
+              WHERE captured_at <= NOW() - INTERVAL 24 HOUR
+              GROUP BY product_id
+            ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
+          ) snap24 ON snap24.product_id = p.product_id
+          LEFT JOIN (
+            SELECT s.product_id, s.sold_count AS sold_48h
+            FROM tiktok_shop_product_snapshots s
+            INNER JOIN (
+              SELECT product_id, MAX(captured_at) AS max_cap
+              FROM tiktok_shop_product_snapshots
+              WHERE captured_at <= NOW() - INTERVAL 48 HOUR
+              GROUP BY product_id
+            ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
+          ) snap48 ON snap48.product_id = p.product_id
         `;
         orderClause = `ORDER BY (
-          (p.sold_count / GREATEST(1, TIMESTAMPDIFF(HOUR, p.first_seen_at, NOW()) / 24)) * 2.0 +
-          COALESCE(pv.max_v_views, p.video_views, 0) * 0.2
-        ) DESC, p.last_seen_at DESC, p.sold_count DESC`;
+          (p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) - 
+          (COALESCE(snap24.sold_24h, p.sold_count) - COALESCE(snap48.sold_48h, snap24.sold_24h, p.sold_count))
+        ) DESC, (p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'trending') {
-        // 4. TENDÊNCIAS: Mede taxa de vendas diárias sustentáveis desde a primeira aparição + avaliação + alcance em vídeo
+        // TENDÊNCIAS: Crescimento recente sustentável (vendas 24h + vendas 48h + rating + alcance)
         joinClause = `
+          LEFT JOIN (
+            SELECT s.product_id, s.sold_count AS sold_24h
+            FROM tiktok_shop_product_snapshots s
+            INNER JOIN (
+              SELECT product_id, MAX(captured_at) AS max_cap
+              FROM tiktok_shop_product_snapshots
+              WHERE captured_at <= NOW() - INTERVAL 24 HOUR
+              GROUP BY product_id
+            ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
+          ) snap24 ON snap24.product_id = p.product_id
+          LEFT JOIN (
+            SELECT s.product_id, s.sold_count AS sold_48h
+            FROM tiktok_shop_product_snapshots s
+            INNER JOIN (
+              SELECT product_id, MAX(captured_at) AS max_cap
+              FROM tiktok_shop_product_snapshots
+              WHERE captured_at <= NOW() - INTERVAL 48 HOUR
+              GROUP BY product_id
+            ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
+          ) snap48 ON snap48.product_id = p.product_id
           LEFT JOIN (
             SELECT product_id, MAX(video_views) AS max_v_views
             FROM tiktok_shop_product_videos
@@ -1626,12 +1699,13 @@ export async function searchTikTokShopProducts(params: {
           ) pv ON pv.product_id = p.product_id
         `;
         orderClause = `ORDER BY (
-          (p.sold_count / GREATEST(1, DATEDIFF(NOW(), p.first_seen_at))) * 0.6 +
-          COALESCE(p.rating, 0) * 20 +
-          COALESCE(pv.max_v_views, p.video_views, 0) * 0.05
+          (p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) * 1.0 +
+          (COALESCE(snap24.sold_24h, p.sold_count) - COALESCE(snap48.sold_48h, snap24.sold_24h, p.sold_count)) * 0.5 +
+          COALESCE(p.rating, 0) * 10.0 +
+          GREATEST(COALESCE(pv.max_v_views, 0), COALESCE(p.video_views, 0)) * 0.001
         ) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'editors_choice') {
-        // 5. ESCOLHA DO DIA: Pontuação composta usando escala logarítmica para equilibrar demanda, avaliação, comissão e conteúdo em vídeo.
+        // ESCOLHA DO DIA: Pontuação composta equilibrada com escala logarítmica
         joinClause = `
           LEFT JOIN (
             SELECT product_id, MAX(video_views) AS max_v_views
@@ -1646,18 +1720,16 @@ export async function searchTikTokShopProducts(params: {
           LOG10(1 + GREATEST(COALESCE(pv.max_v_views, 0), COALESCE(p.video_views, 0))) * 10.0
         ) DESC, p.last_seen_at DESC`;
       } else if (classification === 'most_searched') {
-        // 2. MAIS PESQUISADOS: Utiliza exclusivamente a telemetria real registrada em product_search_events
+        // MAIS PESQUISADOS: Interações reais originadas por pesquisa/clique no produto
         joinClause = `
           LEFT JOIN (
-            SELECT LOWER(TRIM(search_query)) AS norm_q, COUNT(*) AS search_count
-            FROM product_search_events
-            GROUP BY LOWER(TRIM(search_query))
-          ) se ON (
-            LOWER(TRIM(p.query_source)) = se.norm_q
-            OR LOWER(TRIM(p.category_path)) LIKE CONCAT('%', se.norm_q, '%')
-          )
+            SELECT product_id, COUNT(*) AS interaction_count
+            FROM product_interaction_events
+            WHERE event_type IN ('product_open', 'product_click')
+            GROUP BY product_id
+          ) pie ON pie.product_id = p.product_id
         `;
-        orderClause = `ORDER BY COALESCE(se.search_count, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
+        orderClause = `ORDER BY COALESCE(pie.interaction_count, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (querySourceForOrder) {
         orderClause = `ORDER BY CASE WHEN LOWER(TRIM(p.query_source)) = LOWER(?) THEN 0 ELSE 1 END, p.sold_count DESC, p.last_seen_at DESC`;
       }
