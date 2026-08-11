@@ -2,7 +2,7 @@ import express from 'express';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
 import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, reclassifyExistingDatabaseProducts, backfillLegacyVideosToProductVideos, extractVideosFromSearchCachePayloads, ProductRankingSort, logProductInteractionEvent } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
-import { db, isDatabaseConfigured, ensureCodigosAcessoTable } from './database.js';
+import { db, isDatabaseConfigured, ensureCodigosAcessoTable, ensureProductMinerTables } from './database.js';
 import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin } from './presenceService.js';
 
 export const productMinerRouter = express.Router();
