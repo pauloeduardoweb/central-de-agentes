@@ -1738,13 +1738,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           ) : null}
         </div>
 
-        {/* Categories Pills Bar */}
-        <div className="relative group/catnav">
+        {/* Categories Icon Cards Bar */}
+        <div className="relative group/catnav py-1">
           {/* Desktop Scroll Left Arrow */}
           <button
             type="button"
             onClick={() => scrollContainer(categoriesScrollRef, 'left')}
-            className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+            className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
             title="Rolar categorias para esquerda"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -1752,14 +1752,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           <div
             ref={categoriesScrollRef}
-            className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1 scroll-smooth touch-pan-x"
+            className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 scroll-smooth touch-pan-x"
             onWheel={(e) => {
               if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
                 e.currentTarget.scrollLeft += e.deltaY;
               }
             }}
           >
-            <div className="flex w-max min-w-max items-center gap-1.5 pr-12 md:pr-20 flex-nowrap">
+            <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 md:gap-5 pr-12 md:pr-20 flex-nowrap">
               {CATEGORY_CONFIG.map((cat) => {
                 const isActive = selectedCategory === cat.filterKey;
                 return (
@@ -1775,26 +1775,39 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         setSelectedSubcategory('Todas');
                       }
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap flex items-center gap-2 ${
-                      isActive
-                        ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
-                        : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-200/80'
-                    }`}
+                    className="flex flex-col items-center shrink-0 w-[82px] sm:w-[92px] md:w-[100px] group focus:outline-none"
                   >
-                    {cat.imageUrl && (
-                      <img
-                        src={cat.imageUrl}
-                        alt={cat.label}
-                        referrerPolicy="no-referrer"
-                        className="w-6 h-6 rounded-md object-contain shrink-0 border border-slate-200/60 bg-white p-0.5 shadow-2xs"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    )}
-                    <span>{cat.label}</span>
+                    <div
+                      className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-20 md:h-20 lg:w-20 lg:h-20 rounded-2xl overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 p-1.5 ${
+                        isActive
+                          ? 'border-amber-500 bg-amber-50/90 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
+                          : 'border-slate-200 bg-slate-50 group-hover:border-amber-300 group-hover:bg-amber-50/40'
+                      }`}
+                    >
+                      {cat.imageUrl ? (
+                        <img
+                          src={cat.imageUrl}
+                          alt={cat.label}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-contain transition-transform group-hover:scale-105"
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="text-slate-400 font-bold text-xs">{cat.label.slice(0, 2)}</div>
+                      )}
+                    </div>
+
+                    <span
+                      className={`text-[11px] sm:text-xs md:text-xs font-bold text-center mt-1.5 leading-tight max-w-[82px] sm:max-w-[92px] md:max-w-[100px] line-clamp-2 transition-colors ${
+                        isActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
+                      }`}
+                    >
+                      {cat.label}
+                    </span>
                   </button>
                 );
               })}
@@ -1805,7 +1818,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           <button
             type="button"
             onClick={() => scrollContainer(categoriesScrollRef, 'right')}
-            className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+            className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
             title="Rolar categorias para direita"
           >
             <ChevronRight className="w-4 h-4" />
