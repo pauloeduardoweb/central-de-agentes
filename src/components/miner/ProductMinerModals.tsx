@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   X, Sparkles, Copy, Check, Play, Eye, Heart, MessageCircle, Share2,
   Bookmark, Zap, Loader2, AlertCircle, FileText, Wand2, RefreshCw, ExternalLink, ShieldCheck, BarChart3,
-  Store, Star, Flame, ShoppingBag
+  Store, Star, Flame, ShoppingBag, Info, Tag, ChevronDown, ChevronUp, Film, VideoOff, Layers
 } from 'lucide-react';
 import {
   ProductMinerProduct,
@@ -485,11 +485,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onOpenScriptModal,
   onOpenAnalysisModal,
 }) => {
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
   if (!isOpen || !product) return null;
 
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
   const officialProductUrl = getOfficialProductUrl(product);
+
+  const rawDescription =
+    product.description ||
+    product.productDescription ||
+    (product as any).product_description ||
+    (product as any).desc ||
+    product.video?.description;
+
+  const cleanDescription = rawDescription ? String(rawDescription).trim() : '';
+  const hasDescription = Boolean(cleanDescription);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
@@ -538,7 +550,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             <div className="flex-1 min-w-0 space-y-2 w-full">
               {product.score !== undefined && product.score !== null ? (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-950 text-xs font-extrabold shadow-sm">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-950 text-xs font-extrabold shadow-xs">
                   <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
                   Score Geração Z Pro: {product.score}/100
                 </div>
@@ -585,35 +597,109 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Sales & Ratings Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div className="p-3 rounded-xl border border-slate-200 bg-white">
-              <div className="text-[10px] text-slate-500 font-medium">Vendas Totais</div>
-              <div className="font-black text-amber-700 text-sm sm:text-base mt-0.5">
-                {compactNumber(product.soldCount)}
-              </div>
+          {/* Bloco 1: Sobre o Produto */}
+          <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200/90 bg-white space-y-2">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+              <Info className="w-4 h-4 text-amber-600 shrink-0" />
+              <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 uppercase tracking-wide">
+                Sobre o Produto
+              </h4>
             </div>
 
-            <div className="p-3 rounded-xl border border-slate-200 bg-white">
-              <div className="text-[10px] text-slate-500 font-medium">Avaliação</div>
-              <div className="font-black text-amber-600 text-sm sm:text-base mt-0.5 flex items-center gap-1">
-                <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
-                {product.rating ?? '—'}
+            {hasDescription ? (
+              <div className="space-y-2 pt-1">
+                <p className={`text-xs text-slate-700 leading-relaxed whitespace-pre-line ${!isDescriptionExpanded ? 'line-clamp-5' : ''}`}>
+                  {cleanDescription}
+                </p>
+                {cleanDescription.length > 180 ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-800 pt-0.5 cursor-pointer"
+                  >
+                    {isDescriptionExpanded ? (
+                      <>Ver menos <ChevronUp className="w-3.5 h-3.5" /></>
+                    ) : (
+                      <>Ver mais <ChevronDown className="w-3.5 h-3.5" /></>
+                    )}
+                  </button>
+                ) : null}
               </div>
+            ) : (
+              <div className="py-2 text-xs text-slate-400 italic">
+                Descrição detalhada indisponível para este produto.
+              </div>
+            )}
+          </div>
+
+          {/* Bloco 2: Informações do Produto */}
+          <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200/90 bg-white space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+              <Tag className="w-4 h-4 text-amber-600 shrink-0" />
+              <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 uppercase tracking-wide">
+                Informações do Produto
+              </h4>
             </div>
 
-            <div className="p-3 rounded-xl border border-slate-200 bg-white">
-              <div className="text-[10px] text-slate-500 font-medium">Vendas 24h</div>
-              <div className="font-black text-emerald-700 text-sm sm:text-base mt-0.5">
-                {show24h ? `+${compactNumber(product.sales24h)}` : 'Coletando'}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-between gap-2 min-w-0">
+                <span className="text-slate-500 font-medium shrink-0">Loja</span>
+                <span className="font-bold text-slate-900 truncate" title={product.sellerName || 'TikTok Shop'}>
+                  {product.sellerName || 'TikTok Shop'}
+                </span>
               </div>
-            </div>
 
-            <div className="p-3 rounded-xl border border-slate-200 bg-white">
-              <div className="text-[10px] text-slate-500 font-medium">Vendas 7 dias</div>
-              <div className="font-black text-slate-900 text-sm sm:text-base mt-0.5">
-                {show7d ? `+${compactNumber(product.sales7d)}` : 'Coletando'}
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-between gap-2 min-w-0">
+                <span className="text-slate-500 font-medium shrink-0">Categoria</span>
+                <span className="font-bold text-slate-900 truncate">
+                  {product.category || 'Geral'}
+                </span>
               </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-between gap-2 min-w-0">
+                <span className="text-slate-500 font-medium shrink-0">Vendas Totais</span>
+                <span className="font-bold text-amber-700">
+                  {compactNumber(product.soldCount)}
+                  {show24h ? ` (+${compactNumber(product.sales24h)} em 24h)` : ''}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-between gap-2 min-w-0">
+                <span className="text-slate-500 font-medium shrink-0">Avaliação</span>
+                <span className="font-bold text-amber-600 flex items-center gap-1">
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                  {product.rating ?? '—'}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-between gap-2 min-w-0 sm:col-span-2">
+                <span className="text-slate-500 font-medium shrink-0">Vídeo associado</span>
+                <span className={`font-bold flex items-center gap-1 ${product.video ? 'text-emerald-700' : 'text-slate-500'}`}>
+                  {product.video ? (
+                    <>
+                      <Film className="w-3.5 h-3.5 text-emerald-600" /> Sim
+                    </>
+                  ) : (
+                    <>
+                      <VideoOff className="w-3.5 h-3.5 text-slate-400" /> Não
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Display variants if present */}
+              {(() => {
+                const vars = product.variants || (product as any).variations || (product as any).skus;
+                if (!vars || (Array.isArray(vars) && vars.length === 0)) return null;
+                const varsText = Array.isArray(vars) ? vars.map((v: any) => typeof v === 'string' ? v : v.name || v.title || JSON.stringify(v)).join(', ') : String(vars);
+                if (!varsText) return null;
+                return (
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 sm:col-span-2 space-y-1">
+                    <span className="text-slate-500 font-medium text-[11px] block">Variações Identificadas</span>
+                    <span className="font-bold text-slate-800 text-xs block truncate">{varsText}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -656,7 +742,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
           ) : null}
 
-          {/* Action Buttons Grid - Mobile responsive stack */}
+          {/* Action Buttons Grid */}
           <div className="pt-2 border-t border-slate-100 space-y-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {product.video ? (
@@ -666,7 +752,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     onClose();
                     onOpenAnalysisModal?.(product);
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                  className="w-full py-2.5 px-3 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                 >
                   <BarChart3 className="w-4 h-4 text-amber-600" />
                   🔍 Analisar Vídeo
@@ -678,7 +764,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   href={product.video.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-black text-xs flex items-center justify-center gap-1.5 transition-all"
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Play className="w-4 h-4 text-amber-600 fill-amber-500" />
                   ▶️ Assistir Vídeo
@@ -690,7 +776,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   href={officialProductUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="sm:hidden w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                 >
                   Pesquisar no TikTok Shop <ExternalLink className="w-3.5 h-3.5" />
                 </a>
@@ -699,7 +785,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <button
                 type="button"
                 onClick={() => onToggleFavorite?.(product)}
-                className={`w-full py-2.5 px-3 rounded-xl border font-black text-xs flex items-center justify-center gap-1.5 transition-all ${
+                className={`w-full py-2.5 px-3 rounded-xl border font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   isFavorite
                     ? 'border-rose-200 bg-rose-50 text-rose-700'
                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
