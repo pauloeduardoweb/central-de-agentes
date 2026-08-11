@@ -1106,6 +1106,27 @@ export function ensureProductMinerTables(): Promise<void> {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS tiktok_shop_product_videos (
+          id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          product_id VARCHAR(64) NOT NULL,
+          video_id VARCHAR(64) NOT NULL,
+          video_url TEXT DEFAULT NULL,
+          video_author VARCHAR(255) DEFAULT NULL,
+          video_author_followers BIGINT DEFAULT NULL,
+          video_views BIGINT DEFAULT NULL,
+          video_likes BIGINT DEFAULT NULL,
+          video_comments BIGINT DEFAULT NULL,
+          video_shares BIGINT DEFAULT NULL,
+          video_saves BIGINT DEFAULT NULL,
+          video_description TEXT DEFAULT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_tspv_product_video (product_id, video_id),
+          INDEX idx_tspv_product_views (product_id, video_views)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
       await ensureDailyCollectionsTable();
     })().catch((err: any) => {
       productMinerTablesPromise = null;

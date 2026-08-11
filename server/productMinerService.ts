@@ -20,6 +20,19 @@ type SocialCrawlSearchResponse = {
 
 export type ProductRankingSort = 'opportunities' | 'total' | '24h' | '7d' | 'spiking';
 
+export type MinedVideo = {
+  id: string | null;
+  url: string | null;
+  description?: string | null;
+  author: string | null;
+  authorFollowers: number | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+};
+
 export type MinedProduct = {
   productId: string;
   title: string;
@@ -43,18 +56,8 @@ export type MinedProduct = {
   lastSeenAt?: string | Date | null;
   estimatedCommissionCents?: number | null;
   commissionRatePercent?: number | null;
-  video: null | {
-    id: string | null;
-    url: string | null;
-    description?: string | null;
-    author: string | null;
-    authorFollowers: number | null;
-    views: number | null;
-    likes: number | null;
-    comments: number | null;
-    shares: number | null;
-    saves: number | null;
-  };
+  video: MinedVideo | null;
+  associatedVideos?: MinedVideo[];
   videoDownload?: null | {
     isPrepared: boolean;
     directMediaUrl?: string | null;
@@ -483,6 +486,273 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
       [snapshotRows]
     );
   }
+
+  for (const p of validProducts) {
+    const vList = p.associatedVideos && p.associatedVideos.length > 0
+      ? p.associatedVideos
+      : (p.video && p.video.id ? [p.video] : []);
+    if (vList.length > 0) {
+      await saveVideosToProductVideosTable(p.productId, vList).catch(() => {});
+    }
+  }
+}
+
+export async function saveVideosToProductVideosTable(productId: string, videos: MinedVideo[]): Promise<void> {
+  if (!isDatabaseConfigured() || !productId || !videos || videos.length === 0) return;
+  await ensureProductMinerTables();
+
+  const validVideos = videos.filter((v) => v && v.id && String(v.id).trim() !== '');
+  if (validVideos.length === 0) return;
+
+  for (const v of validVideos) {
+    const videoId = String(v.id).trim();
+    const videoUrl = v.url ? String(v.url) : null;
+    const author = v.author ? String(v.author) : null;
+    const authorFollowers = v.authorFollowers === null || v.authorFollowers === undefined ? null : Number(v.authorFollowers);
+    const views = v.views === null || v.views === undefined ? null : Number(v.views);
+    const likes = v.likes === null || v.likes === undefined ? null : Number(v.likes);
+    const comments = v.comments === null || v.comments === undefined ? null : Number(v.comments);
+    const shares = v.shares === null || v.shares === undefined ? null : Number(v.shares);
+    const saves = v.saves === null || v.saves === undefined ? null : Number(v.saves);
+    const description = v.description ? String(v.description) : null;
+
+    await db.query(
+      `INSERT INTO tiktok_shop_product_videos (
+        product_id, video_id, video_url, video_author, video_author_followers,
+        video_views, video_likes, video_comments, video_shares, video_saves, video_description
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        video_url = IF(VALUES(video_url) IS NOT NULL AND VALUES(video_url) != '', VALUES(video_url), video_url),
+        video_author = COALESCE(VALUES(video_author), video_author),
+        video_author_followers = COALESCE(VALUES(video_author_followers), video_author_followers),
+        video_views = GREATEST(COALESCE(VALUES(video_views), 0), COALESCE(video_views, 0)),
+        video_likes = GREATEST(COALESCE(VALUES(video_likes), 0), COALESCE(video_likes, 0)),
+        video_comments = COALESCE(VALUES(video_comments), video_comments),
+        video_shares = COALESCE(VALUES(video_shares), video_shares),
+        video_saves = COALESCE(VALUES(video_saves), video_saves),
+        video_description = COALESCE(VALUES(video_description), video_description),
+        updated_at = NOW()`,
+      [
+        productId,
+        videoId,
+        videoUrl,
+        author,
+        authorFollowers,
+        views,
+        likes,
+        comments,
+        shares,
+        saves,
+        description,
+      ]
+    ).catch((vErr: any) => {
+      console.warn('[Save Video Row Error]:', vErr?.message || vErr);
+    });
+  }
+
+  // Enforce Max 3 videos per product: keep top 3 by views/likes
+  const [existingRows]: any = await db.query(
+    `SELECT video_id
+     FROM tiktok_shop_product_videos
+     WHERE product_id = ?
+     ORDER BY COALESCE(video_views, 0) DESC, COALESCE(video_likes, 0) DESC, id DESC`,
+    [productId]
+  ).catch(() => [[]]);
+
+  if (Array.isArray(existingRows) && existingRows.length > 3) {
+    const top3Ids = existingRows.slice(0, 3).map((r: any) => String(r.video_id));
+    await db.query(
+      `DELETE FROM tiktok_shop_product_videos
+       WHERE product_id = ? AND video_id NOT IN (?)`,
+      [productId, top3Ids]
+    ).catch(() => {});
+  }
+}
+
+export async function attachAssociatedVideos(products: MinedProduct[]): Promise<MinedProduct[]> {
+  if (!isDatabaseConfigured() || !products || products.length === 0) return products;
+  await ensureProductMinerTables();
+
+  const productIds = Array.from(new Set(products.map((p) => p.productId).filter(Boolean)));
+  if (productIds.length === 0) return products;
+
+  try {
+    const [rows]: any = await db.query(
+      `SELECT product_id, video_id, video_url, video_author, video_author_followers,
+              video_views, video_likes, video_comments, video_shares, video_saves, video_description
+       FROM tiktok_shop_product_videos
+       WHERE product_id IN (?)
+       ORDER BY product_id, COALESCE(video_views, 0) DESC, COALESCE(video_likes, 0) DESC, id DESC`,
+      [productIds]
+    );
+
+    const videoMap = new Map<string, MinedVideo[]>();
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        const pId = String(row.product_id);
+        if (!videoMap.has(pId)) {
+          videoMap.set(pId, []);
+        }
+        const currentList = videoMap.get(pId)!;
+        if (currentList.length < 3) {
+          currentList.push({
+            id: String(row.video_id),
+            url: row.video_url,
+            description: row.video_description,
+            author: row.video_author,
+            authorFollowers: row.video_author_followers === null ? null : Number(row.video_author_followers),
+            views: row.video_views === null ? null : Number(row.video_views),
+            likes: row.video_likes === null ? null : Number(row.video_likes),
+            comments: row.video_comments === null ? null : Number(row.video_comments),
+            shares: row.video_shares === null ? null : Number(row.video_shares),
+            saves: row.video_saves === null ? null : Number(row.video_saves),
+          });
+        }
+      }
+    }
+
+    for (const p of products) {
+      const vList = videoMap.get(p.productId) || [];
+      if (vList.length > 0) {
+        p.associatedVideos = vList;
+        p.video = vList[0];
+      } else if (p.video && p.video.id) {
+        p.associatedVideos = [p.video];
+      } else {
+        p.associatedVideos = [];
+      }
+    }
+  } catch (err) {
+    console.warn('[attachAssociatedVideos Error]:', err);
+    for (const p of products) {
+      if (!p.associatedVideos) {
+        p.associatedVideos = p.video && p.video.id ? [p.video] : [];
+      }
+    }
+  }
+
+  return products;
+}
+
+export async function backfillLegacyVideosToProductVideos(): Promise<{ processedCount: number; insertedCount: number }> {
+  if (!isDatabaseConfigured()) return { processedCount: 0, insertedCount: 0 };
+  await ensureProductMinerTables();
+
+  const [rows]: any = await db.query(`
+    SELECT product_id, video_id, video_url, video_author, video_author_followers,
+           video_views, video_likes, video_comments, video_shares, video_saves
+    FROM tiktok_shop_products
+    WHERE video_id IS NOT NULL AND video_id != ''
+  `);
+
+  const list = Array.isArray(rows) ? rows : [];
+  let insertedCount = 0;
+
+  for (const row of list) {
+    const video: MinedVideo = {
+      id: String(row.video_id),
+      url: row.video_url,
+      author: row.video_author,
+      authorFollowers: row.video_author_followers === null ? null : Number(row.video_author_followers),
+      views: row.video_views === null ? null : Number(row.video_views),
+      likes: row.video_likes === null ? null : Number(row.video_likes),
+      comments: row.video_comments === null ? null : Number(row.video_comments),
+      shares: row.video_shares === null ? null : Number(row.video_shares),
+      saves: row.video_saves === null ? null : Number(row.video_saves),
+    };
+
+    await saveVideosToProductVideosTable(String(row.product_id), [video]);
+    insertedCount++;
+  }
+
+  return { processedCount: list.length, insertedCount };
+}
+
+export async function extractVideosFromSearchCachePayloads(): Promise<{
+  cacheRowsProcessed: number;
+  totalProductsFound: number;
+  totalVideosExtracted: number;
+  totalVideosInserted: number;
+}> {
+  if (!isDatabaseConfigured()) return { cacheRowsProcessed: 0, totalProductsFound: 0, totalVideosExtracted: 0, totalVideosInserted: 0 };
+  await ensureProductMinerTables();
+
+  const [rows]: any = await db.query(`
+    SELECT payload_json FROM tiktok_shop_search_cache
+  `);
+
+  const cacheRows = Array.isArray(rows) ? rows : [];
+  let cacheRowsProcessed = 0;
+  let totalProductsFound = 0;
+  let totalVideosExtracted = 0;
+  let totalVideosInserted = 0;
+
+  const productVideosMap = new Map<string, Map<string, MinedVideo>>();
+
+  for (const row of cacheRows) {
+    if (!row.payload_json) continue;
+    cacheRowsProcessed++;
+    try {
+      const parsed = typeof row.payload_json === 'string' ? JSON.parse(row.payload_json) : row.payload_json;
+      const items = parsed?.data?.products || parsed?.data?.items || parsed?.products || parsed?.items || (Array.isArray(parsed) ? parsed : []);
+
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          const productId = item?.product_id ? String(item.product_id).trim() : '';
+          if (!productId) continue;
+          totalProductsFound++;
+
+          const v = item?.video;
+          const awemeId = v?.aweme_id ? String(v.aweme_id) : (v?.id ? String(v.id) : null);
+          if (!awemeId) continue;
+
+          totalVideosExtracted++;
+
+          const stats = v?.statistics || {};
+          const author = v?.author || {};
+
+          const videoObj: MinedVideo = {
+            id: awemeId,
+            url: v?.share_url || v?.url || null,
+            description: v?.desc || v?.description || null,
+            author: author?.unique_id || author?.nickname || v?.author || null,
+            authorFollowers: parseInteger(author?.follower_count || author?.followers),
+            views: parseInteger(stats?.play_count || stats?.views),
+            likes: parseInteger(stats?.digg_count || stats?.likes),
+            comments: parseInteger(stats?.comment_count || stats?.comments),
+            shares: parseInteger(stats?.share_count || stats?.shares),
+            saves: parseInteger(stats?.collect_count || stats?.saves),
+          };
+
+          if (!productVideosMap.has(productId)) {
+            productVideosMap.set(productId, new Map());
+          }
+          const vMap = productVideosMap.get(productId)!;
+          const existing = vMap.get(awemeId);
+          if (!existing || (videoObj.views && (!existing.views || videoObj.views > existing.views))) {
+            vMap.set(awemeId, videoObj);
+          }
+        }
+      }
+    } catch (err) {
+      // Ignore JSON parse errors
+    }
+  }
+
+  for (const [productId, vMap] of productVideosMap.entries()) {
+    const videoList = Array.from(vMap.values());
+    if (videoList.length > 0) {
+      await saveVideosToProductVideosTable(productId, videoList);
+      totalVideosInserted += videoList.length;
+    }
+  }
+
+  return {
+    cacheRowsProcessed,
+    totalProductsFound,
+    totalVideosExtracted,
+    totalVideosInserted,
+  };
 }
 
 function chooseBaseline(samples: SnapshotPoint[], targetHours: number, minHours: number, maxHours: number): SnapshotPoint | null {
@@ -1022,7 +1292,8 @@ export async function searchTikTokShopProducts(params: {
         localProducts = fRows.slice(0, safePageSize).map(rowToProduct);
       }
 
-      const products = await attachTrendMetrics(localProducts);
+      const productsWithTrends = await attachTrendMetrics(localProducts);
+      const products = await attachAssociatedVideos(productsWithTrends);
       logMinerAcquisition({
         category,
         query,
@@ -1163,7 +1434,8 @@ export async function searchTikTokShopProducts(params: {
     })
     .filter((item) => item.productId);
   await persistProducts(normalized, query);
-  const products = await attachTrendMetrics(normalized);
+  const productsWithTrends = await attachTrendMetrics(normalized);
+  const products = await attachAssociatedVideos(productsWithTrends);
 
   logMinerAcquisition({
     query: providerQuery,
@@ -1291,8 +1563,10 @@ export async function refreshMultiPageTikTokShopProducts(params: {
     }
   }
 
+  const finalProducts = await attachAssociatedVideos(allUniqueProducts);
+
   return {
-    products: allUniqueProducts,
+    products: finalProducts,
     uniqueProductsCount: allUniqueProducts.length,
     pagesConsulted,
     creditsUsed: totalCreditsUsed,
@@ -1355,7 +1629,8 @@ export async function getProductMinerRanking(limit = 50, sort: ProductRankingSor
   );
 
   const baseProducts = (Array.isArray(rows) ? rows : []).map(rowToProduct);
-  const enriched = await attachTrendMetrics(baseProducts);
+  const enrichedWithTrends = await attachTrendMetrics(baseProducts);
+  const enriched = await attachAssociatedVideos(enrichedWithTrends);
 
   const sorted = [...enriched].sort((a, b) => {
     if (sort === 'opportunities') {

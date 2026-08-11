@@ -1,6 +1,6 @@
 import express from 'express';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
-import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, reclassifyExistingDatabaseProducts, ProductRankingSort } from './productMinerService.js';
+import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, reclassifyExistingDatabaseProducts, backfillLegacyVideosToProductVideos, extractVideosFromSearchCachePayloads, ProductRankingSort } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
 import { db, isDatabaseConfigured, ensureCodigosAcessoTable } from './database.js';
 import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin } from './presenceService.js';
@@ -597,6 +597,30 @@ productMinerRouter.get('/videos/:productId/download', async (req, res) => {
   } catch (error: any) {
     console.error('[Product Miner Video Download Route Error]:', error?.message || error);
     return res.status(500).json({ error: 'VIDEO_DOWNLOAD_ERROR' });
+  }
+});
+
+// Admin Route: Manual backfill from legacy video columns to product_videos table
+productMinerRouter.post('/admin/backfill-videos', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const result = await backfillLegacyVideosToProductVideos();
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[Backfill Videos Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'BACKFILL_ERROR' });
+  }
+});
+
+// Admin Route: Manual sync from search cache payloads to product_videos table
+productMinerRouter.post('/admin/sync-cache-videos', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const result = await extractVideosFromSearchCachePayloads();
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[Sync Cache Videos Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'CACHE_SYNC_ERROR' });
   }
 });
 
