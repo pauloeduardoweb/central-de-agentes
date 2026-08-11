@@ -1443,6 +1443,36 @@ function logMinerAcquisition(details: {
   console.log(`================================================================`);
 }
 
+export async function logSearchEvent(params: {
+  studentCode?: string;
+  query?: string;
+  category?: string;
+  subcategory?: string;
+  childCategory?: string;
+}): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  const q = String(params.query || '').trim();
+  const cat = String(params.category || '').trim();
+  if (!q && !cat) return;
+
+  try {
+    await ensureProductMinerTables();
+    await db.query(
+      `INSERT INTO product_search_events (student_code, search_query, category, subcategory, child_category)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        params.studentCode || null,
+        q || cat,
+        cat || null,
+        params.subcategory || null,
+        params.childCategory || null,
+      ]
+    );
+  } catch (err: any) {
+    console.warn('[logSearchEvent Error]:', err?.message || err);
+  }
+}
+
 export async function searchTikTokShopProducts(params: {
   query?: string;
   category?: string;
@@ -1469,6 +1499,11 @@ export async function searchTikTokShopProducts(params: {
   const subcategory = String(params.subcategory || '').trim();
   const childCategory = String(params.childCategory || '').trim();
   const classification = params.classification;
+
+  // Telemetry: record search event for query/category
+  if (query || category) {
+    logSearchEvent({ query, category, subcategory, childCategory }).catch(() => {});
+  }
 
   if (query.length === 1) {
     logMinerAcquisition({
@@ -1515,6 +1550,7 @@ export async function searchTikTokShopProducts(params: {
       });
 
       let orderClause = `ORDER BY p.sold_count DESC, p.last_seen_at DESC`;
+      let joinClause = ``;
 
       if (classification === 'best_sellers') {
         orderClause = `ORDER BY p.sold_count DESC, p.rating DESC, p.last_seen_at DESC`;
@@ -1523,17 +1559,105 @@ export async function searchTikTokShopProducts(params: {
       } else if (classification === 'highest_commission') {
         orderClause = `ORDER BY COALESCE(p.estimated_commission_cents, (p.price_cents * p.commission_rate_percent / 100), 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (classification === 'viral_video') {
-        orderClause = `ORDER BY (CASE WHEN p.video_views IS NOT NULL AND p.video_views > 0 THEN p.video_views ELSE 0 END) DESC, COALESCE(p.video_likes, 0) DESC, p.sold_count DESC`;
+        // 3. VÍDEO VIRAL: Usa a tabela relacional tiktok_shop_product_videos
+        // Agrupado por product_id para selecionar o MELHOR vídeo e garantir 1 produto = 1 linha (sem duplicação).
+        // Score viral = views (1.0) + shares (10.0) + saves (5.0) + comments (3.0) + likes (0.5)
+        joinClause = `
+          LEFT JOIN (
+            SELECT 
+              product_id,
+              MAX(
+                COALESCE(video_views, 0) * 1.0 + 
+                COALESCE(video_shares, 0) * 10.0 + 
+                COALESCE(video_saves, 0) * 5.0 + 
+                COALESCE(video_comments, 0) * 3.0 + 
+                COALESCE(video_likes, 0) * 0.5
+              ) AS best_video_viral_score,
+              MAX(COALESCE(video_views, 0)) AS max_v_views
+            FROM tiktok_shop_product_videos
+            GROUP BY product_id
+          ) pv ON pv.product_id = p.product_id
+        `;
+        orderClause = `ORDER BY GREATEST(
+          COALESCE(pv.best_video_viral_score, 0),
+          (
+            COALESCE(p.video_views, 0) * 1.0 + 
+            COALESCE(p.video_shares, 0) * 10.0 + 
+            COALESCE(p.video_saves, 0) * 5.0 + 
+            COALESCE(p.video_comments, 0) * 3.0 + 
+            COALESCE(p.video_likes, 0) * 0.5
+          )
+        ) DESC, p.sold_count DESC`;
       } else if (classification === 'sales_24h') {
-        orderClause = `ORDER BY COALESCE(p.video_views, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
+        // 1. VENDAS 24H: Variação real de sold_count nas últimas 24h via tiktok_shop_product_snapshots.
+        // Nunca utiliza video_views como substituto silencioso de vendas.
+        joinClause = `
+          LEFT JOIN (
+            SELECT product_id, sold_count AS snap_sold
+            FROM tiktok_shop_product_snapshots s1
+            WHERE s1.id = (
+              SELECT id FROM tiktok_shop_product_snapshots s2
+              WHERE s2.product_id = s1.product_id AND s2.captured_at <= NOW() - INTERVAL 24 HOUR
+              ORDER BY s2.captured_at DESC LIMIT 1
+            )
+          ) snap24 ON snap24.product_id = p.product_id
+        `;
+        orderClause = `ORDER BY (p.sold_count - COALESCE(snap24.snap_sold, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'spiking') {
-        orderClause = `ORDER BY (COALESCE(p.video_views, 0) + p.sold_count * 2) DESC, p.last_seen_at DESC`;
+        // 4. DISPARANDO: Mede aceleração recente (vendas/dia online desde a primeira captura + engajamento visual)
+        joinClause = `
+          LEFT JOIN (
+            SELECT product_id, MAX(video_views) AS max_v_views
+            FROM tiktok_shop_product_videos
+            GROUP BY product_id
+          ) pv ON pv.product_id = p.product_id
+        `;
+        orderClause = `ORDER BY (
+          (p.sold_count / GREATEST(1, TIMESTAMPDIFF(HOUR, p.first_seen_at, NOW()) / 24)) * 2.0 +
+          COALESCE(pv.max_v_views, p.video_views, 0) * 0.2
+        ) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'trending') {
-        orderClause = `ORDER BY (p.sold_count * 0.5 + COALESCE(p.video_views, 0) * 0.1 + COALESCE(p.rating, 0) * 10) DESC, p.last_seen_at DESC`;
+        // 4. TENDÊNCIAS: Mede taxa de vendas diárias sustentáveis desde a primeira aparição + avaliação + alcance em vídeo
+        joinClause = `
+          LEFT JOIN (
+            SELECT product_id, MAX(video_views) AS max_v_views
+            FROM tiktok_shop_product_videos
+            GROUP BY product_id
+          ) pv ON pv.product_id = p.product_id
+        `;
+        orderClause = `ORDER BY (
+          (p.sold_count / GREATEST(1, DATEDIFF(NOW(), p.first_seen_at))) * 0.6 +
+          COALESCE(p.rating, 0) * 20 +
+          COALESCE(pv.max_v_views, p.video_views, 0) * 0.05
+        ) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'editors_choice') {
-        orderClause = `ORDER BY (p.sold_count * 0.3 + COALESCE(p.rating, 0) * 500 + COALESCE(p.estimated_commission_cents, 0) * 0.1) DESC, p.last_seen_at DESC`;
+        // 5. ESCOLHA DO DIA: Pontuação composta usando escala logarítmica para equilibrar demanda, avaliação, comissão e conteúdo em vídeo.
+        joinClause = `
+          LEFT JOIN (
+            SELECT product_id, MAX(video_views) AS max_v_views
+            FROM tiktok_shop_product_videos
+            GROUP BY product_id
+          ) pv ON pv.product_id = p.product_id
+        `;
+        orderClause = `ORDER BY (
+          LOG10(1 + p.sold_count) * 25.0 +
+          COALESCE(p.rating, 4.0) * 15.0 +
+          LOG10(1 + COALESCE(p.estimated_commission_cents, (p.price_cents * p.commission_rate_percent / 100), 0)) * 15.0 +
+          LOG10(1 + GREATEST(COALESCE(pv.max_v_views, 0), COALESCE(p.video_views, 0))) * 10.0
+        ) DESC, p.last_seen_at DESC`;
       } else if (classification === 'most_searched') {
-        orderClause = `ORDER BY (LOG10(1 + COALESCE(p.video_views, 0)) * 50 + p.sold_count * 0.2 + COALESCE(p.rating, 0) * 10) DESC, p.last_seen_at DESC`;
+        // 2. MAIS PESQUISADOS: Utiliza exclusivamente a telemetria real registrada em product_search_events
+        joinClause = `
+          LEFT JOIN (
+            SELECT LOWER(TRIM(search_query)) AS norm_q, COUNT(*) AS search_count
+            FROM product_search_events
+            GROUP BY LOWER(TRIM(search_query))
+          ) se ON (
+            LOWER(TRIM(p.query_source)) = se.norm_q
+            OR LOWER(TRIM(p.category_path)) LIKE CONCAT('%', se.norm_q, '%')
+          )
+        `;
+        orderClause = `ORDER BY COALESCE(se.search_count, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (querySourceForOrder) {
         orderClause = `ORDER BY CASE WHEN LOWER(TRIM(p.query_source)) = LOWER(?) THEN 0 ELSE 1 END, p.sold_count DESC, p.last_seen_at DESC`;
       }
@@ -1543,6 +1667,7 @@ export async function searchTikTokShopProducts(params: {
       const [rows]: any = await db.query(
         `SELECT p.*
          FROM tiktok_shop_products p
+         ${joinClause}
          WHERE ${whereSql}
          ${orderClause}
          LIMIT ? OFFSET ?`,
@@ -1558,6 +1683,7 @@ export async function searchTikTokShopProducts(params: {
         const [fallbackRows]: any = await db.query(
           `SELECT p.*
            FROM tiktok_shop_products p
+           ${joinClause}
            WHERE ${whereSql}
            ${orderClause}
            LIMIT ? OFFSET 0`,

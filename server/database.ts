@@ -1127,6 +1127,32 @@ export function ensureProductMinerTables(): Promise<void> {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
+      await db.query(`
+        INSERT IGNORE INTO tiktok_shop_product_videos (
+          product_id, video_id, video_url, video_author, video_author_followers,
+          video_views, video_likes, video_comments, video_shares, video_saves
+        )
+        SELECT product_id, video_id, video_url, video_author, video_author_followers,
+               video_views, video_likes, video_comments, video_shares, video_saves
+        FROM tiktok_shop_products
+        WHERE video_id IS NOT NULL AND video_id != ''
+      `).catch(() => {});
+
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS product_search_events (
+          id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          student_code VARCHAR(100) DEFAULT NULL,
+          search_query VARCHAR(120) NOT NULL,
+          category VARCHAR(120) DEFAULT NULL,
+          subcategory VARCHAR(120) DEFAULT NULL,
+          child_category VARCHAR(120) DEFAULT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_pse_query (search_query),
+          INDEX idx_pse_created (created_at),
+          INDEX idx_pse_cat (category)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
       await ensureDailyCollectionsTable();
     })().catch((err: any) => {
       productMinerTablesPromise = null;
