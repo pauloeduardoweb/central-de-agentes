@@ -324,6 +324,28 @@ productMinerRouter.get('/search', async (req, res) => {
 });
 
 // Track real student interaction with a product
+productMinerRouter.get('/admin/audit-diagnostic', async (req, res) => {
+  if (!isDatabaseConfigured()) return res.json({ error: 'DB_NOT_CONFIGURED' });
+  try {
+    await ensureProductMinerTables();
+    const [productsCount]: any = await db.query('SELECT COUNT(*) AS total FROM tiktok_shop_products');
+    const [snapshotsCount]: any = await db.query('SELECT COUNT(*) AS total FROM tiktok_shop_product_snapshots');
+    const [videosCount]: any = await db.query('SELECT COUNT(*) AS total FROM tiktok_shop_product_videos');
+    const [interactionsCount]: any = await db.query('SELECT COUNT(*) AS total FROM product_interaction_events');
+    const [searchEventsCount]: any = await db.query('SELECT COUNT(*) AS total FROM product_search_events');
+
+    return res.json({
+      products: productsCount[0]?.total || 0,
+      snapshots: snapshotsCount[0]?.total || 0,
+      videos: videosCount[0]?.total || 0,
+      interactions: interactionsCount[0]?.total || 0,
+      searchEvents: searchEventsCount[0]?.total || 0,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message });
+  }
+});
+
 productMinerRouter.post('/track-interaction', async (req, res) => {
   try {
     const studentCode = getRequesterCode(req) || undefined;

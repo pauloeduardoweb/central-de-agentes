@@ -1627,7 +1627,7 @@ export async function searchTikTokShopProducts(params: {
           )
         ) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (classification === 'sales_24h') {
-        // VENDAS 24H: Variação real de sold_count nas últimas 24h via snapshot
+        // VENDAS 24H: Variação real de sold_count em janela coerente (~24h: 18h a 42h)
         joinClause = `
           LEFT JOIN (
             SELECT s.product_id, s.sold_count AS sold_24h
@@ -1635,14 +1635,14 @@ export async function searchTikTokShopProducts(params: {
             INNER JOIN (
               SELECT product_id, MAX(captured_at) AS max_cap
               FROM tiktok_shop_product_snapshots
-              WHERE captured_at <= NOW() - INTERVAL 24 HOUR
+              WHERE captured_at <= NOW() - INTERVAL 18 HOUR AND captured_at >= NOW() - INTERVAL 42 HOUR
               GROUP BY product_id
             ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
           ) snap24 ON snap24.product_id = p.product_id
         `;
-        orderClause = `ORDER BY (p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
+        orderClause = `ORDER BY GREATEST(0, p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'spiking') {
-        // DISPARANDO: Mede ACELERAÇÃO recente real = sales_last_24h - sales_previous_24h
+        // DISPARANDO: Mede ACELERAÇÃO recente real = sales_last_24h - sales_previous_24h com proteção contra deltas negativos
         joinClause = `
           LEFT JOIN (
             SELECT s.product_id, s.sold_count AS sold_24h
@@ -1650,7 +1650,7 @@ export async function searchTikTokShopProducts(params: {
             INNER JOIN (
               SELECT product_id, MAX(captured_at) AS max_cap
               FROM tiktok_shop_product_snapshots
-              WHERE captured_at <= NOW() - INTERVAL 24 HOUR
+              WHERE captured_at <= NOW() - INTERVAL 18 HOUR AND captured_at >= NOW() - INTERVAL 42 HOUR
               GROUP BY product_id
             ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
           ) snap24 ON snap24.product_id = p.product_id
@@ -1660,15 +1660,15 @@ export async function searchTikTokShopProducts(params: {
             INNER JOIN (
               SELECT product_id, MAX(captured_at) AS max_cap
               FROM tiktok_shop_product_snapshots
-              WHERE captured_at <= NOW() - INTERVAL 48 HOUR
+              WHERE captured_at <= NOW() - INTERVAL 42 HOUR AND captured_at >= NOW() - INTERVAL 72 HOUR
               GROUP BY product_id
             ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
           ) snap48 ON snap48.product_id = p.product_id
         `;
         orderClause = `ORDER BY (
-          (p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) - 
-          (COALESCE(snap24.sold_24h, p.sold_count) - COALESCE(snap48.sold_48h, snap24.sold_24h, p.sold_count))
-        ) DESC, (p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
+          GREATEST(0, p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) - 
+          GREATEST(0, COALESCE(snap24.sold_24h, p.sold_count) - COALESCE(snap48.sold_48h, snap24.sold_24h, p.sold_count))
+        ) DESC, GREATEST(0, p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'trending') {
         // TENDÊNCIAS: Crescimento recente sustentável (vendas 24h + vendas 48h + rating + alcance)
         joinClause = `
@@ -1678,7 +1678,7 @@ export async function searchTikTokShopProducts(params: {
             INNER JOIN (
               SELECT product_id, MAX(captured_at) AS max_cap
               FROM tiktok_shop_product_snapshots
-              WHERE captured_at <= NOW() - INTERVAL 24 HOUR
+              WHERE captured_at <= NOW() - INTERVAL 18 HOUR AND captured_at >= NOW() - INTERVAL 42 HOUR
               GROUP BY product_id
             ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
           ) snap24 ON snap24.product_id = p.product_id
@@ -1688,7 +1688,7 @@ export async function searchTikTokShopProducts(params: {
             INNER JOIN (
               SELECT product_id, MAX(captured_at) AS max_cap
               FROM tiktok_shop_product_snapshots
-              WHERE captured_at <= NOW() - INTERVAL 48 HOUR
+              WHERE captured_at <= NOW() - INTERVAL 42 HOUR AND captured_at >= NOW() - INTERVAL 72 HOUR
               GROUP BY product_id
             ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
           ) snap48 ON snap48.product_id = p.product_id
@@ -1699,8 +1699,8 @@ export async function searchTikTokShopProducts(params: {
           ) pv ON pv.product_id = p.product_id
         `;
         orderClause = `ORDER BY (
-          (p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) * 1.0 +
-          (COALESCE(snap24.sold_24h, p.sold_count) - COALESCE(snap48.sold_48h, snap24.sold_24h, p.sold_count)) * 0.5 +
+          GREATEST(0, p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) * 1.0 +
+          GREATEST(0, COALESCE(snap24.sold_24h, p.sold_count) - COALESCE(snap48.sold_48h, snap24.sold_24h, p.sold_count)) * 0.5 +
           COALESCE(p.rating, 0) * 10.0 +
           GREATEST(COALESCE(pv.max_v_views, 0), COALESCE(p.video_views, 0)) * 0.001
         ) DESC, p.last_seen_at DESC, p.sold_count DESC`;
