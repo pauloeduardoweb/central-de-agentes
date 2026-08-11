@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X, Sparkles, Copy, Check, Play, Eye, Heart, MessageCircle, Share2,
   Bookmark, Zap, Loader2, AlertCircle, FileText, Wand2, RefreshCw, ExternalLink, ShieldCheck, BarChart3,
-  Store, Star, Flame, ShoppingBag, Info, Tag, ChevronDown, ChevronUp, Film, VideoOff, Layers
+  Store, Star, Flame, ShoppingBag, Info, Tag, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Film, VideoOff, Layers
 } from 'lucide-react';
 import {
   ProductMinerProduct,
@@ -486,6 +486,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onOpenAnalysisModal,
 }) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveVideoIndex(0);
+  }, [product?.productId]);
 
   if (!isOpen || !product) return null;
 
@@ -493,15 +498,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
   const officialProductUrl = getOfficialProductUrl(product);
 
-  const rawDescription =
+  const videoList = (product.associatedVideos && product.associatedVideos.length > 0)
+    ? product.associatedVideos
+    : (product.video ? [product.video] : []);
+
+  const activeVideo = videoList[activeVideoIndex] || product.video || null;
+
+  const officialDescription =
     product.description ||
     product.productDescription ||
     (product as any).product_description ||
-    (product as any).desc ||
-    product.video?.description;
+    (product as any).desc;
 
-  const cleanDescription = rawDescription ? String(rawDescription).trim() : '';
-  const hasDescription = Boolean(cleanDescription);
+  const videoDescription = activeVideo?.description || product.video?.description;
+
+  const cleanOfficialDesc = officialDescription ? String(officialDescription).trim() : '';
+  const cleanVideoDesc = videoDescription ? String(videoDescription).trim() : '';
+
+  const hasOfficialDesc = Boolean(cleanOfficialDesc);
+  const hasVideoDesc = !hasOfficialDesc && Boolean(cleanVideoDesc);
+
+  const displayDescription = hasOfficialDesc ? cleanOfficialDesc : (hasVideoDesc ? cleanVideoDesc : '');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
@@ -596,19 +613,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           {/* Bloco 1: Sobre o Produto */}
           <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200/90 bg-white space-y-2">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-              <Info className="w-4 h-4 text-amber-600 shrink-0" />
-              <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 uppercase tracking-wide">
-                Sobre o Produto
-              </h4>
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 uppercase tracking-wide">
+                  Sobre o Produto
+                </h4>
+              </div>
+              {hasVideoDesc ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                  Descrição do vídeo associado
+                </span>
+              ) : null}
             </div>
 
-            {hasDescription ? (
+            {displayDescription ? (
               <div className="space-y-2 pt-1">
                 <p className={`text-xs text-slate-700 leading-relaxed whitespace-pre-line ${!isDescriptionExpanded ? 'line-clamp-5' : ''}`}>
-                  {cleanDescription}
+                  {displayDescription}
                 </p>
-                {cleanDescription.length > 180 ? (
+                {displayDescription.length > 180 ? (
                   <button
                     type="button"
                     onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
@@ -671,10 +695,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
               <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-between gap-2 min-w-0 sm:col-span-2">
                 <span className="text-slate-500 font-medium shrink-0">Vídeo associado</span>
-                <span className={`font-bold flex items-center gap-1 ${product.video ? 'text-emerald-700' : 'text-slate-500'}`}>
-                  {product.video ? (
+                <span className={`font-bold flex items-center gap-1 ${videoList.length > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                  {videoList.length > 0 ? (
                     <>
-                      <Film className="w-3.5 h-3.5 text-emerald-600" /> Sim
+                      <Film className="w-3.5 h-3.5 text-emerald-600" /> Sim {videoList.length > 1 ? `(${videoList.length} vídeos)` : ''}
                     </>
                   ) : (
                     <>
@@ -701,15 +725,45 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
 
           {/* Creator & Video Section */}
-          {product.video ? (
+          {activeVideo ? (
             <div className="p-3.5 sm:p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-3">
               <div className="flex items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
-                <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
-                  📹 Criador: @{product.video.author || 'creator'}
-                </span>
-                {product.video.authorFollowers !== null && product.video.authorFollowers !== undefined ? (
-                  <span className="text-[11px] font-semibold text-slate-600 shrink-0">
-                    {compactNumber(product.video.authorFollowers)} seguidores
+                <div className="flex items-center gap-2 truncate">
+                  <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                    📹 Criador: @{activeVideo.author || 'creator'}
+                  </span>
+                  {activeVideo.authorFollowers !== null && activeVideo.authorFollowers !== undefined ? (
+                    <span className="text-[11px] font-semibold text-slate-600 shrink-0 hidden sm:inline">
+                      ({compactNumber(activeVideo.authorFollowers)} seguidores)
+                    </span>
+                  ) : null}
+                </div>
+
+                {videoList.length > 1 ? (
+                  <div className="flex items-center gap-1.5 shrink-0 bg-white/90 border border-amber-300 rounded-lg p-1 shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setActiveVideoIndex((prev) => (prev - 1 + videoList.length) % videoList.length)}
+                      className="p-1 rounded hover:bg-amber-100 text-amber-900 transition-colors cursor-pointer"
+                      title="Vídeo anterior"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-xs font-black text-amber-950 px-1 select-none">
+                      {activeVideoIndex + 1} de {videoList.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveVideoIndex((prev) => (prev + 1) % videoList.length)}
+                      className="p-1 rounded hover:bg-amber-100 text-amber-900 transition-colors cursor-pointer"
+                      title="Próximo vídeo"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : activeVideo.authorFollowers !== null && activeVideo.authorFollowers !== undefined ? (
+                  <span className="text-[11px] font-semibold text-slate-600 shrink-0 sm:hidden">
+                    {compactNumber(activeVideo.authorFollowers)} seguidores
                   </span>
                 ) : null}
               </div>
@@ -717,23 +771,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div className="grid grid-cols-5 gap-1 text-center text-[9px] sm:text-xs text-slate-700 font-semibold">
                 <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
                   <Eye className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-600" />
-                  <span className="block truncate">{compactNumber(product.video.views)}</span>
+                  <span className="block truncate">{compactNumber(activeVideo.views)}</span>
                 </div>
                 <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
                   <Heart className="w-3.5 h-3.5 mx-auto mb-0.5 text-rose-500" />
-                  <span className="block truncate">{compactNumber(product.video.likes)}</span>
+                  <span className="block truncate">{compactNumber(activeVideo.likes)}</span>
                 </div>
                 <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
                   <MessageCircle className="w-3.5 h-3.5 mx-auto mb-0.5 text-sky-600" />
-                  <span className="block truncate">{compactNumber(product.video.comments)}</span>
+                  <span className="block truncate">{compactNumber(activeVideo.comments)}</span>
                 </div>
                 <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
                   <Share2 className="w-3.5 h-3.5 mx-auto mb-0.5 text-emerald-600" />
-                  <span className="block truncate">{compactNumber(product.video.shares)}</span>
+                  <span className="block truncate">{compactNumber(activeVideo.shares)}</span>
                 </div>
                 <div className="p-1 sm:p-1.5 rounded-lg bg-white/80 border border-slate-200/80 min-w-0 overflow-hidden">
                   <Bookmark className="w-3.5 h-3.5 mx-auto mb-0.5 text-amber-600" />
-                  <span className="block truncate">{compactNumber(product.video.saves)}</span>
+                  <span className="block truncate">{compactNumber(activeVideo.saves)}</span>
                 </div>
               </div>
             </div>
@@ -742,29 +796,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Action Buttons Grid */}
           <div className="pt-2 border-t border-slate-100 space-y-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {product.video ? (
+              {activeVideo ? (
                 <button
                   type="button"
                   onClick={() => {
                     onClose();
-                    onOpenAnalysisModal?.(product);
+                    onOpenAnalysisModal?.({ ...product, video: activeVideo });
                   }}
                   className="w-full py-2.5 px-3 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                 >
                   <BarChart3 className="w-4 h-4 text-amber-600" />
-                  🔍 Analisar Vídeo
+                  🔍 Analisar Vídeo {videoList.length > 1 ? `(${activeVideoIndex + 1})` : ''}
                 </button>
               ) : null}
 
-              {product.video?.url ? (
+              {activeVideo?.url ? (
                 <a
-                  href={product.video.url}
+                  href={activeVideo.url}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Play className="w-4 h-4 text-amber-600 fill-amber-500" />
-                  ▶️ Assistir Vídeo
+                  ▶️ Assistir Vídeo {videoList.length > 1 ? `(${activeVideoIndex + 1})` : ''}
                 </a>
               ) : null}
 
