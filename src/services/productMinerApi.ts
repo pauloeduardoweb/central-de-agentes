@@ -40,6 +40,7 @@ export interface ProductMinerProduct {
   estimatedCommissionCents?: number | null;
   commissionRatePercent?: number | null;
   video: ProductMinerVideo | null;
+  associatedVideos?: ProductMinerVideo[];
   videoDownload?: {
     isPrepared: boolean;
     directMediaUrl?: string | null;
