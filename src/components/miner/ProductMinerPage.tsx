@@ -3264,7 +3264,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               }
             }}
           >
-            <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 md:gap-5 px-8 sm:px-10 flex-nowrap pt-1.5">
+            <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 md:gap-5 px-0 md:px-10 flex-nowrap pt-1.5">
               {CATEGORY_CONFIG.map((cat) => {
                 const isActive = selectedCategory === cat.filterKey;
                 return (
@@ -3650,12 +3650,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
 
         {/* Action group: Filtros Avançados & Adquirir Produtos */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <div className="flex flex-row items-center gap-2 flex-nowrap">
           {/* Advanced Filters Toggle Button */}
           <button
             type="button"
             onClick={() => setShowAdvancedFilters((prev) => !prev)}
-            className={`px-3.5 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
+            className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0 whitespace-nowrap ${
               showAdvancedFilters || activeFilterCount > 0
                 ? 'border-amber-400 bg-amber-50 text-amber-800 font-black'
                 : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:border-slate-300'
@@ -3675,7 +3675,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             <button
               type="button"
               onClick={() => setMode('collector')}
-              className={`px-3.5 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
+              className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0 whitespace-nowrap ${
                 mode === 'collector'
                   ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
                   : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:border-amber-300'
