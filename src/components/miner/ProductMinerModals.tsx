@@ -516,9 +516,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <h2 className="text-base sm:text-lg font-black text-slate-900 truncate">
                 Detalhes do Produto
               </h2>
-              <p className="text-[11px] text-slate-500 truncate">
-                Loja: {product.sellerName || 'TikTok Shop'}
-              </p>
             </div>
           </div>
 
@@ -564,7 +561,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 const range = getProductPriceRange(product.priceCents, product.currencySymbol);
                 if (!range) {
                   return (
-                    <div>
+                    <div className="mt-2.5">
                       <span className="text-lg sm:text-xl font-black text-emerald-700">
                         {formatMoney(product.priceCents, product.currencySymbol)}
                       </span>
@@ -572,7 +569,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   );
                 }
                 return (
-                  <div>
+                  <div className="mt-2.5">
                     <div className="flex items-center gap-1 mb-1">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 inline-block leading-none whitespace-nowrap">
                         Faixa estimada
