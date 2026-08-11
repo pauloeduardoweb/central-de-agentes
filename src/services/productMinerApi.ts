@@ -398,3 +398,32 @@ export async function runBaseReclassification(studentCode: string): Promise<Recl
   if (!response.ok) throw accessError(data);
   return data.report as ReclassificationReport;
 }
+
+export interface TrackInteractionParams {
+  productId: string;
+  eventType: 'product_open' | 'product_click';
+  query?: string;
+  category?: string;
+  subcategory?: string;
+  childCategory?: string;
+}
+
+export async function trackProductInteraction(
+  studentCode: string,
+  params: TrackInteractionParams
+): Promise<void> {
+  if (!params.productId) return;
+  try {
+    await fetch('/api/product-miner/track-interaction', {
+      method: 'POST',
+      headers: {
+        ...authHeaders(studentCode),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+  } catch (err) {
+    console.warn('[trackProductInteraction Error]', err);
+  }
+}
+
