@@ -125,106 +125,166 @@ const CLASSIFICATIONS: ClassificationItem[] = [
 export interface CategoryConfigItem {
   filterKey: string;
   label: string;
+  imageUrl: string;
   subcategories: string[];
 }
 
 export const CATEGORY_CONFIG: CategoryConfigItem[] = [
   {
-    filterKey: 'Moda',
-    label: 'Moda',
-    subcategories: [
-      'Todas',
-      'Acessórios',
-      'Malas e Mochilas',
-      'Moda Feminina',
-      'Moda Masculina',
-      'Calçados',
-    ],
+    filterKey: 'Acessórios de moda',
+    label: 'Acessórios de moda',
+    imageUrl: 'https://i.postimg.cc/N5bQfc1f/Acessorios-de-moda.png',
+    subcategories: ['Todas'],
   },
   {
-    filterKey: 'Itens para Casa',
-    label: 'Itens para Casa',
-    subcategories: [
-      'Todas',
-      'Utensílios de Cozinha',
-      'Móveis',
-      'Ferramentas',
-      'Artigos para Festas',
-      'Reforma e Construção',
-      'Itens para Banheiro',
-      'Produtos de Limpeza',
-      'Decoração de Casa',
-      'Cama, Mesa e Banho',
-    ],
+    filterKey: 'Alimentos e bebidas',
+    label: 'Alimentos e bebidas',
+    imageUrl: 'https://i.postimg.cc/vcGQsB6d/Alimentos-e-bebidas.png',
+    subcategories: ['Todas'],
   },
   {
-    filterKey: 'Eletrônicos',
-    label: 'Eletrônicos',
-    subcategories: [
-      'Todas',
-      'Celulares e Eletrônicos',
-      'Livros e Revistas',
-      'Automotivo',
-      'Computadores e Equipamentos',
-      'Dispositivos de Higiene',
-      'Eletrodomésticos',
-      'Livros e Áudio',
-    ],
+    filterKey: 'Automotivo e moto',
+    label: 'Automotivo e moto',
+    imageUrl: 'https://i.postimg.cc/N5bQfc1q/Automotivo-e-moto.png',
+    subcategories: ['Todas'],
   },
   {
-    filterKey: 'Beleza e Cuidados Pessoais',
-    label: 'Beleza e Cuidados Pessoais',
-    subcategories: [
-      'Todas',
-      'Maquiagem',
-      'Cuidados Capilares',
-      'Perfumes',
-      'Cuidados com o Corpo',
-      'Cuidados Masculinos',
-      'Cuidados com a Pele',
-    ],
+    filterKey: 'Bebê e maternidade',
+    label: 'Bebê e maternidade',
+    imageUrl: 'https://i.postimg.cc/CzJwLgb9/Bebe-e-maternidade.png',
+    subcategories: ['Todas'],
   },
   {
-    filterKey: 'Esportes e Lazer',
-    label: 'Esportes e Lazer',
-    subcategories: [
-      'Todas',
-      'Fitness',
-      'Equipamentos para Lazer',
-      'Roupas Esportivas',
-      'Acessórios para Esportes',
-      'Calçados Esportivos',
-    ],
+    filterKey: 'Beleza e cuidados pessoais',
+    label: 'Beleza e cuidados pessoais',
+    imageUrl: 'https://i.postimg.cc/svK3Drpy/Beleza-e-cuidados-pessoais.png',
+    subcategories: ['Todas'],
   },
   {
-    filterKey: 'Brinquedos e Pets',
-    label: 'Brinquedos e Pets',
-    subcategories: [
-      'Todas',
-      'Produtos para Pets',
-      'Suprimentos para Pets',
-    ],
+    filterKey: 'Brinquedos e passatempos',
+    label: 'Brinquedos e passatempos',
+    imageUrl: 'https://i.postimg.cc/Xpxn7bw0/Brinquedos-e-passatempos.png',
+    subcategories: ['Todas'],
   },
   {
-    filterKey: 'Health',
-    label: 'Health',
-    subcategories: [
-      'Todas',
-      'Health Nutrition',
-    ],
+    filterKey: 'Computadores e equipamentos de escritório',
+    label: 'Computadores e equipamentos de escritório',
+    imageUrl: 'https://i.postimg.cc/QHSjx3cw/Computadores-e-equipamentos-de-escritorio.png',
+    subcategories: ['Todas'],
   },
   {
-    filterKey: 'Infantil',
-    label: 'Infantil',
-    subcategories: [
-      'Todas',
-      'Bebês',
-      'Moda Infantil',
-      'Calçados',
-      'Brinquedos',
-      'Cuidados',
-      'Acessórios',
-    ],
+    filterKey: 'Eletrodomésticos',
+    label: 'Eletrodomésticos',
+    imageUrl: 'https://i.postimg.cc/yk7VHd32/Eletrodomesticos.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Esportes e atividades ao ar livre',
+    label: 'Esportes e atividades ao ar livre',
+    imageUrl: 'https://i.postimg.cc/fJ5MTNxN/Esportes-e-atividades-ao-ar-livre.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Ferramentas e hardware',
+    label: 'Ferramentas e hardware',
+    imageUrl: 'https://i.postimg.cc/RNGvVBwY/Ferramentas-e-hardware.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Joias, acessórios e derivados',
+    label: 'Joias, acessórios e derivados',
+    imageUrl: 'https://i.postimg.cc/yk7VHd3L/Joias-acessorios-e-derivados.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Livros, revistas e áudios',
+    label: 'Livros, revistas e áudios',
+    imageUrl: 'https://i.postimg.cc/tY9XjTnL/Livros-revistas-e-audios.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Malas e bolsas',
+    label: 'Malas e bolsas',
+    imageUrl: 'https://i.postimg.cc/KRQmv2nh/Malas-e-bolsas.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Moda muçulmana',
+    label: 'Moda muçulmana',
+    imageUrl: 'https://i.postimg.cc/hfKSBj7W/Moda-muculmana.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Moda para crianças',
+    label: 'Moda para crianças',
+    imageUrl: 'https://i.postimg.cc/JGKR4Lbw/Moda-para-criancas.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Móveis',
+    label: 'Móveis',
+    imageUrl: 'https://i.postimg.cc/VdzY860T/Moveis.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Reformas residenciais',
+    label: 'Reformas residenciais',
+    imageUrl: 'https://i.postimg.cc/zVqJrBRY/Reformas-residenciais.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Roupas femininas e roupas íntimas femininas',
+    label: 'Roupas femininas e roupas íntimas femininas',
+    imageUrl: 'https://i.postimg.cc/bsLqNhQv/Roupas-femininas-e-roupas-intimas-femininas.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Roupas masculinas e roupas íntimas masculinas',
+    label: 'Roupas masculinas e roupas íntimas masculinas',
+    imageUrl: 'https://i.postimg.cc/hfMKPB9t/Roupas-masculinas-e-roupas-intimas-masculinas.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Sapatos',
+    label: 'Sapatos',
+    imageUrl: 'https://i.postimg.cc/mtVT2sQ4/Sapatos.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Saúde',
+    label: 'Saúde',
+    imageUrl: 'https://i.postimg.cc/SJmyhsYP/Saude.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Suprimentos domésticos',
+    label: 'Suprimentos domésticos',
+    imageUrl: 'https://i.postimg.cc/Vd4zL8jz/Suprimentos-domesticos.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Suprimentos para animais de estimação',
+    label: 'Suprimentos para animais de estimação',
+    imageUrl: 'https://i.postimg.cc/crdsSH8S/Suprimentos-para-animais-de-estimacao.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Telefones e eletrônicos',
+    label: 'Telefones e eletrônicos',
+    imageUrl: 'https://i.postimg.cc/Xpxn7bwN/Telefones-e-eletronicos.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Têxteis e móveis',
+    label: 'Têxteis e móveis',
+    imageUrl: 'https://i.postimg.cc/vcXGHs5j/Texteis-e-moveis.png',
+    subcategories: ['Todas'],
+  },
+  {
+    filterKey: 'Utensílios de cozinha',
+    label: 'Utensílios de cozinha',
+    imageUrl: 'https://i.postimg.cc/tYD9CjFL/Utensilios-de-cozinha.png',
+    subcategories: ['Todas'],
   },
 ];
 
@@ -324,79 +384,48 @@ function matchesCategoryFilter(
   selectedCat: string,
   productTitleRaw?: string | null
 ): boolean {
-  if (!selectedCat || selectedCat === 'Todos') return true;
+  if (!selectedCat || selectedCat === 'Todos' || selectedCat === 'Todas') return true;
+  if (!productCatRaw && !productTitleRaw) return false;
 
   const target = selectedCat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const cat = (productCatRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  if (target === 'infantil') {
-    const cat = (productCatRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-    // 1. Structured category metadata check
-    const structuredMatch =
-      cat.includes('infantil') ||
-      cat.includes('bebe') ||
-      cat.includes('bebes') ||
-      cat.includes('crianca') ||
-      cat.includes('criancas') ||
-      cat.includes('kids') ||
-      cat.includes('baby') ||
-      cat.includes('maternidade');
-
-    if (structuredMatch) return true;
-
-    // 2. Unambiguous title terms fallback
-    const title = (productTitleRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const titleMatch =
-      title.includes('infantil') ||
-      title.includes('bebe') ||
-      title.includes('bebes') ||
-      title.includes('crianca') ||
-      title.includes('criancas') ||
-      title.includes('recem nascido') ||
-      title.includes('recem-nascido') ||
-      title.includes('maternidade') ||
-      title.includes('body bebe') ||
-      title.includes('macacao bebe') ||
-      title.includes('sapatinho bebe') ||
-      title.includes('mamadeira') ||
-      title.includes('chupeta') ||
-      title.includes('fralda') ||
-      title.includes('carrinho de bebe') ||
-      title.includes('berco') ||
-      title.includes('moda infantil') ||
-      title.includes('calcado infantil') ||
-      title.includes('brinquedo infantil') ||
-      title.includes('roupa infantil');
-
-    return titleMatch;
+  if (cat && (cat === target || cat.includes(target) || target.includes(cat))) {
+    return true;
   }
 
-  if (!productCatRaw) return false;
-  const cat = productCatRaw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Fallback checks for title + category text against legacy or keywords
+  const title = (productTitleRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const text = `${cat} ${title}`;
 
-  if (target === 'moda') {
-    return cat.includes('moda') || cat.includes('vestuario') || cat.includes('roupa') || cat.includes('calçado');
-  }
-  if (target.includes('casa')) {
-    return cat.includes('casa') || cat.includes('cozinha') || cat.includes('lar') || cat.includes('decoracao');
-  }
-  if (target.includes('eletronicos')) {
-    return cat.includes('eletronico') || cat.includes('tecnologia') || cat.includes('gadget') || cat.includes('celular') || cat.includes('fone');
-  }
-  if (target.includes('beleza')) {
-    return cat.includes('beleza') || cat.includes('pessoal') || cat.includes('cosmetico') || cat.includes('skincare') || cat.includes('cabelo') || cat.includes('maquiagem');
-  }
-  if (target.includes('esporte')) {
-    return cat.includes('esporte') || cat.includes('fitness') || cat.includes('lazer') || cat.includes('treino') || cat.includes('academia');
-  }
-  if (target.includes('brinquedos') || target.includes('pets')) {
-    return cat.includes('pet') || cat.includes('brinquedo') || cat.includes('bebe') || cat.includes('infantil') || cat.includes('animais');
-  }
-  if (target.includes('health')) {
-    return cat.includes('health') || cat.includes('saude') || cat.includes('suplemento') || cat.includes('vitamina');
-  }
+  if (target.includes('saude')) return text.includes('saude') || text.includes('creatina') || text.includes('suplemento') || text.includes('vitamina') || text.includes('health');
+  if (target.includes('animais') || target.includes('estima')) return text.includes('pet') || text.includes('cachorro') || text.includes('gato') || text.includes('racao') || text.includes('animais');
+  if (target.includes('bebe') && target.includes('maternidade')) return text.includes('bebe') || text.includes('maternidade') || text.includes('fralda') || text.includes('berco');
+  if (target.includes('criancas')) return text.includes('infantil') || text.includes('crianca') || text.includes('kids') || text.includes('brinquedo');
+  if (target.includes('alimentos') || target.includes('bebidas')) return text.includes('alimento') || text.includes('comida') || text.includes('bebida') || text.includes('snack');
+  if (target.includes('beleza') || target.includes('cuidados')) return text.includes('beleza') || text.includes('maquiagem') || text.includes('skincare') || text.includes('cabelo') || text.includes('perfume') || text.includes('corpo');
+  if (target.includes('telefones') || target.includes('eletronicos')) return text.includes('eletronico') || text.includes('celular') || text.includes('fone') || text.includes('smartphone') || text.includes('tecnologia');
+  if (target.includes('computadores')) return text.includes('computador') || text.includes('notebook') || text.includes('teclado') || text.includes('mouse') || text.includes('escritorio');
+  if (target.includes('eletrodomesticos')) return text.includes('eletrodomestico') || text.includes('air fryer') || text.includes('liquidificador') || text.includes('aspirador');
+  if (target.includes('automotivo') || target.includes('moto')) return text.includes('automotivo') || text.includes('carro') || text.includes('moto') || text.includes('capacete');
+  if (target.includes('esportes') || target.includes('livre')) return text.includes('esporte') || text.includes('fitness') || text.includes('treino') || text.includes('academia') || text.includes('lazer');
+  if (target.includes('ferramentas') || target.includes('hardware')) return text.includes('ferramenta') || text.includes('furadeira') || text.includes('alicate') || text.includes('chave');
+  if (target.includes('joias')) return text.includes('joia') || text.includes('brinco') || text.includes('colar') || text.includes('anel') || text.includes('pulseira');
+  if (target.includes('livros')) return text.includes('livro') || text.includes('revista') || text.includes('kindle') || text.includes('audio');
+  if (target.includes('malas') || target.includes('bolsas')) return text.includes('mala') || text.includes('mochila') || text.includes('bolsa') || text.includes('carteira');
+  if (target.includes('muculmana')) return text.includes('hijab') || text.includes('abaya') || text.includes('muculmana');
+  if (target.includes('moveis')) return text.includes('movel') || text.includes('cadeira') || text.includes('mesa') || text.includes('sofa');
+  if (target.includes('reformas')) return text.includes('reforma') || text.includes('construcao') || text.includes('lampada') || text.includes('torneira');
+  if (target.includes('femininas')) return text.includes('vestido') || text.includes('saia') || text.includes('lingerie') || text.includes('feminina');
+  if (target.includes('masculinas')) return text.includes('camisa') || text.includes('cueca') || text.includes('masculina') || text.includes('bermuda');
+  if (target.includes('sapatos')) return text.includes('sapato') || text.includes('tenis') || text.includes('sandalia') || text.includes('calcado') || text.includes('bota');
+  if (target.includes('domesticos')) return text.includes('limpeza') || text.includes('sabao') || text.includes('mop') || text.includes('domestico');
+  if (target.includes('brinquedos') || target.includes('passatempos')) return text.includes('brinquedo') || text.includes('jogo') || text.includes('boneca') || text.includes('quebra-cabeca');
+  if (target.includes('acessorios de moda')) return text.includes('cinto') || text.includes('oculos') || text.includes('relogio') || text.includes('chapeu');
+  if (target.includes('texteis')) return text.includes('cama') || text.includes('lencol') || text.includes('toalha') || text.includes('cortina');
+  if (target.includes('cozinha')) return text.includes('panela') || text.includes('frigideira') || text.includes('utensilio') || text.includes('copo') || text.includes('prato');
 
-  return cat.includes(target);
+  return false;
 }
 
 function matchesSubcategoryFilter(
@@ -1733,13 +1762,25 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       setSelectedSubcategory('Todas');
                     }
                   }}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-xl text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap flex items-center gap-2 ${
                     isActive
                       ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
                       : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-200/80'
                   }`}
                 >
-                  {cat.label}
+                  {cat.imageUrl && (
+                    <img
+                      src={cat.imageUrl}
+                      alt={cat.label}
+                      className="w-5 h-5 rounded-md object-cover shrink-0 border border-slate-200/50"
+                      loading="lazy"
+                      decoding="async"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <span>{cat.label}</span>
                 </button>
               );
             })}
@@ -2209,7 +2250,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <div className="flex items-center gap-2 text-xs shrink-0">
                 <span className="px-3.5 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 font-extrabold flex items-center gap-1.5 shadow-sm">
                   <Layers className="w-4 h-4 text-amber-600" />
-                  8 Categorias do Minerador
+                  {CATEGORY_CONFIG.length} Categorias do Minerador
                 </span>
               </div>
             </div>
@@ -2239,7 +2280,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 }`}
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>🔄 Atualizar Base (Reciclar 8 Categorias)</span>
+                <span>🔄 Atualizar Base (Reciclar {CATEGORY_CONFIG.length} Categorias)</span>
               </button>
             </div>
           </div>
@@ -2255,7 +2296,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     <span>Organização Automática da Base Existente (~1.495 produtos)</span>
                   </div>
                   <p className="text-xs text-amber-800/80 mt-1 max-w-2xl">
-                    Sua base possui produtos armazenados no MySQL. Clique para reclassificá-los e distribuí-los automaticamente entre as 8 categorias e subcategorias sem chamar o SocialCrawl (<strong>0 créditos consumidos</strong>).
+                    Sua base possui produtos armazenados no MySQL. Clique para reclassificá-los e distribuí-los automaticamente entre as {CATEGORY_CONFIG.length} categorias e subcategorias sem chamar o SocialCrawl (<strong>0 créditos consumidos</strong>).
                   </p>
                 </div>
 
@@ -2369,7 +2410,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div>
                     <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-amber-600" /> 2. Avanço e Cobertura das 8 Categorias do Minerador
+                      <Layers className="w-4 h-4 text-amber-600" /> 2. Avanço e Cobertura das {CATEGORY_CONFIG.length} Categorias do Minerador
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Monitore a quantidade armazenada, cobertura de subcategorias e selecione os escopos para expansão
@@ -2383,7 +2424,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   >
                     {selectedExpansionCategories.length === CATEGORY_CONFIG.length
                       ? 'Desmarcar Todas'
-                      : 'Selecionar Todas (8)'}
+                      : `Selecionar Todas (${CATEGORY_CONFIG.length})`}
                   </button>
                 </div>
 
@@ -2417,10 +2458,23 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                               className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 shrink-0"
                             />
 
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="p-1.5 rounded-lg bg-white border border-slate-200 shrink-0">
-                                {getCategoryIcon(catConfig.filterKey)}
-                              </div>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {catConfig.imageUrl ? (
+                                <img
+                                  src={catConfig.imageUrl}
+                                  alt={catConfig.filterKey}
+                                  className="w-7 h-7 rounded-lg object-cover shrink-0 border border-slate-200"
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="p-1.5 rounded-lg bg-white border border-slate-200 shrink-0">
+                                  {getCategoryIcon(catConfig.filterKey)}
+                                </div>
+                              )}
                               <span className="font-extrabold text-sm text-slate-900 truncate">
                                 {catConfig.filterKey}
                               </span>
@@ -2599,13 +2653,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   <div>
                     <div className="flex items-center gap-2 text-amber-700 text-xs font-black uppercase tracking-wider">
                       <RefreshCw className={`w-4 h-4 text-amber-600 ${isDailyRefreshing ? 'animate-spin' : ''}`} />
-                      Atualização Diária da Base • 8 Categorias
+                      Atualização Diária da Base • {CATEGORY_CONFIG.length} Categorias
                     </div>
                     <h3 className="mt-1 text-lg font-black text-slate-900">
                       Atualizar Todas as Categorias em Sequência
                     </h3>
                     <p className="mt-1 text-xs text-slate-600 max-w-2xl">
-                      Varre e recicla as 8 categorias do Minerador no TikTok Shop em lote (Moda, Itens para Casa, Eletrônicos, Beleza e Cuidados Pessoais, Esportes e Lazer, Brinquedos e Pets, Health, Infantil), mantendo ranking, score e ordenações atualizados.
+                      Varre e recicla as {CATEGORY_CONFIG.length} categorias do Minerador no TikTok Shop em lote, mantendo ranking, score e ordenações atualizados.
                     </p>
                   </div>
 
@@ -2624,7 +2678,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     {isDailyRefreshing ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Atualizando base ({dailyStatus?.categoriesProcessed ?? 0}/8)...</span>
+                        <span>Atualizando base ({dailyStatus?.categoriesProcessed ?? 0}/{CATEGORY_CONFIG.length})...</span>
                       </>
                     ) : dailyStatus?.isCooldownActive ? (
                       <>
@@ -2634,7 +2688,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     ) : (
                       <>
                         <RefreshCw className="w-4 h-4" />
-                        <span>🔄 Atualizar 8 Categorias Diárias (~80 créditos)</span>
+                        <span>🔄 Atualizar {CATEGORY_CONFIG.length} Categorias Diárias (~80 créditos)</span>
                       </>
                     )}
                   </button>
