@@ -347,7 +347,7 @@ export interface AuditLogEntry {
   id: number;
   targetAccessKeyId?: number;
   targetMaskedKey: string;
-  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK' | 'ACTIVATED_MINER' | 'DEACTIVATED_MINER';
+  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK' | 'ACTIVATED_MINER' | 'DEACTIVATED_MINER' | 'ACTIVATED_MINER_ALL';
   reason?: string;
   adminIdentifier: string;
   ipAddress: string;
@@ -427,7 +427,7 @@ loadKeyStatusStore();
 
 export async function recordAdminAuditAction(
   targetKey: string,
-  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK' | 'ACTIVATED_MINER' | 'DEACTIVATED_MINER',
+  actionType: 'DISCONNECT' | 'SUSPEND' | 'REACTIVATE' | 'BAN' | 'DISCONNECT_ALL_SESSIONS' | 'UNLINK' | 'ACTIVATED_MINER' | 'DEACTIVATED_MINER' | 'ACTIVATED_MINER_ALL',
   reason?: string,
   ipAddress?: string
 ): Promise<void> {
@@ -1218,6 +1218,7 @@ export async function getCentralPresenceData() {
             lastAction: recentAction,
             disconnectSource: (!hasActiveSession && r.disconnected_at && r.disconnect_source && ['MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT'].includes(r.disconnect_source)) ? r.disconnect_source : null,
             disconnectedAt: (!hasActiveSession && r.disconnected_at && r.disconnect_source && ['MENTOR_SINGLE', 'MENTOR_ALL', 'STUDENT_LOGOUT'].includes(r.disconnect_source)) ? new Date(r.disconnected_at).toISOString() : null,
+            hasAccessed: true,
           });
         }
       }
@@ -1313,6 +1314,7 @@ export async function getCentralPresenceData() {
               tempoOnlineFormatted: '—',
               lastActivityFormatted: r.last_heartbeat_at ? formatLastActivity(new Date(r.last_heartbeat_at).getTime()) : (r.last_admin_action_at ? formatLastActivity(new Date(r.last_admin_action_at).getTime()) : '—'),
               recentAction: accStat === 'SUSPENDED' ? 'Suspenso' : accStat === 'BANNED' ? 'Banido' : (r.last_admin_action === 'DISCONNECT' ? 'Encerrado pelo Mentor' : 'Offline'),
+              hasAccessed: Boolean(r.session_id),
             });
           }
         }
@@ -1366,6 +1368,7 @@ export async function getCentralPresenceData() {
           loginAt: memSession.startedAt.toISOString(),
           lastActivity: memSession.lastHeartbeatAt.toISOString(),
           connectedTime: formatConnectedTime(memSession.startedAt),
+          hasAccessed: true,
         });
       }
     }
@@ -1415,6 +1418,7 @@ export async function getCentralPresenceData() {
         tempoOnlineFormatted: '—',
         lastActivityFormatted: '—',
         recentAction: accStat === 'SUSPENDED' ? 'Suspenso' : accStat === 'BANNED' ? 'Banido' : 'Offline',
+        hasAccessed: false,
       });
     }
   }

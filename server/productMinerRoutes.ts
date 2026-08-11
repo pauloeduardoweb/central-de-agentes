@@ -233,6 +233,51 @@ productMinerRouter.post('/admin/toggle', async (req, res) => {
   }
 });
 
+// ADMIN: Enable Product Miner access for ALL eligible students currently without access
+productMinerRouter.post('/admin/activate-all', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    let activatedCount = 0;
+
+    if (isDatabaseConfigured()) {
+      await ensureCodigosAcessoTable();
+      const [result]: any = await db.query(
+        `UPDATE codigos_acesso
+         SET 
+           product_miner_enabled = 1,
+           product_miner_enabled_at = NOW(),
+           product_miner_enabled_by = 'SESSION_MASTER'
+         WHERE (product_miner_enabled = 0 OR product_miner_enabled IS NULL)`
+      );
+      activatedCount = result?.affectedRows || result?.changedRows || 0;
+    }
+
+    // Update memory status for keys in memory
+    for (const [code, status] of memoryKeyStatusMap.entries()) {
+      if (!status.productMinerEnabled) {
+        memoryKeyStatusMap.set(code, {
+          ...status,
+          productMinerEnabled: true,
+          productMinerEnabledAt: new Date().toISOString(),
+          productMinerEnabledBy: 'SESSION_MASTER',
+        });
+      }
+    }
+
+    const clientIp = getClientIp(req);
+    await recordAdminAuditAction('ALL_STUDENTS', 'ACTIVATED_MINER_ALL', 'Acesso ao Minerador ativado para todos os alunos pelo Mentor', clientIp).catch(() => {});
+
+    return res.json({
+      success: true,
+      activatedCount,
+      message: 'Acesso ao Minerador ativado com sucesso para todos os alunos sem acesso!',
+    });
+  } catch (err: any) {
+    console.error('[Admin Miner Activate All Error]:', err?.message || err);
+    return res.status(500).json({ error: 'SERVER_ERROR', message: 'Erro ao liberar acesso ao minerador em massa.' });
+  }
+});
+
 // ADMIN: Reclassify existing local products into categories without calling SocialCrawl or consuming credits
 productMinerRouter.post('/admin/reclassify', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
