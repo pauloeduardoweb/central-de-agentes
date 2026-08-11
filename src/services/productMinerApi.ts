@@ -33,6 +33,9 @@ export interface ProductMinerProduct {
   sellerName: string | null;
   productUrl: string | null;
   category: string | null;
+  description?: string | null;
+  productDescription?: string | null;
+  variants?: any;
   lastSeenAt?: string | null;
   estimatedCommissionCents?: number | null;
   commissionRatePercent?: number | null;
