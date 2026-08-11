@@ -1296,6 +1296,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
+  const categoriesScrollRef = React.useRef<HTMLDivElement>(null);
   const subcatScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollContainer = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
     if (ref.current) {
@@ -1738,53 +1739,77 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
 
         {/* Categories Pills Bar */}
-        <div
-          className="w-full overflow-x-auto overflow-y-hidden scrollbar-none pb-1"
-          onWheel={(e) => {
-            if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
-              e.currentTarget.scrollLeft += e.deltaY;
-            }
-          }}
-        >
-          <div className="flex w-max min-w-max items-center gap-1.5 pr-6">
-            {CATEGORY_CONFIG.map((cat) => {
-              const isActive = selectedCategory === cat.filterKey;
-              return (
-                <button
-                  key={cat.filterKey}
-                  type="button"
-                  onClick={() => {
-                    if (isActive) {
-                      setSelectedCategory('Todos');
-                      setSelectedSubcategory('Todas');
-                    } else {
-                      setSelectedCategory(cat.filterKey);
-                      setSelectedSubcategory('Todas');
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap flex items-center gap-2 ${
-                    isActive
-                      ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
-                      : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-200/80'
-                  }`}
-                >
-                  {cat.imageUrl && (
-                    <img
-                      src={cat.imageUrl}
-                      alt={cat.label}
-                      className="w-5 h-5 rounded-md object-cover shrink-0 border border-slate-200/50"
-                      loading="lazy"
-                      decoding="async"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  )}
-                  <span>{cat.label}</span>
-                </button>
-              );
-            })}
+        <div className="relative group/catnav">
+          {/* Desktop Scroll Left Arrow */}
+          <button
+            type="button"
+            onClick={() => scrollContainer(categoriesScrollRef, 'left')}
+            className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+            title="Rolar categorias para esquerda"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div
+            ref={categoriesScrollRef}
+            className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1 scroll-smooth touch-pan-x"
+            onWheel={(e) => {
+              if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+          >
+            <div className="flex w-max min-w-max items-center gap-1.5 pr-12 md:pr-20 flex-nowrap">
+              {CATEGORY_CONFIG.map((cat) => {
+                const isActive = selectedCategory === cat.filterKey;
+                return (
+                  <button
+                    key={cat.filterKey}
+                    type="button"
+                    onClick={() => {
+                      if (isActive) {
+                        setSelectedCategory('Todos');
+                        setSelectedSubcategory('Todas');
+                      } else {
+                        setSelectedCategory(cat.filterKey);
+                        setSelectedSubcategory('Todas');
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap flex items-center gap-2 ${
+                      isActive
+                        ? 'border-amber-500 bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20 font-black'
+                        : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-200/80'
+                    }`}
+                  >
+                    {cat.imageUrl && (
+                      <img
+                        src={cat.imageUrl}
+                        alt={cat.label}
+                        referrerPolicy="no-referrer"
+                        className="w-6 h-6 rounded-md object-contain shrink-0 border border-slate-200/60 bg-white p-0.5 shadow-2xs"
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Desktop Scroll Right Arrow */}
+          <button
+            type="button"
+            onClick={() => scrollContainer(categoriesScrollRef, 'right')}
+            className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+            title="Rolar categorias para direita"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Subcategories Horizontal Scroll Row (Renders when a main category is selected) */}
@@ -2463,7 +2488,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                                 <img
                                   src={catConfig.imageUrl}
                                   alt={catConfig.filterKey}
-                                  className="w-7 h-7 rounded-lg object-cover shrink-0 border border-slate-200"
+                                  referrerPolicy="no-referrer"
+                                  className="w-7 h-7 rounded-lg object-contain bg-white p-0.5 shrink-0 border border-slate-200"
                                   loading="lazy"
                                   decoding="async"
                                   onError={(e) => {
