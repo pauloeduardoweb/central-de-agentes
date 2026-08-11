@@ -40,6 +40,8 @@ export const MentorMinerAccess: React.FC<MentorMinerAccessProps> = ({ studentCod
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ENABLED' | 'DISABLED'>('ALL');
   const [showFullKeys, setShowFullKeys] = useState<boolean>(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [showActivateAllModal, setShowActivateAllModal] = useState<boolean>(false);
+  const [activatingAll, setActivatingAll] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const triggerToast = (msg: string) => {
@@ -122,6 +124,43 @@ export const MentorMinerAccess: React.FC<MentorMinerAccessProps> = ({ studentCod
     }
   };
 
+  const handleActivateAll = async () => {
+    if (activatingAll) return;
+    setActivatingAll(true);
+    try {
+      const res = await fetch('/api/product-miner/admin/activate-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-student-access-code': studentCode,
+          'x-access-code': studentCode,
+          'x-master-key': studentCode,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        triggerToast(data.message || 'Acesso ao Minerador ativado para todos os alunos!');
+        const nowIso = new Date().toISOString();
+        setStudents((prev) =>
+          prev.map((s) => ({
+            ...s,
+            productMinerEnabled: true,
+            productMinerEnabledAt: s.productMinerEnabled ? s.productMinerEnabledAt : nowIso,
+          }))
+        );
+        setShowActivateAllModal(false);
+      } else {
+        triggerToast(data.message || 'Erro ao liberar minerador em massa.');
+      }
+    } catch (err) {
+      console.error('[Activate All Error]:', err);
+      triggerToast('Falha na comunicação com o servidor.');
+    } finally {
+      setActivatingAll(false);
+    }
+  };
+
   const filteredStudents = students.filter((student) => {
     const term = searchTerm.toLowerCase().trim();
     const matchesSearch =
@@ -191,15 +230,29 @@ export const MentorMinerAccess: React.FC<MentorMinerAccessProps> = ({ studentCod
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={loadStudents}
-            disabled={loading}
-            className="px-3.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center justify-center space-x-2 transition-all shrink-0 cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Atualizar Lista</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {disabledCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowActivateAllModal(true)}
+                disabled={loading || activatingAll}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center justify-center space-x-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                <Sparkles className="w-4 h-4 fill-current" />
+                <span>Ativar todos</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={loadStudents}
+              disabled={loading}
+              className="px-3.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center justify-center space-x-2 transition-all shrink-0 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>Atualizar Lista</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -411,6 +464,54 @@ export const MentorMinerAccess: React.FC<MentorMinerAccessProps> = ({ studentCod
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal for Ativar Todos */}
+      {showActivateAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-[#0a192f] border border-amber-500/40 p-5 shadow-2xl space-y-4 text-white">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-white">Liberar Minerador para Todos</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Deseja liberar o Minerador para todos os alunos atualmente sem acesso?
+                </p>
+                <p className="text-[11px] text-amber-300/80 pt-1">
+                  {disabledCount} {disabledCount === 1 ? 'aluno será ativado' : 'alunos serão ativados'} imediatamente. Alunos que já possuem acesso não serão alterados.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowActivateAllModal(false)}
+                disabled={activatingAll}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleActivateAll}
+                disabled={activatingAll}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {activatingAll ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Ativando...</span>
+                  </>
+                ) : (
+                  <span>Ativar todos</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

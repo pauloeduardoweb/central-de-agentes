@@ -57,6 +57,7 @@ export interface OnlineUser {
   disconnectSource?: string;
   disconnectedAt?: string;
   hasActiveSession?: boolean;
+  hasAccessed?: boolean;
   suspensionReason?: string;
   suspendedAt?: string;
   bannedReason?: string;
@@ -746,8 +747,11 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
   const isUserAusente = (u: OnlineUser) => isUserActive(u) && Boolean(u.hasActiveSession) && u.status === 'Ausente';
   const isUserOffline = (u: OnlineUser) => isUserActive(u) && (u.status === 'Offline' || !u.hasActiveSession);
 
+  // Filter Monitored Users (only users/keys that have accessed the app at least once)
+  const monitoredUsers = users.filter((u) => u.hasAccessed ?? Boolean(u.sessionRecordId || u.loginAt || (u.connectedTime && u.connectedTime !== '—')));
+
   // Filter Users
-  const filteredUsers = users.filter((u) => {
+  const filteredUsers = monitoredUsers.filter((u) => {
     const isSuspended = u.accessStatus === 'SUSPENDED';
     const isBanned = u.accessStatus === 'BANNED';
 
@@ -1566,7 +1570,7 @@ export const MentorOnlineMonitoring: React.FC<MentorOnlineMonitoringProps> = ({ 
             <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
             <span>Sessão MASTER ativa do Mentor Bigode. Todas as ações são auditadas.</span>
           </div>
-          <span>Exibindo {filteredUsers.length} de {users.length} alunos monitorados</span>
+          <span>Exibindo {filteredUsers.length} de {monitoredUsers.length} alunos monitorados</span>
         </div>
       </div>
 
