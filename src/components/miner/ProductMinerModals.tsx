@@ -379,29 +379,16 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
         </div>
 
         {/* Author / Creator info */}
-        <div className="mt-4 p-3 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center font-bold text-amber-900 text-sm">
-              @
-            </div>
-            <div>
-              <div className="text-xs font-bold text-amber-950">@{video.author || 'criador'}</div>
-              <div className="text-[10px] text-slate-500">
-                {video.authorFollowers ? `${compactNumber(video.authorFollowers)} seguidores` : 'Creator do TikTok Shop'}
-              </div>
+        <div className="mt-4 p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300/80 flex items-center justify-center font-bold text-amber-900 text-sm shrink-0 shadow-2xs">
+            @
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold text-amber-950 truncate">@{video.author || 'criador'}</div>
+            <div className="text-xs text-slate-500 font-medium mt-0.5">
+              {video.authorFollowers ? `${compactNumber(video.authorFollowers)} seguidores` : 'Creator do TikTok Shop'}
             </div>
           </div>
-
-          {video.url ? (
-            <a
-              href={video.url}
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 shadow-sm"
-            >
-              Ver no TikTok <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          ) : null}
         </div>
 
         {/* Metrics Grid */}
