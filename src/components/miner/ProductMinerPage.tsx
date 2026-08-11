@@ -3090,7 +3090,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     (viralVideoOnly ? 1 : 0);
 
   return (
-    <section className="space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
+    <section className="space-y-2 sm:space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
       {/* ================================================== */}
       {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (9 CLASSIFICATIONS)  */}
       {/* ================================================== */}
@@ -3536,10 +3536,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* 3 — MODES & ADVANCED FILTERS BAR                   */}
       {/* ================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="inline-flex p-1 rounded-xl border border-slate-200 bg-white shadow-sm self-start flex-wrap gap-1">
+        {/* Superior group: Pesquisa & Meus Favoritos */}
+        <div className="inline-flex p-1 rounded-xl border border-slate-200 bg-white shadow-xs self-start items-center gap-1">
           <button
             onClick={() => setMode('search')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mode === 'search'
                 ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
                 : 'text-slate-600 hover:text-slate-900'
@@ -3551,7 +3552,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           <button
             onClick={() => setMode('favorites')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mode === 'favorites'
                 ? 'bg-rose-500/15 text-rose-800 font-black border border-rose-300/60'
                 : 'text-slate-600 hover:text-slate-900'
@@ -3565,31 +3566,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </span>
             )}
           </button>
-
-          {canRefresh ? (
-            <button
-              onClick={() => setMode('collector')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
-                mode === 'collector'
-                  ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5 text-amber-600" />
-              Adquirir Produtos
-            </button>
-          ) : null}
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Action group: Filtros Avançados & Adquirir Produtos */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {/* Advanced Filters Toggle Button */}
           <button
             type="button"
             onClick={() => setShowAdvancedFilters((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
               showAdvancedFilters || activeFilterCount > 0
-                ? 'border-amber-400 bg-amber-50 text-amber-800'
-                : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900'
+                ? 'border-amber-400 bg-amber-50 text-amber-800 font-black'
+                : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:border-slate-300'
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -3601,6 +3589,21 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             ) : null}
             {showAdvancedFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
+
+          {canRefresh ? (
+            <button
+              type="button"
+              onClick={() => setMode('collector')}
+              className={`px-3.5 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
+                mode === 'collector'
+                  ? 'bg-amber-500/15 text-amber-800 font-black border border-amber-300/60'
+                  : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:border-amber-300'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-600" />
+              <span>Adquirir Produtos</span>
+            </button>
+          ) : null}
         </div>
       </div>
 
