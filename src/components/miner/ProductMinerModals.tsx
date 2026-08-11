@@ -379,14 +379,16 @@ export const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({
         </div>
 
         {/* Author / Creator info */}
-        <div className="mt-4 p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300/80 flex items-center justify-center font-bold text-amber-900 text-sm shrink-0 shadow-2xs">
-            @
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold text-amber-950 truncate">@{video.author || 'criador'}</div>
-            <div className="text-xs text-slate-500 font-medium mt-0.5">
-              {video.authorFollowers ? `${compactNumber(video.authorFollowers)} seguidores` : 'Creator do TikTok Shop'}
+        <div className="mt-4 p-3 rounded-xl border border-amber-200 bg-amber-50/60 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center font-bold text-amber-900 text-sm">
+              @
+            </div>
+            <div>
+              <div className="text-xs font-bold text-amber-950">@{video.author || 'criador'}</div>
+              <div className="text-[10px] text-slate-500">
+                {video.authorFollowers ? `${compactNumber(video.authorFollowers)} seguidores` : 'Creator do TikTok Shop'}
+              </div>
             </div>
           </div>
         </div>
@@ -715,7 +717,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {activeVideo ? (
             <div className="p-3.5 sm:p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-3">
               <div className="flex items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
-                <div className="flex items-center gap-2 truncate">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
                     📹 Criador: @{activeVideo.author || 'creator'}
                   </span>
