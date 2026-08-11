@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import {
   Search, Flame, ShoppingBag, Star, Store, ExternalLink, Play, Eye, Heart,
   MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap, RefreshCw,
@@ -1198,6 +1198,65 @@ const ProductCard: React.FC<{
 };
 
 
+function useDragToScroll<T extends HTMLElement = HTMLDivElement>() {
+  const ref = useRef<T>(null);
+  const isMouseDownRef = useRef(false);
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const onMouseDown = useCallback((e: React.MouseEvent<T>) => {
+    if (e.button !== 0 || !ref.current) return;
+    isMouseDownRef.current = true;
+    isDraggingRef.current = false;
+    startXRef.current = e.pageX - ref.current.offsetLeft;
+    scrollLeftRef.current = ref.current.scrollLeft;
+  }, []);
+
+  const onMouseMove = useCallback((e: React.MouseEvent<T>) => {
+    if (!isMouseDownRef.current || !ref.current) return;
+    const x = e.pageX - ref.current.offsetLeft;
+    const walk = x - startXRef.current;
+    if (Math.abs(walk) > 5) {
+      if (!isDraggingRef.current) {
+        isDraggingRef.current = true;
+        setIsDragging(true);
+      }
+      e.preventDefault();
+      ref.current.scrollLeft = scrollLeftRef.current - walk;
+    }
+  }, []);
+
+  const onMouseUp = useCallback(() => {
+    if (!isMouseDownRef.current) return;
+    isMouseDownRef.current = false;
+    setTimeout(() => {
+      isDraggingRef.current = false;
+      setIsDragging(false);
+    }, 50);
+  }, []);
+
+  const onClickCapture = useCallback((e: React.MouseEvent<T>) => {
+    if (isDraggingRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, []);
+
+  return {
+    ref,
+    isDragging,
+    bind: {
+      onMouseDown,
+      onMouseMove,
+      onMouseUp,
+      onMouseLeave: onMouseUp,
+      onClickCapture,
+    },
+  };
+}
+
 export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   studentCode,
   canRefresh = false,
@@ -1438,10 +1497,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
-  const categoriesScrollRef = React.useRef<HTMLDivElement>(null);
-  const subcatScrollRef = React.useRef<HTMLDivElement>(null);
-  const visualSubScrollRef = React.useRef<HTMLDivElement>(null);
-  const childSubScrollRef = React.useRef<HTMLDivElement>(null);
+  const catDrag = useDragToScroll<HTMLDivElement>();
+  const subcatDrag = useDragToScroll<HTMLDivElement>();
+  const visSubDrag = useDragToScroll<HTMLDivElement>();
+  const childSubDrag = useDragToScroll<HTMLDivElement>();
+
+  const categoriesScrollRef = catDrag.ref;
+  const subcatScrollRef = subcatDrag.ref;
+  const visualSubScrollRef = visSubDrag.ref;
+  const childSubScrollRef = childSubDrag.ref;
   const scrollContainer = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
     if (ref.current) {
       ref.current.scrollBy({
@@ -1902,14 +1966,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           <div
             ref={categoriesScrollRef}
-            className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1 scroll-smooth touch-pan-x"
+            {...catDrag.bind}
+            className={`w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1 touch-pan-x select-none ${
+              catDrag.isDragging ? 'cursor-grabbing' : 'cursor-grab'
+            }`}
             onWheel={(e) => {
               if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
                 e.currentTarget.scrollLeft += e.deltaY;
               }
             }}
           >
-            <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 md:gap-5 pr-12 md:pr-20 flex-nowrap pt-1.5 px-0.5">
+            <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 md:gap-5 px-8 sm:px-10 flex-nowrap pt-1.5">
               {CATEGORY_CONFIG.map((cat) => {
                 const isActive = selectedCategory === cat.filterKey;
                 return (
@@ -1995,7 +2062,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     }}
                     className="text-[10px] sm:text-xs font-bold text-amber-700 hover:underline"
                   >
-                    Ver todas de {activeCategoryConfig.label}
+                    Ver todas
                   </button>
                 ) : null}
               </div>
@@ -2014,14 +2081,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
                 <div
                   ref={visualSubScrollRef}
-                  className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1 scroll-smooth touch-pan-x"
+                  {...visSubDrag.bind}
+                  className={`w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1 touch-pan-x select-none ${
+                    visSubDrag.isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                  }`}
                   onWheel={(e) => {
                     if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
                       e.currentTarget.scrollLeft += e.deltaY;
                     }
                   }}
                 >
-                  <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 pr-12 sm:pr-24 flex-nowrap pt-1">
+                  <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 px-8 sm:px-10 flex-nowrap pt-1">
                     {activeCategoryConfig.visualSubcategories.map((sub) => {
                       const isSubActive = selectedSubcategory === sub.name;
                       return (
@@ -2040,7 +2110,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                           className="flex flex-col items-center shrink-0 w-[78px] sm:w-[92px] group focus:outline-none"
                         >
                           <div
-                            className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 p-1 ${
+                            className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
                               isSubActive
                                 ? 'border-amber-500 bg-amber-50/90 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
                                 : 'border-slate-200 bg-slate-50 group-hover:border-amber-300 group-hover:bg-amber-50/40'
@@ -2050,7 +2120,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                               src={sub.imageUrl}
                               alt={sub.name}
                               referrerPolicy="no-referrer"
-                              className="w-full h-full object-contain transition-transform group-hover:scale-105"
+                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
                               loading="lazy"
                               decoding="async"
                               onError={(e) => {
@@ -2119,14 +2189,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
                       <div
                         ref={childSubScrollRef}
-                        className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1 touch-pan-x"
+                        {...childSubDrag.bind}
+                        className={`w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1 touch-pan-x select-none ${
+                          childSubDrag.isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                        }`}
                         onWheel={(e) => {
                           if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
                             e.currentTarget.scrollLeft += e.deltaY;
                           }
                         }}
                       >
-                        <div className="flex w-max min-w-max items-center gap-1.5 pr-12 sm:pr-24 flex-nowrap">
+                        <div className="flex w-max min-w-max items-center gap-1.5 px-8 sm:px-10 flex-nowrap">
                           {activeVisualSub.childCategories.map((chip) => {
                             const isChildActive = selectedChildCategory === chip;
                             return (
@@ -2173,7 +2246,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     onClick={() => setSelectedSubcategory('Todas')}
                     className="text-[10px] sm:text-xs font-bold text-amber-700 hover:underline"
                   >
-                    Ver todas de {activeCategoryConfig.label}
+                    Ver todas
                   </button>
                 ) : null}
               </div>
@@ -2190,14 +2263,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
                 <div
                   ref={subcatScrollRef}
-                  className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1"
+                  {...subcatDrag.bind}
+                  className={`w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1 touch-pan-x select-none ${
+                    subcatDrag.isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                  }`}
                   onWheel={(e) => {
                     if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
                       e.currentTarget.scrollLeft += e.deltaY;
                     }
                   }}
                 >
-                  <div className="flex w-max min-w-max items-center gap-1.5 pr-12 sm:pr-24">
+                  <div className="flex w-max min-w-max items-center gap-1.5 px-8 sm:px-10 flex-nowrap">
                     {availableSubcategories.map((subcat) => {
                       const isSubActive = selectedSubcategory === subcat;
                       return (
