@@ -10,6 +10,7 @@ import {
   generateProductScript,
   calculateVideoAnalysis,
 } from '../../services/productMinerApi';
+import { getProductPriceRange } from '../../utils/priceHelper';
 
 function compactNumber(value: number | null | undefined) {
   if (value === null || value === undefined) return '—';
@@ -170,7 +171,12 @@ export const ScriptGeneratorModal: React.FC<ScriptGeneratorModalProps> = ({
               ) : null}
             </div>
             <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500">
-              <span className="font-bold text-emerald-700">A partir de {formatMoney(product.priceCents, product.currencySymbol)}</span>
+              <span className="font-bold text-emerald-700">
+                {(() => {
+                  const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+                  return range ? range.formattedRange : formatMoney(product.priceCents, product.currencySymbol);
+                })()}
+              </span>
               <span>• {compactNumber(product.soldCount)} vendas</span>
               {product.video?.views ? <span>• {compactNumber(product.video.views)} views no vídeo</span> : null}
             </div>
@@ -542,21 +548,33 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 {product.title}
               </h3>
 
-              <div>
-                <span className="text-xs text-slate-500 font-medium block leading-none mb-0.5">
-                  A partir de
-                </span>
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-lg sm:text-xl font-black text-emerald-700">
-                    {formatMoney(product.priceCents, product.currencySymbol)}
-                  </span>
-                  {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-                    <span className="text-xs text-slate-400 line-through">
-                      {formatMoney(product.originalPriceCents, product.currencySymbol)}
+              {(() => {
+                const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+                if (!range) {
+                  return (
+                    <div>
+                      <span className="text-lg sm:text-xl font-black text-emerald-700">
+                        {formatMoney(product.priceCents, product.currencySymbol)}
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div>
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 inline-block leading-none">
+                        Faixa estimada
+                      </span>
+                    </div>
+                    <div className="text-lg sm:text-xl font-black text-emerald-700 leading-tight">
+                      {range.formattedRange}
+                    </div>
+                    <span className="text-xs text-slate-500 font-medium block leading-tight mt-1">
+                      {range.auxiliaryText}
                     </span>
-                  ) : null}
-                </div>
-              </div>
+                  </div>
+                );
+              })()}
 
               {(() => {
                 const commText = getCommissionText(product);

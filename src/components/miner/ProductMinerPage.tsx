@@ -28,6 +28,7 @@ import {
   VideoAnalysisModal,
   ProductDetailModal,
 } from './ProductMinerModals';
+import { getProductPriceRange } from '../../utils/priceHelper';
 
 interface ProductMinerPageProps {
   studentCode: string;
@@ -719,21 +720,33 @@ const MobileProductCard: React.FC<{
           })()}
 
           {/* Price */}
-          <div className="pt-0.5 space-y-0.5">
-            <span className="text-[10px] text-slate-500 font-medium block leading-none">
-              A partir de
-            </span>
-            <div className="flex items-baseline gap-1 flex-wrap">
-              <span className="text-xs font-black text-emerald-700">
-                {formatMoney(product.priceCents, product.currencySymbol)}
-              </span>
-              {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-                <span className="text-[9px] text-slate-400 line-through">
-                  {formatMoney(product.originalPriceCents, product.currencySymbol)}
+          {(() => {
+            const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+            if (!range) {
+              return (
+                <div className="pt-0.5 space-y-0.5">
+                  <span className="text-xs font-black text-emerald-700">
+                    {formatMoney(product.priceCents, product.currencySymbol)}
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <div className="pt-0.5 space-y-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60 inline-block leading-tight">
+                    Faixa estimada
+                  </span>
+                </div>
+                <div className="text-xs font-black text-emerald-700 leading-tight">
+                  {range.formattedRange}
+                </div>
+                <span className="text-[9px] text-slate-500 font-medium block leading-tight">
+                  {range.auxiliaryText}
                 </span>
-              ) : null}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Bottom Bar: Seller Name + Heart Favorite & Action Buttons */}
@@ -877,22 +890,33 @@ const ProductCard: React.FC<{
         })()}
 
         <div className="flex items-end justify-between gap-3">
-          <div>
-            <span className="text-[11px] text-slate-500 font-medium block leading-none mb-0.5">
-              A partir de
-            </span>
-            <div className="flex items-baseline gap-1.5 flex-wrap">
-              <span className="text-lg font-black text-emerald-700">
-                {formatMoney(product.priceCents, product.currencySymbol)}
-              </span>
-
-              {product.originalPriceCents && product.originalPriceCents > (product.priceCents || 0) ? (
-                <span className="text-[11px] text-slate-400 line-through">
-                  {formatMoney(product.originalPriceCents, product.currencySymbol)}
+          {(() => {
+            const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+            if (!range) {
+              return (
+                <div>
+                  <span className="text-lg font-black text-emerald-700">
+                    {formatMoney(product.priceCents, product.currencySymbol)}
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <div>
+                <div className="flex items-center gap-1 mb-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block leading-none">
+                    Faixa estimada
+                  </span>
+                </div>
+                <div className="text-base sm:text-lg font-black text-emerald-700 leading-tight">
+                  {range.formattedRange}
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium block leading-tight mt-0.5">
+                  {range.auxiliaryText}
                 </span>
-              ) : null}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
 
           <div className="text-right">
             <div className="text-xs text-slate-500">Vendas totais</div>
