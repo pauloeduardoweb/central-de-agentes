@@ -123,11 +123,18 @@ const CLASSIFICATIONS: ClassificationItem[] = [
   },
 ];
 
+export interface VisualSubcategory {
+  name: string;
+  imageUrl: string;
+  childCategories: string[];
+}
+
 export interface CategoryConfigItem {
   filterKey: string;
   label: string;
   imageUrl: string;
   subcategories: string[];
+  visualSubcategories?: VisualSubcategory[];
 }
 
 export const CATEGORY_CONFIG: CategoryConfigItem[] = [
@@ -237,7 +244,73 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
     filterKey: 'Roupas femininas e roupas íntimas femininas',
     label: 'Roupas femininas e roupas íntimas femininas',
     imageUrl: 'https://i.postimg.cc/bsLqNhQv/Roupas-femininas-e-roupas-intimas-femininas.png',
-    subcategories: ['Todas'],
+    subcategories: [
+      'Todas',
+      'Roupas íntimas femininas',
+      'Ternos e macacões femininos',
+      'Vestidos femininos',
+      'Peças femininas para parte superior',
+      'Moda feminina de dormir e lazer',
+      'Peças femininas para parte inferior',
+      'Roupas especiais para mulheres',
+    ],
+    visualSubcategories: [
+      {
+        name: 'Roupas íntimas femininas',
+        imageUrl: 'https://i.postimg.cc/bDW9HFDD/Sutias.jpg',
+        childCategories: [
+          'Todas',
+          'Acessórios de sutiã',
+          'Cinta modeladora',
+          'Lingerie',
+          'Calcinhas',
+          'Bralettes',
+          'Meias',
+          'Meias-calças',
+          'Conjuntos de roupas íntimas',
+          'Roupas íntimas térmicas',
+        ],
+      },
+      {
+        name: 'Ternos e macacões femininos',
+        imageUrl: 'https://i.postimg.cc/1n2rcYnp/Ternos-e-macacoes-femininos.jpg',
+        childCategories: ['Todas', 'Conjuntos', 'Ternos', 'Macacões'],
+      },
+      {
+        name: 'Vestidos femininos',
+        imageUrl: 'https://i.postimg.cc/62gfL123/Vestidos-femininos.jpg',
+        childCategories: ['Todas', 'Vestidos casuais', 'Vestidos formais', 'Vestidos de noiva', 'Vestidos de madrinha'],
+      },
+      {
+        name: 'Peças femininas para parte superior',
+        imageUrl: 'https://i.postimg.cc/sQq490Q7/Pecas-femininas-para-parte-superior.jpg',
+        childCategories: [
+          'Todas',
+          'Coletes, regatas e tops',
+          'Blusas e camisas',
+          'Camisetas',
+          'Jaquetas e casacos',
+          'Malhas',
+          'Coletes',
+          'Camisas polo',
+        ],
+      },
+      {
+        name: 'Moda feminina de dormir e lazer',
+        imageUrl: 'https://i.postimg.cc/hz61b3zd/Moda-feminina-de-dormir-e-lazer.jpg',
+        childCategories: ['Todas', 'Camisolas', 'Moletons e blusões', 'Pijamas', 'Macacão', 'Roupões de banho'],
+      },
+      {
+        name: 'Peças femininas para parte inferior',
+        imageUrl: 'https://i.postimg.cc/8J9mBnJv/Pecas-femininas-para-parte-inferior.jpg',
+        childCategories: ['Todas', 'Jeans', 'Shorts', 'Calças', 'Saias', 'Leggings', 'Saias-calças e Short-saias'],
+      },
+      {
+        name: 'Roupas especiais para mulheres',
+        imageUrl: 'https://i.postimg.cc/ftpfjgtS/Roupas-especiais-para-mulheres.jpg',
+        childCategories: ['Todas', 'Vestuário e uniformes', 'Vestido tradicional', 'Fantasias e acessórios'],
+      },
+    ],
   },
   {
     filterKey: 'Roupas masculinas e roupas íntimas masculinas',
@@ -506,6 +579,54 @@ function matchesSubcategoryFilter(
 
     // Health
     'health nutrition': ['nutrition', 'nutricao', 'suplemento', 'vitamina', 'whey', 'creatina', 'colageno', 'omega 3', 'protein', 'termogenico', 'pre treino'],
+
+    // Roupas femininas e roupas íntimas femininas - Subcategorias
+    'roupas intimas femininas': ['sutias', 'sutia', 'lingerie', 'calcinha', 'calcinhas', 'bralette', 'meia', 'meias', 'intima', 'intimas', 'cinta'],
+    'ternos e macacoes femininos': ['terno', 'ternos', 'macacao', 'macacoes', 'conjunto', 'blazer'],
+    'vestidos femininos': ['vestido', 'vestidos', 'noiva', 'madrinha', 'festa'],
+    'pecas femininas para parte superior': ['regata', 'top', 'top', 'blusa', 'blusao', 'camisa', 'camiseta', 'jaqueta', 'casaco', 'malha', 'colete', 'polo', 'cropped'],
+    'moda feminina de dormir e lazer': ['camisola', 'moleton', 'moletom', 'pijama', 'pijamas', 'macacao', 'roupao', 'dormir', 'lazer'],
+    'pecas femininas para parte inferior': ['jeans', 'short', 'shorts', 'calca', 'calcas', 'saia', 'saias', 'legging', 'leggings', 'short-saia'],
+    'roupas especiais para mulheres': ['uniforme', 'uniformes', 'fantasia', 'fantasias', 'tradicional', 'costume'],
+
+    // Roupas femininas - Terceiro Nível
+    'acessorios de sutia': ['sutia', 'sutias', 'alca', 'bojo', 'extensor'],
+    'cinta modeladora': ['cinta', 'modelador', 'modeladora', 'espartilho', 'corsete'],
+    'lingerie': ['lingerie', 'renda', 'espartilho', 'body'],
+    'calcinhas': ['calcinha', 'calcinhas', 'tanga', 'fio dental'],
+    'bralettes': ['bralette', 'bralettes'],
+    'meias': ['meia', 'meias', 'soquete'],
+    'meias-calcas': ['meia-calca', 'meias-calcas', 'meia calca', 'meias calcas'],
+    'conjuntos de roupas intimas': ['conjunto', 'conjuntos', 'kit lingerie', 'kit calcinha'],
+    'roupas intimas termicas': ['termica', 'termicas', 'segunda pele'],
+    'conjuntos': ['conjunto', 'conjuntos', 'terninho'],
+    'ternos': ['terno', 'ternos', 'blazer', 'paleto'],
+    'macacoes': ['macacao', 'macacoes', 'jumpsuit', 'macaquinho'],
+    'vestidos casuais': ['casual', 'dia a dia', 'soltinho', 'curto'],
+    'vestidos formais': ['formal', 'festa', 'gala', 'longo', 'elegante'],
+    'vestidos de noiva': ['noiva', 'casamento', 'bridal'],
+    'vestidos de madrinha': ['madrinha', 'madrinhas'],
+    'coletes, regatas e tops': ['colete', 'regata', 'top', 'cropped'],
+    'blusas e camisas': ['blusa', 'camisa', 'bata'],
+    'camisetas': ['camiseta', 't-shirt', 'tshirt'],
+    'jaquetas e casacos': ['jaqueta', 'casaco', 'cardigan', 'sobretudo'],
+    'malhas': ['malha', 'trico', 'tricot', 'sueter'],
+    'coletes': ['colete', 'coletes'],
+    'camisas polo': ['polo', 'camisa polo'],
+    'camisolas': ['camisola', 'camisolas'],
+    'moletons e blusoes': ['moletom', 'moletom', 'blusao', 'hoodie'],
+    'pijamas': ['pijama', 'pijamas', 'baby doll', 'babydoll'],
+    'macacao': ['macacao', 'pijama macacao'],
+    'roupoes de banho': ['roupao', 'roupoes'],
+    'jeans': ['jeans', 'denim'],
+    'shorts': ['short', 'shorts', 'bermuda'],
+    'calcas': ['calca', 'calcas', 'pantalona', 'jogger'],
+    'saias': ['saia', 'saias', 'plissada'],
+    'leggings': ['legging', 'leggings', 'corsario'],
+    'saias-calcas e short-saias': ['short saia', 'short-saia', 'saia calca', 'saia-calca'],
+    'vestuario e uniformes': ['vestuario', 'uniforme', 'uniformes', 'trabalho'],
+    'vestido tradicional': ['tradicional', 'etnico', 'kimono'],
+    'fantasias e acessorios': ['fantasia', 'fantasias', 'cosplay', 'halloween'],
 
     // Infantil Specific Keys
     'infantil_bebes': ['bebe', 'bebes', 'baby', 'recem nascido', 'maternidade', 'fralda', 'mamadeira', 'chupeta', 'berco', 'carrinho de bebe', 'ninho'],
@@ -1312,12 +1433,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   // Local Ranking Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('Todas');
+  const [selectedChildCategory, setSelectedChildCategory] = useState<string>('Todas');
   const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
   const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
   const categoriesScrollRef = React.useRef<HTMLDivElement>(null);
   const subcatScrollRef = React.useRef<HTMLDivElement>(null);
+  const visualSubScrollRef = React.useRef<HTMLDivElement>(null);
+  const childSubScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollContainer = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
     if (ref.current) {
       ref.current.scrollBy({
@@ -1340,17 +1464,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   useEffect(() => {
     if (selectedSubcategory && selectedSubcategory !== 'Todas' && !availableSubcategories.includes(selectedSubcategory)) {
       setSelectedSubcategory('Todas');
+      setSelectedChildCategory('Todas');
     }
   }, [availableSubcategories, selectedSubcategory]);
 
   // Ranking Pagination State
   const [rankingPage, setRankingPage] = useState<number>(1);
 
-  // Reset ranking page and search page whenever any filter, subcategory, classification, sort, or mode changes
+  // Reset ranking page and search page whenever any filter, subcategory, child category, classification, sort, or mode changes
   useEffect(() => {
     setRankingPage(1);
     setPage(1);
-  }, [selectedCategory, selectedSubcategory, hasVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
+  }, [selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
 
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
@@ -1419,11 +1544,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       // 1. Filter by TikTok main category
       list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory, p.title));
+    }
 
-      // 1b. Filter by subcategory
-      if (selectedSubcategory && selectedSubcategory !== 'Todas' && selectedSubcategory !== 'Todos') {
-        list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedSubcategory, selectedCategory));
-      }
+    // 1b. Filter by subcategory (applies to search and favorites)
+    if (selectedSubcategory && selectedSubcategory !== 'Todas' && selectedSubcategory !== 'Todos') {
+      list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedSubcategory, selectedCategory));
+    }
+
+    // 1c. Filter by third level child category
+    if (selectedChildCategory && selectedChildCategory !== 'Todas' && selectedChildCategory !== 'Todos') {
+      list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedChildCategory, selectedCategory));
     }
 
     // 2. Filter by video options
@@ -1759,7 +1889,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
 
         {/* Categories Icon Cards Bar */}
-        <div className="relative group/catnav py-1">
+        <div className="relative group/catnav pt-2.5 pb-1">
           {/* Desktop Scroll Left Arrow */}
           <button
             type="button"
@@ -1772,14 +1902,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           <div
             ref={categoriesScrollRef}
-            className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 scroll-smooth touch-pan-x"
+            className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1 scroll-smooth touch-pan-x"
             onWheel={(e) => {
               if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
                 e.currentTarget.scrollLeft += e.deltaY;
               }
             }}
           >
-            <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 md:gap-5 pr-12 md:pr-20 flex-nowrap">
+            <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 md:gap-5 pr-12 md:pr-20 flex-nowrap pt-1.5 px-0.5">
               {CATEGORY_CONFIG.map((cat) => {
                 const isActive = selectedCategory === cat.filterKey;
                 return (
@@ -1790,9 +1920,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       if (isActive) {
                         setSelectedCategory('Todos');
                         setSelectedSubcategory('Todas');
+                        setSelectedChildCategory('Todas');
                       } else {
                         setSelectedCategory(cat.filterKey);
                         setSelectedSubcategory('Todas');
+                        setSelectedChildCategory('Todas');
                       }
                     }}
                     className="flex flex-col items-center shrink-0 w-[82px] sm:w-[92px] md:w-[100px] group focus:outline-none"
@@ -1847,73 +1979,257 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
         {/* Subcategories Horizontal Scroll Row (Renders when a main category is selected) */}
         {activeCategoryConfig ? (
-          <div className="pt-2 border-t border-slate-100 space-y-1.5 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-xs md:text-xs font-bold uppercase tracking-wider text-slate-500">
-                Subcategorias de <span className="font-black text-slate-800">{activeCategoryConfig.label}</span>:
-              </span>
-              {selectedSubcategory && selectedSubcategory !== 'Todas' ? (
-                <button
-                  type="button"
-                  onClick={() => setSelectedSubcategory('Todas')}
-                  className="text-[10px] sm:text-xs font-bold text-amber-700 hover:underline"
-                >
-                  Ver todas de {activeCategoryConfig.label}
-                </button>
-              ) : null}
-            </div>
-            <div className="relative group/subnav">
-              {/* Desktop Scroll Left Arrow */}
-              <button
-                type="button"
-                onClick={() => scrollContainer(subcatScrollRef, 'left')}
-                className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
-                title="Rolar para esquerda"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-
-              <div
-                ref={subcatScrollRef}
-                className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1"
-                onWheel={(e) => {
-                  if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
-                    e.currentTarget.scrollLeft += e.deltaY;
-                  }
-                }}
-              >
-                <div className="flex w-max min-w-max items-center gap-1.5 pr-12 sm:pr-24">
-                  {availableSubcategories.map((subcat) => {
-                    const isSubActive = selectedSubcategory === subcat;
-                    return (
-                      <button
-                        key={subcat}
-                        type="button"
-                        onClick={() => setSelectedSubcategory(subcat)}
-                        className={`px-3 py-1 rounded-lg text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap ${
-                          isSubActive
-                            ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
-                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
-                        }`}
-                      >
-                        {subcat}
-                      </button>
-                    );
-                  })}
-                </div>
+          activeCategoryConfig.visualSubcategories && activeCategoryConfig.visualSubcategories.length > 0 ? (
+            <div className="pt-2 border-t border-slate-100 space-y-2 animate-fade-in">
+              {/* Level 2 Header */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-xs md:text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Subcategorias de <span className="font-black text-slate-800">{activeCategoryConfig.label}</span>:
+                </span>
+                {selectedSubcategory && selectedSubcategory !== 'Todas' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSubcategory('Todas');
+                      setSelectedChildCategory('Todas');
+                    }}
+                    className="text-[10px] sm:text-xs font-bold text-amber-700 hover:underline"
+                  >
+                    Ver todas de {activeCategoryConfig.label}
+                  </button>
+                ) : null}
               </div>
 
-              {/* Desktop Scroll Right Arrow */}
-              <button
-                type="button"
-                onClick={() => scrollContainer(subcatScrollRef, 'right')}
-                className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
-                title="Rolar para direita"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              {/* Level 2 Visual Cards Strip */}
+              <div className="relative group/subnav py-1">
+                {/* Desktop Scroll Left Arrow */}
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(visualSubScrollRef, 'left')}
+                  className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+                  title="Rolar para esquerda"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                <div
+                  ref={visualSubScrollRef}
+                  className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1 scroll-smooth touch-pan-x"
+                  onWheel={(e) => {
+                    if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                      e.currentTarget.scrollLeft += e.deltaY;
+                    }
+                  }}
+                >
+                  <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 pr-12 sm:pr-24 flex-nowrap pt-1">
+                    {activeCategoryConfig.visualSubcategories.map((sub) => {
+                      const isSubActive = selectedSubcategory === sub.name;
+                      return (
+                        <button
+                          key={sub.name}
+                          type="button"
+                          onClick={() => {
+                            if (isSubActive) {
+                              setSelectedSubcategory('Todas');
+                              setSelectedChildCategory('Todas');
+                            } else {
+                              setSelectedSubcategory(sub.name);
+                              setSelectedChildCategory('Todas');
+                            }
+                          }}
+                          className="flex flex-col items-center shrink-0 w-[78px] sm:w-[92px] group focus:outline-none"
+                        >
+                          <div
+                            className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 p-1 ${
+                              isSubActive
+                                ? 'border-amber-500 bg-amber-50/90 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
+                                : 'border-slate-200 bg-slate-50 group-hover:border-amber-300 group-hover:bg-amber-50/40'
+                            }`}
+                          >
+                            <img
+                              src={sub.imageUrl}
+                              alt={sub.name}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-contain transition-transform group-hover:scale-105"
+                              loading="lazy"
+                              decoding="async"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+
+                          <span
+                            className={`text-[10px] sm:text-xs font-bold text-center mt-1.5 leading-tight max-w-[78px] sm:max-w-[92px] line-clamp-2 transition-colors ${
+                              isSubActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
+                            }`}
+                          >
+                            {sub.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Desktop Scroll Right Arrow */}
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(visualSubScrollRef, 'right')}
+                  className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+                  title="Rolar para direita"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Level 3 Text-Only Chips Bar */}
+              {(() => {
+                if (selectedSubcategory === 'Todas') return null;
+                const activeVisualSub = activeCategoryConfig.visualSubcategories.find((v) => v.name === selectedSubcategory);
+                if (!activeVisualSub || !activeVisualSub.childCategories || activeVisualSub.childCategories.length === 0) return null;
+
+                return (
+                  <div className="pt-2 border-t border-slate-100 space-y-1.5 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] sm:text-xs md:text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Filtrar <span className="font-black text-slate-800">{activeVisualSub.name}</span>:
+                      </span>
+                      {selectedChildCategory && selectedChildCategory !== 'Todas' ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedChildCategory('Todas')}
+                          className="text-[10px] sm:text-xs font-bold text-amber-700 hover:underline"
+                        >
+                          Limpar filtro de {activeVisualSub.name}
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="relative group/childnav">
+                      {/* Desktop Scroll Left Arrow */}
+                      <button
+                        type="button"
+                        onClick={() => scrollContainer(childSubScrollRef, 'left')}
+                        className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+                        title="Rolar para esquerda"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+
+                      <div
+                        ref={childSubScrollRef}
+                        className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1 touch-pan-x"
+                        onWheel={(e) => {
+                          if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                            e.currentTarget.scrollLeft += e.deltaY;
+                          }
+                        }}
+                      >
+                        <div className="flex w-max min-w-max items-center gap-1.5 pr-12 sm:pr-24 flex-nowrap">
+                          {activeVisualSub.childCategories.map((chip) => {
+                            const isChildActive = selectedChildCategory === chip;
+                            return (
+                              <button
+                                key={chip}
+                                type="button"
+                                onClick={() => setSelectedChildCategory(chip)}
+                                className={`px-3 py-1 rounded-lg text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap ${
+                                  isChildActive
+                                    ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
+                                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
+                                }`}
+                              >
+                                {chip}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Desktop Scroll Right Arrow */}
+                      <button
+                        type="button"
+                        onClick={() => scrollContainer(childSubScrollRef, 'right')}
+                        className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+                        title="Rolar para direita"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-          </div>
+          ) : (
+            <div className="pt-2 border-t border-slate-100 space-y-1.5 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] sm:text-xs md:text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Subcategorias de <span className="font-black text-slate-800">{activeCategoryConfig.label}</span>:
+                </span>
+                {selectedSubcategory && selectedSubcategory !== 'Todas' ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSubcategory('Todas')}
+                    className="text-[10px] sm:text-xs font-bold text-amber-700 hover:underline"
+                  >
+                    Ver todas de {activeCategoryConfig.label}
+                  </button>
+                ) : null}
+              </div>
+              <div className="relative group/subnav">
+                {/* Desktop Scroll Left Arrow */}
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(subcatScrollRef, 'left')}
+                  className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+                  title="Rolar para esquerda"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                <div
+                  ref={subcatScrollRef}
+                  className="w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-1"
+                  onWheel={(e) => {
+                    if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                      e.currentTarget.scrollLeft += e.deltaY;
+                    }
+                  }}
+                >
+                  <div className="flex w-max min-w-max items-center gap-1.5 pr-12 sm:pr-24">
+                    {availableSubcategories.map((subcat) => {
+                      const isSubActive = selectedSubcategory === subcat;
+                      return (
+                        <button
+                          key={subcat}
+                          type="button"
+                          onClick={() => setSelectedSubcategory(subcat)}
+                          className={`px-3 py-1 rounded-lg text-xs sm:text-xs md:text-sm font-bold shrink-0 border transition-all whitespace-nowrap ${
+                            isSubActive
+                              ? 'border-amber-500 bg-amber-500/15 text-amber-900 font-black shadow-xs ring-1 ring-amber-400/50'
+                              : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300'
+                          }`}
+                        >
+                          {subcat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Desktop Scroll Right Arrow */}
+                <button
+                  type="button"
+                  onClick={() => scrollContainer(subcatScrollRef, 'right')}
+                  className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
+                  title="Rolar para direita"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )
         ) : null}
       </div>
 
