@@ -308,9 +308,11 @@ productMinerRouter.get('/search', async (req, res) => {
     const query = String(req.query.query || req.query.q || '').trim();
     const category = String(req.query.category || '').trim();
     const subcategory = String(req.query.subcategory || '').trim();
+    const childCategory = String(req.query.childCategory || req.query.child_category || '').trim();
+    const classification = String(req.query.classification || '').trim() as any;
     const page = Number(req.query.page || 1);
-    const result = await searchTikTokShopProducts({ query, category, subcategory, page, region: 'BR', forceRefresh: false });
-    return res.json({ success: true, region: 'BR', query, category, subcategory, page, ...result });
+    const result = await searchTikTokShopProducts({ query, category, subcategory, childCategory, classification, page, region: 'BR', forceRefresh: false });
+    return res.json({ success: true, region: 'BR', query, category, subcategory, childCategory, classification, page, ...result });
   } catch (error: any) {
     console.error('[Product Miner Search Error]:', error?.message || error);
     const message = String(error?.message || 'PRODUCT_MINER_ERROR');

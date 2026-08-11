@@ -22,6 +22,17 @@ export const MAX_ASSOCIATED_VIDEOS = 9;
 
 export type ProductRankingSort = 'opportunities' | 'total' | '24h' | '7d' | 'spiking';
 
+export type ClassificationType =
+  | 'best_sellers'
+  | 'top_rated'
+  | 'highest_commission'
+  | 'viral_video'
+  | 'sales_24h'
+  | 'spiking'
+  | 'trending'
+  | 'editors_choice'
+  | 'most_searched';
+
 export type MinedVideo = {
   id: string | null;
   url: string | null;
@@ -1155,10 +1166,126 @@ export async function prepareVideoDownload(productId: string): Promise<{
   }
 }
 
+export function getCategoryAliases(cat: string): string[] {
+  const norm = String(cat || '').trim().toLowerCase();
+  if (!norm) return [];
+  const aliases = new Set<string>([cat]);
+
+  if (norm.includes('beleza')) {
+    aliases.add('Beleza e cuidados pessoais');
+    aliases.add('Beleza e Cuidados Pessoais');
+    aliases.add('Beleza');
+  } else if (norm.includes('automotivo') || norm.includes('moto') || norm.includes('veiculo')) {
+    aliases.add('Automotivo e moto');
+    aliases.add('Automotivo');
+    aliases.add('Moto');
+    aliases.add('Veículos');
+  } else if (norm.includes('esporte') || norm.includes('lazer') || norm.includes('ar livre')) {
+    aliases.add('Esportes e atividades ao ar livre');
+    aliases.add('Esportes e Lazer');
+    aliases.add('Esportes');
+  } else if (norm.includes('animais') || norm.includes('pet')) {
+    aliases.add('Suprimentos para animais de estimação');
+    aliases.add('Brinquedos e Pets');
+    aliases.add('Pets');
+    aliases.add('Pet');
+  } else if (norm.includes('roupas femininas') || norm.includes('moda feminina')) {
+    aliases.add('Roupas femininas e roupas íntimas femininas');
+    aliases.add('Moda');
+  } else if (norm.includes('roupas masculinas') || norm.includes('moda masculina')) {
+    aliases.add('Roupas masculinas e roupas íntimas masculinas');
+    aliases.add('Moda');
+  } else if (norm.includes('telefone') || norm.includes('eletronico')) {
+    aliases.add('Telefones e eletrônicos');
+    aliases.add('Eletrônicos');
+  } else if (norm.includes('crianca') || norm.includes('infantil')) {
+    aliases.add('Moda para crianças');
+    aliases.add('Infantil');
+  } else if (norm.includes('bebe') || norm.includes('maternidade')) {
+    aliases.add('Bebê e maternidade');
+    aliases.add('Infantil');
+    aliases.add('Bebê');
+  } else if (norm.includes('cozinha') || norm.includes('utensilio')) {
+    aliases.add('Utensílios de cozinha');
+    aliases.add('Itens para Casa');
+    aliases.add('Cozinha');
+  } else if (norm.includes('domestico') || norm.includes('casa')) {
+    aliases.add('Suprimentos domésticos');
+    aliases.add('Itens para Casa');
+  } else if (norm.includes('saude')) {
+    aliases.add('Saúde');
+    aliases.add('Health');
+  }
+
+  return Array.from(aliases);
+}
+
+export function getSubcategoryKeywords(sub: string): string[] {
+  const norm = String(sub || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!norm || norm === 'todas' || norm === 'todos' || norm === 'geral') return [];
+
+  const map: Record<string, string[]> = {
+    'acessorios interiores de veiculos': ['interior', 'capa', 'suporte', 'organizador', 'tapete', 'volante', 'assento'],
+    'lavagem e manutencao de carros': ['lavagem', 'shampoo', 'cera', 'pretinho', 'limpeza', 'microfibra', 'polimento'],
+    'ferramentas de reparo de veiculos': ['ferramenta', 'chave', 'macaco', 'soquete', 'reparo', 'scanner', 'obd'],
+    'sistema eletronico de veiculos': ['eletronico', 'alarme', 'rastreador', 'som', 'multimidia', 'rele', 'modulo'],
+    'luzes do veiculo': ['luz', 'lampada', 'led', 'farol', 'lanterna', 'milha', 'pingo'],
+    'acessorios exteriores de veiculos': ['exterior', 'palheta', 'calha', 'aerofolio', 'emblema', 'retrovisor', 'protecao'],
+    'capas e protecoes de veiculos': ['capa', 'protecao', 'sol', 'parasol', 'cobertura'],
+    'pecas de reposicao para veiculos': ['peca', 'filtro', 'vela', 'pastilha', 'correia', 'amortecedor', 'bomba'],
+    'motocicletas e quadriciclos': ['moto', 'motocicleta', 'capacetes', 'luva moto', 'bau moto', 'jaqueta moto'],
+    'pecas e acessorios para motos': ['moto', 'retrovisor moto', 'manopla', 'corrente moto', 'escapamento', 'suporte cel'],
+
+    'fragrancias': ['perfume', 'parfum', 'fragrancia', 'splash', 'colonia'],
+    'cuidados com a pele': ['skincare', 'serum', 'creme', 'hidratante', 'protetor', 'limpeza', 'esfoliante'],
+    'maquiagem': ['batom', 'base', 'corretivo', 'rimel', 'sombra', 'pincel', 'po', 'gloss'],
+    'cuidados com o cabelo': ['shampoo', 'condicionador', 'mascara', 'oleo', 'cabelo', 'trancador', 'progressiva'],
+    'higiene pessoal': ['sabonete', 'desodorante', 'pasta', 'escova', 'absorvente', 'fio dental'],
+  };
+
+  return map[norm] || [norm];
+}
+
+export function getChildCategoryKeywords(child: string): string[] {
+  const norm = String(child || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!norm || norm === 'todas' || norm === 'todos' || norm === 'geral') return [];
+
+  const map: Record<string, string[]> = {
+    'perfume feminino': ['perfume', 'feminino', 'woman', 'women', 'splash', 'parfum', 'doce', 'floral'],
+    'perfume masculino': ['perfume', 'masculino', 'men', 'man', 'parfum', 'amadeirado', 'citrico'],
+    'body splash e brumas': ['body splash', 'bruma', 'splash', 'desodorante colonia'],
+    'fragrancias unissex': ['unissex', 'perfume', 'colonia'],
+
+    'suportes para celular de carro': ['suporte', 'celular', 'veicular', 'painel', 'saida de ar'],
+    'organizadores e sacos de armazenamento': ['organizador', 'porta objetos', 'bolsa', 'banco'],
+    'aromatizantes e purificadores de ar': ['cheirinho', 'aromatizante', 'difusor', 'aroma', 'glade', 'little trees'],
+    'capas de volante': ['capa', 'volante', 'couro', 'costurada'],
+    'capas de banco e protetores': ['capa', 'banco', 'assento', 'estofado', 'couro'],
+
+    'shampoo e sabao automotivo': ['shampoo', 'sabao', 'desengraxante', 'lava auto'],
+    'ceras e selantes': ['cera', 'selante', 'vitrificador', 'cristalizador'],
+    'toalhas e luvas de microfibra': ['microfibra', 'flanela', 'toalha', 'luva lavagem'],
+    'pretinho e limpa pneus': ['pneu', 'pretinho', 'revitalizador', 'borracha'],
+
+    'scanner de diagnostico obd2': ['scanner', 'obd2', 'obd', 'diagnostico', 'elm327'],
+    'jogos de chaves e soquetes': ['chave', 'soquete', 'catraca', 'jogo de chaves', 'alicate'],
+    'macacos e cavaletes': ['macaco', 'cavalete', 'hidraulico', 'joelho'],
+
+    'cameras para carros (dashcam)': ['camera', 'dashcam', 'retrovisor', 'gravador', 're'],
+    'central multimidia e som': ['multimidia', 'som', 'bluetooth', 'radio', 'carplay', 'android auto'],
+
+    'lampadas led para farol': ['led', 'lampada', 'h7', 'h4', 'h1', 'farol'],
+    'lanternas e luzes internas': ['lanterna', 'interna', 'pingo', 't10', 'festoft'],
+  };
+
+  return map[norm] || [norm];
+}
+
 export function buildProductSearchWhereClause(params: {
   query?: string;
   category?: string;
   subcategory?: string;
+  childCategory?: string;
 }): { whereSql: string; sqlParams: any[]; querySourceForOrder: string | null } {
   const whereConditions: string[] = [];
   const sqlParams: any[] = [];
@@ -1166,6 +1293,7 @@ export function buildProductSearchWhereClause(params: {
   const rawQuery = String(params.query || '').trim();
   const rawCategory = String(params.category || '').trim();
   const rawSubcategory = String(params.subcategory || '').trim();
+  const rawChildCategory = String(params.childCategory || '').trim();
 
   let categoryToUse = rawCategory;
   if (categoryToUse.toLowerCase() === 'todos' || categoryToUse.toLowerCase() === 'todas') {
@@ -1177,43 +1305,73 @@ export function buildProductSearchWhereClause(params: {
     subcategoryToUse = '';
   }
 
+  let childCategoryToUse = rawChildCategory;
+  if (childCategoryToUse.toLowerCase() === 'todas' || childCategoryToUse.toLowerCase() === 'todos') {
+    childCategoryToUse = '';
+  }
+
   // 1. Category Filter
   if (categoryToUse) {
-    whereConditions.push(`(
-      TRIM(p.query_source) = ?
-      OR LOWER(TRIM(p.query_source)) = LOWER(?)
-      OR p.category_path = ?
-      OR p.category_path LIKE ?
-    )`);
-    sqlParams.push(categoryToUse, categoryToUse, categoryToUse, `${categoryToUse} >%`);
+    const catAliases = getCategoryAliases(categoryToUse);
+    const catOrs: string[] = [];
+    for (const alias of catAliases) {
+      catOrs.push(`TRIM(p.query_source) = ?`);
+      sqlParams.push(alias);
+      catOrs.push(`LOWER(TRIM(p.query_source)) = LOWER(?)`);
+      sqlParams.push(alias);
+      catOrs.push(`p.category_path = ?`);
+      sqlParams.push(alias);
+      catOrs.push(`p.category_path LIKE ?`);
+      sqlParams.push(`${alias} >%`);
+    }
+    whereConditions.push(`(${catOrs.join(' OR ')})`);
   }
 
   // 2. Subcategory Filter
   if (subcategoryToUse) {
-    if (categoryToUse) {
-      whereConditions.push(`(
-        p.category_path = ?
-        OR p.category_path LIKE ?
-        OR p.category_path LIKE ?
-        OR p.category_path LIKE ?
-        OR p.category_path = ?
-      )`);
-      const exactPath = `${categoryToUse} > ${subcategoryToUse}`;
-      const prefixPath = `${categoryToUse} > ${subcategoryToUse} >%`;
-      const endPath = `%> ${subcategoryToUse}`;
-      const midPath = `%> ${subcategoryToUse} >%`;
-      sqlParams.push(exactPath, prefixPath, endPath, midPath, subcategoryToUse);
-    } else {
-      whereConditions.push(`(
-        p.category_path LIKE ?
-        OR p.category_path LIKE ?
-        OR p.category_path = ?
-      )`);
-      sqlParams.push(`%> ${subcategoryToUse}`, `%> ${subcategoryToUse} >%`, subcategoryToUse);
+    const subOrs: string[] = [];
+    subOrs.push(`p.category_path LIKE ?`);
+    sqlParams.push(`%> ${subcategoryToUse}`);
+    subOrs.push(`p.category_path LIKE ?`);
+    sqlParams.push(`%> ${subcategoryToUse} >%`);
+    subOrs.push(`p.category_path = ?`);
+    sqlParams.push(subcategoryToUse);
+
+    const subKeywords = getSubcategoryKeywords(subcategoryToUse);
+    if (subKeywords.length > 0) {
+      const kwOrs = subKeywords.map(() => `p.title LIKE ?`);
+      for (const kw of subKeywords) {
+        sqlParams.push(`%${kw}%`);
+      }
+      subOrs.push(`(${kwOrs.join(' OR ')})`);
     }
+
+    whereConditions.push(`(${subOrs.join(' OR ')})`);
   }
 
-  // 3. Search Query Filter
+  // 3. Child Category Filter
+  if (childCategoryToUse) {
+    const childOrs: string[] = [];
+    childOrs.push(`p.category_path LIKE ?`);
+    sqlParams.push(`%> ${childCategoryToUse}`);
+    childOrs.push(`p.category_path LIKE ?`);
+    sqlParams.push(`%> ${childCategoryToUse} >%`);
+    childOrs.push(`p.category_path = ?`);
+    sqlParams.push(childCategoryToUse);
+
+    const childKeywords = getChildCategoryKeywords(childCategoryToUse);
+    if (childKeywords.length > 0) {
+      const kwOrs = childKeywords.map(() => `p.title LIKE ?`);
+      for (const kw of childKeywords) {
+        sqlParams.push(`%${kw}%`);
+      }
+      childOrs.push(`(${kwOrs.join(' OR ')})`);
+    }
+
+    whereConditions.push(`(${childOrs.join(' OR ')})`);
+  }
+
+  // 4. Search Query Filter
   let querySourceForOrder: string | null = null;
   if (rawQuery) {
     const isMainCatName = COLLECTOR_CATEGORIES.some((c) => c.toLowerCase() === rawQuery.toLowerCase());
@@ -1289,6 +1447,8 @@ export async function searchTikTokShopProducts(params: {
   query?: string;
   category?: string;
   subcategory?: string;
+  childCategory?: string;
+  classification?: ClassificationType | null;
   page?: number;
   region?: string;
   forceRefresh?: boolean;
@@ -1307,6 +1467,8 @@ export async function searchTikTokShopProducts(params: {
   const query = String(params.query || '').trim();
   const category = String(params.category || '').trim();
   const subcategory = String(params.subcategory || '').trim();
+  const childCategory = String(params.childCategory || '').trim();
+  const classification = params.classification;
 
   if (query.length === 1) {
     logMinerAcquisition({
@@ -1349,13 +1511,34 @@ export async function searchTikTokShopProducts(params: {
         query,
         category,
         subcategory,
+        childCategory,
       });
 
-      const orderClause = querySourceForOrder
-        ? `ORDER BY CASE WHEN LOWER(TRIM(p.query_source)) = LOWER(?) THEN 0 ELSE 1 END, p.sold_count DESC, p.last_seen_at DESC`
-        : `ORDER BY p.sold_count DESC, p.last_seen_at DESC`;
+      let orderClause = `ORDER BY p.sold_count DESC, p.last_seen_at DESC`;
 
-      const orderParams = querySourceForOrder ? [querySourceForOrder] : [];
+      if (classification === 'best_sellers') {
+        orderClause = `ORDER BY p.sold_count DESC, p.rating DESC, p.last_seen_at DESC`;
+      } else if (classification === 'top_rated') {
+        orderClause = `ORDER BY COALESCE(p.rating, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
+      } else if (classification === 'highest_commission') {
+        orderClause = `ORDER BY COALESCE(p.estimated_commission_cents, (p.price_cents * p.commission_rate_percent / 100), 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
+      } else if (classification === 'viral_video') {
+        orderClause = `ORDER BY (CASE WHEN p.video_views IS NOT NULL AND p.video_views > 0 THEN p.video_views ELSE 0 END) DESC, COALESCE(p.video_likes, 0) DESC, p.sold_count DESC`;
+      } else if (classification === 'sales_24h') {
+        orderClause = `ORDER BY COALESCE(p.video_views, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
+      } else if (classification === 'spiking') {
+        orderClause = `ORDER BY (COALESCE(p.video_views, 0) + p.sold_count * 2) DESC, p.last_seen_at DESC`;
+      } else if (classification === 'trending') {
+        orderClause = `ORDER BY (p.sold_count * 0.5 + COALESCE(p.video_views, 0) * 0.1 + COALESCE(p.rating, 0) * 10) DESC, p.last_seen_at DESC`;
+      } else if (classification === 'editors_choice') {
+        orderClause = `ORDER BY (p.sold_count * 0.3 + COALESCE(p.rating, 0) * 500 + COALESCE(p.estimated_commission_cents, 0) * 0.1) DESC, p.last_seen_at DESC`;
+      } else if (classification === 'most_searched') {
+        orderClause = `ORDER BY (LOG10(1 + COALESCE(p.video_views, 0)) * 50 + p.sold_count * 0.2 + COALESCE(p.rating, 0) * 10) DESC, p.last_seen_at DESC`;
+      } else if (querySourceForOrder) {
+        orderClause = `ORDER BY CASE WHEN LOWER(TRIM(p.query_source)) = LOWER(?) THEN 0 ELSE 1 END, p.sold_count DESC, p.last_seen_at DESC`;
+      }
+
+      const orderParams = (!classification && querySourceForOrder) ? [querySourceForOrder] : [];
 
       const [rows]: any = await db.query(
         `SELECT p.*
