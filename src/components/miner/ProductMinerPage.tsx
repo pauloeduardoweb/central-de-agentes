@@ -253,6 +253,9 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
       'Moda feminina de dormir e lazer',
       'Peças femininas para parte inferior',
       'Roupas especiais para mulheres',
+      'Conjuntos de roupas para família',
+      'Fantasias e acessórios',
+      'Leggings',
     ],
     visualSubcategories: [
       {
@@ -274,7 +277,7 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
       {
         name: 'Ternos e macacões femininos',
         imageUrl: 'https://i.postimg.cc/1n2rcYnp/Ternos-e-macacoes-femininos.jpg',
-        childCategories: ['Todas', 'Conjuntos', 'Ternos', 'Macacões'],
+        childCategories: ['Todas', 'Ternos', 'Macacões'],
       },
       {
         name: 'Vestidos femininos',
@@ -303,12 +306,27 @@ export const CATEGORY_CONFIG: CategoryConfigItem[] = [
       {
         name: 'Peças femininas para parte inferior',
         imageUrl: 'https://i.postimg.cc/8J9mBnJv/Pecas-femininas-para-parte-inferior.jpg',
-        childCategories: ['Todas', 'Jeans', 'Shorts', 'Calças', 'Saias', 'Leggings', 'Saias-calças e Short-saias'],
+        childCategories: ['Todas', 'Jeans', 'Shorts', 'Calças', 'Saias', 'Saias-calças e Short-saias'],
       },
       {
         name: 'Roupas especiais para mulheres',
         imageUrl: 'https://i.postimg.cc/ftpfjgtS/Roupas-especiais-para-mulheres.jpg',
-        childCategories: ['Todas', 'Vestuário e uniformes', 'Vestido tradicional', 'Fantasias e acessórios'],
+        childCategories: ['Todas', 'Vestuário e uniformes', 'Vestido tradicional'],
+      },
+      {
+        name: 'Conjuntos de roupas para família',
+        imageUrl: 'https://i.postimg.cc/CBc1XJ3g/Conjuntos-de-roupas-para-familia.jpg',
+        childCategories: ['Todas'],
+      },
+      {
+        name: 'Fantasias e acessórios',
+        imageUrl: 'https://i.postimg.cc/BLm6kNr4/Fantasias-e-acessorios.png',
+        childCategories: ['Todas'],
+      },
+      {
+        name: 'Leggings',
+        imageUrl: 'https://i.postimg.cc/ZBwR2jGm/Leggings.jpg',
+        childCategories: ['Todas'],
       },
     ],
   },
@@ -777,6 +795,7 @@ function matchesSubcategoryFilter(
     'vestuario e uniformes': ['vestuario', 'uniforme', 'uniformes', 'trabalho'],
     'vestido tradicional': ['tradicional', 'etnico', 'kimono'],
     'fantasias e acessorios': ['fantasia', 'fantasias', 'cosplay', 'halloween'],
+    'conjuntos de roupas para familia': ['conjunto familia', 'familia', 'pai e filho', 'mae e filha', 'pijama familia', 'look familia'],
 
     // Telefones e eletrônicos - Subcategorias
     'acessorios para telefone': ['capa', 'capinha', 'pelicula', 'carregador', 'suporte celular', 'suporte telefone', 'bateria portatil', 'powerbank', 'cabo usb', 'selfie', 'celular', 'telefone', 'alca celular'],
@@ -2298,90 +2317,104 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </div>
 
               {/* Level 2 Visual Cards Strip */}
-              <div className="relative group/subnav py-1">
-                {/* Desktop Scroll Left Arrow */}
-                <button
-                  type="button"
-                  onClick={() => scrollContainer(visualSubScrollRef, 'left')}
-                  className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
-                  title="Rolar para esquerda"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
+              {(() => {
+                const subCount = activeCategoryConfig.visualSubcategories.length;
+                const showDesktopArrows = subCount > 10;
+                const arrowClass = showDesktopArrows ? 'flex' : 'flex md:hidden';
 
-                <div
-                  ref={visualSubScrollRef}
-                  {...visSubDrag.bind}
-                  className={`w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1 touch-pan-x select-none ${
-                    visSubDrag.isDragging ? 'cursor-grabbing' : 'cursor-grab'
-                  }`}
-                  onWheel={(e) => {
-                    if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
-                      e.currentTarget.scrollLeft += e.deltaY;
-                    }
-                  }}
-                >
-                  <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 px-8 sm:px-10 flex-nowrap pt-1">
-                    {activeCategoryConfig.visualSubcategories.map((sub) => {
-                      const isSubActive = selectedSubcategory === sub.name;
-                      return (
-                        <button
-                          key={sub.name}
-                          type="button"
-                          onClick={() => {
-                            if (isSubActive) {
-                              setSelectedSubcategory('Todas');
-                              setSelectedChildCategory('Todas');
-                            } else {
-                              setSelectedSubcategory(sub.name);
-                              setSelectedChildCategory('Todas');
-                            }
-                          }}
-                          className="flex flex-col items-center shrink-0 w-[78px] sm:w-[92px] group focus:outline-none"
-                        >
-                          <div
-                            className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
-                              isSubActive
-                                ? 'border-amber-500 bg-amber-50/90 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
-                                : 'border-slate-200 bg-slate-50 group-hover:border-amber-300 group-hover:bg-amber-50/40'
-                            }`}
-                          >
-                            <img
-                              src={sub.imageUrl}
-                              alt={sub.name}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                              loading="lazy"
-                              decoding="async"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = 'none';
+                return (
+                  <div className="relative group/subnav py-1">
+                    {/* Scroll Left Arrow */}
+                    <button
+                      type="button"
+                      onClick={() => scrollContainer(visualSubScrollRef, 'left')}
+                      className={`${arrowClass} absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100`}
+                      title="Rolar para esquerda"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <div
+                      ref={visualSubScrollRef}
+                      {...visSubDrag.bind}
+                      className={`w-full min-w-0 overflow-x-auto overflow-y-hidden scrollbar-none pb-2 pt-1 touch-pan-x select-none ${
+                        visSubDrag.isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                      }`}
+                      onWheel={(e) => {
+                        if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                          e.currentTarget.scrollLeft += e.deltaY;
+                        }
+                      }}
+                    >
+                      <div
+                        className={`flex w-max min-w-max items-start gap-3 sm:gap-4 flex-nowrap pt-1 ${
+                          showDesktopArrows
+                            ? 'px-8 sm:px-10'
+                            : 'px-8 sm:px-10 md:px-0 md:w-full md:min-w-0 md:justify-around lg:justify-between'
+                        }`}
+                      >
+                        {activeCategoryConfig.visualSubcategories.map((sub) => {
+                          const isSubActive = selectedSubcategory === sub.name;
+                          return (
+                            <button
+                              key={sub.name}
+                              type="button"
+                              onClick={() => {
+                                if (isSubActive) {
+                                  setSelectedSubcategory('Todas');
+                                  setSelectedChildCategory('Todas');
+                                } else {
+                                  setSelectedSubcategory(sub.name);
+                                  setSelectedChildCategory('Todas');
+                                }
                               }}
-                            />
-                          </div>
+                              className="flex flex-col items-center shrink-0 w-[78px] sm:w-[92px] group focus:outline-none"
+                            >
+                              <div
+                                className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
+                                  isSubActive
+                                    ? 'border-amber-500 bg-amber-50/90 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
+                                    : 'border-slate-200 bg-slate-50 group-hover:border-amber-300 group-hover:bg-amber-50/40'
+                                }`}
+                              >
+                                <img
+                                  src={sub.imageUrl}
+                                  alt={sub.name}
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
 
-                          <span
-                            className={`text-[10px] sm:text-xs font-bold text-center mt-1.5 leading-tight max-w-[78px] sm:max-w-[92px] line-clamp-2 transition-colors ${
-                              isSubActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
-                            }`}
-                          >
-                            {sub.name}
-                          </span>
-                        </button>
-                      );
-                    })}
+                              <span
+                                className={`text-[10px] sm:text-xs font-bold text-center mt-1.5 leading-tight max-w-[78px] sm:max-w-[92px] line-clamp-2 transition-colors ${
+                                  isSubActive ? 'text-amber-700 font-black' : 'text-slate-600 group-hover:text-slate-900'
+                                }`}
+                              >
+                                {sub.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Scroll Right Arrow */}
+                    <button
+                      type="button"
+                      onClick={() => scrollContainer(visualSubScrollRef, 'right')}
+                      className={`${arrowClass} absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100`}
+                      title="Rolar para direita"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
-                </div>
-
-                {/* Desktop Scroll Right Arrow */}
-                <button
-                  type="button"
-                  onClick={() => scrollContainer(visualSubScrollRef, 'right')}
-                  className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-700 hover:text-amber-600 hover:border-amber-400 shadow-md items-center justify-center transition-all opacity-90 hover:opacity-100"
-                  title="Rolar para direita"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+                );
+              })()}
 
               {/* Level 3 Text-Only Chips Bar */}
               {(() => {
