@@ -1606,15 +1606,15 @@ export async function searchTikTokShopProducts(params: {
         childCategory,
       });
 
-      let orderClause = `ORDER BY p.sold_count DESC, p.last_seen_at DESC`;
+      let orderClause = `ORDER BY p.last_seen_at DESC, p.sold_count DESC, p.product_id DESC`;
       let joinClause = ``;
 
       if (classification === 'best_sellers') {
-        orderClause = `ORDER BY p.sold_count DESC, p.rating DESC, p.last_seen_at DESC`;
+        orderClause = `ORDER BY p.sold_count DESC, COALESCE(p.rating, 0) DESC, p.last_seen_at DESC`;
       } else if (classification === 'top_rated') {
         orderClause = `ORDER BY COALESCE(p.rating, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (classification === 'highest_commission') {
-        orderClause = `ORDER BY COALESCE(p.estimated_commission_cents, (p.price_cents * p.commission_rate_percent / 100), 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
+        orderClause = `ORDER BY (CASE WHEN (COALESCE(p.estimated_commission_cents, 0) > 0 OR COALESCE(p.commission_rate_percent, 0) > 0) THEN 0 ELSE 1 END), COALESCE(p.estimated_commission_cents, (COALESCE(p.price_cents, 0) * COALESCE(p.commission_rate_percent, 0) / 100), 0) DESC, COALESCE(p.commission_rate_percent, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (classification === 'viral_video') {
         // VÍDEO VIRAL: Usa a tabela relacional tiktok_shop_product_videos
         // Agrupado por product_id para selecionar o MELHOR vídeo (1 produto = 1 linha)
@@ -1684,10 +1684,16 @@ export async function searchTikTokShopProducts(params: {
             ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
           ) snap48 ON snap48.product_id = p.product_id
         `;
-        orderClause = `ORDER BY (
-          GREATEST(0, p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) - 
-          GREATEST(0, COALESCE(snap24.sold_24h, p.sold_count) - COALESCE(snap48.sold_48h, snap24.sold_24h, p.sold_count))
-        ) DESC, GREATEST(0, p.sold_count - COALESCE(snap24.sold_24h, p.sold_count)) DESC, p.last_seen_at DESC, p.sold_count DESC`;
+        orderClause = `ORDER BY 
+          (CASE WHEN snap24.sold_24h IS NOT NULL AND snap48.sold_48h IS NOT NULL THEN 0 ELSE 1 END) ASC,
+          (
+            GREATEST(0, p.sold_count - snap24.sold_24h)
+            -
+            GREATEST(0, snap24.sold_24h - snap48.sold_48h)
+          ) DESC,
+          GREATEST(0, p.sold_count - snap24.sold_24h) DESC,
+          p.sold_count DESC,
+          p.last_seen_at DESC`;
       } else if (classification === 'trending') {
         // TENDÊNCIAS: Crescimento recente sustentável (vendas 24h + vendas 48h + rating + alcance)
         joinClause = `
@@ -1727,17 +1733,29 @@ export async function searchTikTokShopProducts(params: {
         // ESCOLHA DO DIA: Pontuação composta equilibrada com escala logarítmica
         joinClause = `
           LEFT JOIN (
+            SELECT s.product_id, s.sold_count AS sold_24h
+            FROM tiktok_shop_product_snapshots s
+            INNER JOIN (
+              SELECT product_id, MAX(captured_at) AS max_cap
+              FROM tiktok_shop_product_snapshots
+              WHERE captured_at <= NOW() - INTERVAL 18 HOUR AND captured_at >= NOW() - INTERVAL 42 HOUR
+              GROUP BY product_id
+            ) m ON s.product_id = m.product_id AND s.captured_at = m.max_cap
+          ) snap24 ON snap24.product_id = p.product_id
+          LEFT JOIN (
             SELECT product_id, MAX(video_views) AS max_v_views
             FROM tiktok_shop_product_videos
             GROUP BY product_id
           ) pv ON pv.product_id = p.product_id
         `;
         orderClause = `ORDER BY (
-          LOG10(1 + p.sold_count) * 25.0 +
-          COALESCE(p.rating, 4.0) * 15.0 +
-          LOG10(1 + COALESCE(p.estimated_commission_cents, (p.price_cents * p.commission_rate_percent / 100), 0)) * 15.0 +
-          LOG10(1 + GREATEST(COALESCE(pv.max_v_views, 0), COALESCE(p.video_views, 0))) * 10.0
-        ) DESC, p.last_seen_at DESC`;
+          LOG10(1 + p.sold_count) * 20.0 +
+          LOG10(1 + GREATEST(0, p.sold_count - COALESCE(snap24.sold_24h, p.sold_count))) * 25.0 +
+          COALESCE(p.rating, 0) * 10.0 +
+          LOG10(1 + COALESCE(p.estimated_commission_cents, (COALESCE(p.price_cents, 0) * COALESCE(p.commission_rate_percent, 0) / 100), 0)) * 15.0 +
+          LOG10(1 + GREATEST(COALESCE(pv.max_v_views, 0), COALESCE(p.video_views, 0))) * 10.0 +
+          (CASE WHEN p.last_seen_at >= NOW() - INTERVAL 7 DAY THEN 10.0 ELSE 0.0 END)
+        ) DESC, p.last_seen_at DESC, p.sold_count DESC`;
       } else if (classification === 'most_searched') {
         // MAIS PESQUISADOS: Interações reais originadas por pesquisa/clique no produto
         joinClause = `
