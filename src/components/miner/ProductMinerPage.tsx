@@ -2745,7 +2745,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [rankingMeta, setRankingMeta] = useState<ProductRankingMeta | null>(null);
   const [rankingSort, setRankingSort] = useState<ProductRankingSort>('opportunities');
 
-  const [selectedClassification, setSelectedClassification] = useState<ClassificationType | null>('best_sellers');
+  const [selectedClassification, setSelectedClassification] = useState<ClassificationType | null>(null);
 
   const [favorites, setFavorites] = useState<ProductMinerProduct[]>(() => {
     if (typeof localStorage !== 'undefined') {
@@ -3156,68 +3156,52 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       list = list.filter((p) => Boolean(p.video && (p.video.views ?? 0) >= 1000000));
     }
 
-    // 3. Sort by classification choice
-    const copy = [...list];
-    if (selectedClassification === 'best_sellers') {
-      copy.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
-    } else if (selectedClassification === 'top_rated') {
-      copy.sort((a, b) => {
-        const rateDiff = (b.rating || 0) - (a.rating || 0);
-        if (Math.abs(rateDiff) > 0.01) return rateDiff;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
-    } else if (selectedClassification === 'trending') {
-      copy.sort((a, b) => {
-        const g24b = b.growth24hPercent ?? b.sales24h ?? 0;
-        const g24a = a.growth24hPercent ?? a.sales24h ?? 0;
-        if (g24b !== g24a) return g24b - g24a;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
-    } else if (selectedClassification === 'most_searched') {
-      copy.sort((a, b) => {
-        const aScore = (a.trendScore || 0) + (a.video?.views ? Math.log10(a.video.views) : 0);
-        const bScore = (b.trendScore || 0) + (b.video?.views ? Math.log10(b.video.views) : 0);
-        if (bScore !== aScore) return bScore - aScore;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
-    } else if (selectedClassification === 'editors_choice') {
-      copy.sort((a, b) => {
-        const scoreDiff = (b.score || 0) - (a.score || 0);
-        if (scoreDiff !== 0) return scoreDiff;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
-    } else if (selectedClassification === 'highest_commission') {
-      copy.sort((a, b) => {
-        const commB = b.estimatedCommissionCents ?? (b.commissionRatePercent && b.priceCents ? Math.round((b.priceCents * b.commissionRatePercent) / 100) : 0);
-        const commA = a.estimatedCommissionCents ?? (a.commissionRatePercent && a.priceCents ? Math.round((a.priceCents * a.commissionRatePercent) / 100) : 0);
-        if (commB !== commA) return commB - commA;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
-    } else if (selectedClassification === 'sales_24h') {
-      copy.sort((a, b) => {
-        const s24b = b.sales24h ?? 0;
-        const s24a = a.sales24h ?? 0;
-        if (s24b !== s24a) return s24b - s24a;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
-    } else if (selectedClassification === 'spiking') {
-      copy.sort((a, b) => {
-        const spikeB = (b.growth24hPercent ?? 0) * 100 + (b.sales24h ?? 0);
-        const spikeA = (a.growth24hPercent ?? 0) * 100 + (a.sales24h ?? 0);
-        if (spikeB !== spikeA) return spikeB - spikeA;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
-    } else if (selectedClassification === 'viral_video') {
-      copy.sort((a, b) => {
-        const vB = b.video?.views ?? (b.video?.url ? 1 : 0);
-        const vA = a.video?.views ?? (a.video?.url ? 1 : 0);
-        if (vB !== vA) return vB - vA;
-        return (b.soldCount || 0) - (a.soldCount || 0);
-      });
+    // 3. Sort by classification choice (ONLY when in 'favorites' mode, since in 'search' mode the database query has already returned products in the exact classification order)
+    if (mode === 'favorites' && selectedClassification) {
+      const copy = [...list];
+      if (selectedClassification === 'best_sellers') {
+        copy.sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
+      } else if (selectedClassification === 'top_rated') {
+        copy.sort((a, b) => {
+          const rateDiff = (b.rating || 0) - (a.rating || 0);
+          if (Math.abs(rateDiff) > 0.01) return rateDiff;
+          return (b.soldCount || 0) - (a.soldCount || 0);
+        });
+      } else if (selectedClassification === 'highest_commission') {
+        copy.sort((a, b) => {
+          const commB = b.estimatedCommissionCents ?? (b.commissionRatePercent && b.priceCents ? Math.round((b.priceCents * b.commissionRatePercent) / 100) : 0);
+          const commA = a.estimatedCommissionCents ?? (a.commissionRatePercent && a.priceCents ? Math.round((a.priceCents * a.commissionRatePercent) / 100) : 0);
+          const rateB = b.commissionRatePercent ?? 0;
+          const rateA = a.commissionRatePercent ?? 0;
+          const hasB = (commB > 0 || rateB > 0) ? 1 : 0;
+          const hasA = (commA > 0 || rateA > 0) ? 1 : 0;
+          if (hasB !== hasA) return hasB - hasA;
+          if (commB !== commA) return commB - commA;
+          if (rateB !== rateA) return rateB - rateA;
+          return (b.soldCount || 0) - (a.soldCount || 0);
+        });
+      } else if (selectedClassification === 'sales_24h') {
+        copy.sort((a, b) => (b.sales24h ?? 0) - (a.sales24h ?? 0) || (b.soldCount || 0) - (a.soldCount || 0));
+      } else if (selectedClassification === 'spiking') {
+        copy.sort((a, b) => (b.trendScore ?? 0) - (a.trendScore ?? 0) || (b.sales24h ?? 0) - (a.sales24h ?? 0) || (b.soldCount || 0) - (a.soldCount || 0));
+      } else if (selectedClassification === 'trending') {
+        copy.sort((a, b) => (b.growth24hPercent ?? 0) - (a.growth24hPercent ?? 0) || (b.sales24h ?? 0) - (a.sales24h ?? 0) || (b.soldCount || 0) - (a.soldCount || 0));
+      } else if (selectedClassification === 'most_searched') {
+        copy.sort((a, b) => (b.trendScore || 0) - (a.trendScore || 0) || (b.soldCount || 0) - (a.soldCount || 0));
+      } else if (selectedClassification === 'editors_choice') {
+        copy.sort((a, b) => {
+          const scoreB = Math.log10(1 + (b.soldCount || 0)) * 20 + Math.log10(1 + (b.sales24h || 0)) * 25 + (b.rating || 4) * 10;
+          const scoreA = Math.log10(1 + (a.soldCount || 0)) * 20 + Math.log10(1 + (a.sales24h || 0)) * 25 + (a.rating || 4) * 10;
+          return scoreB - scoreA;
+        });
+      } else if (selectedClassification === 'viral_video') {
+        copy.sort((a, b) => (b.video?.views ?? 0) - (a.video?.views ?? 0) || (b.soldCount || 0) - (a.soldCount || 0));
+      }
+      return copy;
     }
 
-    return copy;
-  }, [products, ranking, favorites, mode, selectedCategory, selectedSubcategory, hasVideoOnly, viralVideoOnly, selectedClassification, query]);
+    return list;
+  }, [products, ranking, favorites, mode, selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, viralVideoOnly, selectedClassification, query]);
 
   const totalRankingPages = useMemo(() => {
     if (mode !== 'ranking') return 1;
@@ -3463,6 +3447,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     } else {
                       setSelectedClassification(c.id);
                     }
+                    setMode('search');
                     setPage(1);
                   }}
                   className="flex flex-col items-center shrink-0 w-[80px] sm:w-[92px] lg:w-full group focus:outline-none"
