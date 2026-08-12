@@ -1493,17 +1493,36 @@ export async function logProductInteractionEvent(params: {
 
   try {
     await ensureProductMinerTables();
+
+    const studentCode = params.studentCode || null;
+    const eventType = params.eventType || 'product_open';
+
+    // Anti-double-click deduplication: ignore identical (studentCode, productId, eventType) within 5 seconds
+    const [recentRows]: any = await db.query(
+      `SELECT id FROM product_interaction_events
+       WHERE product_id = ?
+         AND event_type = ?
+         AND (student_code = ? OR (student_code IS NULL AND ? IS NULL))
+         AND created_at >= DATE_SUB(NOW(), INTERVAL 5 SECOND)
+       LIMIT 1`,
+      [productId, eventType, studentCode, studentCode]
+    );
+
+    if (Array.isArray(recentRows) && recentRows.length > 0) {
+      return;
+    }
+
     await db.query(
       `INSERT INTO product_interaction_events (student_code, product_id, search_query, category, subcategory, child_category, event_type)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        params.studentCode || null,
+        studentCode,
         productId,
         params.query || null,
         params.category || null,
         params.subcategory || null,
         params.childCategory || null,
-        params.eventType || 'product_open',
+        eventType,
       ]
     );
   } catch (err: any) {
