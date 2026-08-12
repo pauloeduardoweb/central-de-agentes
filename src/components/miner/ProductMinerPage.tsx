@@ -87,7 +87,7 @@ const CLASSIFICATIONS: ClassificationItem[] = [
   },
   {
     id: 'most_searched',
-    label: 'Mais pesquisados',
+    label: 'Mais acessados',
     imgUrl: 'https://i.postimg.cc/PxZd1fSW/Lupa.jpg',
     fallbackIcon: <Search className="w-6 h-6 text-cyan-500" />,
   },
