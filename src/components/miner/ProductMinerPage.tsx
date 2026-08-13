@@ -5029,6 +5029,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       : CATEGORY_CONFIG.map((c) => c.filterKey);
 
     let totalNewCount = 0;
+    let totalUpdatedCount = 0;
     let totalCreditsUsed = 0;
     let processedCats = 0;
 
@@ -5038,7 +5039,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         processedCategories: processedCats,
         totalCategories: categoriesToProcess.length,
         newProductsCount: totalNewCount,
-        updatedProductsCount: 0,
+        updatedProductsCount: totalUpdatedCount,
         creditsUsed: totalCreditsUsed,
       });
 
@@ -5048,12 +5049,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           for (const sub of selectedSubs) {
             setBatchProgress((prev) => prev ? { ...prev, currentSubcategory: sub } : null);
             const res = await refreshProducts(studentCode, sub, Math.min(150, expansionTargetCount));
-            totalNewCount += res.uniqueProductsCount ?? res.products?.length ?? 0;
+            totalNewCount += res.newProductsCount ?? res.uniqueProductsCount ?? res.products?.length ?? 0;
+            totalUpdatedCount += res.updatedProductsCount ?? 0;
             totalCreditsUsed += res.creditsUsed ?? 1;
           }
         } else {
           const res = await refreshProducts(studentCode, cat, expansionTargetCount);
-          totalNewCount += res.uniqueProductsCount ?? res.products?.length ?? 0;
+          totalNewCount += res.newProductsCount ?? res.uniqueProductsCount ?? res.products?.length ?? 0;
+          totalUpdatedCount += res.updatedProductsCount ?? 0;
           totalCreditsUsed += res.creditsUsed ?? Math.ceil(expansionTargetCount / 30);
         }
       } catch (err: any) {
@@ -5068,9 +5071,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
     setBatchSummaryModal({
       open: true,
-      totalProducts: totalNewCount,
+      totalProducts: totalNewCount + totalUpdatedCount,
       newProducts: totalNewCount,
-      updatedProducts: 0,
+      updatedProducts: totalUpdatedCount,
       creditsUsed: totalCreditsUsed,
       categoriesProcessed: processedCats,
     });
