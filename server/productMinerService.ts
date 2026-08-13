@@ -1881,6 +1881,7 @@ export async function searchTikTokShopProducts(params: {
   newProductsCount?: number;
   updatedProductsCount?: number;
   totalReceived?: number;
+  rejectedCount?: number;
 }> {
   const query = String(params.query || '').trim();
   const category = String(params.category || '').trim();
@@ -2366,6 +2367,9 @@ export async function refreshMultiPageTikTokShopProducts(params: {
 }): Promise<{
   products: MinedProduct[];
   uniqueProductsCount: number;
+  totalReceived?: number;
+  totalNormalized?: number;
+  rejectedCount?: number;
   newProductsCount: number;
   updatedProductsCount: number;
   pagesConsulted: number;
@@ -2400,6 +2404,9 @@ export async function refreshMultiPageTikTokShopProducts(params: {
   const allUniqueProducts: MinedProduct[] = [];
   let pagesConsulted = 0;
   let totalCreditsUsed = 0;
+  let totalReceived = 0;
+  let totalNormalized = 0;
+  let totalRejected = 0;
   let totalNewProducts = 0;
   let totalUpdatedProducts = 0;
   let creditsRemaining: number | null = null;
@@ -2440,13 +2447,17 @@ export async function refreshMultiPageTikTokShopProducts(params: {
 
       pagesConsulted++;
       totalCreditsUsed += res.creditsUsed;
+      const receivedThisPage = res.totalReceived ?? res.products.length;
+      totalReceived += receivedThisPage;
+      totalNormalized += res.products.length;
+      totalRejected += (res.rejectedCount ?? 0);
       totalNewProducts += (res.newProductsCount ?? 0);
       totalUpdatedProducts += (res.updatedProductsCount ?? 0);
 
       if (res.creditsRemaining !== null) {
         creditsRemaining = res.creditsRemaining;
       }
-      hasMore = res.hasMore;
+      hasMore = Boolean(res.hasMore);
 
       for (const prod of res.products) {
         if (prod.productId && !seenProductIds.has(prod.productId)) {
@@ -2455,29 +2466,31 @@ export async function refreshMultiPageTikTokShopProducts(params: {
         }
       }
 
-      // Parar se não houver produtos retornados
-      if (res.products.length === 0) {
+      console.log(`[MultiPage] Query "${query}" - Página ${p}/${maxPages} processada: recebidos_página=${receivedThisPage}, acumulados_recebidos=${totalReceived}, novos=${res.newProductsCount}, atualizados=${res.updatedProductsCount}, meta=${rawMax}, hasMore=${hasMore}`);
+
+      // Condição 1: Parar se a API retornou 0 itens reais
+      if (receivedThisPage === 0) {
         if (!isInfantil) {
-          console.log(`[MultiPage] Query "${query}" finalizou na página ${p}: 0 produtos retornados.`);
+          console.log(`[MultiPage] Query "${query}" finalizou na página ${p}: 0 produtos recebidos da API.`);
           break;
         }
       }
 
-      // Parar se a API informar explicitamente que não há mais páginas
+      // Condição 2: Parar se a API informar explicitamente que não há mais páginas
       if (!hasMore && !isInfantil) {
         console.log(`[MultiPage] Query "${query}" finalizou na página ${p}: API indicou hasMore=false.`);
         break;
       }
 
-      // Parar se atingir ou ultrapassar a meta solicitada de produtos
-      if (allUniqueProducts.length >= rawMax) {
-        console.log(`[MultiPage] Query "${query}" atingiu meta de ${rawMax} produtos (acumulados: ${allUniqueProducts.length}) na página ${p}.`);
+      // Condição 3: Parar se atingir ou ultrapassar a meta solicitada de produtos
+      if (totalReceived >= rawMax || allUniqueProducts.length >= rawMax) {
+        console.log(`[MultiPage] Query "${query}" atingiu meta de ${rawMax} produtos (acumulados recebidos: ${totalReceived}, únicos: ${allUniqueProducts.length}) na página ${p}.`);
         break;
       }
 
       // Pequeno intervalo preventivo entre requisições para estabilidade de rate limit
       if (p < maxPages) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
     } catch (err: any) {
       console.warn(`[MultiPage Collection Partial Failure on page ${p} for query "${query}"]:`, err?.message || err);
@@ -2494,6 +2507,9 @@ export async function refreshMultiPageTikTokShopProducts(params: {
   return {
     products: finalProducts,
     uniqueProductsCount: allUniqueProducts.length,
+    totalReceived,
+    totalNormalized,
+    rejectedCount: totalRejected,
     newProductsCount: totalNewProducts,
     updatedProductsCount: totalUpdatedProducts,
     pagesConsulted,
