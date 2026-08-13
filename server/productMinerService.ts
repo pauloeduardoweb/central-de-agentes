@@ -1319,6 +1319,9 @@ export function getSubcategoryAliases(sub: string): string[] {
     'acessorios para sapatos': ['Shoe Accessories', 'Shoes Accessories'],
     'sapatos femininos': ["Women's Shoes", "Women's Footwear"],
     'sapatos masculinos': ["Men's Shoes", "Men's Footwear"],
+    'suplementos alimentares': ['Food Supplements', 'Dietary Supplements', 'Supplements'],
+    'medicamentos e tratamentos alternativos': ['Alternative Medicine & Treatments', 'Alternative Medicine'],
+    'suprimentos medicos': ['Medical Supplies'],
   };
 
   if (map[norm]) {
@@ -1348,6 +1351,8 @@ export function getChildCategoryAliases(child: string): string[] {
     'meias': ['Socks'],
     'calcados tradicionais': ['Traditional Footwear'],
     'sapatos para casamento': ['Wedding Shoes'],
+    'suplementos herbais': ['Herbal Supplements'],
+    'dispositivos de compressao corporal': ['Body Compression Devices'],
   };
 
   if (map[norm]) {
