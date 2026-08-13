@@ -76,6 +76,12 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
     agent.id === 'agent-tiktok2k-mensageiro-de-deus' ||
     agent.name?.toLowerCase().trim() === 'mensageiro de deus';
 
+  // Determine if this is Vitrine dos Heróis
+  const isVitrineDosHerois =
+    agent.id === 'agent-shop-vitrine-dos-herois' ||
+    agent.name?.toLowerCase().trim().includes('vitrine dos heróis') ||
+    agent.name?.toLowerCase().trim().includes('vitrine dos herois');
+
   // Determine if agent has example video/demo
   const hasExample = Boolean(
     agent.exampleVideoUrl || (agent.exampleVideoUrls && agent.exampleVideoUrls.length > 0)
@@ -147,6 +153,16 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
           <div className="animate-in fade-in slide-in-from-top-1 duration-200">
             <AgentControlHeader agent={agent} onClose={onClose} />
           </div>
+
+          {/* PARTE SUPERIOR: Aviso destacado para Vitrine dos Heróis */}
+          {isVitrineDosHerois && (
+            <div className="relative overflow-hidden bg-gradient-to-r from-amber-950/80 via-yellow-950/60 to-amber-950/80 border border-amber-500/50 rounded-xl p-3 text-center shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-center space-x-2 text-amber-200 font-bold text-xs sm:text-sm tracking-wide">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                <span>Recomendação Plataforma: Grok (Sem Direitos Autorais)</span>
+              </div>
+            </div>
+          )}
 
           {/* ISOLATED LAYOUT FOR "MENSAGEIRO DE DEUS" */}
           {isMensageiroDeDeus ? (
@@ -238,7 +254,7 @@ export const AgentControlCenter: React.FC<AgentControlCenterProps> = ({
                 )}
 
                 {/* Abrir no ChatGPT / WhatsApp Card */}
-                {(agent.chatGptUrl || onOpenChatGPT) && (
+                {!isVitrineDosHerois && (agent.chatGptUrl || onOpenChatGPT) && (
                   <AgentActionCard
                     title={isWhatsApp ? 'ABRIR WHATSAPP' : 'ABRIR NO CHATGPT'}
                     description={
