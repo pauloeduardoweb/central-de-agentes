@@ -1289,6 +1289,15 @@ export function getSubcategoryAliases(sub: string): string[] {
     'ciencias e tecnologia': ['Science & Technology'],
     'revistas e jornais': ['Magazines & Newspapers', 'Magazines'],
     'video e musica': ['Video & Music', 'Music & Video'],
+    'hijabs': ['Hijabs', 'Hijab'],
+    'roupas islamicas femininas': ["Women's Islamic Clothing", "Women's Muslim Clothing"],
+    'roupas islamicas masculinas': ["Men's Islamic Clothing", "Men's Muslim Clothing"],
+    'acessorios islamicos': ['Islamic Accessories', 'Muslim Accessories'],
+    'traje e equipamento de oracao': ['Prayer Attire & Equipment', 'Prayer Equipment', 'Prayer Attire'],
+    'roupas esportivas islamicas': ['Islamic Sportswear', 'Muslim Sportswear'],
+    'agasalhos': ['Outerwear'],
+    'roupas islamicas infantis': ["Kids' Islamic Clothing", "Children's Islamic Clothing", "Kids Muslim Clothing"],
+    'equipamento para umra': ['Umrah Equipment', 'Umroh Equipment'],
   };
 
   if (map[norm]) {
@@ -1311,6 +1320,11 @@ export function getChildCategoryAliases(child: string): string[] {
     'monitor portatil para computador': ['Portable Computer Monitor', 'Portable Monitor'],
     'cabos e acessorios': ['Cables & Accessories', 'Cables and Accessories'],
     'computadores de placa unica (sbc)': ['Single Board Computers', 'Single Board Computer'],
+    'roupas islamicas femininas para dormir e ficar em casa': ["Women's Muslim Sleepwear & Loungewear", "Women's Sleepwear & Loungewear"],
+    'roupas islamicas masculinas para dormir e ficar em casa': ["Men's Muslim Sleepwear & Loungewear", "Men's Sleepwear & Loungewear"],
+    'manguitos para maos': ['Handsocks', 'Hand Sleeves'],
+    'alfinetes para hijab': ['Hijab Pins', 'Hijab Pin'],
+    'meias': ['Socks'],
   };
 
   if (map[norm]) {
