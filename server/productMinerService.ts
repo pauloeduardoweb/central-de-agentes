@@ -1307,6 +1307,15 @@ export function getSubcategoryAliases(sub: string): string[] {
     'moveis para ambientes externos': ['Outdoor Furniture', 'Patio Furniture'],
     'moveis para ambientes internos': ['Indoor Furniture', 'Home Furniture'],
     'moveis para criancas': ["Kids' Furniture", "Children's Furniture"],
+    'acessorios de banheiro': ['Bathroom Fixtures', 'Bathroom Accessories'],
+    'artigos de jardinagem': ['Gardening Supplies', 'Lawn & Garden', 'Gardening'],
+    'luzes e iluminacao': ['Lights & Lighting', 'Lighting'],
+    'materiais de construcao': ['Building Materials'],
+    'acessorios de cozinha': ['Kitchen Fixtures', 'Kitchen Accessories'],
+    'equipamentos e suprimentos eletricos': ['Electrical Equipment & Supplies', 'Electrical Equipment', 'Electrical Supplies'],
+    'seguranca e protecao': ['Safety & Security', 'Security & Protection'],
+    'sistemas domesticos inteligentes': ['Smart Home Systems', 'Smart Home'],
+    'energia solar e eolica': ['Solar & Wind Energy', 'Solar and Wind Energy'],
   };
 
   if (map[norm]) {
