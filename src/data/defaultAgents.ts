@@ -7193,6 +7193,41 @@ Responder apenas:
     usageCount: 210,
     createdAt: '2026-02-15T11:05:00Z'
   },
+  {
+    id: 'agent-shop-vitrine-dos-herois',
+    name: 'Vitrine dos Heróis',
+    tagline: 'Exposição de heróis e colecionáveis para o TikTok Shop',
+    description: 'Especialista em apresentar action figures, colecionáveis e produtos de heróis de forma impactante e envolvente para o TikTok Shop.',
+    category: 'Tiktok Shop',
+    posterSlug: 'vitrine-dos-herois',
+    coverImage: 'https://i.postimg.cc/5NV2PN48/Chat-GPT-Image-13-de-ago-de-2026-09-39-29.png',
+    chatBackgroundImage: 'https://i.postimg.cc/5NV2PN48/Chat-GPT-Image-13-de-ago-de-2026-09-39-29.png',
+    iconName: 'Shield',
+    colorTheme: 'amber',
+    geminiUrl: 'https://gemini.google.com/gem/1Y46WmHJF4h4k06V00gqOKA2oOSnhFLiR?usp=sharing',
+    systemInstruction: `⚡ ATIVAÇÃO DO AGENTE:
+• Iniciar imediatamente assim que receber qualquer mensagem do usuário.
+• Fazer perguntas uma por vez para guiar a criação do roteiro e apresentação do produto.
+
+🎯 OBJETIVO:
+Criar roteiros e apresentações visuais de alta conversão para produtos e colecionáveis do nicho de heróis no TikTok Shop, destacando detalhes, acabamento e chamadas para o Carrinho Amarelo.`,
+    conversationStarters: [
+      'Como criar uma vitrine de action figures para o TikTok Shop?',
+      'Gere um roteiro impactante para produtos de heróis',
+      'Quais os melhores ganchos para o público geek e colecionadores?'
+    ],
+    capabilities: {
+      codeInterpreter: false,
+      webSearch: true,
+      imageGeneration: true,
+      jsonOutput: false
+    },
+    temperature: 0.75,
+    isFavorite: false,
+    isCustom: false,
+    usageCount: 180,
+    createdAt: '2026-08-13T09:39:29Z'
+  },
 
   // --- RECURSO ANTI-VIOLAÇÃO AGENTS (AGENTE EXCLUSIVO) ---
   {
