@@ -4956,15 +4956,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   // Adquirir Produtos (Collector Expansion) State
   const [collectorSubTab, setCollectorSubTab] = useState<'expand' | 'update'>('expand');
   const [expansionTargetCount, setExpansionTargetCount] = useState<number>(300);
-  const [selectedExpansionCategories, setSelectedExpansionCategories] = useState<string[]>([
-    'Moda',
-    'Itens para Casa',
-    'Eletrônicos',
-    'Beleza e Cuidados Pessoais',
-    'Esportes e Lazer',
-    'Brinquedos e Pets',
-    'Health',
-  ]);
+  const [selectedExpansionCategories, setSelectedExpansionCategories] = useState<string[]>([]);
   const [selectedSubcategoriesMap, setSelectedSubcategoriesMap] = useState<Record<string, string[]>>({});
   const [openCategoryDrawers, setOpenCategoryDrawers] = useState<Record<string, boolean>>({});
 
@@ -5020,13 +5012,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   const handleExecuteBatchExpansion = async () => {
     setShowBatchConfirmModal(false);
+    if (selectedExpansionCategories.length === 0) return;
+
     setIsBatchExecuting(true);
     setError('');
     setCollectorNotice(null);
 
-    const categoriesToProcess = selectedExpansionCategories.length > 0
-      ? selectedExpansionCategories
-      : CATEGORY_CONFIG.map((c) => c.filterKey);
+    const categoriesToProcess = selectedExpansionCategories;
 
     let totalNewCount = 0;
     let totalUpdatedCount = 0;
