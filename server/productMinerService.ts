@@ -153,13 +153,27 @@ function parseInteger(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseCurrencyToCents(value: unknown): number | null {
+function parsePriceToCents(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
-  const raw = String(value).trim().replace(',', '.');
-  const num = Number(raw);
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // Formato decimal padrão ou monetário explícito (ex: "37.58", "37,58", "R$ 37,58")
+  if (raw.includes(',') || (raw.includes('.') && raw.split('.')[1]?.length <= 2)) {
+    const cleaned = raw.replace(/[^\d.,]/g, '').replace(',', '.');
+    const num = Number(cleaned);
+    if (!Number.isFinite(num) || num < 0) return null;
+    return Math.round(num * 100);
+  }
+
+  // Formato inteiro de centavos da API TikTok Shop (ex: "3758" -> 3758 centavos = R$ 37,58)
+  const num = Number(raw.replace(/[^\d]/g, ''));
   if (!Number.isFinite(num) || num < 0) return null;
-  // Convert currency units (e.g. 154 or 154.50 BRL) to cents (15400 or 15450)
-  return Math.round(num * 100);
+  return Math.round(num);
+}
+
+function parseCurrencyToCents(value: unknown): number | null {
+  return parsePriceToCents(value);
 }
 
 function parseCents(value: unknown): number | null {
@@ -177,9 +191,9 @@ function parseRating(value: unknown): number | null {
 
 function getPriceCascadeDetails(item: any, priceObj: any) {
   const saleCascade: Array<{ name: string; val: any }> = [
+    { name: 'product_price_info.sale_price_decimal', val: priceObj?.sale_price_decimal },
     { name: 'product_price_info.real_price_decimal', val: priceObj?.real_price_decimal },
     { name: 'product_price_info.real_price', val: priceObj?.real_price },
-    { name: 'product_price_info.sale_price_decimal', val: priceObj?.sale_price_decimal },
     { name: 'product_price_info.sale_price', val: priceObj?.sale_price },
     { name: 'product_price_info.price_decimal', val: priceObj?.price_decimal },
     { name: 'product_price_info.price', val: priceObj?.price },
@@ -219,31 +233,65 @@ function getPriceCascadeDetails(item: any, priceObj: any) {
   };
 }
 
-function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Provider'): MinedProduct {
-  const item = (rawItem && typeof rawItem === 'object' && rawItem.product && typeof rawItem.product === 'object' && !Array.isArray(rawItem.product))
+export function validateAndNormalizeProduct(
+  rawItem: any,
+  sourceEndpoint: string = 'SocialCrawl Provider',
+  collectionPosition?: number
+): {
+  product: MinedProduct | null;
+  rejectReason: string | null;
+} {
+  if (!rawItem || typeof rawItem !== 'object') {
+    return { product: null, rejectReason: 'invalid_raw_item_object' };
+  }
+
+  const item = (rawItem.product && typeof rawItem.product === 'object' && !Array.isArray(rawItem.product))
     ? { ...rawItem.product, ...rawItem }
-    : (rawItem || {});
+    : rawItem;
+
+  const cleanProductId = String(
+    item?.product_id ??
+    item?.productId ??
+    item?.id ??
+    item?.item_id ??
+    item?.itemId ??
+    ''
+  ).trim();
+
+  if (!cleanProductId) {
+    return { product: null, rejectReason: 'missing_product_id' };
+  }
 
   const priceObj = item?.product_price_info || item?.price_info || item?.price || item?.price_range || item?.priceInfo || {};
   const video = item?.video || item?.primary_video || null;
   const stats = video?.statistics || video?.stats || {};
   const author = video?.author || {};
-  let category = Array.isArray(item?.category_breadcrumb)
-    ? item.category_breadcrumb.map((entry: any) => entry?.category_name || entry?.name || entry).filter(Boolean).join(' > ')
-    : null;
+
+  // Categoria a partir de category_breadcrumb (formato real SocialCrawl)
+  let category: string | null = null;
+  if (Array.isArray(item?.category_breadcrumb)) {
+    category = item.category_breadcrumb
+      .map((entry: any) => (entry && typeof entry === 'object' ? (entry.category_name || entry.name) : String(entry)))
+      .filter(Boolean)
+      .join(' > ');
+  }
 
   if (!category && Array.isArray(item?.categories)) {
-    category = item.categories.map((c: any) => typeof c === 'string' ? c : (c?.name || c?.category_name)).filter(Boolean).join(' > ');
+    category = item.categories
+      .map((c: any) => (typeof c === 'string' ? c : (c?.name || c?.category_name)))
+      .filter(Boolean)
+      .join(' > ');
   }
 
   if (!category) {
     category = item?.category_path || item?.category_name || item?.category || item?.categoryPath || null;
   }
 
-  const rawSalePrice = priceObj?.real_price_decimal ??
-                       priceObj?.real_price ??
-                       priceObj?.sale_price_decimal ??
+  // Preço de venda (sale_price)
+  const rawSalePrice = priceObj?.sale_price_decimal ??
+                       priceObj?.real_price_decimal ??
                        priceObj?.sale_price ??
+                       priceObj?.real_price ??
                        priceObj?.price_decimal ??
                        priceObj?.price ??
                        priceObj?.min_price_decimal ??
@@ -252,6 +300,7 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
                        item?.sale_price ??
                        item?.price;
 
+  // Preço original (origin_price)
   const rawOriginPrice = priceObj?.origin_price_decimal ??
                          priceObj?.original_price_decimal ??
                          priceObj?.origin_price ??
@@ -261,17 +310,22 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
                          item?.origin_price ??
                          item?.original_price;
 
-  const priceCents = parseCurrencyToCents(rawSalePrice);
-  const originalPriceCents = parseCurrencyToCents(rawOriginPrice);
+  const priceCents = parsePriceToCents(rawSalePrice);
+  const originalPriceCents = parsePriceToCents(rawOriginPrice);
 
-  let discountPercent = priceObj?.discount_decimal !== undefined && priceObj?.discount_decimal !== null
-    ? Math.round(Number(priceObj.discount_decimal) * 100)
-    : null;
-
+  // Desconto percentual
+  let discountPercent: number | null = null;
+  if (priceObj?.discount_format) {
+    const parsedDisc = parseInteger(String(priceObj.discount_format).replace(/[^\d]/g, ''));
+    if (parsedDisc !== null && parsedDisc > 0) discountPercent = parsedDisc;
+  } else if (priceObj?.discount_decimal !== undefined && priceObj?.discount_decimal !== null) {
+    discountPercent = Math.round(Number(priceObj.discount_decimal) * 100);
+  }
   if ((discountPercent === null || discountPercent === 0) && priceCents && originalPriceCents && originalPriceCents > priceCents) {
     discountPercent = Math.round(((originalPriceCents - priceCents) / originalPriceCents) * 100);
   }
 
+  // Comissões (opcional)
   const commInfo = item?.commission_info || item?.affiliate_info || item?.commission || item?.promotion_info || item?.collaboration_info || item?.creator_commission_info || {};
   let commRate = parseRating(
     commInfo?.commission_rate ??
@@ -296,7 +350,7 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
     item?.earnings
   );
   if (commCents === null) {
-    commCents = parseCurrencyToCents(
+    commCents = parsePriceToCents(
       commInfo?.estimated_commission ??
       commInfo?.commission ??
       item?.estimated_commission
@@ -306,20 +360,12 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
     commCents = Math.round((priceCents * commRate) / 100);
   }
 
+  // URL canônica ou pdp do produto
   const rawProductUrl = item?.seo_url?.canonical_url
     || item?.product_url
     || item?.pdp_url
     || item?.detail_url
     || item?.url;
-
-  const cleanProductId = String(
-    item?.product_id ??
-    item?.productId ??
-    item?.id ??
-    item?.item_id ??
-    item?.itemId ??
-    ''
-  ).trim();
 
   let resolvedProductUrl: string | null = null;
   if (rawProductUrl && typeof rawProductUrl === 'string') {
@@ -334,40 +380,11 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
       resolvedProductUrl = trimmed;
     }
   }
-
-  const isDebug = process.env.NODE_ENV !== 'production' || process.env.MINER_DEBUG === 'true';
-  if (isDebug) {
-    const cascade = getPriceCascadeDetails(item, priceObj);
-    const skus = item?.skus || item?.sku_list || item?.skus_list || item?.variants || null;
-
-    console.log(`[MINER DIAGNOSTIC LOG] ========================================`);
-    console.log(`product_id:`, cleanProductId);
-    console.log(`title:`, String(item?.title || item?.product_name || item?.name || ''));
-    console.log(`seller:`, item?.seller_info?.shop_name || item?.seller_info?.seller_id || item?.seller_name || item?.shop_name || null);
-    console.log(`endpoint/origem:`, sourceEndpoint);
-    console.log(`currency_name:`, priceObj?.currency || item?.currency_name || item?.currency || null);
-    console.log(`currency_symbol:`, priceObj?.currency_symbol || item?.currency_symbol || item?.currency || null);
-    console.log(`product_price_info completo:`, item?.product_price_info ? JSON.stringify(item.product_price_info) : null);
-    console.log(`price_info completo:`, item?.price_info ? JSON.stringify(item.price_info) : null);
-    console.log(`price completo:`, item?.price ? JSON.stringify(item.price) : null);
-    console.log(`price_range completo:`, item?.price_range ? JSON.stringify(item.price_range) : null);
-    console.log(`item.sale_price:`, item?.sale_price ?? null);
-    console.log(`item.real_price:`, item?.real_price ?? null);
-    console.log(`item.price:`, item?.price ?? null);
-    if (skus) {
-      console.log(`skus / sku_list:`, JSON.stringify(skus));
-    }
-    console.log(`selectedPriceField:`, cascade.selectedSaleField);
-    console.log(`selectedPriceRawValue:`, cascade.selectedSaleRawValue);
-    console.log(`normalizedPriceCents (priceCents):`, priceCents);
-    console.log(`selectedOriginalPriceField:`, cascade.selectedOriginField);
-    console.log(`selectedOriginalPriceRawValue:`, cascade.selectedOriginRawValue);
-    console.log(`normalizedOriginalPriceCents:`, originalPriceCents);
-    console.log(`URL original recebida:`, rawProductUrl || null);
-    console.log(`URL final escolhida:`, resolvedProductUrl);
-    console.log(`================================================================`);
+  if (!resolvedProductUrl && cleanProductId) {
+    resolvedProductUrl = `https://www.tiktok.com/shop/pdp/${cleanProductId}`;
   }
 
+  // Extração e normalização de vídeos associados
   const rawVideoList: any[] = [];
   if (item?.video && typeof item.video === 'object') {
     rawVideoList.push(item.video);
@@ -383,15 +400,19 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
   }
 
   const vMap = new Map<string, MinedVideo>();
-  for (const vItem of rawVideoList) {
-    if (!vItem) continue;
-    const awemeId = vItem?.aweme_id ? String(vItem.aweme_id) : (vItem?.id ? String(vItem.id) : null);
+  for (let vIdx = 0; vIdx < rawVideoList.length; vIdx++) {
+    const vItem = rawVideoList[vIdx];
+    if (!vItem || typeof vItem !== 'object') continue;
+    const awemeId = vItem?.aweme_id
+      ? String(vItem.aweme_id)
+      : (vItem?.id ? String(vItem.id) : (vItem?.video_id ? String(vItem.video_id) : (cleanProductId ? `${cleanProductId}_v${vIdx + 1}` : null)));
     if (!awemeId) continue;
     const vStats = vItem?.statistics || vItem?.stats || {};
     const vAuthor = vItem?.author || {};
+    const vUrl = vItem?.share_url || vItem?.url_list?.[0] || vItem?.url || vItem?.play_addr || null;
     const videoObj: MinedVideo = {
       id: awemeId,
-      url: vItem?.share_url || vItem?.url || null,
+      url: vUrl,
       description: vItem?.desc || vItem?.description || null,
       author: vAuthor?.unique_id || vAuthor?.nickname || (typeof vItem?.author === 'string' ? vItem.author : null),
       authorFollowers: parseInteger(vAuthor?.follower_count || vAuthor?.followers),
@@ -411,9 +432,9 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
     .sort(compareMinedVideosDesc)
     .slice(0, MAX_ASSOCIATED_VIDEOS);
 
-  const fallbackSingleVideo: MinedVideo | null = video ? {
-    id: video?.aweme_id ? String(video.aweme_id) : (video?.id ? String(video.id) : null),
-    url: video?.share_url || video?.url || null,
+  const fallbackSingleVideo: MinedVideo | null = (video && typeof video === 'object') ? {
+    id: video?.aweme_id ? String(video.aweme_id) : (video?.id ? String(video.id) : (video?.video_id ? String(video.video_id) : (cleanProductId ? `${cleanProductId}_v1` : 'vid'))),
+    url: video?.share_url || video?.url_list?.[0] || video?.url || null,
     description: video?.desc || video?.description || null,
     author: author?.unique_id || author?.nickname || null,
     authorFollowers: parseInteger(author?.follower_count || author?.followers),
@@ -446,7 +467,7 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
     (Array.isArray(item?.images) ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0]?.url) : null) ||
     null;
 
-  return {
+  const product: MinedProduct = {
     productId: cleanProductId,
     title: rawTitle,
     imageUrl: rawImageUrl,
@@ -454,7 +475,7 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
     originalPriceCents,
     discountPercent,
     currencySymbol: String(priceObj?.currency_symbol || item?.currency_symbol || item?.currency || 'R$'),
-    rating: parseRating(item?.rate_info?.score ?? item?.rating ?? item?.score),
+    rating: parseRating(item?.rate_info?.score ?? item?.rate_info?.rating ?? item?.rating ?? item?.score),
     soldCount: parseInteger(item?.sold_info?.sold_count ?? item?.sold_count ?? item?.sales ?? item?.total_sold) || 0,
     sellerId: item?.seller_info?.seller_id ? String(item.seller_info.seller_id) : (item?.seller_id ? String(item.seller_id) : null),
     sellerName: item?.seller_info?.shop_name ? String(item.seller_info.shop_name) : (item?.seller_name ? String(item.seller_name) : (item?.shop_name ? String(item.shop_name) : null)),
@@ -464,6 +485,34 @@ function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Pr
     commissionRatePercent: commRate && commRate > 0 ? commRate : null,
     video: primaryVideo,
     associatedVideos: associatedVideosList,
+    collectionPosition,
+  };
+
+  return { product, rejectReason: null };
+}
+
+export function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Provider'): MinedProduct {
+  const res = validateAndNormalizeProduct(rawItem, sourceEndpoint);
+  if (res.product) return res.product;
+  const pId = String(rawItem?.product_id || rawItem?.productId || rawItem?.id || 'temp').trim();
+  return {
+    productId: pId,
+    title: String(rawItem?.title || rawItem?.product_name || 'Produto sem nome').trim(),
+    imageUrl: rawItem?.image?.url_list?.[0] || null,
+    priceCents: null,
+    originalPriceCents: null,
+    discountPercent: null,
+    currencySymbol: 'R$',
+    rating: null,
+    soldCount: 0,
+    sellerId: null,
+    sellerName: null,
+    productUrl: null,
+    category: null,
+    estimatedCommissionCents: null,
+    commissionRatePercent: null,
+    video: null,
+    associatedVideos: [],
   };
 }
 
@@ -2254,13 +2303,27 @@ export async function searchTikTokShopProducts(params: {
     });
   }
 
-  const normalized = rawItems
-    .map((rawItem, idx) => {
-      const p = normalizeProduct(rawItem, 'SocialCrawl Search API');
-      p.collectionPosition = (page - 1) * 30 + (idx + 1);
-      return p;
-    })
-    .filter((item) => item.productId && item.productId.length > 0);
+  const rejectionReasons: Record<string, number> = {};
+  const normalized: MinedProduct[] = [];
+
+  for (let idx = 0; idx < rawItems.length; idx++) {
+    const rawItem = rawItems[idx];
+    const pos = (page - 1) * 30 + (idx + 1);
+    const { product, rejectReason } = validateAndNormalizeProduct(rawItem, 'SocialCrawl Search API', pos);
+    if (product && product.productId) {
+      normalized.push(product);
+    } else {
+      const reason = rejectReason || 'unknown_rejection';
+      rejectionReasons[reason] = (rejectionReasons[reason] || 0) + 1;
+    }
+  }
+
+  console.log(`[SocialCrawl Search Stats]: query="${providerQuery}" page=${page} itemsReceived=${rawItems.length} normalizedCount=${normalized.length} rejectedCount=${rawItems.length - normalized.length} reasons=${JSON.stringify(rejectionReasons)}`);
+
+  if (rawItems.length > 0 && normalized.length === 0) {
+    const reasonStr = Object.entries(rejectionReasons).map(([k, v]) => `${k}:${v}`).join(', ');
+    throw new Error(`PARSER_REJECTION: Nenhum produto válido extraído de ${rawItems.length} itens recebidos da SocialCrawl (Motivos: ${reasonStr || 'missing_product_id'}).`);
+  }
 
   const persistStats = await persistProducts(normalized, query);
   const productsWithTrends = await attachTrendMetrics(normalized);
@@ -2419,6 +2482,9 @@ export async function refreshMultiPageTikTokShopProducts(params: {
     } catch (err: any) {
       console.warn(`[MultiPage Collection Partial Failure on page ${p} for query "${query}"]:`, err?.message || err);
       partialError = err?.message || `Falha na página ${p}`;
+      if (pagesConsulted === 0) {
+        throw err;
+      }
       break;
     }
   }
