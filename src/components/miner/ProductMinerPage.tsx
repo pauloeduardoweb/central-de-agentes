@@ -5032,6 +5032,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     let totalUpdatedCount = 0;
     let totalCreditsUsed = 0;
     let processedCats = 0;
+    const failedErrors: string[] = [];
 
     for (const cat of categoriesToProcess) {
       setBatchProgress({
@@ -5059,24 +5060,28 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           totalUpdatedCount += res.updatedProductsCount ?? 0;
           totalCreditsUsed += res.creditsUsed ?? Math.ceil(expansionTargetCount / 30);
         }
+        processedCats++;
       } catch (err: any) {
-        console.warn(`[Batch Expansion Warning for ${cat}]:`, err?.message || err);
+        console.warn(`[Batch Expansion Error for ${cat}]:`, err?.message || err);
+        failedErrors.push(`${cat}: ${err?.message || 'Falha na requisição'}`);
       }
-
-      processedCats++;
     }
 
     setIsBatchExecuting(false);
     loadCategories();
 
-    setBatchSummaryModal({
-      open: true,
-      totalProducts: totalNewCount + totalUpdatedCount,
-      newProducts: totalNewCount,
-      updatedProducts: totalUpdatedCount,
-      creditsUsed: totalCreditsUsed,
-      categoriesProcessed: processedCats,
-    });
+    if (processedCats === 0 && failedErrors.length > 0) {
+      setError(`Falha ao expandir categorias: ${failedErrors.join('; ')}`);
+    } else {
+      setBatchSummaryModal({
+        open: true,
+        totalProducts: totalNewCount + totalUpdatedCount,
+        newProducts: totalNewCount,
+        updatedProducts: totalUpdatedCount,
+        creditsUsed: totalCreditsUsed,
+        categoriesProcessed: processedCats,
+      });
+    }
   };
 
   // Atualização Diária da Base State
