@@ -1322,6 +1322,18 @@ export function getSubcategoryAliases(sub: string): string[] {
     'suplementos alimentares': ['Food Supplements', 'Dietary Supplements', 'Supplements'],
     'medicamentos e tratamentos alternativos': ['Alternative Medicine & Treatments', 'Alternative Medicine'],
     'suprimentos medicos': ['Medical Supplies'],
+    'adestramento de caes e gatos': ['Dog & Cat Grooming', 'Cat & Dog Grooming', 'Grooming & Training', 'Grooming', 'Training'],
+    'areia para caes e gatos': ['Cat & Dog Litter & Housebreaking', 'Cat Litter', 'Litter & Housebreaking', 'Dog & Cat Litter & Housebreaking'],
+    'acessorios para caes e gatos': ['Cat & Dog Accessories', 'Dog & Cat Accessories'],
+    'peixes e suprimentos aquaticos': ['Fish & Aquatic Supplies', 'Aquatic Supplies'],
+    'saude para caes e gatos': ['Cat & Dog Health Care', 'Dog & Cat Health Care', 'Cat & Dog Health'],
+    'suprimentos para animais pequenos': ['Small Animal Supplies'],
+    'roupas para caes e gatos': ['Cat & Dog Apparel', 'Dog & Cat Apparel', 'Dog & Cat Clothing'],
+    'comida para caes e gatos': ['Cat & Dog Food', 'Dog & Cat Food'],
+    'suprimentos para animais de fazenda e aves': ['Farm Animal & Poultry Supplies', 'Farm Animal Supplies'],
+    'moveis para caes e gatos': ['Cat & Dog Furniture', 'Dog & Cat Furniture'],
+    'suprimentos para passaros': ['Bird Supplies'],
+    'suprimentos para repteis e anfibios': ['Reptile & Amphibian Supplies', 'Reptile Supplies'],
   };
 
   if (map[norm]) {
@@ -1353,6 +1365,7 @@ export function getChildCategoryAliases(child: string): string[] {
     'sapatos para casamento': ['Wedding Shoes'],
     'suplementos herbais': ['Herbal Supplements'],
     'dispositivos de compressao corporal': ['Body Compression Devices'],
+    'suprimentos de nutricao e cuidados de saude': ['Nutrition & Health Care Supplies'],
   };
 
   if (map[norm]) {
