@@ -1337,6 +1337,15 @@ export function getSubcategoryAliases(sub: string): string[] {
     'roupas de cama': ['Bedding', 'Bedclothes'],
     'texteis domesticos': ['Home Textiles', 'Household Textiles'],
     'tecidos e suprimentos de costura': ['Fabrics & Sewing Supplies', 'Fabrics and Sewing Supplies', 'Sewing Supplies'],
+    'utensilios para bebidas': ['Drinkware', 'Beverage Utensils', 'Drink Utensils'],
+    'utensilios e aparelhos de cozinha': ['Kitchen Tools & Gadgets', 'Kitchen Utensils & Gadgets', 'Kitchen Tools and Gadgets'],
+    'utensilios para forno': ['Bakeware', 'Ovenware'],
+    'facas de cozinha': ['Kitchen Knives', 'Kitchen Cutlery'],
+    'utensilios para cozinhar': ['Cookware', 'Cooking Utensils'],
+    'utensilios para bares e vinhos': ['Bar & Wine Utensils', 'Bar and Wine Utensils', 'Barware'],
+    'talheres e servicos de mesa': ['Cutlery & Tableware', 'Cutlery and Tableware', 'Tableware & Flatware', 'Tableware'],
+    'churrasco': ['Barbecue', 'BBQ', 'Barbecue & Grill'],
+    'utensilios para cha e cafe': ['Tea & Coffee Ware', 'Tea and Coffee Ware', 'Coffee & Tea Ware'],
   };
 
   if (map[norm]) {
