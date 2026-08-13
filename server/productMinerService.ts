@@ -1260,6 +1260,14 @@ export function getSubcategoryAliases(sub: string): string[] {
     'componentes para desktop e laptop': ['Desktop & Laptop Components'],
     'componentes de rede': ['Networking Components'],
     'computadores desktop, laptops e tablets': ['Desktops, Laptops & Tablets', 'Computers & Tablets'],
+    'ferramentas de medicao': ['Measurement & Analysis Instruments', 'Measuring Tools', 'Measurement Instruments'],
+    'ferramentas eletricas': ['Power Tools'],
+    'ferramentas de jardim': ['Garden Tools', 'Gardening Tools'],
+    'hardware': ['Hardware'],
+    'equipamento de solda': ['Welding Equipment', 'Welding & Soldering Supplies'],
+    'ferramentas manuais': ['Hand Tools'],
+    'bombas e encanamento': ['Pumps & Plumbing'],
+    'organizadores de ferramentas': ['Tool Organizers'],
   };
 
   if (map[norm]) {
