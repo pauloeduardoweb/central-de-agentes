@@ -305,11 +305,11 @@ export const TermsPage: React.FC<TermsPageProps> = ({ onNavigateHome }) => {
                 Para dúvidas, esclarecimentos ou solicitações sobre estes Termos, entre em contato:
               </p>
               <a
-                href="mailto:paulo.eduardo.eduardo.web@gmail.com"
+                href="mailto:paulo.eduardo.web@gmail.com"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-medium hover:bg-cyan-500/20 transition-colors text-sm sm:text-base"
               >
                 <Mail className="w-4 h-4 text-cyan-400" />
-                paulo.eduardo.eduardo.web@gmail.com
+                paulo.eduardo.web@gmail.com
               </a>
             </div>
           </section>
