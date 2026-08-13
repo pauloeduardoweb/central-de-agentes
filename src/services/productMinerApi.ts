@@ -150,6 +150,8 @@ export async function searchProducts(
 
 export interface CollectorRefreshResponse extends ProductSearchResponse {
   uniqueProductsCount?: number;
+  newProductsCount?: number;
+  updatedProductsCount?: number;
   pagesConsulted?: number;
   category?: string;
   timestamp?: string;
