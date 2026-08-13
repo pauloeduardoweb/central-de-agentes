@@ -1246,6 +1246,53 @@ export function getSubcategoryKeywords(sub: string): string[] {
   return map[norm] || [norm];
 }
 
+export function getSubcategoryAliases(sub: string): string[] {
+  const norm = String(sub || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!norm || norm === 'todas' || norm === 'todos') return [sub];
+
+  const aliases = new Set<string>([sub]);
+
+  const map: Record<string, string[]> = {
+    'artigos de papelaria e suprimentos para escritorio': ['Stationery & Office Supplies', 'Office Supplies'],
+    'armazenamento de dados e software': ['Data Storage & Software'],
+    'perifericos e acessorios': ['Peripherals & Accessories'],
+    'equipamentos de escritorio': ['Office Equipment'],
+    'componentes para desktop e laptop': ['Desktop & Laptop Components'],
+    'componentes de rede': ['Networking Components'],
+    'computadores desktop, laptops e tablets': ['Desktops, Laptops & Tablets', 'Computers & Tablets'],
+  };
+
+  if (map[norm]) {
+    for (const a of map[norm]) {
+      aliases.add(a);
+    }
+  }
+
+  return Array.from(aliases);
+}
+
+export function getChildCategoryAliases(child: string): string[] {
+  const norm = String(child || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!norm || norm === 'todas' || norm === 'todos') return [child];
+
+  const aliases = new Set<string>([child]);
+
+  const map: Record<string, string[]> = {
+    'limpadores para equipamentos de escritorio': ['Office Equipment Cleaners', 'Equipment Cleaners'],
+    'monitor portatil para computador': ['Portable Computer Monitor', 'Portable Monitor'],
+    'cabos e acessorios': ['Cables & Accessories', 'Cables and Accessories'],
+    'computadores de placa unica (sbc)': ['Single Board Computers', 'Single Board Computer'],
+  };
+
+  if (map[norm]) {
+    for (const a of map[norm]) {
+      aliases.add(a);
+    }
+  }
+
+  return Array.from(aliases);
+}
+
 export function getChildCategoryKeywords(child: string): string[] {
   const norm = String(child || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (!norm || norm === 'todas' || norm === 'todos' || norm === 'geral') return [];
@@ -1276,6 +1323,11 @@ export function getChildCategoryKeywords(child: string): string[] {
 
     'lampadas led para farol': ['led', 'lampada', 'h7', 'h4', 'h1', 'farol'],
     'lanternas e luzes internas': ['lanterna', 'interna', 'pingo', 't10', 'festoft'],
+
+    'limpadores para equipamentos de escritorio': ['limpador', 'limpeza', 'cleaner', 'spray limpeza'],
+    'monitor portatil para computador': ['monitor', 'portatil', 'portable', 'tela portatil'],
+    'cabos e acessorios': ['cabo', 'cable', 'hdmi', 'displayport', 'adaptador'],
+    'computadores de placa unica (sbc)': ['sbc', 'single board', 'raspberry', 'placa unica'],
   };
 
   return map[norm] || [norm];
@@ -1330,12 +1382,15 @@ export function buildProductSearchWhereClause(params: {
   // 2. Subcategory Filter
   if (subcategoryToUse) {
     const subOrs: string[] = [];
-    subOrs.push(`p.category_path LIKE ?`);
-    sqlParams.push(`%> ${subcategoryToUse}`);
-    subOrs.push(`p.category_path LIKE ?`);
-    sqlParams.push(`%> ${subcategoryToUse} >%`);
-    subOrs.push(`p.category_path = ?`);
-    sqlParams.push(subcategoryToUse);
+    const subAliases = getSubcategoryAliases(subcategoryToUse);
+    for (const alias of subAliases) {
+      subOrs.push(`p.category_path LIKE ?`);
+      sqlParams.push(`%> ${alias}`);
+      subOrs.push(`p.category_path LIKE ?`);
+      sqlParams.push(`%> ${alias} >%`);
+      subOrs.push(`p.category_path = ?`);
+      sqlParams.push(alias);
+    }
 
     const subKeywords = getSubcategoryKeywords(subcategoryToUse);
     if (subKeywords.length > 0) {
@@ -1352,12 +1407,15 @@ export function buildProductSearchWhereClause(params: {
   // 3. Child Category Filter
   if (childCategoryToUse) {
     const childOrs: string[] = [];
-    childOrs.push(`p.category_path LIKE ?`);
-    sqlParams.push(`%> ${childCategoryToUse}`);
-    childOrs.push(`p.category_path LIKE ?`);
-    sqlParams.push(`%> ${childCategoryToUse} >%`);
-    childOrs.push(`p.category_path = ?`);
-    sqlParams.push(childCategoryToUse);
+    const childAliases = getChildCategoryAliases(childCategoryToUse);
+    for (const alias of childAliases) {
+      childOrs.push(`p.category_path LIKE ?`);
+      sqlParams.push(`%> ${alias}`);
+      childOrs.push(`p.category_path LIKE ?`);
+      sqlParams.push(`%> ${alias} >%`);
+      childOrs.push(`p.category_path = ?`);
+      sqlParams.push(alias);
+    }
 
     const childKeywords = getChildCategoryKeywords(childCategoryToUse);
     if (childKeywords.length > 0) {
