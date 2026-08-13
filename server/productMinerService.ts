@@ -8,15 +8,64 @@ type SocialCrawlSearchResponse = {
   success?: boolean;
   platform?: string;
   endpoint?: string;
-  data?: { items?: any[]; dropped?: number };
+  data?: any;
+  items?: any[];
+  products?: any[];
+  results?: any[];
+  product_list?: any[];
+  search_result?: any[];
+  credits?: number;
   credits_used?: number;
   credits_remaining?: number;
+  cost?: number;
   request_id?: string;
   cached?: boolean;
-  pagination?: { next_cursor?: string | null; has_more?: boolean; page_size?: number };
+  pagination?: { next_cursor?: string | null; has_more?: boolean; page_size?: number; total?: number };
+  has_more?: boolean;
+  hasMore?: boolean;
   error?: string;
   message?: string;
 };
+
+export function extractRawItemsFromPayload(payload: any): any[] {
+  if (!payload || typeof payload !== 'object') return [];
+
+  // 1. Array direto na raiz ou em payload.data
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload.data)) return payload.data;
+
+  // 2. Objetos aninhados sob payload.data
+  if (payload.data && typeof payload.data === 'object') {
+    if (Array.isArray(payload.data.items)) return payload.data.items;
+    if (Array.isArray(payload.data.products)) return payload.data.products;
+    if (Array.isArray(payload.data.results)) return payload.data.results;
+    if (Array.isArray(payload.data.product_list)) return payload.data.product_list;
+    if (Array.isArray(payload.data.search_result)) return payload.data.search_result;
+    if (Array.isArray(payload.data.data)) return Array.isArray(payload.data.data) ? payload.data.data : (Array.isArray(payload.data.data.items) ? payload.data.data.items : []);
+    if (Array.isArray(payload.data.list)) return payload.data.list;
+  }
+
+  // 3. Chaves na raiz do payload
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.products)) return payload.products;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.product_list)) return payload.product_list;
+  if (Array.isArray(payload.search_result)) return payload.search_result;
+  if (Array.isArray(payload.list)) return payload.list;
+
+  return [];
+}
+
+export function extractHasMoreFromPayload(payload: any, itemsLength: number): boolean {
+  if (typeof payload?.pagination?.has_more === 'boolean') return payload.pagination.has_more;
+  if (typeof payload?.data?.pagination?.has_more === 'boolean') return payload.data.pagination.has_more;
+  if (typeof payload?.has_more === 'boolean') return payload.has_more;
+  if (typeof payload?.hasMore === 'boolean') return payload.hasMore;
+  if (typeof payload?.data?.has_more === 'boolean') return payload.data.has_more;
+  if (typeof payload?.data?.hasMore === 'boolean') return payload.data.hasMore;
+  // Se retornou pelo menos 15 produtos, assumir que existem mais páginas disponíveis
+  return itemsLength >= 15;
+}
 
 export const MAX_ASSOCIATED_VIDEOS = 9;
 
@@ -170,17 +219,25 @@ function getPriceCascadeDetails(item: any, priceObj: any) {
   };
 }
 
-function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provider'): MinedProduct {
-  const priceObj = item?.product_price_info || item?.price_info || item?.price || item?.price_range || {};
-  const video = item?.video || null;
-  const stats = video?.statistics || {};
+function normalizeProduct(rawItem: any, sourceEndpoint: string = 'SocialCrawl Provider'): MinedProduct {
+  const item = (rawItem && typeof rawItem === 'object' && rawItem.product && typeof rawItem.product === 'object' && !Array.isArray(rawItem.product))
+    ? { ...rawItem.product, ...rawItem }
+    : (rawItem || {});
+
+  const priceObj = item?.product_price_info || item?.price_info || item?.price || item?.price_range || item?.priceInfo || {};
+  const video = item?.video || item?.primary_video || null;
+  const stats = video?.statistics || video?.stats || {};
   const author = video?.author || {};
   let category = Array.isArray(item?.category_breadcrumb)
     ? item.category_breadcrumb.map((entry: any) => entry?.category_name || entry?.name || entry).filter(Boolean).join(' > ')
     : null;
 
+  if (!category && Array.isArray(item?.categories)) {
+    category = item.categories.map((c: any) => typeof c === 'string' ? c : (c?.name || c?.category_name)).filter(Boolean).join(' > ');
+  }
+
   if (!category) {
-    category = item?.category_path || item?.category_name || item?.category || null;
+    category = item?.category_path || item?.category_name || item?.category || item?.categoryPath || null;
   }
 
   const rawSalePrice = priceObj?.real_price_decimal ??
@@ -252,9 +309,17 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
   const rawProductUrl = item?.seo_url?.canonical_url
     || item?.product_url
     || item?.pdp_url
-    || item?.detail_url;
+    || item?.detail_url
+    || item?.url;
 
-  const cleanProductId = item?.product_id ? String(item.product_id).trim() : '';
+  const cleanProductId = String(
+    item?.product_id ??
+    item?.productId ??
+    item?.id ??
+    item?.item_id ??
+    item?.itemId ??
+    ''
+  ).trim();
 
   let resolvedProductUrl: string | null = null;
   if (rawProductUrl && typeof rawProductUrl === 'string') {
@@ -276,9 +341,9 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
     const skus = item?.skus || item?.sku_list || item?.skus_list || item?.variants || null;
 
     console.log(`[MINER DIAGNOSTIC LOG] ========================================`);
-    console.log(`product_id:`, String(item?.product_id || ''));
-    console.log(`title:`, String(item?.title || ''));
-    console.log(`seller:`, item?.seller_info?.shop_name || item?.seller_info?.seller_id || item?.seller_name || null);
+    console.log(`product_id:`, cleanProductId);
+    console.log(`title:`, String(item?.title || item?.product_name || item?.name || ''));
+    console.log(`seller:`, item?.seller_info?.shop_name || item?.seller_info?.seller_id || item?.seller_name || item?.shop_name || null);
     console.log(`endpoint/origem:`, sourceEndpoint);
     console.log(`currency_name:`, priceObj?.currency || item?.currency_name || item?.currency || null);
     console.log(`currency_symbol:`, priceObj?.currency_symbol || item?.currency_symbol || item?.currency || null);
@@ -322,7 +387,7 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
     if (!vItem) continue;
     const awemeId = vItem?.aweme_id ? String(vItem.aweme_id) : (vItem?.id ? String(vItem.id) : null);
     if (!awemeId) continue;
-    const vStats = vItem?.statistics || {};
+    const vStats = vItem?.statistics || vItem?.stats || {};
     const vAuthor = vItem?.author || {};
     const videoObj: MinedVideo = {
       id: awemeId,
@@ -347,32 +412,52 @@ function normalizeProduct(item: any, sourceEndpoint: string = 'SocialCrawl Provi
     .slice(0, MAX_ASSOCIATED_VIDEOS);
 
   const fallbackSingleVideo: MinedVideo | null = video ? {
-    id: video?.aweme_id ? String(video.aweme_id) : null,
-    url: video?.share_url || null,
-    description: video?.desc || null,
+    id: video?.aweme_id ? String(video.aweme_id) : (video?.id ? String(video.id) : null),
+    url: video?.share_url || video?.url || null,
+    description: video?.desc || video?.description || null,
     author: author?.unique_id || author?.nickname || null,
-    authorFollowers: parseInteger(author?.follower_count),
-    views: parseInteger(stats?.play_count),
-    likes: parseInteger(stats?.digg_count),
-    comments: parseInteger(stats?.comment_count),
-    shares: parseInteger(stats?.share_count),
-    saves: parseInteger(stats?.collect_count),
+    authorFollowers: parseInteger(author?.follower_count || author?.followers),
+    views: parseInteger(stats?.play_count || stats?.views),
+    likes: parseInteger(stats?.digg_count || stats?.likes),
+    comments: parseInteger(stats?.comment_count || stats?.comments),
+    shares: parseInteger(stats?.share_count || stats?.shares),
+    saves: parseInteger(stats?.collect_count || stats?.saves),
   } : null;
 
   const primaryVideo = associatedVideosList.length > 0 ? associatedVideosList[0] : fallbackSingleVideo;
 
+  const rawTitle = String(
+    item?.title ??
+    item?.product_name ??
+    item?.name ??
+    item?.item_name ??
+    item?.productTitle ??
+    'Produto sem nome'
+  ).trim();
+
+  const rawImageUrl =
+    item?.image?.url_list?.[0] ||
+    item?.image?.url ||
+    item?.image_url ||
+    item?.imageUrl ||
+    item?.cover ||
+    item?.main_image ||
+    item?.mainImage ||
+    (Array.isArray(item?.images) ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0]?.url) : null) ||
+    null;
+
   return {
-    productId: String(item?.product_id || ''),
-    title: String(item?.title || 'Produto sem nome'),
-    imageUrl: item?.image?.url_list?.[0] || null,
+    productId: cleanProductId,
+    title: rawTitle,
+    imageUrl: rawImageUrl,
     priceCents,
     originalPriceCents,
     discountPercent,
     currencySymbol: String(priceObj?.currency_symbol || item?.currency_symbol || item?.currency || 'R$'),
-    rating: parseRating(item?.rate_info?.score),
-    soldCount: parseInteger(item?.sold_info?.sold_count) || 0,
-    sellerId: item?.seller_info?.seller_id ? String(item.seller_info.seller_id) : null,
-    sellerName: item?.seller_info?.shop_name ? String(item.seller_info.shop_name) : null,
+    rating: parseRating(item?.rate_info?.score ?? item?.rating ?? item?.score),
+    soldCount: parseInteger(item?.sold_info?.sold_count ?? item?.sold_count ?? item?.sales ?? item?.total_sold) || 0,
+    sellerId: item?.seller_info?.seller_id ? String(item.seller_info.seller_id) : (item?.seller_id ? String(item.seller_id) : null),
+    sellerName: item?.seller_info?.shop_name ? String(item.seller_info.shop_name) : (item?.seller_name ? String(item.seller_name) : (item?.shop_name ? String(item.shop_name) : null)),
     productUrl: resolvedProductUrl,
     category,
     estimatedCommissionCents: commCents && commCents > 0 ? commCents : null,
@@ -443,12 +528,41 @@ async function saveCachedPayload(query: string, region: string, page: number, pa
   });
 }
 
-async function persistProducts(products: MinedProduct[], query: string): Promise<void> {
-  if (!isDatabaseConfigured() || products.length === 0) return;
+async function persistProducts(products: MinedProduct[], query: string): Promise<{
+  insertedCount: number;
+  updatedCount: number;
+  totalValid: number;
+}> {
+  if (!isDatabaseConfigured() || products.length === 0) {
+    return { insertedCount: 0, updatedCount: 0, totalValid: 0 };
+  }
   await ensureProductMinerTables();
 
-  const validProducts = products.filter((product) => product.productId);
-  if (validProducts.length === 0) return;
+  const validProducts = products.filter((product) => product.productId && String(product.productId).trim() !== '');
+  if (validProducts.length === 0) {
+    return { insertedCount: 0, updatedCount: 0, totalValid: 0 };
+  }
+
+  const ids = validProducts.map((product) => product.productId);
+
+  // Verificar quais produtos já existem no banco para contabilização exata de novos vs atualizados
+  const existingSet = new Set<string>();
+  try {
+    const [existingRows]: any = await db.query(
+      `SELECT product_id FROM tiktok_shop_products WHERE product_id IN (?)`,
+      [ids]
+    );
+    if (Array.isArray(existingRows)) {
+      for (const r of existingRows) {
+        if (r.product_id) existingSet.add(String(r.product_id));
+      }
+    }
+  } catch (err: any) {
+    console.warn('[persistProducts check existing warning]:', err?.message || err);
+  }
+
+  const insertedCount = ids.filter((id) => !existingSet.has(id)).length;
+  const updatedCount = ids.length - insertedCount;
 
   const productRows = validProducts.map((product) => [
     product.productId,
@@ -507,7 +621,6 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
     [productRows]
   );
 
-  const ids = validProducts.map((product) => product.productId);
   const [lastSnapshotRows]: any = await db.query(
     `SELECT s.product_id, MAX(s.captured_at) AS last_captured_at
      FROM tiktok_shop_product_snapshots s
@@ -556,6 +669,12 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
       await saveVideosToProductVideosTable(p.productId, vList).catch(() => {});
     }
   }
+
+  return {
+    insertedCount,
+    updatedCount,
+    totalValid: validProducts.length,
+  };
 }
 
 export function compareMinedVideosDesc(a: MinedVideo, b: MinedVideo): number {
@@ -1710,6 +1829,9 @@ export async function searchTikTokShopProducts(params: {
   needsRefresh: boolean;
   cacheExpired: boolean;
   requestId: string | null;
+  newProductsCount?: number;
+  updatedProductsCount?: number;
+  totalReceived?: number;
 }> {
   const query = String(params.query || '').trim();
   const category = String(params.category || '').trim();
@@ -2097,14 +2219,50 @@ export async function searchTikTokShopProducts(params: {
   }
 
   await saveCachedPayload(query, region, page, payload);
-  const normalized = (payload.data?.items || [])
+
+  const rawItems = extractRawItemsFromPayload(payload);
+  const creditsUsedForThisCall = Number(payload.credits_used ?? payload.credits ?? payload.cost ?? 1);
+  const hasMore = extractHasMoreFromPayload(payload, rawItems.length);
+
+  if (rawItems.length === 0 && response.ok) {
+    const topKeys = Object.keys(payload);
+    const dataKeys = payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+      ? Object.keys(payload.data)
+      : (Array.isArray(payload.data) ? `array[${payload.data.length}]` : typeof payload.data);
+
+    console.warn(`[SocialCrawl Search Unexpected Payload Structure]:`, {
+      category: providerQuery,
+      page,
+      httpStatus: response.status,
+      topLevelKeys: topKeys,
+      dataKeys,
+      itemsFound: 0,
+      reason: 'Nenhum array de produtos identificado nas propriedades conhecidas (items, products, results, product_list, etc.)',
+    });
+
+    logMinerAcquisition({
+      query: providerQuery,
+      page,
+      region,
+      endpoint: '/v1/tiktokshop/search',
+      requestUrl: url.toString(),
+      requestExecuted: true,
+      httpStatus: response.status,
+      itemsReceived: 0,
+      creditsUsed: creditsUsedForThisCall,
+      skipReason: `PAYLOAD_STRUCTURE_MISMATCH: topKeys=[${topKeys.join(',')}], dataKeys=[${dataKeys}]`,
+    });
+  }
+
+  const normalized = rawItems
     .map((rawItem, idx) => {
       const p = normalizeProduct(rawItem, 'SocialCrawl Search API');
       p.collectionPosition = (page - 1) * 30 + (idx + 1);
       return p;
     })
-    .filter((item) => item.productId);
-  await persistProducts(normalized, query);
+    .filter((item) => item.productId && item.productId.length > 0);
+
+  const persistStats = await persistProducts(normalized, query);
   const productsWithTrends = await attachTrendMetrics(normalized);
   const products = await attachAssociatedVideos(productsWithTrends);
 
@@ -2116,21 +2274,24 @@ export async function searchTikTokShopProducts(params: {
     requestUrl: url.toString(),
     requestExecuted: true,
     httpStatus: response.status,
-    itemsReceived: (payload.data?.items || []).length,
-    creditsUsed: payload.credits_used ?? 0,
+    itemsReceived: rawItems.length,
+    creditsUsed: creditsUsedForThisCall,
   });
 
   return {
     products,
-    creditsUsed: Number(payload.credits_used || 0),
+    creditsUsed: creditsUsedForThisCall,
     creditsRemaining: payload.credits_remaining ?? null,
-    hasMore: Boolean(payload.pagination?.has_more),
+    hasMore,
     pageSize: Number(payload.pagination?.page_size || products.length),
     fromCache: false,
     source: 'provider',
     needsRefresh: false,
     cacheExpired: false,
     requestId: payload.request_id || null,
+    newProductsCount: persistStats.insertedCount,
+    updatedProductsCount: persistStats.updatedCount,
+    totalReceived: rawItems.length,
   };
 }
 
@@ -2142,6 +2303,8 @@ export async function refreshMultiPageTikTokShopProducts(params: {
 }): Promise<{
   products: MinedProduct[];
   uniqueProductsCount: number;
+  newProductsCount: number;
+  updatedProductsCount: number;
   pagesConsulted: number;
   creditsUsed: number;
   creditsRemaining: number | null;
@@ -2157,16 +2320,16 @@ export async function refreshMultiPageTikTokShopProducts(params: {
 
   const region = String(params.region || DEFAULT_REGION).trim().toUpperCase();
 
-  // Validate maxProducts (allowed: 30, 90, 150, 300; strictly capped at 300)
+  // Validate maxProducts (permite de 30 até 1200 produtos por expansão)
   let rawMax = Number(params.maxProducts || 90);
   if (!Number.isFinite(rawMax) || rawMax < 30) rawMax = 30;
-  if (rawMax > 300) rawMax = 300;
+  if (rawMax > 1200) rawMax = 1200;
 
   let startPage = 1;
-  let maxPages = Math.min(10, Math.max(1, Math.ceil(rawMax / 30)));
+  let maxPages = Math.min(40, Math.max(1, Math.ceil(rawMax / 30)));
 
   if (params.page && !params.maxProducts) {
-    startPage = Math.max(1, Math.min(Number(params.page), 20));
+    startPage = Math.max(1, Math.min(Number(params.page), 40));
     maxPages = startPage;
   }
 
@@ -2174,6 +2337,8 @@ export async function refreshMultiPageTikTokShopProducts(params: {
   const allUniqueProducts: MinedProduct[] = [];
   let pagesConsulted = 0;
   let totalCreditsUsed = 0;
+  let totalNewProducts = 0;
+  let totalUpdatedProducts = 0;
   let creditsRemaining: number | null = null;
   let hasMore = true;
   let partialError: string | null = null;
@@ -2212,6 +2377,9 @@ export async function refreshMultiPageTikTokShopProducts(params: {
 
       pagesConsulted++;
       totalCreditsUsed += res.creditsUsed;
+      totalNewProducts += (res.newProductsCount ?? 0);
+      totalUpdatedProducts += (res.updatedProductsCount ?? 0);
+
       if (res.creditsRemaining !== null) {
         creditsRemaining = res.creditsRemaining;
       }
@@ -2224,8 +2392,29 @@ export async function refreshMultiPageTikTokShopProducts(params: {
         }
       }
 
-      if (!hasMore || res.products.length === 0) {
-        if (!isInfantil) break;
+      // Parar se não houver produtos retornados
+      if (res.products.length === 0) {
+        if (!isInfantil) {
+          console.log(`[MultiPage] Query "${query}" finalizou na página ${p}: 0 produtos retornados.`);
+          break;
+        }
+      }
+
+      // Parar se a API informar explicitamente que não há mais páginas
+      if (!hasMore && !isInfantil) {
+        console.log(`[MultiPage] Query "${query}" finalizou na página ${p}: API indicou hasMore=false.`);
+        break;
+      }
+
+      // Parar se atingir ou ultrapassar a meta solicitada de produtos
+      if (allUniqueProducts.length >= rawMax) {
+        console.log(`[MultiPage] Query "${query}" atingiu meta de ${rawMax} produtos (acumulados: ${allUniqueProducts.length}) na página ${p}.`);
+        break;
+      }
+
+      // Pequeno intervalo preventivo entre requisições para estabilidade de rate limit
+      if (p < maxPages) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
       }
     } catch (err: any) {
       console.warn(`[MultiPage Collection Partial Failure on page ${p} for query "${query}"]:`, err?.message || err);
@@ -2239,6 +2428,8 @@ export async function refreshMultiPageTikTokShopProducts(params: {
   return {
     products: finalProducts,
     uniqueProductsCount: allUniqueProducts.length,
+    newProductsCount: totalNewProducts,
+    updatedProductsCount: totalUpdatedProducts,
     pagesConsulted,
     creditsUsed: totalCreditsUsed,
     creditsRemaining,
