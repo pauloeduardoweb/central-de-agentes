@@ -1303,6 +1303,10 @@ export function getSubcategoryAliases(sub: string): string[] {
     'roupas para meninas': ["Girls' Clothing", "Girls' Apparel"],
     'acessorios de moda infantil': ["Kids' Fashion Accessories", "Children's Fashion Accessories"],
     'calcados para meninos': ["Boys' Shoes", "Boys' Footwear"],
+    'moveis comerciais': ['Commercial Furniture'],
+    'moveis para ambientes externos': ['Outdoor Furniture', 'Patio Furniture'],
+    'moveis para ambientes internos': ['Indoor Furniture', 'Home Furniture'],
+    'moveis para criancas': ["Kids' Furniture", "Children's Furniture"],
   };
 
   if (map[norm]) {
