@@ -1316,6 +1316,9 @@ export function getSubcategoryAliases(sub: string): string[] {
     'seguranca e protecao': ['Safety & Security', 'Security & Protection'],
     'sistemas domesticos inteligentes': ['Smart Home Systems', 'Smart Home'],
     'energia solar e eolica': ['Solar & Wind Energy', 'Solar and Wind Energy'],
+    'acessorios para sapatos': ['Shoe Accessories', 'Shoes Accessories'],
+    'sapatos femininos': ["Women's Shoes", "Women's Footwear"],
+    'sapatos masculinos': ["Men's Shoes", "Men's Footwear"],
   };
 
   if (map[norm]) {
@@ -1343,6 +1346,8 @@ export function getChildCategoryAliases(child: string): string[] {
     'manguitos para maos': ['Handsocks', 'Hand Sleeves'],
     'alfinetes para hijab': ['Hijab Pins', 'Hijab Pin'],
     'meias': ['Socks'],
+    'calcados tradicionais': ['Traditional Footwear'],
+    'sapatos para casamento': ['Wedding Shoes'],
   };
 
   if (map[norm]) {
