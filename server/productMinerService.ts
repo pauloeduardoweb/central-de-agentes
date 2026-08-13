@@ -1334,6 +1334,9 @@ export function getSubcategoryAliases(sub: string): string[] {
     'moveis para caes e gatos': ['Cat & Dog Furniture', 'Dog & Cat Furniture'],
     'suprimentos para passaros': ['Bird Supplies'],
     'suprimentos para repteis e anfibios': ['Reptile & Amphibian Supplies', 'Reptile Supplies'],
+    'roupas de cama': ['Bedding', 'Bedclothes'],
+    'texteis domesticos': ['Home Textiles', 'Household Textiles'],
+    'tecidos e suprimentos de costura': ['Fabrics & Sewing Supplies', 'Fabrics and Sewing Supplies', 'Sewing Supplies'],
   };
 
   if (map[norm]) {
@@ -1366,6 +1369,12 @@ export function getChildCategoryAliases(child: string): string[] {
     'suplementos herbais': ['Herbal Supplements'],
     'dispositivos de compressao corporal': ['Body Compression Devices'],
     'suprimentos de nutricao e cuidados de saude': ['Nutrition & Health Care Supplies'],
+    'capas contra poeira e armazenamento em tecido': ['Dust cover & Fabric storage', 'Dust cover and Fabric storage'],
+    'camas inflaveis, travesseiros e acessorios': ['Inflatable Beds, Pillows & Accessories', 'Inflatable Beds, Pillows and Accessories'],
+    'trico': ['Knitting'],
+    'bordado e conjuntos': ['Embroidery & sets', 'Embroidery and sets'],
+    'croche': ['Crochet'],
+    'feltro e conjuntos': ['Felt & sets', 'Felt and sets'],
   };
 
   if (map[norm]) {
