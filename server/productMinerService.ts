@@ -1298,6 +1298,11 @@ export function getSubcategoryAliases(sub: string): string[] {
     'agasalhos': ['Outerwear'],
     'roupas islamicas infantis': ["Kids' Islamic Clothing", "Children's Islamic Clothing", "Kids Muslim Clothing"],
     'equipamento para umra': ['Umrah Equipment', 'Umroh Equipment'],
+    'calcados para meninas': ["Girls' Shoes", "Girls' Footwear"],
+    'roupas para meninos': ["Boys' Clothing", "Boys' Apparel"],
+    'roupas para meninas': ["Girls' Clothing", "Girls' Apparel"],
+    'acessorios de moda infantil': ["Kids' Fashion Accessories", "Children's Fashion Accessories"],
+    'calcados para meninos': ["Boys' Shoes", "Boys' Footwear"],
   };
 
   if (map[norm]) {
