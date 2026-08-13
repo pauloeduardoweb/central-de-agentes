@@ -1268,6 +1268,18 @@ export function getSubcategoryAliases(sub: string): string[] {
     'ferramentas manuais': ['Hand Tools'],
     'bombas e encanamento': ['Pumps & Plumbing'],
     'organizadores de ferramentas': ['Tool Organizers'],
+    'cristal natural': ['Natural Crystal', 'Natural Crystals'],
+    'pedras preciosas artificiais': ['Lab-Grown Gemstones', 'Artificial Gemstones'],
+    'platina e ouro quilate': ['Fine Jewelry', 'Platinum & Karat Gold', 'Karat Gold'],
+    'prata': ['Silver', 'Silver Jewelry', '925 Silver'],
+    'cristal artificial': ['Synthetic Crystal', 'Artificial Crystal'],
+    'jade': ['Jade', 'Jadeite', 'Nephrite'],
+    'pedras semipreciosas': ['Semiprecious Stones', 'Semi-Precious Gemstones'],
+    'perola': ['Pearl', 'Pearls', 'Pearl Jewelry'],
+    'ambar': ['Amber', 'Amber Jewelry'],
+    'ouro': ['Gold', 'Gold Jewelry'],
+    'diamante': ['Diamond', 'Diamonds', 'Diamond Jewelry'],
+    'rubi, safira e esmeralda': ['Ruby, Sapphire & Emerald', 'Ruby', 'Sapphire', 'Emerald'],
   };
 
   if (map[norm]) {
