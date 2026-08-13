@@ -1280,6 +1280,15 @@ export function getSubcategoryAliases(sub: string): string[] {
     'ouro': ['Gold', 'Gold Jewelry'],
     'diamante': ['Diamond', 'Diamonds', 'Diamond Jewelry'],
     'rubi, safira e esmeralda': ['Ruby, Sapphire & Emerald', 'Ruby', 'Sapphire', 'Emerald'],
+    'ciencias humanas e sociais': ['Humanities & Social Sciences', 'Humanities'],
+    'estilo de vida e hobbies': ['Lifestyle & Hobbies', 'Lifestyle'],
+    'literatura e arte': ['Literature & Art', 'Literature'],
+    'educacao e escolarizacao': ['Education & Schooling', 'Education'],
+    'livros para bebes e infantis': ["Baby & Children's Books", "Children's Books", 'Kids Books'],
+    'economia e gestao': ['Economics & Management', 'Business & Economics'],
+    'ciencias e tecnologia': ['Science & Technology'],
+    'revistas e jornais': ['Magazines & Newspapers', 'Magazines'],
+    'video e musica': ['Video & Music', 'Music & Video'],
   };
 
   if (map[norm]) {
