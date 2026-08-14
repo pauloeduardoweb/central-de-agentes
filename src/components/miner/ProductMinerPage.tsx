@@ -26,6 +26,7 @@ import {
   calculateExpansionPlanFromStats,
   fetchSubcategoryExpansionPlan,
   executeSubcategoryExpansionApi,
+  calculateCategoryProgressPercent,
   type CategoryExpansionPlan,
   type CategoryExecutionSummaryApi,
 } from '../../services/productMinerApi';
@@ -5011,8 +5012,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [batchProgress, setBatchProgress] = useState<{
     currentCategory: string;
     currentSubcategory?: string;
-    processedCategories: number;
+    currentPage?: number;
+    maxPagesForThisSub?: number;
+    categoryIndex: number;
     totalCategories: number;
+    subcategoryIndex?: number;
+    totalSubcategoriesInCategory?: number;
+    categoryTargetLimit: number;
+    currentValidTargetCount: number;
+    remainingNeeded: number;
+    categoryCreditsUsed: number;
+    categoryCreditLimit: number;
     validNewProductsForTarget: number;
     offTargetProducts: number;
     unclassifiedProducts: number;
@@ -5021,6 +5031,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     totalProcessed: number;
     creditsUsed: number;
     statusText?: string;
+    stopReason?: string;
   } | null>(null);
   const [batchSummaryModal, setBatchSummaryModal] = useState<{
     open: boolean;
@@ -5122,25 +5133,35 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
     for (let i = 0; i < categoriesToProcess.length; i++) {
       const cat = categoriesToProcess[i];
+      const catStat = collectorCategories.find((c) => c.category === cat);
+      const currentCount = catStat?.productCount || 0;
+      const remainingTarget = Math.max(0, expansionTargetCount - currentCount);
+
       setBatchProgress({
         currentCategory: cat,
-        processedCategories: processedCats,
+        currentSubcategory: 'Iniciando análise...',
+        currentPage: 1,
+        maxPagesForThisSub: 1,
+        categoryIndex: i + 1,
         totalCategories: categoriesToProcess.length,
-        totalProcessed: totalProcessedCount,
+        subcategoryIndex: 1,
+        totalSubcategoriesInCategory: 1,
+        categoryTargetLimit: expansionTargetCount,
+        currentValidTargetCount: currentCount,
+        remainingNeeded: remainingTarget,
+        categoryCreditsUsed: 0,
+        categoryCreditLimit: 15,
         validNewProductsForTarget: totalValidNewCount,
         offTargetProducts: totalOffTargetCount,
         unclassifiedProducts: totalUnclassifiedCount,
         newProductsCount: totalNewCount,
         updatedProductsCount: totalUpdatedCount,
+        totalProcessed: totalProcessedCount,
         creditsUsed: totalCreditsUsed,
-        statusText: `Processando subcategorias da categoria "${cat}" (${i + 1}/${categoriesToProcess.length})...`,
+        statusText: `Consultando SocialCrawl...`,
       });
 
       try {
-        const catStat = collectorCategories.find((c) => c.category === cat);
-        const currentCount = catStat?.productCount || 0;
-        const remainingTarget = Math.max(0, expansionTargetCount - currentCount);
-
         // Se a categoria já atingiu a meta ou deficit <= 0, avança para a próxima
         if (remainingTarget <= 0) {
           allCategorySummaries.push({
@@ -5161,12 +5182,41 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           continue;
         }
 
-        // Chamar o serviço oficial de expansão do backend com classificação estrita
-        const result = await executeSubcategoryExpansionApi(studentCode, {
-          selectedCategories: [cat],
-          categoryTargetLimit: expansionTargetCount,
-          perSubcategoryMax: 60,
-        });
+        // Chamar o serviço oficial de expansão do backend com streaming e classificação estrita
+        const result = await executeSubcategoryExpansionApi(
+          studentCode,
+          {
+            selectedCategories: [cat],
+            categoryTargetLimit: expansionTargetCount,
+            perSubcategoryMax: 60,
+          },
+          (progress) => {
+            setBatchProgress({
+              currentCategory: progress.currentCategory,
+              currentSubcategory: progress.currentSubcategory,
+              currentPage: progress.currentPage,
+              maxPagesForThisSub: progress.maxPagesForThisSub,
+              categoryIndex: i + 1,
+              totalCategories: categoriesToProcess.length,
+              subcategoryIndex: progress.subcategoryIndex,
+              totalSubcategoriesInCategory: progress.totalSubcategoriesInCategory,
+              categoryTargetLimit: progress.categoryTargetLimit,
+              currentValidTargetCount: progress.currentValidTargetCount,
+              remainingNeeded: progress.remainingNeeded,
+              categoryCreditsUsed: progress.categoryCreditsUsed,
+              categoryCreditLimit: progress.categoryCreditLimit || 15,
+              validNewProductsForTarget: totalValidNewCount + progress.validNewProductsForTarget,
+              offTargetProducts: totalOffTargetCount + progress.offTargetProducts,
+              unclassifiedProducts: totalUnclassifiedCount + progress.unclassifiedProducts,
+              newProductsCount: totalNewCount + (progress.validNewProductsForTarget + progress.offTargetProducts + progress.unclassifiedProducts),
+              updatedProductsCount: totalUpdatedCount + progress.catUpdatedCount,
+              totalProcessed: totalProcessedCount + progress.catTotalReceived,
+              creditsUsed: totalCreditsUsed + progress.categoryCreditsUsed,
+              statusText: progress.stepStatus,
+              stopReason: progress.stopReason,
+            });
+          }
+        );
 
         totalProcessedCount += (result.totalProcessed || 0);
         totalNewCount += (result.totalNew || 0);
@@ -7177,92 +7227,152 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* MODAL 2: BATCH EXECUTION PROGRESS OVERLAY */}
       {isBatchExecuting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-lg rounded-2xl border border-amber-300 bg-white p-6 shadow-2xl space-y-5">
+          <div className="w-full max-w-lg rounded-2xl border border-amber-300 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 shrink-0">
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
 
-              <div>
-                <h3 className="font-black text-lg text-slate-900 leading-tight">
-                  Expandindo Base de Produtos...
-                </h3>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-black text-lg text-slate-900 leading-tight">
+                    Expandindo Base de Produtos...
+                  </h3>
+                  {(batchProgress?.totalCategories || 1) > 1 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-700">
+                      Categoria {batchProgress?.categoryIndex || 1} de {batchProgress?.totalCategories || 1}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Coletando dados na SocialCrawl com classificação estrita
                 </p>
               </div>
             </div>
 
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                <span>Categoria Atual:</span>
-                <span className="text-amber-800 font-extrabold text-sm">{batchProgress?.currentCategory}</span>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3.5">
+              {/* Category and Subcategory Details */}
+              <div className="space-y-1.5 pb-3 border-b border-slate-200">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="text-slate-500">Categoria Atual:</span>
+                  <span className="text-amber-800 font-extrabold text-sm truncate max-w-[260px]">
+                    {batchProgress?.currentCategory}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs font-medium text-slate-700">
+                  <span className="text-slate-500">Subcategoria:</span>
+                  <span className="font-bold text-slate-900 truncate max-w-[260px]">
+                    {batchProgress?.currentSubcategory || 'Avançando...'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Página / Subcategoria:</span>
+                  <div className="flex items-center gap-2 font-semibold text-slate-700">
+                    <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px]">
+                      Página {batchProgress?.currentPage || 1}
+                    </span>
+                    <span>
+                      ({batchProgress?.subcategoryIndex || 1}/{batchProgress?.totalSubcategoriesInCategory || 1} subcats)
+                    </span>
+                  </div>
+                </div>
               </div>
 
+              {/* Dynamic Step Status */}
               {batchProgress?.statusText && (
-                <div className="text-[11px] text-slate-600 font-medium truncate">
-                  {batchProgress.statusText}
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50/80 border border-amber-200/80 text-amber-900 text-xs font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                  <span className="truncate">{batchProgress.statusText}</span>
                 </div>
               )}
 
-              {/* Progress bar */}
-              <div className="space-y-1">
-                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 h-2.5 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${Math.max(5, Math.round(((batchProgress?.processedCategories || 0) / (batchProgress?.totalCategories || 1)) * 100))}%`,
-                    }}
-                  />
-                </div>
+              {/* Real Category Activity Progress bar based on creditsUsed / creditLimit */}
+              {(() => {
+                const catProgressPercent = calculateCategoryProgressPercent({
+                  creditsUsed: batchProgress?.categoryCreditsUsed,
+                  creditLimit: batchProgress?.categoryCreditLimit || 15,
+                  isTargetReached: (batchProgress?.remainingNeeded ?? 1) <= 0,
+                  stopReason: batchProgress?.stopReason,
+                });
 
-                <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold">
-                  <span>Progresso: {batchProgress?.processedCategories} de {batchProgress?.totalCategories} categorias</span>
-                  <span>{Math.round(((batchProgress?.processedCategories || 0) / (batchProgress?.totalCategories || 1)) * 100)}%</span>
-                </div>
-              </div>
+                return (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                      <span>
+                        Progresso: {batchProgress?.categoryCreditsUsed || 0} de {batchProgress?.categoryCreditLimit || 15} créditos consumidos
+                      </span>
+                      <span className="text-amber-800 font-extrabold text-xs">{catProgressPercent}%</span>
+                    </div>
 
-              {/* Live Metric Chips */}
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-left text-[11px]">
-                <div className="p-2 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[10px] text-slate-500 font-semibold">Créditos</div>
-                  <div className="font-black text-amber-800 text-xs mt-0.5">
-                    {batchProgress?.creditsUsed || 0} crs
+                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden p-0.5 border border-slate-300">
+                      <div
+                        className="bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.max(4, catProgressPercent)}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
+                );
+              })()}
 
-                <div className="p-2 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[10px] text-slate-500 font-semibold">Recebidos</div>
+              {/* Live Metric Grid */}
+              <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-200 text-left text-[11px]">
+                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Recebidos</div>
                   <div className="font-black text-slate-900 text-xs mt-0.5">
-                    {batchProgress?.totalProcessed || 0} prods
+                    {batchProgress?.totalProcessed || 0}
                   </div>
                 </div>
 
-                <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200">
-                  <div className="text-[10px] text-emerald-800 font-bold">Válidos (+Meta)</div>
+                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Novos Inseridos</div>
+                  <div className="font-black text-blue-700 text-xs mt-0.5">
+                    {batchProgress?.newProductsCount || 0}
+                  </div>
+                </div>
+
+                <div className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <div className="text-[9px] text-emerald-800 font-bold leading-tight">Válidos (+Meta)</div>
                   <div className="font-black text-emerald-700 text-xs mt-0.5">
                     +{batchProgress?.validNewProductsForTarget || 0}
                   </div>
                 </div>
 
-                <div className="p-2 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[10px] text-slate-500 font-semibold">Fora do Alvo</div>
+                <div className="p-1.5 rounded-lg bg-indigo-50 border border-indigo-200">
+                  <div className="text-[9px] text-indigo-800 font-bold leading-tight">Déficit Restante</div>
+                  <div className="font-black text-indigo-700 text-xs mt-0.5">
+                    {batchProgress?.remainingNeeded ?? 0}
+                  </div>
+                </div>
+
+                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Fora do Alvo</div>
                   <div className="font-black text-slate-700 text-xs mt-0.5">
                     {batchProgress?.offTargetProducts || 0}
                   </div>
                 </div>
 
-                <div className="p-2 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[10px] text-slate-500 font-semibold">Sem Classif.</div>
+                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Sem Classif.</div>
                   <div className="font-black text-slate-700 text-xs mt-0.5">
                     {batchProgress?.unclassifiedProducts || 0}
                   </div>
                 </div>
 
-                <div className="p-2 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[10px] text-slate-500 font-semibold">Atualizados</div>
+                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Atualizados</div>
                   <div className="font-black text-slate-700 text-xs mt-0.5">
                     {batchProgress?.updatedProductsCount || 0}
+                  </div>
+                </div>
+
+                <div className="p-1.5 rounded-lg bg-amber-50 border border-amber-200">
+                  <div className="text-[9px] text-amber-800 font-bold leading-tight">Créditos Categoria</div>
+                  <div className="font-black text-amber-800 text-xs mt-0.5">
+                    {batchProgress?.categoryCreditsUsed || 0}/{batchProgress?.categoryCreditLimit || 15}
                   </div>
                 </div>
               </div>
