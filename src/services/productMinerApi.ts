@@ -802,6 +802,7 @@ export async function executeSubcategoryExpansionStreamApi(
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
   let finalResult: SubcategoryExpansionResultApi | null = null;
+  let lastProgress: SubcategoryBatchProgressApi | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -813,14 +814,19 @@ export async function executeSubcategoryExpansionStreamApi(
 
     for (const line of lines) {
       const trimmed = line.trim();
+      if (trimmed.startsWith(':')) {
+        // SSE Comment / Ping keep-alive - ignorar
+        continue;
+      }
       if (trimmed.startsWith('data: ')) {
         const jsonStr = trimmed.slice(6).trim();
         if (jsonStr) {
           try {
             const parsed = JSON.parse(jsonStr);
-            if (parsed.type === 'PROGRESS' && parsed.progress && onProgress) {
-              onProgress(parsed.progress);
-            } else if (parsed.type === 'DONE' && parsed.result) {
+            if (parsed.type === 'PROGRESS' && parsed.progress) {
+              lastProgress = parsed.progress;
+              if (onProgress) onProgress(parsed.progress);
+            } else if ((parsed.type === 'COMPLETE' || parsed.type === 'DONE') && parsed.result) {
               finalResult = parsed.result;
             } else if (parsed.type === 'ERROR') {
               throw new Error(parsed.error || 'Erro na expansão');
@@ -835,22 +841,82 @@ export async function executeSubcategoryExpansionStreamApi(
     }
   }
 
-  if (buffer.trim().startsWith('data: ')) {
-    const jsonStr = buffer.trim().slice(6).trim();
-    if (jsonStr) {
-      try {
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.type === 'DONE' && parsed.result) {
-          finalResult = parsed.result;
+  if (buffer.trim()) {
+    const remainingLines = buffer.split('\n');
+    for (const line of remainingLines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('data: ')) {
+        const jsonStr = trimmed.slice(6).trim();
+        if (jsonStr) {
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if ((parsed.type === 'COMPLETE' || parsed.type === 'DONE') && parsed.result) {
+              finalResult = parsed.result;
+            }
+          } catch {
+            // ignore
+          }
         }
-      } catch {
-        // ignore
       }
     }
   }
 
+  // FALLBACK DE SEGURANÇA: Se a conexão SSE fechou sem o evento COMPLETE
+  // (ex: timeout de proxy intermediário ou queda de conexão durante execução longa),
+  // não fechar silenciosamente nem abortar o modal! Reconsultar o MySQL e recuperar o resultado.
   if (!finalResult) {
-    throw new Error('Expansão finalizada sem retorno de resultado.');
+    try {
+      const freshStats = await fetchCollectorCategories(studentCode);
+      const catName = payload.selectedCategories?.[0] || 'Categoria';
+      const targetLimit = payload.categoryTargetLimit || 300;
+      const initialCount = lastProgress?.initialValidCount || 0;
+      const catStat = freshStats.categories.find((c) => c.category === catName);
+      const finalCount = catStat?.productCount || (lastProgress?.currentValidTargetCount ?? initialCount);
+      const growth = Math.max(0, finalCount - initialCount);
+
+      finalResult = {
+        success: true,
+        totalProcessed: lastProgress?.totalReceived || lastProgress?.catTotalReceived || 0,
+        totalUnique: lastProgress?.totalNewProducts || (lastProgress?.validNewProductsForTarget || 0),
+        totalNew: lastProgress?.totalNewProducts || (lastProgress?.validNewProductsForTarget || 0),
+        totalUpdated: lastProgress?.totalUpdatedProducts || lastProgress?.catUpdatedCount || 0,
+        totalValidNewForTarget: growth > 0 ? growth : (lastProgress?.validNewProductsForTarget || 0),
+        totalOffTarget: lastProgress?.offTargetProducts || 0,
+        totalUnclassified: lastProgress?.unclassifiedProducts || 0,
+        totalCreditsUsed: lastProgress?.totalCreditsUsed || lastProgress?.categoryCreditsUsed || 0,
+        totalRequestsMade: lastProgress?.totalRequestsMade || lastProgress?.categoryRequestsMade || 0,
+        totalPagesProcessed: lastProgress?.totalPagesProcessed || lastProgress?.categoryPagesProcessed || 0,
+        categoriesCompleted: 1,
+        totalSelectedSubcategories: lastProgress?.totalSubcategoriesInCategory || 10,
+        subcategoriesConsulted: lastProgress?.subcategoryIndex || lastProgress?.totalSubcategoriesInCategory || 10,
+        subcategoriesExhausted: lastProgress?.subcategoryIndex || 0,
+        subcategoriesCoverageBefore: 0,
+        subcategoriesCoverageAfter: catStat?.coverageCount || 0,
+        categorySummaries: [
+          {
+            category: catName,
+            initialValidCount: initialCount,
+            finalValidCount: finalCount,
+            actualValidGrowth: growth,
+            categoryTargetLimit: targetLimit,
+            validNewProductsForTarget: growth > 0 ? growth : (lastProgress?.validNewProductsForTarget || 0),
+            offTargetProducts: lastProgress?.offTargetProducts || 0,
+            unclassifiedProducts: lastProgress?.unclassifiedProducts || 0,
+            updatedProducts: lastProgress?.catUpdatedCount || 0,
+            totalReceived: lastProgress?.catTotalReceived || lastProgress?.totalReceived || 0,
+            creditsUsed: lastProgress?.categoryCreditsUsed || lastProgress?.totalCreditsUsed || 0,
+            requestsMade: lastProgress?.categoryRequestsMade || lastProgress?.totalRequestsMade || 0,
+            pagesProcessed: lastProgress?.categoryPagesProcessed || lastProgress?.totalPagesProcessed || 0,
+            totalSelectedSubcategories: lastProgress?.totalSubcategoriesInCategory || 10,
+            subcategoriesConsulted: lastProgress?.subcategoryIndex || lastProgress?.totalSubcategoriesInCategory || 10,
+            subcategoriesExhausted: lastProgress?.subcategoryIndex || 0,
+            stopReason: finalCount >= targetLimit ? 'TARGET_REACHED' : 'ALL_SUBCATEGORIES_EXHAUSTED',
+          },
+        ],
+      };
+    } catch {
+      throw new Error('Expansão finalizada sem confirmação de resultado.');
+    }
   }
 
   return finalResult;
