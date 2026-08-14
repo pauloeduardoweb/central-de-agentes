@@ -6586,7 +6586,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     const coveredFromStats = stat?.subcategories
                       ? stat.subcategories.filter((s) => s.subcategory !== 'Todas' && (s.productCount > 0 || (s as any).count > 0)).length
                       : 0;
-                    const coverageCount = stat?.coverageCount ?? (productCount > 0 ? Math.max(1, coveredFromStats) : 0);
+                    const coverageCount = stat?.coverageCount ?? coveredFromStats;
                     const isActive = productCount > 0;
 
                     return (
