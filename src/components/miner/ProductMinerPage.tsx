@@ -6719,6 +6719,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                                 );
                               })}
                             </div>
+
+                            {Number(stat?.unclassifiedProductsCount || 0) > 0 && (
+                              <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50/80 border border-amber-200 text-[11px] text-amber-900 mt-1">
+                                <span className="flex items-center gap-1 font-medium">
+                                  <span>ℹ️ Sem subcategoria específica identificada:</span>
+                                </span>
+                                <span className="font-extrabold text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">
+                                  {stat?.unclassifiedProductsCount} produtos
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
