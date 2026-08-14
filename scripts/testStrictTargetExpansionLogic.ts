@@ -1,6 +1,7 @@
 import { executeSubcategoryExpansion, CategoryExpansionPlan } from '../server/subcategoryExpansionService.js';
 import { classifyProductFull } from '../server/taxonomy.js';
 import type { MinedProduct } from '../server/productMinerService.js';
+import { calculateExpansionPlanFromStats } from '../src/services/productMinerApi.js';
 
 function createMockProduct(partial: Partial<MinedProduct> & { productId: string; title: string }): MinedProduct {
   return {
@@ -46,6 +47,10 @@ function createMockPlan(params: {
     projectedFinalCount: params.currentProductCount + totalAllocated,
     unallocatedGap: Math.max(0, remainingTarget - totalAllocated),
     estimatedCredits: Math.ceil(totalAllocated / 30),
+    minEstimatedCredits: Math.max(1, Math.round(Math.ceil(totalAllocated / 30) * 0.9)),
+    maxEstimatedCredits: Math.max(1, Math.ceil(Math.ceil(totalAllocated / 30) * 1.25)),
+    hasHistoricalData: false,
+    sampleCount: 0,
     subcategories: params.subcategories.map((s, idx) => ({
       category: params.category,
       subcategory: s.subcategory,
@@ -907,6 +912,97 @@ async function runStrictTargetExpansionTestSuite() {
     assert(progressCalls === 1, 'Progresso SSE recebido e despachado');
     assert(finalResult !== null, 'Evento COMPLETE recebido e decodificado antes do encerramento');
     assert(finalResult?.categorySummaries?.[0]?.finalValidCount === 188, 'Valores do sumário final decodificados corretamente');
+  }
+
+  // ==========================================================================
+  // BLOCO 12: ESTIMATIVA DE CRÉDITOS BASEADA NO HISTÓRICO REAL DE RENDIMENTO
+  // ==========================================================================
+  console.log('\n--- Bloco 12: Estimativa Baseada no Histórico Real de Rendimento ---');
+
+  // Teste 43: Sem histórico (Fallback teórico)
+  {
+    const plans = calculateExpansionPlanFromStats({
+      categoryStats: [
+        { category: 'Acessórios de moda', productCount: 206, coverageCount: 5, subcategories: [] },
+      ],
+      selectedCategories: ['Acessórios de moda'],
+      categoryTargetLimit: 300,
+      perSubcategoryMax: 60,
+      taxonomyConfig: { 'Acessórios de moda': ['Sub 1', 'Sub 2', 'Sub 3'] },
+      historyMap: {},
+    });
+
+    assert(plans.length === 1, 'Plano calculado');
+    assert(plans[0].remainingTarget === 94, 'Déficit correto (300 - 206 = 94)');
+    assert(plans[0].hasHistoricalData === false, 'Sem dados históricos detectado');
+    assert(plans[0].estimatedCredits === 4, 'Estimativa teórica padrão (~4 créditos para déficit 94)');
+    assert(plans[0].minEstimatedCredits === 4, 'Min estimado teórico');
+    assert(plans[0].maxEstimatedCredits === 4, 'Max estimado teórico');
+  }
+
+  // Teste 44: Com histórico real (ex: 1.2 válidos/crédito)
+  {
+    const plans = calculateExpansionPlanFromStats({
+      categoryStats: [
+        { category: 'Acessórios de moda', productCount: 206, coverageCount: 5, subcategories: [] },
+      ],
+      selectedCategories: ['Acessórios de moda'],
+      categoryTargetLimit: 300,
+      perSubcategoryMax: 60,
+      taxonomyConfig: { 'Acessórios de moda': ['Sub 1', 'Sub 2', 'Sub 3'] },
+      historyMap: {
+        'Acessórios de moda': {
+          category: 'Acessórios de moda',
+          sampleCount: 3,
+          avgValidPerCredit: 1.25,
+          medianValidPerCredit: 1.2,
+          historicalValidPerCredit: 1.2,
+          lastValidPerCredit: 1.15,
+          totalValidYield: 36,
+          totalCreditsUsed: 30,
+        },
+      },
+    });
+
+    assert(plans.length === 1, 'Plano com histórico calculado');
+    assert(plans[0].hasHistoricalData === true, 'Dados históricos detectados com sucesso');
+    assert(plans[0].sampleCount === 3, 'Amostras registradas');
+    assert(plans[0].historicalValidPerCredit === 1.2, 'Taxa de rendimento histórica 1.2 válidos/cr');
+    // baseEstimate = 94 / 1.2 = 78.33; estimated = ceil(78.33 * 1.15) = 91; min = round(78.33 * 0.9) = 71; max = ceil(78.33 * 1.25) = 98
+    assert(plans[0].estimatedCredits === 91, `Estimativa central realista (${plans[0].estimatedCredits} crs vs 4 teóricos)`);
+    assert(plans[0].minEstimatedCredits === 71, `Faixa mínima calculada (${plans[0].minEstimatedCredits} crs)`);
+    assert(plans[0].maxEstimatedCredits === 98, `Faixa máxima calculada (${plans[0].maxEstimatedCredits} crs)`);
+  }
+
+  // Teste 45: Histórico com alta eficiência (ex: 18 válidos/crédito)
+  {
+    const plans = calculateExpansionPlanFromStats({
+      categoryStats: [
+        { category: 'Beleza', productCount: 100, coverageCount: 5, subcategories: [] },
+      ],
+      selectedCategories: ['Beleza'],
+      categoryTargetLimit: 200,
+      perSubcategoryMax: 60,
+      taxonomyConfig: { 'Beleza': ['Sub 1', 'Sub 2', 'Sub 3'] },
+      historyMap: {
+        'Beleza': {
+          category: 'Beleza',
+          sampleCount: 5,
+          avgValidPerCredit: 18.0,
+          medianValidPerCredit: 18.0,
+          historicalValidPerCredit: 18.0,
+          lastValidPerCredit: 18.5,
+          totalValidYield: 180,
+          totalCreditsUsed: 10,
+        },
+      },
+    });
+
+    // deficit = 100, yield = 18 -> baseEstimate = 5.55; estimated = ceil(5.55 * 1.15) = 7; min = round(5.55 * 0.9) = 5; max = ceil(5.55 * 1.25) = 7
+    assert(plans[0].hasHistoricalData === true, 'Alta eficiência com histórico ativo');
+    assert(plans[0].estimatedCredits === 7, `Estimativa eficiente (${plans[0].estimatedCredits} crs para 100 produtos)`);
+    assert(plans[0].minEstimatedCredits === 5, `Faixa mínima (${plans[0].minEstimatedCredits} crs)`);
+    assert(plans[0].maxEstimatedCredits === 7, `Faixa máxima (${plans[0].maxEstimatedCredits} crs)`);
   }
 
   console.log('\n========================================================================');
