@@ -201,13 +201,23 @@ export interface CollectorCategoryStat {
   totalSubcategories?: number;
 }
 
-export async function fetchCollectorCategories(studentCode: string): Promise<CollectorCategoryStat[]> {
+export interface CollectorCategoriesResponse {
+  categories: CollectorCategoryStat[];
+  totalStoredProducts: number;
+}
+
+export async function fetchCollectorCategories(studentCode: string): Promise<CollectorCategoriesResponse> {
   const response = await fetch('/api/product-miner/collector/categories', {
     headers: authHeaders(studentCode),
+    cache: 'no-store',
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw accessError(data);
-  return (data.categories || []) as CollectorCategoryStat[];
+  const categories = (data.categories || []) as CollectorCategoryStat[];
+  const totalStoredProducts = typeof data.totalStoredProducts === 'number'
+    ? data.totalStoredProducts
+    : categories.reduce((sum, c) => sum + (c.productCount || 0), 0);
+  return { categories, totalStoredProducts };
 }
 
 export interface DailyRefreshStatus {
