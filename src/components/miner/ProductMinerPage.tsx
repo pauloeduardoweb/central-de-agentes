@@ -5041,6 +5041,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       try {
         const catStat = collectorCategories.find((c) => c.category === cat);
         const configItem = CATEGORY_CONFIG.find((c) => c.filterKey === cat);
+        const currentCount = catStat?.productCount || 0;
+        const remainingTarget = Math.max(0, expansionTargetCount - currentCount);
+
+        // Se a categoria já atingiu a meta ou deficit <= 0, avança para a próxima
+        if (remainingTarget <= 0) {
+          processedCats++;
+          continue;
+        }
 
         // Obter lista de subcategorias a processar
         let subsToProcess: string[] = selectedSubcategoriesMap[cat] || [];
@@ -5074,18 +5082,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           subsToProcess = [cat];
         }
 
-        let categoryCollected = 0;
-        const categoryLimit = expansionTargetCount;
+        let categoryNewCollected = 0;
+        let remainingNeeded = remainingTarget;
         const perSubMax = 60;
 
         for (const sub of subsToProcess) {
-          if (categoryCollected >= categoryLimit) {
+          if (remainingNeeded <= 0) {
             break;
           }
 
           setBatchProgress((prev) => prev ? { ...prev, currentSubcategory: sub } : null);
 
-          const subTarget = Math.min(perSubMax, categoryLimit - categoryCollected);
+          const subTarget = Math.min(perSubMax, remainingNeeded);
           const isSubcategorySearch = sub !== cat;
 
           const res = await refreshProducts(
@@ -5097,10 +5105,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           );
 
           const receivedThisCall = res.totalReceived ?? res.products?.length ?? 0;
+          const newThisCall = res.newProductsCount ?? 0;
+          const updatedThisCall = res.updatedProductsCount ?? 0;
+
           totalProcessedCount += receivedThisCall;
-          categoryCollected += receivedThisCall;
-          totalNewCount += (res.newProductsCount ?? 0);
-          totalUpdatedCount += (res.updatedProductsCount ?? 0);
+          categoryNewCollected += newThisCall;
+          remainingNeeded = Math.max(0, remainingTarget - categoryNewCollected);
+
+          totalNewCount += newThisCall;
+          totalUpdatedCount += updatedThisCall;
           totalCreditsUsed += (res.creditsUsed ?? 1);
         }
 
