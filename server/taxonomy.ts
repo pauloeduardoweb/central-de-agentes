@@ -626,7 +626,9 @@ export function getCategoryAliases(catName: string): string[] {
 export function classifyProductFull(product: {
   title?: string;
   category_path?: string;
+  categoryPath?: string;
   query_source?: string;
+  querySource?: string;
   seller_name?: string;
 }): {
   category: string | null;
@@ -635,8 +637,8 @@ export function classifyProductFull(product: {
   resolvedPath: string;
   source: 'category_path' | 'alias' | 'title' | 'none';
 } {
-  const rawPath = String(product.category_path || '').trim();
-  const rawQuery = String(product.query_source || '').trim();
+  const rawPath = String(product.category_path || product.categoryPath || '').trim();
+  const rawQuery = String(product.query_source || product.querySource || '').trim();
   const rawTitle = String(product.title || '').trim();
 
   let resolvedCat: string | null = null;

@@ -716,15 +716,17 @@ productMinerRouter.post('/admin/backfill-videos', async (req, res) => {
   }
 });
 
-// Admin Route: Manual sync from search cache payloads to product_videos table
-productMinerRouter.post('/admin/sync-cache-videos', async (req, res) => {
+// Admin Route: 100% READ-ONLY real taxonomy audit
+productMinerRouter.get('/admin/audit-taxonomy-readonly', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
   try {
-    const result = await extractVideosFromSearchCachePayloads();
+    const { runReadOnlyTaxonomyAudit } = await import('../scripts/diagnoseTaxonomy.js');
+    const result = await runReadOnlyTaxonomyAudit();
     return res.json({ success: true, ...result });
   } catch (error: any) {
-    console.error('[Sync Cache Videos Error]:', error);
-    return res.status(500).json({ success: false, error: error?.message || 'CACHE_SYNC_ERROR' });
+    console.error('[Audit Taxonomy ReadOnly Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'AUDIT_ERROR' });
   }
 });
+
 
