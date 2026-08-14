@@ -648,28 +648,107 @@ export function calculateExpansionPlanFromStats(params: {
   return plans;
 }
 
-export async function executeSubcategoryExpansionApi(
-  studentCode: string,
-  payload: {
-    selectedCategories?: string[];
-    categoryTargetLimit?: number;
-    perSubcategoryMax?: number;
-  }
-): Promise<{
+export interface CategoryExecutionSummaryApi {
+  category: string;
+  initialValidCount: number;
+  finalValidCount: number;
+  categoryTargetLimit: number;
+  validNewProductsForTarget: number;
+  offTargetProducts: number;
+  unclassifiedProducts: number;
+  updatedProducts: number;
+  totalReceived: number;
+  creditsUsed: number;
+  subcategoriesConsulted: number;
+  stopReason: 'TARGET_REACHED' | 'MAX_CREDIT_BUDGET' | 'MAX_PAGES' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
+}
+
+export interface SubcategoryBatchProgressApi {
+  currentCategory: string;
+  currentSubcategory: string;
+  currentPage: number;
+  maxPagesForThisSub: number;
+  categoryIndex: number;
+  totalCategories: number;
+  subcategoryIndex: number;
+  totalSubcategoriesInCategory: number;
+
+  categoryTargetLimit: number;
+  currentValidTargetCount: number;
+  remainingNeeded: number;
+  validNewProductsForTarget: number;
+  offTargetProducts: number;
+  unclassifiedProducts: number;
+  catUpdatedCount: number;
+  catTotalReceived: number;
+  categoryCreditsUsed: number;
+  categoryCreditLimit: number;
+
+  stepStatus: string;
+
+  totalReceived: number;
+  totalNewProducts: number;
+  totalUpdatedProducts: number;
+  totalCreditsUsed: number;
+  isCompleted: boolean;
+  stopReason?: string;
+}
+
+export interface SubcategoryExpansionResultApi {
   success: boolean;
   totalProcessed: number;
   totalUnique: number;
   totalNew: number;
   totalUpdated: number;
+  totalValidNewForTarget: number;
+  totalOffTarget: number;
+  totalUnclassified: number;
   totalCreditsUsed: number;
   categoriesCompleted: number;
   subcategoriesConsulted: number;
   subcategoriesCoverageBefore: number;
   subcategoriesCoverageAfter: number;
+  categorySummaries?: CategoryExecutionSummaryApi[];
   plans: CategoryExpansionPlan[];
   errors: string[];
-}> {
-  const response = await fetch('/api/product-miner/admin/execute-subcategory-expansion', {
+}
+
+/**
+ * Calcula o percentual real da barra de progresso da categoria ativa.
+ * Prioridade: creditsUsed / creditLimit (ex: 0/15=0%, 3/15=20%, 7/15=47%, 15/15=100%).
+ * Se TARGET_REACHED: 100%.
+ */
+export function calculateCategoryProgressPercent(params: {
+  creditsUsed?: number;
+  creditLimit?: number;
+  isTargetReached?: boolean;
+  stopReason?: string;
+}): number {
+  if (params.isTargetReached || params.stopReason === 'TARGET_REACHED') {
+    return 100;
+  }
+  const limit = Math.max(1, params.creditLimit || 15);
+  const used = Math.max(0, params.creditsUsed || 0);
+
+  if (used >= limit) {
+    return 100;
+  }
+
+  const raw = (used / limit) * 100;
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
+export async function executeSubcategoryExpansionStreamApi(
+  studentCode: string,
+  payload: {
+    selectedCategories?: string[];
+    categoryTargetLimit?: number;
+    perSubcategoryMax?: number;
+    maxCreditBudgetPerCategory?: number;
+  },
+  onProgress?: (progress: SubcategoryBatchProgressApi) => void
+): Promise<SubcategoryExpansionResultApi> {
+  const response = await fetch('/api/product-miner/admin/execute-subcategory-expansion-stream', {
     method: 'POST',
     headers: {
       ...authHeaders(studentCode),
@@ -677,9 +756,85 @@ export async function executeSubcategoryExpansionApi(
     },
     body: JSON.stringify(payload),
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw accessError(data);
-  return data;
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw accessError(data);
+  }
+
+  if (!response.body) {
+    throw new Error('Streaming não suportado pelo navegador.');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let finalResult: SubcategoryExpansionResultApi | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('data: ')) {
+        const jsonStr = trimmed.slice(6).trim();
+        if (jsonStr) {
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.type === 'PROGRESS' && parsed.progress && onProgress) {
+              onProgress(parsed.progress);
+            } else if (parsed.type === 'DONE' && parsed.result) {
+              finalResult = parsed.result;
+            } else if (parsed.type === 'ERROR') {
+              throw new Error(parsed.error || 'Erro na expansão');
+            }
+          } catch (e: any) {
+            if (e.message && e.message !== 'Unexpected end of JSON input') {
+              throw e;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (buffer.trim().startsWith('data: ')) {
+    const jsonStr = buffer.trim().slice(6).trim();
+    if (jsonStr) {
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.type === 'DONE' && parsed.result) {
+          finalResult = parsed.result;
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  if (!finalResult) {
+    throw new Error('Expansão finalizada sem retorno de resultado.');
+  }
+
+  return finalResult;
+}
+
+export async function executeSubcategoryExpansionApi(
+  studentCode: string,
+  payload: {
+    selectedCategories?: string[];
+    categoryTargetLimit?: number;
+    perSubcategoryMax?: number;
+    maxCreditBudgetPerCategory?: number;
+  },
+  onProgress?: (progress: SubcategoryBatchProgressApi) => void
+): Promise<SubcategoryExpansionResultApi> {
+  return executeSubcategoryExpansionStreamApi(studentCode, payload, onProgress);
 }
 
 
