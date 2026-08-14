@@ -5019,6 +5019,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     subcategoryIndex?: number;
     totalSubcategoriesInCategory?: number;
     categoryTargetLimit: number;
+    initialValidCount?: number;
     currentValidTargetCount: number;
     remainingNeeded: number;
     categoryCreditsUsed: number;
@@ -5155,6 +5156,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         subcategoryIndex: 1,
         totalSubcategoriesInCategory: catPlan?.subcategories?.filter((s) => s.allocatedTarget > 0).length || 1,
         categoryTargetLimit: expansionTargetCount,
+        initialValidCount: currentCount,
         currentValidTargetCount: currentCount,
         remainingNeeded: remainingTarget,
         categoryCreditsUsed: 0,
@@ -5198,7 +5200,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             selectedCategories: [cat],
             categoryTargetLimit: expansionTargetCount,
             perSubcategoryMax: 60,
-            maxCreditBudgetPerCategory: catCreditBudget,
           },
           (progress) => {
             setBatchProgress({
@@ -5211,6 +5212,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               subcategoryIndex: progress.subcategoryIndex,
               totalSubcategoriesInCategory: progress.totalSubcategoriesInCategory,
               categoryTargetLimit: progress.categoryTargetLimit,
+              initialValidCount: progress.initialValidCount ?? currentCount,
               currentValidTargetCount: progress.currentValidTargetCount,
               remainingNeeded: progress.remainingNeeded,
               categoryCreditsUsed: progress.categoryCreditsUsed,
@@ -6976,7 +6978,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     className="px-6 py-3.5 rounded-xl font-black text-xs md:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] flex items-center justify-center gap-2.5 disabled:opacity-50"
                   >
                     <Rocket className="w-4.5 h-4.5" />
-                    <span>🚀 Iniciar Expansão da Base ({expansionSummary.totalEstimatedCredits} crs)</span>
+                    <span>🚀 Iniciar Expansão da Base (~{expansionSummary.totalEstimatedCredits} crs estimados)</span>
                   </button>
                 </div>
 
@@ -7013,13 +7015,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
                   <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex items-center justify-between">
                     <div>
-                      <div className="text-[11px] text-slate-500 font-medium">Créditos SocialCrawl Estimados</div>
+                      <div className="text-[11px] text-slate-500 font-medium">Estimativa Inicial de Créditos</div>
                       <div className="font-black text-amber-900 text-base mt-0.5">
-                        {expansionSummary.totalEstimatedCredits} créditos
+                        ~{expansionSummary.totalEstimatedCredits} créditos
                       </div>
                     </div>
                     <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-amber-100/90 text-amber-800 border border-amber-300">
-                      1 cr / página SocialCrawl
+                      Informativo • Sem trava artificial
                     </span>
                   </div>
 
@@ -7034,6 +7036,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     </div>
                   </div>
                 </div>
+
+                <p className="text-[11px] text-slate-600 leading-relaxed pt-1">
+                  ℹ️ <strong>Mineração Contínua:</strong> O consumo de créditos continuará enquanto houver resultados válidos disponíveis na SocialCrawl e a meta da categoria ainda não tiver sido alcançada.
+                </p>
 
                 {expansionSummary.totalUnallocatedGap > 0 && (
                   <div className="p-3 rounded-xl bg-amber-100/80 border border-amber-300 text-amber-950 text-xs flex items-center gap-2">
@@ -7184,7 +7190,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     Confirmar Expansão da Base
                   </h3>
                   <p className="text-xs text-amber-700 font-bold">
-                    Operação em Lote • Geração Z Pro
+                    Operação Contínua • Geração Z Pro
                   </p>
                 </div>
               </div>
@@ -7208,11 +7214,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div>• Meta por Categoria: <strong className="text-slate-900">{expansionTargetCount} produtos por categoria</strong></div>
                 <div>• Produtos Atuais na Base: <strong className="text-slate-900">{expansionSummary.totalCurrentProducts.toLocaleString('pt-BR')} produtos</strong></div>
                 <div>• Novos Produtos Planejados: <strong className="text-slate-900">até {expansionSummary.totalAllocatedProducts.toLocaleString('pt-BR')} novos produtos</strong></div>
-                <div>• Estimativa de Consumo: <strong className="text-slate-900">{expansionSummary.totalEstimatedCredits} créditos SocialCrawl (1 cr / pág)</strong></div>
+                <div>• Estimativa Inicial: <strong className="text-slate-900">~{expansionSummary.totalEstimatedCredits} créditos SocialCrawl (1 cr / pág)</strong></div>
               </div>
 
               <p className="text-slate-600 text-[11px] leading-relaxed pt-1 border-t border-amber-200/60">
-                A operação fará buscas sequenciais na SocialCrawl priorizando subcategorias com 0 produtos e respeitando rigorosamente o déficit da categoria.
+                A operação fará buscas sequenciais na SocialCrawl priorizando subcategorias com 0 produtos e minerando até que a meta de produtos válidos seja alcançada ou os resultados úteis se esgotem (sem trava artificial de créditos).
               </p>
             </div>
 
@@ -7231,7 +7237,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-amber-500/20"
               >
                 <Rocket className="w-4 h-4" />
-                <span>Confirmar e Iniciar ({expansionSummary.totalEstimatedCredits} crs)</span>
+                <span>Confirmar e Iniciar (~{expansionSummary.totalEstimatedCredits} crs estimados)</span>
               </button>
             </div>
           </div>
@@ -7302,11 +7308,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </div>
               )}
 
-              {/* Real Category Activity Progress bar based on creditsUsed / creditLimit */}
+              {/* Real Category Growth Progress bar towards target */}
               {(() => {
                 const catProgressPercent = calculateCategoryProgressPercent({
-                  creditsUsed: batchProgress?.categoryCreditsUsed,
-                  creditLimit: batchProgress?.categoryCreditLimit ?? 1,
+                  currentValidTargetCount: batchProgress?.currentValidTargetCount,
+                  initialValidCount: batchProgress?.initialValidCount,
+                  categoryTargetLimit: batchProgress?.categoryTargetLimit ?? expansionTargetCount,
+                  remainingNeeded: batchProgress?.remainingNeeded,
+                  validNewProductsForTarget: batchProgress?.validNewProductsForTarget,
                   isTargetReached: (batchProgress?.remainingNeeded ?? 1) <= 0,
                   stopReason: batchProgress?.stopReason,
                 });
@@ -7315,7 +7324,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
                       <span>
-                        Progresso: {batchProgress?.categoryCreditsUsed || 0} de {batchProgress?.categoryCreditLimit || 0} créditos consumidos
+                        Progresso: {batchProgress?.currentValidTargetCount || 0} de {batchProgress?.categoryTargetLimit || expansionTargetCount} produtos confirmados
                       </span>
                       <span className="text-amber-800 font-extrabold text-xs">{catProgressPercent}%</span>
                     </div>
@@ -7384,9 +7393,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </div>
 
                 <div className="p-1.5 rounded-lg bg-amber-50 border border-amber-200">
-                  <div className="text-[9px] text-amber-800 font-bold leading-tight">Créditos Categoria</div>
+                  <div className="text-[9px] text-amber-800 font-bold leading-tight">Créditos Usados</div>
                   <div className="font-black text-amber-800 text-xs mt-0.5">
-                    {batchProgress?.categoryCreditsUsed || 0}/{batchProgress?.categoryCreditLimit || 0}
+                    {batchProgress?.categoryCreditsUsed || 0} crs
                   </div>
                 </div>
               </div>
@@ -7512,10 +7521,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       switch (reason) {
                         case 'TARGET_REACHED':
                           return <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">🎯 Meta Atingida</span>;
-                        case 'MAX_CREDIT_BUDGET':
-                          return <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px]">💳 Limite Créditos</span>;
-                        case 'MAX_PAGES':
-                          return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">📄 Fim de Páginas</span>;
                         case 'NO_MORE_RESULTS':
                           return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">🏁 Fim Resultados</span>;
                         case 'NO_VALID_RESULTS':
