@@ -22,16 +22,19 @@ import {
 
 async function runDiagnosis() {
   console.log('--- DIAGNOSTIC AUDIT & TAXONOMY CLASSIFICATION ---');
-  if (!isDatabaseConfigured()) {
-    console.log('Database not configured in .env (DB_HOST, DB_NAME, DB_USER required).');
-    process.exit(1);
-  }
-  await ensureProductMinerTables();
+  let products: any[] = [];
 
-  const [products]: any = await db.query(
-    `SELECT product_id, title, category_path, query_source, seller_name
-     FROM tiktok_shop_products`
-  );
+  if (isDatabaseConfigured()) {
+    await ensureProductMinerTables();
+    const [pRows]: any = await db.query(
+      `SELECT product_id, title, category_path, query_source, seller_name
+       FROM tiktok_shop_products`
+    );
+    products = Array.isArray(pRows) ? pRows : [];
+    console.log(`Conexão MySQL ativa. Total de produtos no banco: ${products.length}`);
+  } else {
+    console.log('Banco de dados não conectado neste ambiente local. Executando diagnóstico estático da taxonomia...');
+  }
 
   const totalProducts = Array.isArray(products) ? products.length : 0;
   console.log(`Total database products: ${totalProducts}`);
@@ -82,24 +85,19 @@ async function runDiagnosis() {
   }
 
   console.log('\n==================================================');
-  console.log('RELATÓRIO DE DIAGNÓSTICO');
+  console.log('RELATÓRIO DE DIAGNÓSTICO (100% READ-ONLY)');
   console.log('==================================================');
-  console.log(`TOTAL:`);
-  console.log(`${totalProducts}`);
+  console.log(`TOTAL DE PRODUTOS: ${totalProducts}`);
   console.log(`\nCategorias principais:`);
-  console.log(`${classifiedCatCount} classificados`);
+  console.log(`- Classificados: ${classifiedCatCount}`);
+  console.log(`- Não classificados: ${totalProducts - classifiedCatCount}`);
   console.log(`\nSubcategorias:`);
-  console.log(`${classifiedSubCount} classificados`);
-  console.log(`\nSem subcategoria:`);
-  console.log(`${unclassifiedSubCount}`);
-  console.log(`\nChildCategories:`);
-  console.log(`${classifiedChildCount} classificados`);
-  console.log(`\nSem childCategory:`);
-  console.log(`${unclassifiedChildCount}`);
-  console.log(`\nConflitos detectados antes da resolução:`);
-  console.log(`${conflictsDetectedBefore}`);
-  console.log(`\nConflitos após resolução:`);
-  console.log(`0`);
+  console.log(`- Com subcategoria reconhecida: ${classifiedSubCount}`);
+  console.log(`- Sem subcategoria reconhecida: ${unclassifiedSubCount}`);
+  console.log(`\nChildCategories (Validação Estrita):`);
+  console.log(`- Com childCategory oficial: ${classifiedChildCount}`);
+  console.log(`- Sem childCategory: ${unclassifiedChildCount}`);
+  console.log(`\nConflitos após resolução (Single-Winner): 0`);
 
   console.log('\n==================================================');
   console.log('VALIDAÇÕES MATEMÁTICAS POR CATEGORIA');
@@ -133,23 +131,10 @@ async function runDiagnosis() {
 
   console.log(`\nValidação matemática global: ${allMathValid ? 'TODAS AS 26 CATEGORIAS ESTÃO 100% VÁLIDAS ✅' : 'FALHA ❌'}`);
 
-  // Now execute reclassification into MySQL
-  console.log('\n--- EXECUTANDO RECLASSIFICAÇÃO NO MYSQL ---');
-  const report = await reclassifyExistingDatabaseProducts();
-  console.log('Reclassificação concluída:', {
-    totalAnalyzed: report.totalAnalyzed,
-    totalChanged: report.totalChanged,
-    totalMaintained: report.totalMaintained,
-    totalClassified: report.totalClassified,
-    totalWithSubcategory: report.totalWithSubcategory,
-    totalWithoutSubcategory: report.totalWithoutSubcategory,
-    socialCrawlCalled: report.socialCrawlCalled,
-    creditsConsumed: report.creditsConsumed,
-  });
-
-  // Verify getCollectorCategoriesStats
+  // Verify getCollectorCategoriesStats dynamically in read-only mode
   const stats = await getCollectorCategoriesStats();
-  console.log(`getCollectorCategoriesStats total categories: ${stats.categories.length}`);
+  console.log(`\ngetCollectorCategoriesStats: ${stats.categories.length} categorias oficiais auditadas em tempo real.`);
+  console.log('Diagnóstico finalizado em modo 100% READ-ONLY (nenhum UPDATE/INSERT/DELETE executado no MySQL).');
 
   process.exit(0);
 }

@@ -1,75 +1,184 @@
 import {
   COLLECTOR_CATEGORIES,
   OFFICIAL_TIKTOK_TAXONOMY,
+  OFFICIAL_TIKTOK_CHILD_CATEGORIES,
   classifyProductFull,
-  removeAccents,
-  getSubcategoryAliases,
-  getCategoryAliases,
 } from '../server/taxonomy.js';
 
-// Test dataset representing real TikTok Shop products across various categories
-const sampleProducts = [
-  // Roupas masculinas e roupas íntimas masculinas
-  { title: 'Kit 10 Cuecas Boxer Sem Costura Masculina Microfibra', category_path: 'Roupas masculinas e roupas íntimas masculinas > Roupas íntimas masculinas > Cuecas', query_source: 'Roupas masculinas e roupas íntimas masculinas' },
-  { title: 'Camiseta Masculina Básica Algodão Premium Slim Fit', category_path: 'Roupas masculinas e roupas íntimas masculinas > Peças masculinas para parte superior', query_source: 'Roupas masculinas e roupas íntimas masculinas' },
-  { title: 'Calça Jeans Masculina Skinny Rasgada Estilosa', category_path: 'Roupas masculinas e roupas íntimas masculinas > Peças masculinas para parte inferior', query_source: 'Roupas masculinas e roupas íntimas masculinas' },
-  { title: 'Blazer Masculino Slim Fit Alfaiataria Terno', category_path: 'Roupas masculinas e roupas íntimas masculinas > Ternos', query_source: 'Roupas masculinas e roupas íntimas masculinas' },
-  { title: 'Kit 12 Pares de Meias Cano Curto Soquete Masculina', category_path: 'Roupas masculinas e roupas íntimas masculinas > Meias', query_source: 'Roupas masculinas e roupas íntimas masculinas' },
-  { title: 'Conjunto Moletom Masculino Casaco com Capuz e Calça', category_path: 'Roupas masculinas e roupas íntimas masculinas > Conjuntos', query_source: 'Roupas masculinas e roupas íntimas masculinas' },
-  
-  // Utensílios de cozinha
-  { title: 'Copo Térmico Com Tampa e Abridor Inox 473ml', category_path: 'Utensílios de cozinha > Utensílios para bebidas > Copos térmicos', query_source: 'Utensílios de cozinha' },
-  { title: 'Processador e Triturador Manual de Alimentos Alho Legumes', category_path: 'Utensílios de cozinha > Utensílios e aparelhos de cozinha', query_source: 'Utensílios de cozinha' },
-  { title: 'Jogo 6 Facas Inox Antiaderente Chef Cozinha com Descascador', category_path: 'Utensílios de cozinha > Facas de cozinha', query_source: 'Utensílios de cozinha' },
-  { title: 'Forma de Silicone para Airfryer Redonda Antiaderente Reutilizável', category_path: 'Utensílios de cozinha > Utensílios para forno', query_source: 'Utensílios de cozinha' },
-  { title: 'Frigideira Antiaderente Cerâmica Wok com Tampa', category_path: 'Utensílios de cozinha > Utensílios para cozinhar', query_source: 'Utensílios de cozinha' },
-  { title: 'Kit Churrasco Inox 3 Peças Faca Garfo Pegador na Maleta', category_path: 'Utensílios de cozinha > Churrasco', query_source: 'Utensílios de cozinha' },
-  { title: 'Prensa Francesa Cafeteira de Vidro e Inox 600ml', category_path: 'Utensílios de cozinha > Utensílios para chá e café', query_source: 'Utensílios de cozinha' },
-  
-  // Saúde
-  { title: 'Creatina Monohidratada 100% Pura 300g Max Titanium', category_path: 'Saúde > Suplementos alimentares', query_source: 'Saúde' },
-  { title: 'Óleo Essencial de Lavanda 100% Puro e Natural 10ml', category_path: 'Saúde > Medicamentos e tratamentos alternativos', query_source: 'Saúde' },
-  { title: 'Medidor de Pressão Arterial Digital de Braço Automático', category_path: 'Saúde > Suprimentos médicos', query_source: 'Saúde' },
+function runTestSuite() {
+  console.log('====================================================');
+  console.log('SUITE DE TESTES: AUDITORIA E INTEGRIDADE DA TAXONOMIA');
+  console.log('====================================================');
 
-  // Beleza e cuidados pessoais
-  { title: 'Batom Líquido Matte Longa Duração Alta Pigmentação', category_path: 'Beleza e cuidados pessoais > Maquiagem', query_source: 'Beleza e cuidados pessoais' },
-  { title: 'Perfume Feminino Body Splash Doce Encanto 200ml', category_path: 'Beleza e cuidados pessoais > Fragrâncias', query_source: 'Beleza e cuidados pessoais' },
-  { title: 'Sérum Facial Ácido Hialurônico Hidratação Profunda', category_path: 'Beleza e cuidados pessoais > Cuidados com a pele', query_source: 'Beleza e cuidados pessoais' },
-  { title: 'Kit Shampoo e Condicionador Reconstrução Capilar Óleo de Argan', category_path: 'Beleza e cuidados pessoais > Cuidados com cabelos e penteados', query_source: 'Beleza e cuidados pessoais' },
+  let passedTests = 0;
+  let totalTests = 0;
 
-  // Generic / Unclassified edge cases
-  { title: 'Produto Sem Categoria Específica Teste 1', category_path: 'Utensílios de cozinha', query_source: 'Utensílios de cozinha' },
-  { title: 'Item Genérico Não Mapeado Teste 2', category_path: 'Saúde', query_source: 'Saúde' },
-];
-
-function runTests() {
-  console.log('=== TESTE DE TAXONOMIA E CLASSIFICAÇÃO ÚNICA ===');
-
-  let passed = 0;
-  let total = sampleProducts.length;
-
-  for (const p of sampleProducts) {
-    const res = classifyProductFull(p);
-    
-    // Invariant 1: Exactly 1 valid Category
-    const isValidCategory = COLLECTOR_CATEGORIES.includes(res.category as any);
-    
-    // Invariant 2: Subcategory is either null or strictly belongs to the Category
-    const validSubs = OFFICIAL_TIKTOK_TAXONOMY[res.category] || [];
-    const isValidSub = res.subcategory === null || validSubs.includes(res.subcategory);
-
-    // Invariant 3: Single winner (cannot return an array or overlapping values)
-    const isSingleWinner = typeof res.category === 'string' && (res.subcategory === null || typeof res.subcategory === 'string');
-
-    if (isValidCategory && isValidSub && isSingleWinner) {
-      passed++;
-      console.log(`[PASS] "${p.title.slice(0, 45)}..." -> [${res.category}] > [${res.subcategory || 'SEM SUBCAT'}] (Src: ${res.source})`);
+  function assert(condition: boolean, testName: string, details?: string) {
+    totalTests++;
+    if (condition) {
+      passedTests++;
+      console.log(`✅ [PASS] ${testName}`);
     } else {
-      console.error(`[FAIL] "${p.title}" -> ${JSON.stringify(res)}`);
+      console.error(`❌ [FAIL] ${testName}${details ? ` -> ${details}` : ''}`);
     }
   }
 
-  console.log(`\nTaxonomy Engine: ${passed}/${total} testes aprovados com sucesso!`);
+  // TEST 1: Child category inválida deve ser descartada (retornar childCategory: null)
+  console.log('\n--- TESTE 1: VALIDAÇÃO ESTRITA DE CHILD CATEGORY ---');
+  const invalidChildProduct = {
+    title: 'Produto Teste Categoria Válida',
+    category_path: 'Roupas masculinas e roupas íntimas masculinas > Roupas íntimas masculinas > ArbitraryChildFake123',
+    query_source: 'Roupas masculinas e roupas íntimas masculinas',
+  };
+  const res1 = classifyProductFull(invalidChildProduct);
+  assert(
+    res1.category === 'Roupas masculinas e roupas íntimas masculinas',
+    'Categoria principal reconhecida corretamente',
+    `Recebido: ${res1.category}`
+  );
+  assert(
+    res1.subcategory === 'Roupas íntimas masculinas',
+    'Subcategoria reconhecida corretamente',
+    `Recebido: ${res1.subcategory}`
+  );
+  assert(
+    res1.childCategory === null,
+    'ChildCategory inválida descartada com sucesso (retornou null)',
+    `Recebido: ${res1.childCategory}`
+  );
+
+  // Valid child category test
+  const validChildProduct = {
+    title: 'Kit Cuecas Boxer Masculinas',
+    category_path: 'Roupas masculinas e roupas íntimas masculinas > Roupas íntimas masculinas > Roupas íntimas',
+    query_source: 'Roupas masculinas e roupas íntimas masculinas',
+  };
+  const resValidChild = classifyProductFull(validChildProduct);
+  assert(
+    resValidChild.childCategory === 'Roupas íntimas',
+    'ChildCategory oficial reconhecida com sucesso',
+    `Recebido: ${resValidChild.childCategory}`
+  );
+
+  // TEST 2: Idempotência da classificação
+  console.log('\n--- TESTE 2: IDEMPOTÊNCIA DA CLASSIFICAÇÃO ---');
+  const prodToTest = {
+    title: 'Copo Térmico Inox 473ml com Tampa e Abridor',
+    category_path: 'Utensílios de cozinha > Utensílios para bebidas > Copos térmicos',
+    query_source: 'Utensílios de cozinha',
+  };
+  const firstPass = classifyProductFull(prodToTest);
+  const secondPass = classifyProductFull(prodToTest);
+  const thirdPass = classifyProductFull({
+    ...prodToTest,
+    category_path: firstPass.resolvedPath,
+  });
+
+  assert(
+    JSON.stringify(firstPass) === JSON.stringify(secondPass),
+    'Classificação idêntica em múltiplas execuções consecutivas'
+  );
+  assert(
+    firstPass.category === thirdPass.category &&
+      firstPass.subcategory === thirdPass.subcategory &&
+      firstPass.childCategory === thirdPass.childCategory,
+    'Classificação idempotente usando o próprio resolvedPath como entrada'
+  );
+
+  // TEST 3: Não alteração/mutação dos campos originais
+  console.log('\n--- TESTE 3: PRESERVAÇÃO DOS DADOS BRUTOS (NÃO MUTAÇÃO) ---');
+  const originalInput = Object.freeze({
+    title: 'Smartwatch Fitness Tracker Pro Original',
+    category_path: 'Telefones e eletrônicos > Dispositivos inteligentes',
+    query_source: 'Telefones e eletrônicos',
+  });
+  const copyBefore = { ...originalInput };
+  const res3 = classifyProductFull(originalInput);
+  assert(
+    originalInput.category_path === copyBefore.category_path &&
+      originalInput.query_source === copyBefore.query_source &&
+      originalInput.title === copyBefore.title,
+    'Objeto de entrada original permaneceu estritamente inalterado e preservado'
+  );
+
+  // TEST 4: Produto completamente desconhecido retornando category: null (Sem fallback para Utensílios)
+  console.log('\n--- TESTE 4: PRODUTO DESCONHECIDO (SEM FORÇAR UTENSÍLIOS) ---');
+  const unknownProduct = {
+    title: 'Xyz123 Qwerty NonExistentProductAlphaOmega 9999',
+    category_path: 'NonExistentCategoryRoot > SubRootUnknown',
+    query_source: 'NonExistentQuerySourceUnknown',
+  };
+  const res4 = classifyProductFull(unknownProduct);
+  assert(
+    res4.category === null,
+    'Produto sem correspondência retorna category: null (NÃO joga em Utensílios de cozinha)',
+    `Recebido: ${res4.category}`
+  );
+  assert(
+    res4.subcategory === null && res4.childCategory === null,
+    'Subcategoria e ChildCategory são null quando category é null'
+  );
+  assert(
+    res4.source === 'none',
+    'Source é "none" quando nenhuma categoria foi determinada'
+  );
+
+  // TEST 5: Cobertura e cálculo de estatísticas (Cobertura 0/Y para categorias sem subcategoria ativa)
+  console.log('\n--- TESTE 5: COBERTURA E RESOLUÇÃO SINGLE-WINNER ---');
+  const sampleBatch = [
+    { title: 'Item 1 sem subcat', category_path: 'Móveis', query_source: 'Móveis' },
+    { title: 'Item 2 sem subcat', category_path: 'Móveis', query_source: 'Móveis' },
+  ];
+  let catProds = 0;
+  let subsCovered = 0;
+  for (const p of sampleBatch) {
+    const res = classifyProductFull(p);
+    if (res.category === 'Móveis') {
+      catProds++;
+      if (res.subcategory) {
+        subsCovered++;
+      }
+    }
+  }
+  assert(
+    catProds === 2 && subsCovered === 0,
+    'Categoria com produtos mas nenhuma subcategoria reconhecida calcula cobertura 0/Y (sem artificial 1/Y)',
+    `Produtos: ${catProds}, Subcategorias cobertas: ${subsCovered}`
+  );
+
+  // TEST 6: Validação de integridade global da taxonomia
+  console.log('\n--- TESTE 6: INTEGRIDADE DA TAXONOMIA DE 3 NÍVEIS ---');
+  assert(
+    COLLECTOR_CATEGORIES.length === 26,
+    'Exatamente 26 categorias oficiais presentes',
+    `Total: ${COLLECTOR_CATEGORIES.length}`
+  );
+  let totalSubsCount = 0;
+  let totalChildrenCount = 0;
+  for (const cat of COLLECTOR_CATEGORIES) {
+    const subs = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
+    totalSubsCount += subs.length;
+    for (const sub of subs) {
+      const children = OFFICIAL_TIKTOK_CHILD_CATEGORIES[cat]?.[sub] || [];
+      totalChildrenCount += children.length;
+    }
+  }
+  assert(
+    totalSubsCount > 200,
+    `Subcategorias oficiais presentes: ${totalSubsCount}`
+  );
+  assert(
+    totalChildrenCount > 1500,
+    `Child categories oficiais sincronizadas: ${totalChildrenCount}`
+  );
+
+  console.log('\n====================================================');
+  console.log(`RESULTADO FINAL DOS TESTES: ${passedTests}/${totalTests} PASSARAM!`);
+  console.log('====================================================');
+
+  if (passedTests !== totalTests) {
+    process.exit(1);
+  }
 }
 
-runTests();
+runTestSuite();
