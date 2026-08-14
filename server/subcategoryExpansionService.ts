@@ -1,4 +1,4 @@
-import { db, isDatabaseConfigured, ensureProductMinerTables } from './database.js';
+import { db, isDatabaseConfigured, ensureProductMinerTables, ensureCategoryExecutionHistoryTable } from './database.js';
 import {
   COLLECTOR_CATEGORIES,
   OFFICIAL_TIKTOK_TAXONOMY,
@@ -22,6 +22,17 @@ export interface SubcategoryTargetPlan {
   estimatedPages: number;
 }
 
+export interface CategoryHistoryStat {
+  category: string;
+  sampleCount: number;
+  historicalValidPerCredit: number | null;
+  minEstimatedYield?: number;
+  maxEstimatedYield?: number;
+  averageGrowth: number;
+  averageCredits: number;
+  lastExecutionDate: string | null;
+}
+
 export interface CategoryExpansionPlan {
   category: string;
   currentProductCount: number;
@@ -31,6 +42,11 @@ export interface CategoryExpansionPlan {
   projectedFinalCount: number;
   unallocatedGap: number;
   estimatedCredits: number;
+  minEstimatedCredits: number;
+  maxEstimatedCredits: number;
+  hasHistoricalData: boolean;
+  historicalValidPerCredit?: number;
+  sampleCount: number;
   subcategories: SubcategoryTargetPlan[];
 }
 
@@ -54,6 +70,125 @@ export interface CategoryExecutionSummary {
   coverageBefore?: number;
   coverageAfter?: number;
   stopReason: 'TARGET_REACHED' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
+}
+
+/**
+ * Grava o resultado de execução de uma categoria na tabela de histórico de eficiência.
+ */
+export async function recordCategoryExecutionHistory(summary: CategoryExecutionSummary): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  try {
+    await ensureCategoryExecutionHistoryTable();
+    const confirmedPerCredit = summary.creditsUsed > 0
+      ? Number((summary.actualValidGrowth / summary.creditsUsed).toFixed(4))
+      : null;
+
+    // Critério rigoroso de amostra válida para cálculo de estimativa real:
+    // - Não pode ter sido cancelada manualmente
+    // - Deve ter consumido créditos (> 0)
+    // - Deve ter feito requisições (> 0)
+    // - Crescimento >= 0
+    const isValidSample = summary.stopReason !== 'CANCELLED' &&
+      summary.creditsUsed > 0 &&
+      summary.requestsMade > 0 &&
+      summary.actualValidGrowth >= 0;
+
+    await db.query(
+      `INSERT INTO product_miner_category_history (
+        category, execution_type, initial_valid_count, final_valid_count,
+        actual_valid_growth, target_limit, credits_consumed, requests_made,
+        pages_processed, subcategories_consulted, stop_reason,
+        confirmed_valid_per_credit, is_valid_sample, created_at, completed_at
+      ) VALUES (?, 'EXPANSION', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        summary.category,
+        summary.initialValidCount,
+        summary.finalValidCount,
+        summary.actualValidGrowth,
+        summary.categoryTargetLimit,
+        summary.creditsUsed,
+        summary.requestsMade,
+        summary.pagesProcessed,
+        summary.subcategoriesConsulted,
+        summary.stopReason,
+        confirmedPerCredit,
+        isValidSample ? 1 : 0,
+      ]
+    );
+  } catch (err: any) {
+    console.warn('[recordCategoryExecutionHistory Error]:', err?.message || err);
+  }
+}
+
+/**
+ * Consulta as últimas 3 a 5 execuções válidas de cada categoria e calcula a média ponderada de rendimento (produtos válidos/crédito).
+ */
+export async function getCategoryExecutionHistoryStats(categories?: string[]): Promise<Record<string, CategoryHistoryStat>> {
+  const result: Record<string, CategoryHistoryStat> = {};
+  const targetCats = categories && categories.length > 0 ? categories : COLLECTOR_CATEGORIES;
+
+  for (const cat of targetCats) {
+    result[cat] = {
+      category: cat,
+      sampleCount: 0,
+      historicalValidPerCredit: null,
+      averageGrowth: 0,
+      averageCredits: 0,
+      lastExecutionDate: null,
+    };
+  }
+
+  if (!isDatabaseConfigured()) return result;
+
+  try {
+    await ensureCategoryExecutionHistoryTable();
+    for (const cat of targetCats) {
+      const [rows]: any = await db.query(
+        `SELECT id, actual_valid_growth, credits_consumed, confirmed_valid_per_credit, created_at
+         FROM product_miner_category_history
+         WHERE category = ? AND is_valid_sample = 1 AND credits_consumed > 0
+         ORDER BY created_at DESC, id DESC
+         LIMIT 5`,
+        [cat]
+      );
+
+      const samples = Array.isArray(rows) ? rows : [];
+      if (samples.length === 0) continue;
+
+      // Pesos das amostras mais recentes: [3.0, 2.0, 1.5, 1.0, 1.0]
+      const weights = [3.0, 2.0, 1.5, 1.0, 1.0];
+      let weightedGrowthSum = 0;
+      let weightedCreditsSum = 0;
+      let totalGrowth = 0;
+      let totalCredits = 0;
+
+      samples.forEach((s, idx) => {
+        const w = weights[idx] ?? 1.0;
+        const g = Math.max(0, Number(s.actual_valid_growth) || 0);
+        const c = Math.max(1, Number(s.credits_consumed) || 1);
+        weightedGrowthSum += w * g;
+        weightedCreditsSum += w * c;
+        totalGrowth += g;
+        totalCredits += c;
+      });
+
+      const weightedYield = weightedCreditsSum > 0 ? (weightedGrowthSum / weightedCreditsSum) : 0;
+      const cleanYield = Number(weightedYield.toFixed(3));
+
+      result[cat] = {
+        category: cat,
+        sampleCount: samples.length,
+        historicalValidPerCredit: cleanYield,
+        averageGrowth: Number((totalGrowth / samples.length).toFixed(1)),
+        averageCredits: Number((totalCredits / samples.length).toFixed(1)),
+        lastExecutionDate: samples[0]?.created_at ? new Date(samples[0].created_at).toISOString() : null,
+      };
+    }
+  } catch (err: any) {
+    console.warn('[getCategoryExecutionHistoryStats Error]:', err?.message || err);
+  }
+
+  return result;
 }
 
 export interface SubcategoryBatchProgress {
@@ -140,6 +275,7 @@ export function buildSubcategoryExpansionPlan(params: {
   selectedSubcategoriesMap?: Record<string, string[]>;
   categoryTargetLimit?: number;
   perSubcategoryMax?: number;
+  historyMap?: Record<string, CategoryHistoryStat>;
 }): CategoryExpansionPlan[] {
   const {
     categoryStats,
@@ -147,6 +283,7 @@ export function buildSubcategoryExpansionPlan(params: {
     selectedSubcategoriesMap,
     categoryTargetLimit = 500,
     perSubcategoryMax = 60,
+    historyMap,
   } = params;
 
   const targetCats = selectedCategories.length > 0 ? selectedCategories : COLLECTOR_CATEGORIES;
@@ -238,7 +375,35 @@ export function buildSubcategoryExpansionPlan(params: {
     const totalAllocated = subPlans.reduce((sum, s) => sum + s.allocatedTarget, 0);
     const projectedFinalCount = currentProductCount + totalAllocated;
     const unallocatedGap = Math.max(0, remainingTarget - totalAllocated);
-    const estimatedCredits = subPlans.reduce((sum, s) => sum + s.estimatedPages, 0);
+    const theoreticalCredits = subPlans.reduce((sum, s) => sum + s.estimatedPages, 0);
+
+    const catHistory = historyMap?.[catName];
+    const hasHistoricalData = Boolean(
+      catHistory &&
+      catHistory.sampleCount > 0 &&
+      catHistory.historicalValidPerCredit !== null &&
+      catHistory.historicalValidPerCredit > 0
+    );
+
+    let estimatedCredits = theoreticalCredits;
+    let minEstimatedCredits = theoreticalCredits;
+    let maxEstimatedCredits = theoreticalCredits;
+    let historicalValidPerCredit: number | undefined = undefined;
+    let sampleCount = 0;
+
+    if (remainingTarget === 0) {
+      estimatedCredits = 0;
+      minEstimatedCredits = 0;
+      maxEstimatedCredits = 0;
+    } else if (hasHistoricalData && catHistory?.historicalValidPerCredit) {
+      const yieldRate = Math.max(0.05, catHistory.historicalValidPerCredit);
+      const baseEstimate = remainingTarget / yieldRate;
+      estimatedCredits = Math.ceil(baseEstimate * 1.15); // 15% margem de segurança
+      minEstimatedCredits = Math.max(1, Math.round(baseEstimate * 0.9));
+      maxEstimatedCredits = Math.max(minEstimatedCredits, Math.ceil(baseEstimate * 1.25));
+      historicalValidPerCredit = Number(catHistory.historicalValidPerCredit.toFixed(2));
+      sampleCount = catHistory.sampleCount;
+    }
 
     plans.push({
       category: catName,
@@ -249,6 +414,11 @@ export function buildSubcategoryExpansionPlan(params: {
       projectedFinalCount,
       unallocatedGap,
       estimatedCredits,
+      minEstimatedCredits,
+      maxEstimatedCredits,
+      hasHistoricalData,
+      historicalValidPerCredit,
+      sampleCount,
       subcategories: subPlans,
     });
   }
@@ -791,7 +961,7 @@ export async function executeSubcategoryExpansion(options: {
       }
     }
 
-    categorySummaries.push({
+    const catSummary: CategoryExecutionSummary = {
       category: catPlan.category,
       initialValidCount,
       finalValidCount: officialFinalValidCount,
@@ -811,6 +981,13 @@ export async function executeSubcategoryExpansion(options: {
       coverageBefore,
       coverageAfter,
       stopReason: catStopReason,
+    };
+
+    categorySummaries.push(catSummary);
+
+    // Gravar no histórico de execuções para aprendizado da eficiência real de créditos
+    await recordCategoryExecutionHistory(catSummary).catch((recErr) => {
+      console.warn('[recordCategoryExecutionHistory Warning]:', recErr?.message || recErr);
     });
 
     categoriesCompleted++;

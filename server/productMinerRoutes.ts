@@ -755,7 +755,7 @@ productMinerRouter.get('/admin/audit-unclassified-products-readonly', async (req
 productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
   try {
-    const { buildSubcategoryExpansionPlan } = await import('./subcategoryExpansionService.js');
+    const { buildSubcategoryExpansionPlan, getCategoryExecutionHistoryStats } = await import('./subcategoryExpansionService.js');
     const { getCollectorCategoriesStats } = await import('./productMinerService.js');
     const targetLimit = Number(req.query.categoryTargetLimit || 500);
     const perSubMax = Number(req.query.perSubcategoryMax || 60);
@@ -769,13 +769,18 @@ productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
       }
     }
 
-    const stats = await getCollectorCategoriesStats();
+    const [stats, historyMap] = await Promise.all([
+      getCollectorCategoriesStats(),
+      getCategoryExecutionHistoryStats(selectedCatsParam),
+    ]);
+
     const plans = buildSubcategoryExpansionPlan({
       categoryStats: stats.categories,
       selectedCategories: selectedCatsParam,
       selectedSubcategoriesMap,
       categoryTargetLimit: targetLimit,
       perSubcategoryMax: perSubMax,
+      historyMap,
     });
 
     const totalSubcategories = plans.reduce((sum, p) => sum + p.subcategories.length, 0);
@@ -785,6 +790,9 @@ productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
     );
     const totalAllocatedProducts = plans.reduce((sum, p) => sum + p.totalAllocated, 0);
     const totalEstimatedCredits = plans.reduce((sum, p) => sum + p.estimatedCredits, 0);
+    const totalMinEstimatedCredits = plans.reduce((sum, p) => sum + p.minEstimatedCredits, 0);
+    const totalMaxEstimatedCredits = plans.reduce((sum, p) => sum + p.maxEstimatedCredits, 0);
+    const hasHistoricalDataCount = plans.filter((p) => p.hasHistoricalData).length;
 
     return res.json({
       success: true,
@@ -795,14 +803,32 @@ productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
         zeroCountSubcategories,
         totalAllocatedProducts,
         totalEstimatedCredits,
+        totalMinEstimatedCredits,
+        totalMaxEstimatedCredits,
+        hasHistoricalDataCount,
         categoryTargetLimit: targetLimit,
         perSubcategoryMax: perSubMax,
       },
+      historyMap,
       plans,
     });
   } catch (error: any) {
     console.error('[Expansion Plan ReadOnly Error]:', error);
     return res.status(500).json({ success: false, error: error?.message || 'EXPANSION_PLAN_ERROR' });
+  }
+});
+
+// Admin Route: Get category execution history stats for estimating credits
+productMinerRouter.get('/admin/category-execution-history', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const { getCategoryExecutionHistoryStats } = await import('./subcategoryExpansionService.js');
+    const selectedCatsParam = req.query.categories ? String(req.query.categories).split(',') : undefined;
+    const historyMap = await getCategoryExecutionHistoryStats(selectedCatsParam);
+    return res.json({ success: true, historyMap });
+  } catch (error: any) {
+    console.error('[Category Execution History Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'HISTORY_ERROR' });
   }
 });
 

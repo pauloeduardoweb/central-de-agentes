@@ -1198,6 +1198,7 @@ export function ensureProductMinerTables(): Promise<void> {
       `);
 
       await ensureDailyCollectionsTable();
+      await ensureCategoryExecutionHistoryTable();
     })().catch((err: any) => {
       productMinerTablesPromise = null;
       console.warn('[MySQL ensureProductMinerTables Error]:', err?.message || err);
@@ -1205,6 +1206,44 @@ export function ensureProductMinerTables(): Promise<void> {
     });
   }
   return productMinerTablesPromise;
+}
+
+let categoryExecutionHistoryPromise: Promise<void> | null = null;
+export function ensureCategoryExecutionHistoryTable(): Promise<void> {
+  if (!isDatabaseConfigured()) return Promise.resolve();
+  if (!categoryExecutionHistoryPromise) {
+    categoryExecutionHistoryPromise = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS product_miner_category_history (
+          id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          category VARCHAR(120) NOT NULL,
+          execution_type VARCHAR(50) NOT NULL DEFAULT 'EXPANSION',
+          started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          initial_valid_count INT NOT NULL DEFAULT 0,
+          final_valid_count INT NOT NULL DEFAULT 0,
+          actual_valid_growth INT NOT NULL DEFAULT 0,
+          target_limit INT NOT NULL DEFAULT 0,
+          credits_consumed INT NOT NULL DEFAULT 0,
+          requests_made INT NOT NULL DEFAULT 0,
+          pages_processed INT NOT NULL DEFAULT 0,
+          subcategories_consulted INT NOT NULL DEFAULT 0,
+          stop_reason VARCHAR(50) DEFAULT NULL,
+          confirmed_valid_per_credit FLOAT DEFAULT NULL,
+          is_valid_sample TINYINT(1) NOT NULL DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_pmch_category (category),
+          INDEX idx_pmch_created (created_at),
+          INDEX idx_pmch_sample (category, is_valid_sample, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    })().catch((err: any) => {
+      categoryExecutionHistoryPromise = null;
+      console.warn('[MySQL ensureCategoryExecutionHistoryTable Error]:', err?.message || err);
+      throw err;
+    });
+  }
+  return categoryExecutionHistoryPromise;
 }
 
 let dailyCollectionsPromise: Promise<void> | null = null;
