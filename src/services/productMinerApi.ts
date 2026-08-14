@@ -569,6 +569,7 @@ export function calculateExpansionPlanFromStats(params: {
   categoryTargetLimit: number;
   perSubcategoryMax?: number;
   taxonomyConfig?: Record<string, string[]>;
+  selectedSubcategoriesMap?: Record<string, string[]>;
   historyMap?: Record<string, CategoryHistoryStatApi>;
 }): CategoryExpansionPlan[] {
   const {
@@ -577,6 +578,7 @@ export function calculateExpansionPlanFromStats(params: {
     categoryTargetLimit,
     perSubcategoryMax = 60,
     taxonomyConfig,
+    selectedSubcategoriesMap,
     historyMap,
   } = params;
 
@@ -598,6 +600,14 @@ export function calculateExpansionPlanFromStats(params: {
       officialSubs = catStat.subcategories
         .map((s) => s.subcategory)
         .filter((s) => s !== 'Todas');
+    }
+
+    if (selectedSubcategoriesMap && Object.prototype.hasOwnProperty.call(selectedSubcategoriesMap, catName)) {
+      const allowed = selectedSubcategoriesMap[catName];
+      if (Array.isArray(allowed)) {
+        const allowedSubs = new Set(allowed.filter((s) => s !== 'Todas'));
+        officialSubs = officialSubs.filter((s) => allowedSubs.has(s));
+      }
     }
 
     const remainingTarget = Math.max(0, categoryTargetLimit - currentProductCount);
@@ -678,6 +688,7 @@ export function calculateExpansionPlanFromStats(params: {
       catHistory &&
       catHistory.sampleCount > 0 &&
       catHistory.historicalValidPerCredit !== null &&
+      catHistory.historicalValidPerCredit !== undefined &&
       catHistory.historicalValidPerCredit > 0
     );
 
@@ -691,8 +702,8 @@ export function calculateExpansionPlanFromStats(params: {
       estimatedCredits = 0;
       minEstimatedCredits = 0;
       maxEstimatedCredits = 0;
-    } else if (hasHistoricalData && catHistory?.historicalValidPerCredit) {
-      const yieldRate = Math.max(0.05, catHistory.historicalValidPerCredit);
+    } else if (hasHistoricalData && catHistory?.historicalValidPerCredit && catHistory.historicalValidPerCredit > 0) {
+      const yieldRate = catHistory.historicalValidPerCredit;
       const baseEstimate = remainingTarget / yieldRate;
       estimatedCredits = Math.ceil(baseEstimate * 1.15); // 15% margem de segurança
       minEstimatedCredits = Math.max(1, Math.round(baseEstimate * 0.9));
@@ -741,7 +752,19 @@ export interface CategoryExecutionSummaryApi {
   subcategoriesExhausted?: number;
   coverageBefore?: number;
   coverageAfter?: number;
-  stopReason: 'TARGET_REACHED' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
+  technicalErrors?: number;
+  subcategoriesFailed?: number;
+  executionId?: string;
+  stopReason:
+    | 'TARGET_REACHED'
+    | 'NO_MORE_RESULTS'
+    | 'NO_VALID_RESULTS'
+    | 'ALL_SUBCATEGORIES_EXHAUSTED'
+    | 'PARTIAL_ERROR'
+    | 'API_BALANCE_ERROR'
+    | 'API_AUTH_ERROR'
+    | 'CANCELLED'
+    | 'FAILED';
 }
 
 export interface SubcategoryBatchProgressApi {
@@ -877,6 +900,7 @@ export async function executeSubcategoryExpansionStreamApi(
   let buffer = '';
   let finalResult: SubcategoryExpansionResultApi | null = null;
   let lastProgress: SubcategoryBatchProgressApi | null = null;
+  let executionId: string | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -897,10 +921,14 @@ export async function executeSubcategoryExpansionStreamApi(
         if (jsonStr) {
           try {
             const parsed = JSON.parse(jsonStr);
-            if (parsed.type === 'PROGRESS' && parsed.progress) {
+            if (parsed.type === 'INIT' && parsed.executionId) {
+              executionId = parsed.executionId;
+            } else if (parsed.type === 'PROGRESS' && parsed.progress) {
+              if (parsed.executionId) executionId = parsed.executionId;
               lastProgress = parsed.progress;
               if (onProgress) onProgress(parsed.progress);
             } else if ((parsed.type === 'COMPLETE' || parsed.type === 'DONE') && parsed.result) {
+              if (parsed.executionId) executionId = parsed.executionId;
               finalResult = parsed.result;
             } else if (parsed.type === 'ERROR') {
               throw new Error(parsed.error || 'Erro na expansão');
@@ -935,9 +963,21 @@ export async function executeSubcategoryExpansionStreamApi(
     }
   }
 
-  // FALLBACK DE SEGURANÇA: Se a conexão SSE fechou sem o evento COMPLETE
+  // FALLBACK DE SEGURANÇA RESILIENTE: Se a conexão SSE fechou sem o evento COMPLETE
   // (ex: timeout de proxy intermediário ou queda de conexão durante execução longa),
-  // não fechar silenciosamente nem abortar o modal! Reconsultar o MySQL e recuperar o resultado.
+  // primeiro tentamos recuperar o resultado do Job no MySQL usando o executionId
+  if (!finalResult && executionId) {
+    try {
+      const jobStatus = await getExpansionJobStatusApi(studentCode, executionId);
+      if (jobStatus && jobStatus.job?.result) {
+        finalResult = jobStatus.job.result;
+      }
+    } catch {
+      // continua para fallback de contagem direta
+    }
+  }
+
+  // Se ainda assim não recuperou o resultado consolidado, consulta o banco MySQL diretamente
   if (!finalResult) {
     try {
       const freshStats = await fetchCollectorCategories(studentCode);
@@ -998,6 +1038,69 @@ export async function executeSubcategoryExpansionStreamApi(
   return finalResult;
 }
 
+export async function startExpansionJobApi(
+  studentCode: string,
+  payload: {
+    selectedCategories?: string[];
+    selectedSubcategoriesMap?: Record<string, string[]>;
+    categoryTargetLimit?: number;
+    perSubcategoryMax?: number;
+  }
+): Promise<{ success: boolean; executionId: string; state: any; meta: any }> {
+  const response = await fetch('/api/product-miner/admin/expansion-jobs/start', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data;
+}
+
+export async function stepExpansionJobApi(
+  studentCode: string,
+  executionId: string
+): Promise<{ success: boolean; executionId: string; isCompleted: boolean; progress?: SubcategoryBatchProgressApi; result?: SubcategoryExpansionResultApi; state?: any; stepInProgress?: boolean }> {
+  const response = await fetch(`/api/product-miner/admin/expansion-jobs/${encodeURIComponent(executionId)}/step`, {
+    method: 'POST',
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (response.status === 409 || data.error === 'STEP_IN_PROGRESS') {
+    return { success: false, executionId, isCompleted: false, stepInProgress: true };
+  }
+  if (!response.ok) throw accessError(data);
+  return data;
+}
+
+export async function getExpansionJobStatusApi(
+  studentCode: string,
+  executionId: string
+): Promise<{ success: boolean; job: any }> {
+  const response = await fetch(`/api/product-miner/admin/expansion-jobs/${encodeURIComponent(executionId)}/status`, {
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data;
+}
+
+export async function cancelExpansionJobApi(
+  studentCode: string,
+  executionId: string
+): Promise<{ success: boolean; executionId: string; status: string }> {
+  const response = await fetch(`/api/product-miner/admin/expansion-jobs/${encodeURIComponent(executionId)}/cancel`, {
+    method: 'POST',
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data;
+}
+
 export async function executeSubcategoryExpansionApi(
   studentCode: string,
   payload: {
@@ -1007,9 +1110,97 @@ export async function executeSubcategoryExpansionApi(
     perSubcategoryMax?: number;
     maxCreditBudgetPerCategory?: number;
   },
-  onProgress?: (progress: SubcategoryBatchProgressApi) => void
+  onProgress?: (progress: SubcategoryBatchProgressApi) => void,
+  signal?: AbortSignal
 ): Promise<SubcategoryExpansionResultApi> {
-  return executeSubcategoryExpansionStreamApi(studentCode, payload, onProgress);
+  // Inicia o job persistente no backend
+  const startRes = await startExpansionJobApi(studentCode, {
+    selectedCategories: payload.selectedCategories,
+    selectedSubcategoriesMap: payload.selectedSubcategoriesMap,
+    categoryTargetLimit: payload.categoryTargetLimit,
+    perSubcategoryMax: payload.perSubcategoryMax,
+  });
+
+  const executionId = startRes.executionId;
+  let isCompleted = false;
+  let finalResult: SubcategoryExpansionResultApi | undefined;
+
+  // Itera chamando /step até a conclusão do job ou cancelamento
+  let networkFailures = 0;
+  const MAX_NETWORK_RETRIES = 5;
+
+  while (!isCompleted) {
+    if (signal?.aborted) {
+      await cancelExpansionJobApi(studentCode, executionId).catch(() => {});
+      throw new Error('EXPANSION_CANCELLED');
+    }
+
+    try {
+      const stepRes = await stepExpansionJobApi(studentCode, executionId);
+
+      if (stepRes.stepInProgress) {
+        // Step em execução por lock atômico — aguarda brevemente sem contabilizar falha de rede
+        await new Promise((r) => setTimeout(r, 1200));
+        continue;
+      }
+
+      networkFailures = 0; // Reset ao obter resposta com sucesso
+
+      if (stepRes.progress && onProgress) {
+        onProgress(stepRes.progress);
+      }
+
+      isCompleted = Boolean(stepRes.isCompleted);
+      if (stepRes.result) {
+        finalResult = stepRes.result;
+      }
+    } catch (err: any) {
+      if (signal?.aborted) {
+        await cancelExpansionJobApi(studentCode, executionId).catch(() => {});
+        throw new Error('EXPANSION_CANCELLED');
+      }
+
+      networkFailures++;
+      console.warn(`[Expansion Job] Falha de comunicação no step (${networkFailures}/${MAX_NETWORK_RETRIES}) para job ${executionId}:`, err?.message || err);
+
+      if (networkFailures > MAX_NETWORK_RETRIES) {
+        throw new Error(`Falha de comunicação persistente com o servidor após ${MAX_NETWORK_RETRIES} tentativas: ${err?.message || err}`);
+      }
+
+      // Backoff exponencial: 1s, 2s, 4s...
+      const backoffMs = Math.min(8000, 1000 * Math.pow(2, networkFailures - 1));
+      await new Promise((r) => setTimeout(r, backoffMs));
+
+      // Consulta o estado oficial persistido no backend usando o MESMO executionId
+      try {
+        const statusRes = await getExpansionJobStatusApi(studentCode, executionId);
+        if (statusRes.job) {
+          if (statusRes.job.progress && onProgress) {
+            onProgress(statusRes.job.progress);
+          }
+          if (statusRes.job.status === 'COMPLETED' || statusRes.job.status === 'CANCELLED' || statusRes.job.status === 'FAILED' || statusRes.job.status === 'PARTIAL_ERROR') {
+            isCompleted = true;
+            if (statusRes.job.result) {
+              finalResult = statusRes.job.result;
+            }
+          }
+        }
+      } catch (statusErr: any) {
+        console.warn(`[Expansion Job] Falha ao consultar status após erro de rede:`, statusErr?.message || statusErr);
+      }
+    }
+  }
+
+  if (finalResult) {
+    return finalResult;
+  }
+
+  const statusRes = await getExpansionJobStatusApi(studentCode, executionId);
+  if (statusRes.job?.result) {
+    return statusRes.job.result;
+  }
+
+  throw new Error('Expansão finalizada sem confirmação de resultado.');
 }
 
 
