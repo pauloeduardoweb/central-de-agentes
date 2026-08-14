@@ -652,6 +652,7 @@ export interface CategoryExecutionSummaryApi {
   category: string;
   initialValidCount: number;
   finalValidCount: number;
+  actualValidGrowth?: number;
   categoryTargetLimit: number;
   validNewProductsForTarget: number;
   offTargetProducts: number;
@@ -660,6 +661,8 @@ export interface CategoryExecutionSummaryApi {
   totalReceived: number;
   creditsUsed: number;
   subcategoriesConsulted: number;
+  coverageBefore?: number;
+  coverageAfter?: number;
   stopReason: 'TARGET_REACHED' | 'MAX_CREDIT_BUDGET' | 'MAX_PAGES' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
 }
 
@@ -727,7 +730,7 @@ export function calculateCategoryProgressPercent(params: {
   if (params.isTargetReached || params.stopReason === 'TARGET_REACHED') {
     return 100;
   }
-  const limit = Math.max(1, params.creditLimit || 15);
+  const limit = Math.max(1, params.creditLimit !== undefined && params.creditLimit > 0 ? params.creditLimit : 1);
   const used = Math.max(0, params.creditsUsed || 0);
 
   if (used >= limit) {
