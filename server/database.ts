@@ -1043,6 +1043,12 @@ export function ensureProductMinerTables(): Promise<void> {
         if (!tspColNames.includes('classification_source')) {
           await db.query(`ALTER TABLE tiktok_shop_products ADD COLUMN classification_source VARCHAR(50) DEFAULT NULL`).catch(() => {});
         }
+        if (!tspColNames.includes('collection_category')) {
+          await db.query(`ALTER TABLE tiktok_shop_products ADD COLUMN collection_category VARCHAR(120) DEFAULT NULL`).catch(() => {});
+        }
+        if (!tspColNames.includes('collection_subcategory')) {
+          await db.query(`ALTER TABLE tiktok_shop_products ADD COLUMN collection_subcategory VARCHAR(120) DEFAULT NULL`).catch(() => {});
+        }
       } catch (tspColErr: any) {
         console.warn('[MySQL tiktok_shop_products Columns Check Warning]:', tspColErr?.message || tspColErr);
       }

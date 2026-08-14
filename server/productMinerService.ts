@@ -596,7 +596,12 @@ async function saveCachedPayload(query: string, region: string, page: number, pa
   });
 }
 
-async function persistProducts(products: MinedProduct[], query: string): Promise<{
+export async function persistProducts(
+  products: MinedProduct[],
+  query: string,
+  collectionCategory?: string | null,
+  collectionSubcategory?: string | null
+): Promise<{
   insertedCount: number;
   updatedCount: number;
   totalValid: number;
@@ -658,6 +663,8 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
     product.estimatedCommissionCents || null,
     product.commissionRatePercent || null,
     query,
+    collectionCategory || null,
+    collectionSubcategory || null,
   ]);
 
   await db.query(
@@ -665,7 +672,8 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
       product_id, title, image_url, price_cents, original_price_cents, discount_percent,
       currency_symbol, rating, sold_count, seller_id, seller_name, product_url, category_path,
       video_id, video_url, video_author, video_author_followers, video_views, video_likes,
-      video_comments, video_shares, video_saves, estimated_commission_cents, commission_rate_percent, query_source
+      video_comments, video_shares, video_saves, estimated_commission_cents, commission_rate_percent, query_source,
+      collection_category, collection_subcategory
     ) VALUES ?
     ON DUPLICATE KEY UPDATE
       title = VALUES(title),
@@ -685,6 +693,8 @@ async function persistProducts(products: MinedProduct[], query: string): Promise
       video_shares = VALUES(video_shares), video_saves = VALUES(video_saves),
       estimated_commission_cents = VALUES(estimated_commission_cents), commission_rate_percent = VALUES(commission_rate_percent),
       query_source = VALUES(query_source),
+      collection_category = IF(VALUES(collection_category) IS NOT NULL, VALUES(collection_category), collection_category),
+      collection_subcategory = IF(VALUES(collection_subcategory) IS NOT NULL, VALUES(collection_subcategory), collection_subcategory),
       last_seen_at = NOW()`,
     [productRows]
   );
@@ -1721,6 +1731,8 @@ export async function searchTikTokShopProducts(params: {
   page?: number;
   region?: string;
   forceRefresh?: boolean;
+  collectionCategory?: string | null;
+  collectionSubcategory?: string | null;
 }): Promise<{
   products: MinedProduct[];
   creditsUsed: number;
@@ -2180,7 +2192,12 @@ export async function searchTikTokShopProducts(params: {
     throw new Error(`PARSER_REJECTION: Nenhum produto válido extraído de ${rawItems.length} itens recebidos da SocialCrawl (Motivos: ${reasonStr || 'missing_product_id'}).`);
   }
 
-  const persistStats = await persistProducts(normalized, query);
+  const persistStats = await persistProducts(
+    normalized,
+    query,
+    params.collectionCategory || category || null,
+    params.collectionSubcategory || subcategory || null
+  );
   const productsWithTrends = await attachTrendMetrics(normalized);
   const products = await attachAssociatedVideos(productsWithTrends);
 
@@ -2218,6 +2235,8 @@ export async function refreshMultiPageTikTokShopProducts(params: {
   region?: string;
   maxProducts?: number;
   page?: number;
+  collectionCategory?: string | null;
+  collectionSubcategory?: string | null;
 }): Promise<{
   products: MinedProduct[];
   uniqueProductsCount: number;
@@ -2293,6 +2312,8 @@ export async function refreshMultiPageTikTokShopProducts(params: {
         page: actualPage,
         region,
         forceRefresh: true,
+        collectionCategory: params.collectionCategory || null,
+        collectionSubcategory: params.collectionSubcategory || null,
       });
 
       if (isInfantil && res.products.length > 0) {

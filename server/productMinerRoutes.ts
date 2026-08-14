@@ -380,8 +380,17 @@ productMinerRouter.post('/refresh', async (req, res) => {
     const query = String(req.body?.query || req.body?.q || req.query.query || req.query.q || '').trim();
     const page = req.body?.page ? Number(req.body.page) : undefined;
     const maxProducts = req.body?.maxProducts ? Number(req.body.maxProducts) : undefined;
+    const collectionCategory = req.body?.collectionCategory ? String(req.body.collectionCategory).trim() : undefined;
+    const collectionSubcategory = req.body?.collectionSubcategory ? String(req.body.collectionSubcategory).trim() : undefined;
 
-    const result = await refreshMultiPageTikTokShopProducts({ query, region: 'BR', maxProducts, page });
+    const result = await refreshMultiPageTikTokShopProducts({
+      query,
+      region: 'BR',
+      maxProducts,
+      page,
+      collectionCategory,
+      collectionSubcategory,
+    });
     return res.json({ success: true, region: 'BR', ...result });
   } catch (error: any) {
     console.error('[Product Miner Refresh Error]:', error?.message || error);
@@ -741,5 +750,74 @@ productMinerRouter.get('/admin/audit-unclassified-products-readonly', async (req
     return res.status(500).json({ success: false, error: error?.message || 'AUDIT_ERROR' });
   }
 });
+
+// Admin Route: 100% READ-ONLY Expansion Plan by Official Subcategories
+productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const { buildSubcategoryExpansionPlan } = await import('./subcategoryExpansionService.js');
+    const { getCollectorCategoriesStats } = await import('./productMinerService.js');
+    const targetLimit = Number(req.query.categoryTargetLimit || 500);
+    const perSubMax = Number(req.query.perSubcategoryMax || 60);
+    const selectedCatsParam = req.query.categories ? String(req.query.categories).split(',') : undefined;
+
+    const stats = await getCollectorCategoriesStats();
+    const plans = buildSubcategoryExpansionPlan({
+      categoryStats: stats.categories,
+      selectedCategories: selectedCatsParam,
+      categoryTargetLimit: targetLimit,
+      perSubcategoryMax: perSubMax,
+    });
+
+    const totalSubcategories = plans.reduce((sum, p) => sum + p.subcategories.length, 0);
+    const zeroCountSubcategories = plans.reduce(
+      (sum, p) => sum + p.subcategories.filter((s) => s.isZeroCount).length,
+      0
+    );
+    const totalAllocatedProducts = plans.reduce((sum, p) => sum + p.totalAllocated, 0);
+    const totalEstimatedCredits = plans.reduce((sum, p) => sum + p.estimatedCredits, 0);
+
+    return res.json({
+      success: true,
+      readOnly: true,
+      meta: {
+        totalCategories: plans.length,
+        totalSubcategories,
+        zeroCountSubcategories,
+        totalAllocatedProducts,
+        totalEstimatedCredits,
+        categoryTargetLimit: targetLimit,
+        perSubcategoryMax: perSubMax,
+      },
+      plans,
+    });
+  } catch (error: any) {
+    console.error('[Expansion Plan ReadOnly Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'EXPANSION_PLAN_ERROR' });
+  }
+});
+
+// Admin Route: Execute subcategory expansion (Mentor only)
+productMinerRouter.post('/admin/execute-subcategory-expansion', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const { executeSubcategoryExpansion } = await import('./subcategoryExpansionService.js');
+    const selectedCategories = Array.isArray(req.body?.selectedCategories) ? req.body.selectedCategories : undefined;
+    const categoryTargetLimit = req.body?.categoryTargetLimit ? Number(req.body.categoryTargetLimit) : 500;
+    const perSubcategoryMax = req.body?.perSubcategoryMax ? Number(req.body.perSubcategoryMax) : 60;
+
+    const result = await executeSubcategoryExpansion({
+      selectedCategories,
+      categoryTargetLimit,
+      perSubcategoryMax,
+    });
+
+    return res.json(result);
+  } catch (error: any) {
+    console.error('[Execute Subcategory Expansion Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'EXPANSION_EXECUTION_ERROR' });
+  }
+});
+
 
 
