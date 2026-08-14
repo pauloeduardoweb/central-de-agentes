@@ -133,6 +133,9 @@ export type MinedProduct = {
   sellerName: string | null;
   productUrl: string | null;
   category: string | null;
+  collectionCategory?: string | null;
+  collectionSubcategory?: string | null;
+  querySource?: string | null;
   collectionPosition?: number | null;
   lastSeenAt?: string | Date | null;
   estimatedCommissionCents?: number | null;
@@ -689,14 +692,21 @@ export async function persistProducts(
       seller_id = VALUES(seller_id),
       seller_name = VALUES(seller_name),
       product_url = IF(VALUES(product_url) IS NOT NULL AND VALUES(product_url) != '', VALUES(product_url), product_url),
-      category_path = VALUES(category_path), video_id = VALUES(video_id), video_url = VALUES(video_url),
-      video_author = VALUES(video_author), video_author_followers = VALUES(video_author_followers),
-      video_views = VALUES(video_views), video_likes = VALUES(video_likes), video_comments = VALUES(video_comments),
-      video_shares = VALUES(video_shares), video_saves = VALUES(video_saves),
-      estimated_commission_cents = VALUES(estimated_commission_cents), commission_rate_percent = VALUES(commission_rate_percent),
-      query_source = VALUES(query_source),
-      collection_category = IF(VALUES(collection_category) IS NOT NULL, VALUES(collection_category), collection_category),
-      collection_subcategory = IF(VALUES(collection_subcategory) IS NOT NULL, VALUES(collection_subcategory), collection_subcategory),
+      category_path = IF(category_path IS NULL OR TRIM(category_path) = '', VALUES(category_path), category_path),
+      video_id = IF(VALUES(video_id) IS NOT NULL AND VALUES(video_id) != '', VALUES(video_id), video_id),
+      video_url = IF(VALUES(video_url) IS NOT NULL AND VALUES(video_url) != '', VALUES(video_url), video_url),
+      video_author = IF(VALUES(video_author) IS NOT NULL AND VALUES(video_author) != '', VALUES(video_author), video_author),
+      video_author_followers = IF(VALUES(video_author_followers) IS NOT NULL, VALUES(video_author_followers), video_author_followers),
+      video_views = IF(VALUES(video_views) IS NOT NULL, VALUES(video_views), video_views),
+      video_likes = IF(VALUES(video_likes) IS NOT NULL, VALUES(video_likes), video_likes),
+      video_comments = IF(VALUES(video_comments) IS NOT NULL, VALUES(video_comments), video_comments),
+      video_shares = IF(VALUES(video_shares) IS NOT NULL, VALUES(video_shares), video_shares),
+      video_saves = IF(VALUES(video_saves) IS NOT NULL, VALUES(video_saves), video_saves),
+      estimated_commission_cents = IF(VALUES(estimated_commission_cents) IS NOT NULL, VALUES(estimated_commission_cents), estimated_commission_cents),
+      commission_rate_percent = IF(VALUES(commission_rate_percent) IS NOT NULL, VALUES(commission_rate_percent), commission_rate_percent),
+      query_source = IF(query_source IS NOT NULL AND query_source != '', query_source, VALUES(query_source)),
+      collection_category = IF(collection_category IS NOT NULL AND collection_category != '', collection_category, VALUES(collection_category)),
+      collection_subcategory = IF(collection_subcategory IS NOT NULL AND collection_subcategory != '', collection_subcategory, VALUES(collection_subcategory)),
       last_seen_at = NOW()`,
     [productRows]
   );
@@ -2141,7 +2151,13 @@ export async function searchTikTokShopProducts(params: {
   await saveCachedPayload(query, region, page, payload);
 
   const rawItems = extractRawItemsFromPayload(payload);
-  const creditsUsedForThisCall = Number(payload.credits_used ?? payload.credits ?? payload.cost ?? 1);
+  const rawCredits = payload.credits_used ?? payload.credits ?? payload.cost;
+  if (rawCredits === undefined || rawCredits === null) {
+    console.warn(`[SocialCrawl Search Warning]: Campo de créditos ausente na resposta da query "${providerQuery}" (Pág ${page}). Assumindo 0 créditos.`);
+  }
+  const creditsUsedForThisCall = (typeof rawCredits === 'number' && Number.isFinite(rawCredits))
+    ? Math.max(0, rawCredits)
+    : (rawCredits !== undefined && rawCredits !== null && !isNaN(Number(rawCredits)) ? Math.max(0, Number(rawCredits)) : 0);
   const hasMore = extractHasMoreFromPayload(payload, rawItems.length);
 
   if (rawItems.length === 0 && response.ok) {

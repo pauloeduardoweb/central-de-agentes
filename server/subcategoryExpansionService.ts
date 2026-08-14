@@ -1,4 +1,4 @@
-import { db, isDatabaseConfigured, ensureProductMinerTables, ensureCategoryExecutionHistoryTable } from './database.js';
+import { db, isDatabaseConfigured, ensureProductMinerTables, ensureCategoryExecutionHistoryTable, updateExpansionJobInDb, getExpansionJobFromDb, createExpansionJobInDb } from './database.js';
 import {
   COLLECTOR_CATEGORIES,
   OFFICIAL_TIKTOK_TAXONOMY,
@@ -11,6 +11,8 @@ import {
   CollectorCategoryStat,
   MinedProduct,
 } from './productMinerService.js';
+
+export const MAX_PAGES_PER_SUBCATEGORY = 50;
 
 export interface SubcategoryTargetPlan {
   category: string;
@@ -69,13 +71,16 @@ export interface CategoryExecutionSummary {
   subcategoriesExhausted: number;
   coverageBefore?: number;
   coverageAfter?: number;
-  stopReason: 'TARGET_REACHED' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
+  technicalErrors?: number;
+  subcategoriesFailed?: number;
+  executionId?: string;
+  stopReason: 'TARGET_REACHED' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'PARTIAL_ERROR' | 'API_BALANCE_ERROR' | 'API_AUTH_ERROR' | 'CANCELLED' | 'FAILED';
 }
 
 /**
- * Grava o resultado de execução de uma categoria na tabela de histórico de eficiência.
+ * Grava o resultado de execução de uma categoria na tabela de histórico de eficiência com idempotência por execução e categoria.
  */
-export async function recordCategoryExecutionHistory(summary: CategoryExecutionSummary): Promise<void> {
+export async function recordCategoryExecutionHistory(summary: CategoryExecutionSummary, executionId?: string): Promise<void> {
   if (!isDatabaseConfigured()) return;
   try {
     await ensureCategoryExecutionHistoryTable();
@@ -83,24 +88,43 @@ export async function recordCategoryExecutionHistory(summary: CategoryExecutionS
       ? Number((summary.actualValidGrowth / summary.creditsUsed).toFixed(4))
       : null;
 
+    const effExecutionId = executionId || summary.executionId || null;
+    const hasTechnicalErrors = (summary.technicalErrors && summary.technicalErrors > 0) || (summary.subcategoriesFailed && summary.subcategoriesFailed > 0);
+
     // Critério rigoroso de amostra válida para cálculo de estimativa real:
-    // - Não pode ter sido cancelada manualmente
     // - Deve ter consumido créditos (> 0)
     // - Deve ter feito requisições (> 0)
+    // - Não pode ter erros técnicos
     // - Crescimento >= 0
-    const isValidSample = summary.stopReason !== 'CANCELLED' &&
-      summary.creditsUsed > 0 &&
+    // - stopReason deve ser TARGET_REACHED ou ALL_SUBCATEGORIES_EXHAUSTED
+    const isValidSample = summary.creditsUsed > 0 &&
       summary.requestsMade > 0 &&
-      summary.actualValidGrowth >= 0;
+      !hasTechnicalErrors &&
+      summary.actualValidGrowth >= 0 &&
+      (summary.stopReason === 'TARGET_REACHED' || summary.stopReason === 'ALL_SUBCATEGORIES_EXHAUSTED');
 
     await db.query(
       `INSERT INTO product_miner_category_history (
-        category, execution_type, initial_valid_count, final_valid_count,
+        execution_id, category, execution_type, initial_valid_count, final_valid_count,
         actual_valid_growth, target_limit, credits_consumed, requests_made,
         pages_processed, subcategories_consulted, stop_reason,
         confirmed_valid_per_credit, is_valid_sample, created_at, completed_at
-      ) VALUES (?, 'EXPANSION', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      ) VALUES (?, ?, 'EXPANSION', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      ON DUPLICATE KEY UPDATE
+        initial_valid_count = VALUES(initial_valid_count),
+        final_valid_count = VALUES(final_valid_count),
+        actual_valid_growth = VALUES(actual_valid_growth),
+        target_limit = VALUES(target_limit),
+        credits_consumed = VALUES(credits_consumed),
+        requests_made = VALUES(requests_made),
+        pages_processed = VALUES(pages_processed),
+        subcategories_consulted = VALUES(subcategories_consulted),
+        stop_reason = VALUES(stop_reason),
+        confirmed_valid_per_credit = VALUES(confirmed_valid_per_credit),
+        is_valid_sample = VALUES(is_valid_sample),
+        completed_at = NOW()`,
       [
+        effExecutionId,
         summary.category,
         summary.initialValidCount,
         summary.finalValidCount,
@@ -276,6 +300,7 @@ export function buildSubcategoryExpansionPlan(params: {
   categoryTargetLimit?: number;
   perSubcategoryMax?: number;
   historyMap?: Record<string, CategoryHistoryStat>;
+  taxonomyConfig?: Record<string, string[]>;
 }): CategoryExpansionPlan[] {
   const {
     categoryStats,
@@ -284,6 +309,7 @@ export function buildSubcategoryExpansionPlan(params: {
     categoryTargetLimit = 500,
     perSubcategoryMax = 60,
     historyMap,
+    taxonomyConfig = OFFICIAL_TIKTOK_TAXONOMY,
   } = params;
 
   const targetCats = selectedCategories.length > 0 ? selectedCategories : COLLECTOR_CATEGORIES;
@@ -294,10 +320,13 @@ export function buildSubcategoryExpansionPlan(params: {
     const currentProductCount = catStat?.productCount || 0;
     
     // Subcategorias oficiais ou filtradas pelas selecionadas
-    let targetSubList = OFFICIAL_TIKTOK_TAXONOMY[catName] || [];
-    if (selectedSubcategoriesMap && Array.isArray(selectedSubcategoriesMap[catName]) && selectedSubcategoriesMap[catName].length > 0) {
-      const allowedSubs = new Set(selectedSubcategoriesMap[catName].filter((s) => s !== 'Todas'));
-      targetSubList = targetSubList.filter((s) => allowedSubs.has(s));
+    let targetSubList = taxonomyConfig[catName] || OFFICIAL_TIKTOK_TAXONOMY[catName] || [];
+    if (selectedSubcategoriesMap && Object.prototype.hasOwnProperty.call(selectedSubcategoriesMap, catName)) {
+      const allowed = selectedSubcategoriesMap[catName];
+      if (Array.isArray(allowed)) {
+        const allowedSubs = new Set(allowed.filter((s) => s !== 'Todas'));
+        targetSubList = targetSubList.filter((s) => allowedSubs.has(s));
+      }
     }
 
     // Déficit real necessário para a categoria atingir a meta final
@@ -395,8 +424,8 @@ export function buildSubcategoryExpansionPlan(params: {
       estimatedCredits = 0;
       minEstimatedCredits = 0;
       maxEstimatedCredits = 0;
-    } else if (hasHistoricalData && catHistory?.historicalValidPerCredit) {
-      const yieldRate = Math.max(0.05, catHistory.historicalValidPerCredit);
+    } else if (hasHistoricalData && catHistory?.historicalValidPerCredit && catHistory.historicalValidPerCredit > 0) {
+      const yieldRate = catHistory.historicalValidPerCredit;
       const baseEstimate = remainingTarget / yieldRate;
       estimatedCredits = Math.ceil(baseEstimate * 1.15); // 15% margem de segurança
       minEstimatedCredits = Math.max(1, Math.round(baseEstimate * 0.9));
@@ -638,7 +667,7 @@ export async function executeSubcategoryExpansion(options: {
       let hasMoreInSub = true;
       let isSubExhausted = false;
 
-      for (let page = 1; page <= 30 && hasMoreInSub; page++) {
+      for (let page = 1; page <= MAX_PAGES_PER_SUBCATEGORY && hasMoreInSub; page++) {
         if (shouldCancel && shouldCancel()) {
           catStopReason = 'CANCELLED';
           break;
@@ -830,14 +859,15 @@ export async function executeSubcategoryExpansion(options: {
           }
 
           // Atualizar contadores
+          const effectivePageUpdated = (typeof res.updatedProductsCount === 'number') ? res.updatedProductsCount : pageUpdated;
           catValidNewCount += pageValidNew;
           catOffTargetCount += pageOffTarget;
           catUnclassifiedCount += pageUnclassified;
-          catUpdatedCount += pageUpdated;
+          catUpdatedCount += effectivePageUpdated;
 
           const totalNewThisPage = pageValidNew + pageOffTarget + pageUnclassified;
           totalNew += totalNewThisPage;
-          totalUpdated += pageUpdated;
+          totalUpdated += effectivePageUpdated;
           totalValidNewForTarget += pageValidNew;
           totalOffTarget += pageOffTarget;
           totalUnclassified += pageUnclassified;
@@ -986,16 +1016,23 @@ export async function executeSubcategoryExpansion(options: {
     categorySummaries.push(catSummary);
 
     // Gravar no histórico de execuções para aprendizado da eficiência real de créditos
-    await recordCategoryExecutionHistory(catSummary).catch((recErr) => {
-      console.warn('[recordCategoryExecutionHistory Warning]:', recErr?.message || recErr);
-    });
+    // Proteção rigorosa: não gravar se foi cancelado, erro fatal de crédito ou sem requisições reais
+    if (catSummary.creditsUsed > 0 && catSummary.stopReason !== 'CANCELLED' && !isFatalCreditError && catSummary.requestsMade > 0) {
+      await recordCategoryExecutionHistory(catSummary).catch((recErr) => {
+        console.warn('[recordCategoryExecutionHistory Warning]:', recErr?.message || recErr);
+      });
+    }
 
     categoriesCompleted++;
   }
 
-  // Notificação final de progresso
+  // Notificação final de progresso baseada em DADOS REAIS consolidados pós-execução
   if (onProgress && plans.length > 0) {
     const lastPlan = plans[plans.length - 1];
+    const lastSummary = categorySummaries[categorySummaries.length - 1];
+    const finalValidCount = lastSummary ? lastSummary.finalValidCount : (lastPlan.currentProductCount + totalValidNewForTarget);
+    const finalRemaining = Math.max(0, lastPlan.categoryTargetLimit - finalValidCount);
+
     onProgress({
       currentCategory: lastPlan.category,
       currentSubcategory: lastPlan.subcategories[lastPlan.subcategories.length - 1]?.subcategory || '',
@@ -1006,18 +1043,19 @@ export async function executeSubcategoryExpansion(options: {
       subcategoryIndex: lastPlan.subcategories.length,
       totalSubcategoriesInCategory: lastPlan.subcategories.length,
       categoryTargetLimit: lastPlan.categoryTargetLimit,
-      currentValidTargetCount: lastPlan.categoryTargetLimit,
-      remainingNeeded: 0,
+      initialValidCount: lastSummary ? lastSummary.initialValidCount : lastPlan.currentProductCount,
+      currentValidTargetCount: finalValidCount,
+      remainingNeeded: finalRemaining,
       validNewProductsForTarget: totalValidNewForTarget,
       offTargetProducts: totalOffTarget,
       unclassifiedProducts: totalUnclassified,
       catUpdatedCount: totalUpdated,
       catTotalReceived: totalProcessed,
-      categoryCreditsUsed: totalCreditsUsed,
-      categoryCreditLimit: totalCreditsUsed,
-      categoryRequestsMade: totalRequestsMade,
-      categoryPagesProcessed: totalPagesProcessed,
-      stepStatus: 'Concluindo categoria...',
+      categoryCreditsUsed: lastSummary ? lastSummary.creditsUsed : totalCreditsUsed,
+      categoryCreditLimit: lastPlan.estimatedCredits || totalCreditsUsed,
+      categoryRequestsMade: lastSummary ? lastSummary.requestsMade : totalRequestsMade,
+      categoryPagesProcessed: lastSummary ? lastSummary.pagesProcessed : totalPagesProcessed,
+      stepStatus: 'Concluído com sucesso.',
       totalReceived: totalProcessed,
       totalNewProducts: totalNew,
       totalUpdatedProducts: totalUpdated,
@@ -1025,7 +1063,7 @@ export async function executeSubcategoryExpansion(options: {
       totalRequestsMade,
       totalPagesProcessed,
       isCompleted: true,
-      stopReason: 'COMPLETED',
+      stopReason: lastSummary ? lastSummary.stopReason : (finalRemaining <= 0 ? 'TARGET_REACHED' : 'COMPLETED'),
     });
   }
 
@@ -1035,7 +1073,7 @@ export async function executeSubcategoryExpansion(options: {
     finalCoverage += cat.coverageCount;
   }
 
-  return {
+  const resultPayload: SubcategoryExpansionResult = {
     success: errors.length === 0 || totalProcessed > 0,
     totalProcessed,
     totalUnique: seenProductIds.size,
@@ -1057,4 +1095,627 @@ export async function executeSubcategoryExpansion(options: {
     plans,
     errors,
   };
+
+  return resultPayload;
 }
+
+export interface ExpansionJobState {
+  jobId: string;
+  studentCode: string;
+  selectedCategories: string[];
+  selectedSubcategoriesMap?: Record<string, string[]>;
+  categoryTargetLimit: number;
+  perSubcategoryMax: number;
+  plans: CategoryExpansionPlan[];
+  currentCatIdx: number;
+  currentSubIdx: number;
+  currentPage: number;
+  currentPageRetryCount: number;
+  consecutiveNoValidPages: number;
+  technicalErrors: number;
+  subcategoriesFailed: number;
+  initialValidCount: number;
+  currentValidTargetCount: number;
+  catValidNewCount: number;
+  catOffTargetCount: number;
+  catUnclassifiedCount: number;
+  catUpdatedCount: number;
+  catTotalReceived: number;
+  catCreditsUsed: number;
+  catRequestsMade: number;
+  catPagesProcessed: number;
+  catSubcategoriesConsulted: number;
+  catSubcategoriesExhausted: number;
+  isSubConsulted: boolean;
+  totalProcessed: number;
+  totalNew: number;
+  totalUpdated: number;
+  totalValidNewForTarget: number;
+  totalOffTarget: number;
+  totalUnclassified: number;
+  totalCreditsUsed: number;
+  totalRequestsMade: number;
+  totalPagesProcessed: number;
+  categoriesCompleted: number;
+  totalSelectedSubcategories: number;
+  subcategoriesConsulted: number;
+  subcategoriesExhausted: number;
+  initialCoverage: number;
+  seenProductIds: string[];
+  categorySummaries: CategoryExecutionSummary[];
+  errors: string[];
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_ERROR' | 'CANCELLED' | 'FAILED';
+  isCompleted: boolean;
+  stopReason?: string;
+}
+
+export async function initializeExpansionJobState(params: {
+  jobId: string;
+  studentCode: string;
+  selectedCategories?: string[];
+  selectedSubcategoriesMap?: Record<string, string[]>;
+  categoryTargetLimit?: number;
+  perSubcategoryMax?: number;
+  categoryStats?: CollectorCategoryStat[];
+  taxonomyConfig?: Record<string, string[]>;
+}): Promise<ExpansionJobState> {
+  const {
+    jobId,
+    studentCode,
+    selectedCategories = [...COLLECTOR_CATEGORIES],
+    selectedSubcategoriesMap,
+    categoryTargetLimit = 300,
+    perSubcategoryMax = 60,
+    categoryStats: customCategoryStats,
+    taxonomyConfig,
+  } = params;
+
+  let initialCategories: CollectorCategoryStat[];
+  if (customCategoryStats) {
+    initialCategories = customCategoryStats;
+  } else {
+    const statsBefore = await getCollectorCategoriesStats().catch(() => ({ categories: [], totalStoredProducts: 0 }));
+    initialCategories = statsBefore.categories;
+  }
+
+  const plans = buildSubcategoryExpansionPlan({
+    categoryStats: initialCategories,
+    selectedCategories: [...selectedCategories],
+    selectedSubcategoriesMap,
+    categoryTargetLimit,
+    perSubcategoryMax,
+    taxonomyConfig,
+  });
+
+  let initialCoverage = 0;
+  for (const cat of initialCategories) {
+    initialCoverage += cat.coverageCount || 0;
+  }
+
+  let totalSelectedSubcategories = 0;
+  for (const p of plans) {
+    totalSelectedSubcategories += p.subcategories.length;
+  }
+
+  const firstPlan = plans[0];
+  const initialValidCount = firstPlan ? firstPlan.currentProductCount : 0;
+
+  const state: ExpansionJobState = {
+    jobId,
+    studentCode,
+    selectedCategories: plans.map((p) => p.category),
+    selectedSubcategoriesMap,
+    categoryTargetLimit,
+    perSubcategoryMax,
+    plans,
+    currentCatIdx: 0,
+    currentSubIdx: 0,
+    currentPage: 1,
+    currentPageRetryCount: 0,
+    consecutiveNoValidPages: 0,
+    technicalErrors: 0,
+    subcategoriesFailed: 0,
+    initialValidCount,
+    currentValidTargetCount: initialValidCount,
+    catValidNewCount: 0,
+    catOffTargetCount: 0,
+    catUnclassifiedCount: 0,
+    catUpdatedCount: 0,
+    catTotalReceived: 0,
+    catCreditsUsed: 0,
+    catRequestsMade: 0,
+    catPagesProcessed: 0,
+    catSubcategoriesConsulted: 0,
+    catSubcategoriesExhausted: 0,
+    isSubConsulted: false,
+    totalProcessed: 0,
+    totalNew: 0,
+    totalUpdated: 0,
+    totalValidNewForTarget: 0,
+    totalOffTarget: 0,
+    totalUnclassified: 0,
+    totalCreditsUsed: 0,
+    totalRequestsMade: 0,
+    totalPagesProcessed: 0,
+    categoriesCompleted: 0,
+    totalSelectedSubcategories,
+    subcategoriesConsulted: 0,
+    subcategoriesExhausted: 0,
+    initialCoverage,
+    seenProductIds: [],
+    categorySummaries: [],
+    errors: [],
+    status: plans.length === 0 ? 'COMPLETED' : 'RUNNING',
+    isCompleted: plans.length === 0,
+  };
+
+  return state;
+}
+
+/**
+ * Centraliza a finalização e construção do relatório final estruturado de um Job de Expansão.
+ * Garante que result_json e categorySummaries estejam sempre completos e consistentes.
+ */
+export function finalizeExpansionJobState(state: ExpansionJobState): {
+  state: ExpansionJobState;
+  progress: SubcategoryBatchProgress;
+  result: SubcategoryExpansionResult;
+} {
+  state.isCompleted = true;
+
+  if (state.status === 'RUNNING' || !state.status) {
+    if (state.stopReason === 'API_AUTH_ERROR' || state.stopReason === 'API_BALANCE_ERROR') {
+      state.status = 'FAILED';
+    } else if (state.technicalErrors > 0 && state.totalProcessed > 0) {
+      state.status = 'PARTIAL_ERROR';
+    } else if (state.technicalErrors > 0 && state.totalProcessed === 0) {
+      state.status = 'FAILED';
+    } else {
+      state.status = 'COMPLETED';
+    }
+  }
+
+  // Se a categoria em andamento ainda não foi adicionada a categorySummaries, adiciona o sumário final dela
+  if (state.currentCatIdx < state.plans.length) {
+    const currentPlan = state.plans[state.currentCatIdx];
+    const alreadySummarized = state.categorySummaries.some((s) => s.category === currentPlan.category);
+    if (!alreadySummarized) {
+      const growth = Math.max(0, state.currentValidTargetCount - state.initialValidCount);
+      let catStopReason = state.stopReason as CategoryExecutionSummary['stopReason'] | undefined;
+      if (!catStopReason) {
+        if (state.currentValidTargetCount >= currentPlan.categoryTargetLimit) {
+          catStopReason = 'TARGET_REACHED';
+        } else if (state.status === 'CANCELLED') {
+          catStopReason = 'CANCELLED';
+        } else if (state.technicalErrors > 0 || state.subcategoriesFailed > 0) {
+          catStopReason = 'PARTIAL_ERROR';
+        } else {
+          catStopReason = 'ALL_SUBCATEGORIES_EXHAUSTED';
+        }
+      }
+
+      state.categorySummaries.push({
+        category: currentPlan.category,
+        initialValidCount: state.initialValidCount,
+        finalValidCount: state.currentValidTargetCount,
+        actualValidGrowth: growth,
+        categoryTargetLimit: currentPlan.categoryTargetLimit,
+        validNewProductsForTarget: state.catValidNewCount,
+        offTargetProducts: state.catOffTargetCount,
+        unclassifiedProducts: state.catUnclassifiedCount,
+        updatedProducts: state.catUpdatedCount,
+        totalReceived: state.catTotalReceived,
+        creditsUsed: state.catCreditsUsed,
+        requestsMade: state.catRequestsMade,
+        pagesProcessed: state.catPagesProcessed,
+        totalSelectedSubcategories: currentPlan.subcategories.length,
+        subcategoriesConsulted: state.catSubcategoriesConsulted,
+        subcategoriesExhausted: state.catSubcategoriesExhausted,
+        coverageBefore: 0,
+        coverageAfter: 0,
+        technicalErrors: state.technicalErrors,
+        subcategoriesFailed: state.subcategoriesFailed,
+        executionId: state.jobId,
+        stopReason: catStopReason,
+      });
+    }
+  }
+
+  const lastPlan = state.plans[state.plans.length - 1];
+  const lastSummary = state.categorySummaries[state.categorySummaries.length - 1];
+  const finalValidCount = lastSummary ? lastSummary.finalValidCount : state.currentValidTargetCount;
+  const finalTarget = lastPlan?.categoryTargetLimit || state.categoryTargetLimit;
+  const finalRemaining = Math.max(0, finalTarget - finalValidCount);
+  const finalStopReason = state.stopReason || lastSummary?.stopReason || (finalRemaining <= 0 ? 'TARGET_REACHED' : 'ALL_SUBCATEGORIES_EXHAUSTED');
+
+  const finalProgress: SubcategoryBatchProgress = {
+    currentCategory: lastPlan?.category || '',
+    currentSubcategory: '',
+    currentPage: 1,
+    maxPagesForThisSub: 1,
+    categoryIndex: Math.min(state.plans.length, Math.max(1, state.currentCatIdx + 1)),
+    totalCategories: state.plans.length,
+    subcategoryIndex: 1,
+    totalSubcategoriesInCategory: 1,
+    categoryTargetLimit: finalTarget,
+    initialValidCount: lastSummary ? lastSummary.initialValidCount : state.initialValidCount,
+    currentValidTargetCount: finalValidCount,
+    remainingNeeded: finalRemaining,
+    validNewProductsForTarget: state.totalValidNewForTarget,
+    offTargetProducts: state.totalOffTarget,
+    unclassifiedProducts: state.totalUnclassified,
+    catUpdatedCount: state.totalUpdated,
+    catTotalReceived: state.totalProcessed,
+    categoryCreditsUsed: state.totalCreditsUsed,
+    categoryCreditLimit: state.totalCreditsUsed,
+    categoryRequestsMade: state.totalRequestsMade,
+    categoryPagesProcessed: state.totalPagesProcessed,
+    stepStatus: state.status === 'CANCELLED' ? 'Expansão cancelada.' : (state.status === 'FAILED' ? 'Expansão falhou.' : 'Expansão concluída.'),
+    totalReceived: state.totalProcessed,
+    totalNewProducts: state.totalNew,
+    totalUpdatedProducts: state.totalUpdated,
+    totalCreditsUsed: state.totalCreditsUsed,
+    totalRequestsMade: state.totalRequestsMade,
+    totalPagesProcessed: state.totalPagesProcessed,
+    isCompleted: true,
+    stopReason: finalStopReason,
+  };
+
+  const finalResult: SubcategoryExpansionResult = {
+    success: (state.errors.length === 0 || state.totalProcessed > 0) && state.status !== 'FAILED' && state.status !== 'CANCELLED',
+    totalProcessed: state.totalProcessed,
+    totalUnique: new Set(state.seenProductIds).size,
+    totalNew: state.totalNew,
+    totalUpdated: state.totalUpdated,
+    totalValidNewForTarget: state.totalValidNewForTarget,
+    totalOffTarget: state.totalOffTarget,
+    totalUnclassified: state.totalUnclassified,
+    totalCreditsUsed: state.totalCreditsUsed,
+    totalRequestsMade: state.totalRequestsMade,
+    totalPagesProcessed: state.totalPagesProcessed,
+    categoriesCompleted: state.categoriesCompleted,
+    totalSelectedSubcategories: state.totalSelectedSubcategories,
+    subcategoriesConsulted: state.subcategoriesConsulted,
+    subcategoriesExhausted: state.subcategoriesExhausted,
+    subcategoriesCoverageBefore: state.initialCoverage,
+    subcategoriesCoverageAfter: state.initialCoverage,
+    categorySummaries: state.categorySummaries,
+    plans: state.plans,
+    errors: state.errors,
+  };
+
+  return { state, progress: finalProgress, result: finalResult };
+}
+
+/**
+ * Executa um ÚNICO STEP (página/requisição) da expansão com idempotência e persistência.
+ * Pode ser chamado repetidamente pelo frontend ou por um loop assíncrono.
+ */
+export async function executeSubcategoryExpansionStep(
+  state: ExpansionJobState,
+  searchFn: (params: {
+    query: string;
+    page: number;
+    region: string;
+    forceRefresh: boolean;
+    collectionCategory?: string | null;
+    collectionSubcategory?: string | null;
+  }) => Promise<{
+    products: MinedProduct[];
+    creditsUsed: number;
+    hasMore: boolean;
+    totalReceived?: number;
+    newProductsCount?: number;
+    updatedProductsCount?: number;
+    insertedIds?: string[];
+  }> = searchTikTokShopProducts,
+  getStatsFn: typeof getCollectorCategoriesStats = getCollectorCategoriesStats
+): Promise<{
+  state: ExpansionJobState;
+  progress: SubcategoryBatchProgress;
+  result?: SubcategoryExpansionResult;
+}> {
+  if (state.isCompleted || state.currentCatIdx >= state.plans.length) {
+    return finalizeExpansionJobState(state);
+  }
+
+  const catPlan = state.plans[state.currentCatIdx];
+  let remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - state.currentValidTargetCount);
+
+  // Se a categoria já atingiu a meta ou não tem subcategorias selecionadas ou percorreu todas
+  if (remainingNeeded <= 0 || catPlan.subcategories.length === 0 || state.currentSubIdx >= catPlan.subcategories.length) {
+    // Finalizar categoria atual
+    const statsAfterCat = await getStatsFn().catch(() => ({ totalStoredProducts: 0, categories: [] }));
+    const catStatAfter = statsAfterCat.categories.find((c) => c.category === catPlan.category);
+    const officialFinalValidCount = (statsAfterCat.totalStoredProducts > 0 && catStatAfter !== undefined)
+      ? catStatAfter.productCount
+      : state.currentValidTargetCount;
+    const actualValidGrowth = officialFinalValidCount - state.initialValidCount;
+
+    let catStopReason: CategoryExecutionSummary['stopReason'] = 'TARGET_REACHED';
+    if (officialFinalValidCount < catPlan.categoryTargetLimit && remainingNeeded > 0) {
+      if (state.technicalErrors > 0 || state.subcategoriesFailed > 0) {
+        catStopReason = 'PARTIAL_ERROR';
+      } else if (state.catSubcategoriesExhausted === catPlan.subcategories.length && state.technicalErrors === 0 && state.subcategoriesFailed === 0) {
+        catStopReason = 'ALL_SUBCATEGORIES_EXHAUSTED';
+      } else {
+        catStopReason = 'NO_MORE_RESULTS';
+      }
+    }
+
+    const catSummary: CategoryExecutionSummary = {
+      category: catPlan.category,
+      initialValidCount: state.initialValidCount,
+      finalValidCount: officialFinalValidCount,
+      actualValidGrowth,
+      categoryTargetLimit: catPlan.categoryTargetLimit,
+      validNewProductsForTarget: state.catValidNewCount,
+      offTargetProducts: state.catOffTargetCount,
+      unclassifiedProducts: state.catUnclassifiedCount,
+      updatedProducts: state.catUpdatedCount,
+      totalReceived: state.catTotalReceived,
+      creditsUsed: state.catCreditsUsed,
+      requestsMade: state.catRequestsMade,
+      pagesProcessed: state.catPagesProcessed,
+      totalSelectedSubcategories: catPlan.subcategories.length,
+      subcategoriesConsulted: state.catSubcategoriesConsulted,
+      subcategoriesExhausted: state.catSubcategoriesExhausted,
+      coverageBefore: 0,
+      coverageAfter: catStatAfter?.coverageCount || 0,
+      technicalErrors: state.technicalErrors,
+      subcategoriesFailed: state.subcategoriesFailed,
+      executionId: state.jobId,
+      stopReason: catStopReason,
+    };
+
+    state.categorySummaries.push(catSummary);
+    if (catSummary.creditsUsed > 0 && catSummary.stopReason !== 'CANCELLED' && catSummary.requestsMade > 0) {
+      await recordCategoryExecutionHistory(catSummary, state.jobId).catch(() => {});
+    }
+
+    state.categoriesCompleted++;
+    state.currentCatIdx++;
+    state.currentSubIdx = 0;
+    state.currentPage = 1;
+    state.currentPageRetryCount = 0;
+    state.consecutiveNoValidPages = 0;
+    state.isSubConsulted = false;
+
+    if (state.currentCatIdx < state.plans.length) {
+      const nextPlan = state.plans[state.currentCatIdx];
+      state.initialValidCount = nextPlan.currentProductCount;
+      state.currentValidTargetCount = nextPlan.currentProductCount;
+      state.catValidNewCount = 0;
+      state.catOffTargetCount = 0;
+      state.catUnclassifiedCount = 0;
+      state.catUpdatedCount = 0;
+      state.catTotalReceived = 0;
+      state.catCreditsUsed = 0;
+      state.catRequestsMade = 0;
+      state.catPagesProcessed = 0;
+      state.catSubcategoriesConsulted = 0;
+      state.catSubcategoriesExhausted = 0;
+    } else {
+      return finalizeExpansionJobState(state);
+    }
+
+    return executeSubcategoryExpansionStep(state, searchFn, getStatsFn);
+  }
+
+  const subPlan = catPlan.subcategories[state.currentSubIdx];
+  const page = state.currentPage;
+  const processedSubcategoryIndex = Math.min(catPlan.subcategories.length, Math.max(1, state.currentSubIdx + 1));
+
+  if (!state.isSubConsulted) {
+    state.isSubConsulted = true;
+    state.catSubcategoriesConsulted++;
+    state.subcategoriesConsulted++;
+  }
+
+  let stepValidNew = 0;
+  let stepOffTarget = 0;
+  let stepUnclassified = 0;
+  let stepUpdated = 0;
+  let stepReceived = 0;
+  let stepCredits = 0;
+  let isSubExhausted = false;
+  let hasMore = true;
+  let shouldRetrySamePage = false;
+  let shouldAdvanceToNextSubcategory = false;
+
+  try {
+    const res = await searchFn({
+      query: subPlan.subcategory,
+      page,
+      region: 'BR',
+      forceRefresh: true,
+      collectionCategory: catPlan.category,
+      collectionSubcategory: subPlan.subcategory,
+    });
+
+    state.currentPageRetryCount = 0;
+    state.catRequestsMade++;
+    state.totalRequestsMade++;
+    state.catPagesProcessed++;
+    state.totalPagesProcessed++;
+
+    stepReceived = res.totalReceived ?? res.products?.length ?? 0;
+    stepCredits = (typeof res.creditsUsed === 'number' && Number.isFinite(res.creditsUsed)) ? res.creditsUsed : 0;
+    hasMore = Boolean(res.hasMore);
+
+    state.catCreditsUsed += stepCredits;
+    state.totalCreditsUsed += stepCredits;
+    state.catTotalReceived += stepReceived;
+    state.totalProcessed += stepReceived;
+
+    const rawProducts = res.products || [];
+    if (!res.insertedIds) {
+      console.warn('[Expansion Step] insertedIds ausente na resposta de busca. Nenhum produto será presumido como novo.');
+    }
+    const insertedIdsSet = new Set(res.insertedIds || []);
+
+    for (const rawProd of rawProducts) {
+      if (!rawProd.productId) continue;
+      state.seenProductIds.push(rawProd.productId);
+
+      // Apenas produtos efetivamente NOVOS contam para a meta ou categorização da etapa
+      if (insertedIdsSet.has(rawProd.productId)) {
+        const classification = classifyProductFull({
+          title: rawProd.title || '',
+          category_path: rawProd.category || undefined,
+          seller_name: rawProd.sellerName || undefined,
+          query_source: subPlan.subcategory,
+        });
+
+        const effectiveCategory = classification.category;
+
+        if (effectiveCategory === catPlan.category) {
+          stepValidNew++;
+        } else if (effectiveCategory === null) {
+          stepUnclassified++;
+        } else {
+          stepOffTarget++;
+        }
+      }
+    }
+
+    stepUpdated = (typeof res.updatedProductsCount === 'number')
+      ? res.updatedProductsCount
+      : Math.max(0, rawProducts.length - insertedIdsSet.size);
+
+    state.catValidNewCount += stepValidNew;
+    state.totalValidNewForTarget += stepValidNew;
+    state.currentValidTargetCount += stepValidNew;
+    state.catOffTargetCount += stepOffTarget;
+    state.totalOffTarget += stepOffTarget;
+    state.catUnclassifiedCount += stepUnclassified;
+    state.totalUnclassified += stepUnclassified;
+    state.catUpdatedCount += stepUpdated;
+    state.totalUpdated += stepUpdated;
+    state.totalNew += (stepValidNew + stepOffTarget + stepUnclassified);
+
+    remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - state.currentValidTargetCount);
+
+    if (stepValidNew === 0) {
+      state.consecutiveNoValidPages++;
+      if (state.consecutiveNoValidPages >= 3) {
+        isSubExhausted = true;
+      }
+    } else {
+      state.consecutiveNoValidPages = 0;
+    }
+
+    if (stepReceived === 0 || !hasMore || page >= MAX_PAGES_PER_SUBCATEGORY) {
+      isSubExhausted = true;
+    }
+  } catch (err: any) {
+    const errMsg = `Erro ao coletar "${catPlan.category} > ${subPlan.subcategory}" (Pág ${page}): ${err?.message || err}`;
+    const errStr = String(err?.message || err).toLowerCase();
+
+    if (errStr.includes('401') || errStr.includes('403') || errStr.includes('unauthorized') || errStr.includes('invalid_api_key')) {
+      state.errors.push(errMsg);
+      state.status = 'FAILED';
+      state.isCompleted = true;
+      state.stopReason = 'API_AUTH_ERROR';
+      isSubExhausted = false;
+      return finalizeExpansionJobState(state);
+    } else if (errStr.includes('402') || errStr.includes('429') || errStr.includes('insufficient') || errStr.includes('saldo') || errStr.includes('balance') || errStr.includes('credits')) {
+      state.errors.push(errMsg);
+      state.status = 'FAILED';
+      state.isCompleted = true;
+      state.stopReason = 'API_BALANCE_ERROR';
+      isSubExhausted = false;
+      return finalizeExpansionJobState(state);
+    } else {
+      // Erro transitório de página: tenta até 2 vezes antes de pular a subcategoria
+      if (state.currentPageRetryCount < 2) {
+        state.currentPageRetryCount++;
+        state.errors.push(errMsg);
+        shouldRetrySamePage = true;
+      } else {
+        state.technicalErrors++;
+        state.subcategoriesFailed++;
+        state.currentPageRetryCount = 0;
+        state.errors.push(errMsg);
+        shouldAdvanceToNextSubcategory = true;
+      }
+    }
+  }
+
+  // Avanço de página ou subcategoria
+  if (remainingNeeded <= 0) {
+    // Revalidação estrita com contagem oficial no MySQL antes de encerrar
+    const statsCheck = await getStatsFn().catch(() => ({ totalStoredProducts: 0, categories: [] }));
+    const officialCat = statsCheck.categories.find((c) => c.category === catPlan.category);
+    const officialCount = (statsCheck.totalStoredProducts > 0 && officialCat !== undefined)
+      ? officialCat.productCount
+      : state.currentValidTargetCount;
+
+    state.currentValidTargetCount = officialCount;
+    remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - officialCount);
+
+    if (officialCount >= catPlan.categoryTargetLimit) {
+      // Meta confirmada oficialmente pelo MySQL! Avança para encerramento da categoria no próximo step
+      state.currentSubIdx = catPlan.subcategories.length;
+    }
+  }
+
+  if (state.currentSubIdx < catPlan.subcategories.length) {
+    if (shouldRetrySamePage) {
+      // Mantém a mesma página para retry no próximo step
+    } else if (shouldAdvanceToNextSubcategory) {
+      // Avança para próxima subcategoria por erro técnico (sem marcar como esgotada por dados)
+      state.currentSubIdx++;
+      state.currentPage = 1;
+      state.consecutiveNoValidPages = 0;
+      state.isSubConsulted = false;
+    } else if (isSubExhausted) {
+      state.catSubcategoriesExhausted++;
+      state.subcategoriesExhausted++;
+      state.currentSubIdx++;
+      state.currentPage = 1;
+      state.consecutiveNoValidPages = 0;
+      state.isSubConsulted = false;
+    } else {
+      state.currentPage++;
+    }
+  }
+
+  const progress: SubcategoryBatchProgress = {
+    currentCategory: catPlan.category,
+    currentSubcategory: subPlan.subcategory,
+    currentPage: page,
+    maxPagesForThisSub: page,
+    categoryIndex: state.currentCatIdx + 1,
+    totalCategories: state.plans.length,
+    subcategoryIndex: processedSubcategoryIndex,
+    totalSubcategoriesInCategory: catPlan.subcategories.length,
+    categoryTargetLimit: catPlan.categoryTargetLimit,
+    initialValidCount: state.initialValidCount,
+    currentValidTargetCount: state.currentValidTargetCount,
+    remainingNeeded,
+    validNewProductsForTarget: state.catValidNewCount,
+    offTargetProducts: state.catOffTargetCount,
+    unclassifiedProducts: state.catUnclassifiedCount,
+    catUpdatedCount: state.catUpdatedCount,
+    catTotalReceived: state.catTotalReceived,
+    categoryCreditsUsed: state.catCreditsUsed,
+    categoryCreditLimit: catPlan.estimatedCredits,
+    categoryRequestsMade: state.catRequestsMade,
+    categoryPagesProcessed: state.catPagesProcessed,
+    stepStatus: shouldRetrySamePage
+      ? `Tentando novamente subcategoria "${subPlan.subcategory}" (Página ${page} - Tentativa ${state.currentPageRetryCount + 1})...`
+      : `Coletando subcategoria "${subPlan.subcategory}" (Página ${page})...`,
+    totalReceived: state.totalProcessed,
+    totalNewProducts: state.totalNew,
+    totalUpdatedProducts: state.totalUpdated,
+    totalCreditsUsed: state.totalCreditsUsed,
+    totalRequestsMade: state.totalRequestsMade,
+    totalPagesProcessed: state.totalPagesProcessed,
+    isCompleted: state.isCompleted,
+    stopReason: state.stopReason,
+  };
+
+  return { state, progress };
+}
+

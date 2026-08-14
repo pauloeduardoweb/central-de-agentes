@@ -1199,6 +1199,7 @@ export function ensureProductMinerTables(): Promise<void> {
 
       await ensureDailyCollectionsTable();
       await ensureCategoryExecutionHistoryTable();
+      await ensureExpansionJobsTable();
     })().catch((err: any) => {
       productMinerTablesPromise = null;
       console.warn('[MySQL ensureProductMinerTables Error]:', err?.message || err);
@@ -1216,6 +1217,7 @@ export function ensureCategoryExecutionHistoryTable(): Promise<void> {
       await db.query(`
         CREATE TABLE IF NOT EXISTS product_miner_category_history (
           id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          execution_id VARCHAR(64) NULL,
           category VARCHAR(120) NOT NULL,
           execution_type VARCHAR(50) NOT NULL DEFAULT 'EXPANSION',
           started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1232,11 +1234,20 @@ export function ensureCategoryExecutionHistoryTable(): Promise<void> {
           confirmed_valid_per_credit FLOAT DEFAULT NULL,
           is_valid_sample TINYINT(1) NOT NULL DEFAULT 1,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_pmch_execution_category (execution_id, category),
           INDEX idx_pmch_category (category),
           INDEX idx_pmch_created (created_at),
           INDEX idx_pmch_sample (category, is_valid_sample, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      // Idempotent column and index additions if table already existed
+      try {
+        await db.query(`ALTER TABLE product_miner_category_history ADD COLUMN execution_id VARCHAR(64) NULL AFTER id`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE product_miner_category_history ADD UNIQUE KEY uk_pmch_execution_category (execution_id, category)`);
+      } catch {}
     })().catch((err: any) => {
       categoryExecutionHistoryPromise = null;
       console.warn('[MySQL ensureCategoryExecutionHistoryTable Error]:', err?.message || err);
@@ -1332,6 +1343,273 @@ export function ensureTikTokOAuthStatesTable(): Promise<void> {
   }
   return tiktokOAuthStatesPromise;
 }
+
+let expansionJobsPromise: Promise<void> | null = null;
+export function ensureExpansionJobsTable(): Promise<void> {
+  if (!isDatabaseConfigured()) return Promise.resolve();
+  if (!expansionJobsPromise) {
+    expansionJobsPromise = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS product_miner_expansion_jobs (
+          id VARCHAR(64) PRIMARY KEY,
+          student_code VARCHAR(128) NOT NULL,
+          selected_categories TEXT NOT NULL,
+          selected_subcategories_map TEXT DEFAULT NULL,
+          category_target_limit INT NOT NULL DEFAULT 300,
+          per_subcategory_max INT NOT NULL DEFAULT 60,
+          status VARCHAR(32) NOT NULL DEFAULT 'RUNNING',
+          current_category_index INT NOT NULL DEFAULT 0,
+          current_subcategory_index INT NOT NULL DEFAULT 0,
+          current_page INT NOT NULL DEFAULT 1,
+          consecutive_no_valid_pages INT NOT NULL DEFAULT 0,
+          total_categories INT NOT NULL DEFAULT 0,
+          categories_completed INT NOT NULL DEFAULT 0,
+          total_received INT NOT NULL DEFAULT 0,
+          total_new_products INT NOT NULL DEFAULT 0,
+          total_updated_products INT NOT NULL DEFAULT 0,
+          total_valid_new_target INT NOT NULL DEFAULT 0,
+          total_off_target INT NOT NULL DEFAULT 0,
+          total_unclassified INT NOT NULL DEFAULT 0,
+          total_credits_used INT NOT NULL DEFAULT 0,
+          total_requests_made INT NOT NULL DEFAULT 0,
+          total_pages_processed INT NOT NULL DEFAULT 0,
+          technical_errors INT NOT NULL DEFAULT 0,
+          subcategories_failed INT NOT NULL DEFAULT 0,
+          plans_json LONGTEXT DEFAULT NULL,
+          state_json LONGTEXT DEFAULT NULL,
+          category_summaries_json LONGTEXT DEFAULT NULL,
+          result_json LONGTEXT DEFAULT NULL,
+          last_progress_json LONGTEXT DEFAULT NULL,
+          step_lock_token VARCHAR(64) DEFAULT NULL,
+          step_lock_until DATETIME(3) DEFAULT NULL,
+          error_message TEXT DEFAULT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          completed_at DATETIME DEFAULT NULL,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_pmej_student_code (student_code),
+          INDEX idx_pmej_status (status),
+          INDEX idx_pmej_updated (updated_at),
+          INDEX idx_pmej_lock (step_lock_until)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      // Idempotent column additions if table already existed
+      try {
+        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN technical_errors INT NOT NULL DEFAULT 0 AFTER total_pages_processed`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN subcategories_failed INT NOT NULL DEFAULT 0 AFTER technical_errors`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN step_lock_token VARCHAR(64) DEFAULT NULL AFTER status`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN step_lock_until DATETIME(3) DEFAULT NULL AFTER step_lock_token`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD INDEX idx_pmej_lock (step_lock_until)`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN completed_at DATETIME DEFAULT NULL AFTER created_at`);
+      } catch {}
+    })().catch((err: any) => {
+      expansionJobsPromise = null;
+      console.warn('[MySQL ensureExpansionJobsTable Error]:', err?.message || err);
+      throw err;
+    });
+  }
+  return expansionJobsPromise;
+}
+
+export interface ExpansionJobRow {
+  id: string;
+  student_code: string;
+  selected_categories: string;
+  selected_subcategories_map: string | null;
+  category_target_limit: number;
+  per_subcategory_max: number;
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_ERROR' | 'CANCELLED' | 'FAILED';
+  current_category_index: number;
+  current_subcategory_index: number;
+  current_page: number;
+  consecutive_no_valid_pages: number;
+  total_categories: number;
+  categories_completed: number;
+  total_received: number;
+  total_new_products: number;
+  total_updated_products: number;
+  total_valid_new_target: number;
+  total_off_target: number;
+  total_unclassified: number;
+  total_credits_used: number;
+  total_requests_made: number;
+  total_pages_processed: number;
+  technical_errors: number;
+  subcategories_failed: number;
+  plans_json: string | null;
+  state_json: string | null;
+  category_summaries_json: string | null;
+  result_json: string | null;
+  last_progress_json: string | null;
+  step_lock_token?: string | null;
+  step_lock_until?: string | Date | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export async function createExpansionJobInDb(job: {
+  id: string;
+  studentCode: string;
+  selectedCategories: string[];
+  selectedSubcategoriesMap?: Record<string, string[]>;
+  categoryTargetLimit: number;
+  perSubcategoryMax: number;
+  totalCategories: number;
+  plansJson?: string;
+  stateJson?: string;
+}): Promise<void> {
+  if (!isDatabaseConfigured()) return;
+  await ensureExpansionJobsTable();
+  await db.query(
+    `
+    INSERT INTO product_miner_expansion_jobs (
+      id, student_code, selected_categories, selected_subcategories_map,
+      category_target_limit, per_subcategory_max, total_categories,
+      status, plans_json, state_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'RUNNING', ?, ?)
+    ON DUPLICATE KEY UPDATE
+      selected_categories = VALUES(selected_categories),
+      selected_subcategories_map = VALUES(selected_subcategories_map),
+      category_target_limit = VALUES(category_target_limit),
+      per_subcategory_max = VALUES(per_subcategory_max),
+      total_categories = VALUES(total_categories),
+      plans_json = VALUES(plans_json),
+      state_json = VALUES(state_json)
+    `,
+    [
+      job.id,
+      job.studentCode,
+      JSON.stringify(job.selectedCategories),
+      job.selectedSubcategoriesMap ? JSON.stringify(job.selectedSubcategoriesMap) : null,
+      job.categoryTargetLimit,
+      job.perSubcategoryMax,
+      job.totalCategories,
+      job.plansJson || null,
+      job.stateJson || null,
+    ]
+  );
+}
+
+export async function getExpansionJobFromDb(jobId: string): Promise<ExpansionJobRow | null> {
+  if (!isDatabaseConfigured()) return null;
+  await ensureExpansionJobsTable();
+  const [rows]: any = await db.query(
+    `SELECT * FROM product_miner_expansion_jobs WHERE id = ? LIMIT 1`,
+    [jobId]
+  );
+  return Array.isArray(rows) && rows.length > 0 ? (rows[0] as ExpansionJobRow) : null;
+}
+
+/**
+ * Tenta adquirir lock atômico para execução de um step do job com lease de tempo.
+ * Retorna true se adquiriu o lock com sucesso, false se já há outro step ativo.
+ */
+export async function tryAcquireExpansionJobStepLock(jobId: string, token: string, leaseSeconds = 60): Promise<boolean> {
+  if (!isDatabaseConfigured()) return true;
+  await ensureExpansionJobsTable();
+  const [res]: any = await db.query(
+    `
+    UPDATE product_miner_expansion_jobs
+    SET step_lock_token = ?,
+        step_lock_until = DATE_ADD(NOW(3), INTERVAL ? SECOND)
+    WHERE id = ?
+      AND status = 'RUNNING'
+      AND (step_lock_until IS NULL OR step_lock_until < NOW(3))
+    `,
+    [token, leaseSeconds, jobId]
+  );
+  return Boolean(res && res.affectedRows > 0);
+}
+
+/**
+ * Libera o lock do step caso pertença ao token informado.
+ */
+export async function releaseExpansionJobStepLock(jobId: string, token: string): Promise<boolean> {
+  if (!isDatabaseConfigured()) return true;
+  await ensureExpansionJobsTable();
+  const [res]: any = await db.query(
+    `
+    UPDATE product_miner_expansion_jobs
+    SET step_lock_token = NULL,
+        step_lock_until = NULL
+    WHERE id = ?
+      AND step_lock_token = ?
+    `,
+    [jobId, token]
+  );
+  return Boolean(res && res.affectedRows > 0);
+}
+
+export async function updateExpansionJobInDb(jobId: string, updates: Partial<{
+  status: 'RUNNING' | 'COMPLETED' | 'PARTIAL_ERROR' | 'CANCELLED' | 'FAILED';
+  current_category_index: number;
+  current_subcategory_index: number;
+  current_page: number;
+  consecutive_no_valid_pages: number;
+  categories_completed: number;
+  total_received: number;
+  total_new_products: number;
+  total_updated_products: number;
+  total_valid_new_target: number;
+  total_off_target: number;
+  total_unclassified: number;
+  total_credits_used: number;
+  total_requests_made: number;
+  total_pages_processed: number;
+  technical_errors: number;
+  subcategories_failed: number;
+  plans_json: string;
+  state_json: string;
+  category_summaries_json: string;
+  result_json: string;
+  last_progress_json: string;
+  error_message: string;
+  completed_at: string | Date | null;
+}>, allowResurrectFromCancelled = false): Promise<boolean> {
+  if (!isDatabaseConfigured()) return true;
+  await ensureExpansionJobsTable();
+  const setClauses: string[] = [];
+  const values: any[] = [];
+
+  const finalUpdates: any = { ...updates };
+  if (updates.status && updates.status !== 'RUNNING' && updates.completed_at === undefined) {
+    finalUpdates.completed_at = new Date();
+  }
+
+  for (const [key, val] of Object.entries(finalUpdates)) {
+    if (val !== undefined) {
+      setClauses.push(`\`${key}\` = ?`);
+      values.push(val);
+    }
+  }
+
+  if (setClauses.length === 0) return true;
+  values.push(jobId);
+
+  // Proteção contra race conditions: se o job foi CANCELLED, não reverter para RUNNING
+  const whereClause = (updates.status === 'RUNNING' || updates.status === undefined) && !allowResurrectFromCancelled
+    ? `WHERE id = ? AND status != 'CANCELLED'`
+    : `WHERE id = ?`;
+
+  const [res]: any = await db.query(
+    `UPDATE product_miner_expansion_jobs SET ${setClauses.join(', ')} ${whereClause}`,
+    values
+  );
+  return Boolean(res && res.affectedRows > 0);
+}
+
 
 
 

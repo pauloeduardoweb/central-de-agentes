@@ -868,15 +868,33 @@ productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (re
     isClientClosed = true;
   });
 
+  const executionId = `exp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
   try {
     const { executeSubcategoryExpansion } = await import('./subcategoryExpansionService.js');
+    const { createExpansionJobInDb, updateExpansionJobInDb } = await import('./database.js');
     const selectedCategories = Array.isArray(req.body?.selectedCategories) ? req.body.selectedCategories : undefined;
     const selectedSubcategoriesMap = (req.body?.selectedSubcategoriesMap && typeof req.body.selectedSubcategoriesMap === 'object')
       ? req.body.selectedSubcategoriesMap
       : undefined;
-    const categoryTargetLimit = req.body?.categoryTargetLimit ? Number(req.body.categoryTargetLimit) : 500;
+    const categoryTargetLimit = req.body?.categoryTargetLimit ? Number(req.body.categoryTargetLimit) : 300;
     const perSubcategoryMax = req.body?.perSubcategoryMax ? Number(req.body.perSubcategoryMax) : 60;
     const maxCreditBudgetPerCategory = req.body?.maxCreditBudgetPerCategory ? Number(req.body.maxCreditBudgetPerCategory) : undefined;
+    const studentCode = normalizeAccessCode(req.header('x-access-code') || req.header('x-student-access-code') || '') || 'MENTOR';
+
+    // Cria registro do job no banco para rastreamento resiliente
+    await createExpansionJobInDb({
+      id: executionId,
+      studentCode,
+      selectedCategories: selectedCategories || [],
+      selectedSubcategoriesMap,
+      categoryTargetLimit,
+      perSubcategoryMax,
+      totalCategories: selectedCategories ? selectedCategories.length : 0,
+    }).catch(() => {});
+
+    // Enviar evento INIT com o executionId para o frontend
+    sendEvent({ type: 'INIT', executionId });
 
     const result = await executeSubcategoryExpansion({
       selectedCategories,
@@ -887,25 +905,290 @@ productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (re
       shouldCancel: () => isClientClosed,
       onProgress: (progress) => {
         if (!isClientClosed) {
-          sendEvent({ type: 'PROGRESS', progress });
+          sendEvent({ type: 'PROGRESS', executionId, progress });
         }
+        // Atualiza progresso no MySQL
+        updateExpansionJobInDb(executionId, {
+          last_progress_json: JSON.stringify(progress),
+          total_received: progress.totalReceived,
+          total_new_products: progress.totalNewProducts,
+          total_updated_products: progress.totalUpdatedProducts,
+          total_valid_new_target: progress.validNewProductsForTarget,
+          total_off_target: progress.offTargetProducts,
+          total_unclassified: progress.unclassifiedProducts,
+          total_credits_used: progress.totalCreditsUsed,
+          total_requests_made: progress.totalRequestsMade,
+          total_pages_processed: progress.totalPagesProcessed,
+        }).catch(() => {});
       },
     });
 
     clearInterval(pingInterval);
+
+    await updateExpansionJobInDb(executionId, {
+      status: 'COMPLETED',
+      result_json: JSON.stringify(result),
+      category_summaries_json: JSON.stringify(result.categorySummaries),
+      categories_completed: result.categoriesCompleted,
+    }).catch(() => {});
+
     // Emissão do evento terminal com alias duplo (COMPLETE e DONE)
-    sendEvent({ type: 'COMPLETE', result });
-    sendEvent({ type: 'DONE', result });
+    sendEvent({ type: 'COMPLETE', executionId, result });
+    sendEvent({ type: 'DONE', executionId, result });
     res.end();
   } catch (error: any) {
     clearInterval(pingInterval);
     console.error('[Execute Subcategory Expansion Stream Error]:', error);
-    sendEvent({ type: 'ERROR', error: error?.message || 'EXPANSION_EXECUTION_ERROR' });
+    const { updateExpansionJobInDb } = await import('./database.js');
+    await updateExpansionJobInDb(executionId, {
+      status: 'FAILED',
+      error_message: error?.message || 'EXPANSION_EXECUTION_ERROR',
+    }).catch(() => {});
+    sendEvent({ type: 'ERROR', executionId, error: error?.message || 'EXPANSION_EXECUTION_ERROR' });
     res.end();
   } finally {
     clearInterval(pingInterval);
   }
 });
+
+// Admin Route: Iniciar Job de Expansão Passo a Passo (Resumable Job)
+productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const { initializeExpansionJobState } = await import('./subcategoryExpansionService.js');
+    const { createExpansionJobInDb, updateExpansionJobInDb } = await import('./database.js');
+
+    const selectedCategories = Array.isArray(req.body?.selectedCategories) ? req.body.selectedCategories : undefined;
+    const selectedSubcategoriesMap = (req.body?.selectedSubcategoriesMap && typeof req.body.selectedSubcategoriesMap === 'object')
+      ? req.body.selectedSubcategoriesMap
+      : undefined;
+    const categoryTargetLimit = req.body?.categoryTargetLimit ? Number(req.body.categoryTargetLimit) : 300;
+    const perSubcategoryMax = req.body?.perSubcategoryMax ? Number(req.body.perSubcategoryMax) : 60;
+    const rawCode = req.header('x-access-code') || req.header('x-student-access-code') || '';
+    const studentCode = normalizeAccessCode(rawCode) || 'MENTOR';
+
+    const executionId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const state = await initializeExpansionJobState({
+      jobId: executionId,
+      studentCode,
+      selectedCategories,
+      selectedSubcategoriesMap,
+      categoryTargetLimit,
+      perSubcategoryMax,
+    });
+
+    await createExpansionJobInDb({
+      id: executionId,
+      studentCode,
+      selectedCategories: state.selectedCategories,
+      selectedSubcategoriesMap,
+      categoryTargetLimit,
+      perSubcategoryMax,
+      totalCategories: state.plans.length,
+      plansJson: JSON.stringify(state.plans),
+      stateJson: JSON.stringify(state),
+    });
+
+    return res.json({
+      success: true,
+      executionId,
+      state,
+      meta: {
+        totalCategories: state.plans.length,
+        totalSubcategories: state.totalSelectedSubcategories,
+        plans: state.plans,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Start Expansion Job Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'START_JOB_ERROR' });
+  }
+});
+
+// Admin Route: Executar um Step do Job de Expansão (Resumable Job)
+productMinerRouter.post('/admin/expansion-jobs/:executionId/step', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  const executionId = req.params.executionId;
+  const { getExpansionJobFromDb, updateExpansionJobInDb, tryAcquireExpansionJobStepLock, releaseExpansionJobStepLock } = await import('./database.js');
+  const { executeSubcategoryExpansionStep, finalizeExpansionJobState } = await import('./subcategoryExpansionService.js');
+
+  const lockToken = `lock_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const acquired = await tryAcquireExpansionJobStepLock(executionId, lockToken, 60);
+  if (!acquired) {
+    return res.status(409).json({
+      success: false,
+      error: 'STEP_IN_PROGRESS',
+      message: 'Já existe um step em execução para este job. Aguarde a conclusão.',
+    });
+  }
+
+  try {
+    const jobRow = await getExpansionJobFromDb(executionId);
+    if (!jobRow) {
+      return res.status(404).json({ success: false, error: 'JOB_NOT_FOUND', message: `Job ${executionId} não encontrado.` });
+    }
+
+    if (jobRow.status === 'COMPLETED' || jobRow.status === 'CANCELLED' || jobRow.status === 'FAILED' || jobRow.status === 'PARTIAL_ERROR') {
+      return res.json({
+        success: true,
+        executionId,
+        isCompleted: true,
+        status: jobRow.status,
+        result: jobRow.result_json ? JSON.parse(jobRow.result_json) : null,
+      });
+    }
+
+    let state = jobRow.state_json ? JSON.parse(jobRow.state_json) : null;
+    if (!state) {
+      return res.status(400).json({ success: false, error: 'INVALID_JOB_STATE' });
+    }
+
+    const stepOutcome = await executeSubcategoryExpansionStep(state);
+    let updatedState = stepOutcome.state;
+    let progress = stepOutcome.progress;
+    let result = stepOutcome.result;
+
+    if (updatedState.isCompleted || result) {
+      const finalized = finalizeExpansionJobState(updatedState);
+      updatedState = finalized.state;
+      progress = finalized.progress;
+      result = finalized.result;
+    }
+
+    await updateExpansionJobInDb(executionId, {
+      status: updatedState.status,
+      current_category_index: updatedState.currentCatIdx,
+      current_subcategory_index: updatedState.currentSubIdx,
+      current_page: updatedState.currentPage,
+      consecutive_no_valid_pages: updatedState.consecutiveNoValidPages,
+      categories_completed: updatedState.categoriesCompleted,
+      total_received: updatedState.totalProcessed,
+      total_new_products: updatedState.totalNew,
+      total_updated_products: updatedState.totalUpdated,
+      total_valid_new_target: updatedState.totalValidNewForTarget,
+      total_off_target: updatedState.totalOffTarget,
+      total_unclassified: updatedState.totalUnclassified,
+      total_credits_used: updatedState.totalCreditsUsed,
+      total_requests_made: updatedState.totalRequestsMade,
+      total_pages_processed: updatedState.totalPagesProcessed,
+      technical_errors: updatedState.technicalErrors,
+      subcategories_failed: updatedState.subcategoriesFailed,
+      state_json: JSON.stringify(updatedState),
+      last_progress_json: JSON.stringify(progress),
+      category_summaries_json: JSON.stringify(updatedState.categorySummaries),
+      result_json: result ? JSON.stringify(result) : undefined,
+    });
+
+    return res.json({
+      success: true,
+      executionId,
+      isCompleted: updatedState.isCompleted,
+      status: updatedState.status,
+      progress,
+      result: result || null,
+      state: updatedState,
+    });
+  } catch (error: any) {
+    console.error(`[Step Expansion Job Error - ${executionId}]:`, error);
+    try {
+      const jobRow = await getExpansionJobFromDb(executionId);
+      if (jobRow?.state_json) {
+        const state = JSON.parse(jobRow.state_json);
+        state.errors = state.errors || [];
+        state.errors.push(error?.message || 'STEP_JOB_ERROR');
+        state.status = 'FAILED';
+        const finalized = finalizeExpansionJobState(state);
+        await updateExpansionJobInDb(executionId, {
+          status: 'FAILED',
+          error_message: error?.message || 'STEP_JOB_ERROR',
+          result_json: JSON.stringify(finalized.result),
+          category_summaries_json: JSON.stringify(finalized.state.categorySummaries),
+          state_json: JSON.stringify(finalized.state),
+        });
+      } else {
+        await updateExpansionJobInDb(executionId, {
+          status: 'FAILED',
+          error_message: error?.message || 'STEP_JOB_ERROR',
+        });
+      }
+    } catch {}
+    return res.status(500).json({ success: false, error: error?.message || 'STEP_JOB_ERROR' });
+  } finally {
+    await releaseExpansionJobStepLock(executionId, lockToken).catch(() => {});
+  }
+});
+
+// Admin Route: Status do Job de Expansão
+productMinerRouter.get('/admin/expansion-jobs/:executionId/status', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  const executionId = req.params.executionId;
+  try {
+    const { getExpansionJobFromDb } = await import('./database.js');
+    const jobRow = await getExpansionJobFromDb(executionId);
+    if (!jobRow) {
+      return res.status(404).json({ success: false, error: 'JOB_NOT_FOUND' });
+    }
+    return res.json({
+      success: true,
+      job: {
+        id: jobRow.id,
+        status: jobRow.status,
+        categoriesCompleted: jobRow.categories_completed,
+        totalCategories: jobRow.total_categories,
+        totalReceived: jobRow.total_received,
+        totalNewProducts: jobRow.total_new_products,
+        totalUpdatedProducts: jobRow.total_updated_products,
+        totalValidNewTarget: jobRow.total_valid_new_target,
+        totalCreditsUsed: jobRow.total_credits_used,
+        totalRequestsMade: jobRow.total_requests_made,
+        totalPagesProcessed: jobRow.total_pages_processed,
+        technicalErrors: jobRow.technical_errors,
+        subcategoriesFailed: jobRow.subcategories_failed,
+        lastProgress: jobRow.last_progress_json ? JSON.parse(jobRow.last_progress_json) : null,
+        result: jobRow.result_json ? JSON.parse(jobRow.result_json) : null,
+        errorMessage: jobRow.error_message,
+        createdAt: jobRow.created_at,
+        updatedAt: jobRow.updated_at,
+        completedAt: jobRow.completed_at,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Get Expansion Job Status Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'STATUS_JOB_ERROR' });
+  }
+});
+
+// Admin Route: Cancelar Job de Expansão
+productMinerRouter.post('/admin/expansion-jobs/:executionId/cancel', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  const executionId = req.params.executionId;
+  try {
+    const { getExpansionJobFromDb, updateExpansionJobInDb } = await import('./database.js');
+    const { finalizeExpansionJobState } = await import('./subcategoryExpansionService.js');
+    const jobRow = await getExpansionJobFromDb(executionId);
+    let finalResultJson: string | undefined = undefined;
+    if (jobRow?.state_json) {
+      try {
+        const state = JSON.parse(jobRow.state_json);
+        state.status = 'CANCELLED';
+        state.stopReason = 'CANCELLED';
+        const finalized = finalizeExpansionJobState(state);
+        finalResultJson = JSON.stringify(finalized.result);
+      } catch {}
+    }
+    await updateExpansionJobInDb(executionId, {
+      status: 'CANCELLED',
+      result_json: finalResultJson,
+      completed_at: new Date(),
+    }, true);
+    return res.json({ success: true, executionId, status: 'CANCELLED' });
+  } catch (error: any) {
+    console.error('[Cancel Expansion Job Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'CANCEL_JOB_ERROR' });
+  }
+});
+
 
 
 
