@@ -1,4 +1,4 @@
-import { executeSubcategoryExpansion, CategoryExpansionPlan } from '../server/subcategoryExpansionService.js';
+import { executeSubcategoryExpansion, CategoryExpansionPlan, initializeExpansionJobState, executeSubcategoryExpansionStep } from '../server/subcategoryExpansionService.js';
 import { classifyProductFull } from '../server/taxonomy.js';
 import type { MinedProduct } from '../server/productMinerService.js';
 import { calculateExpansionPlanFromStats } from '../src/services/productMinerApi.js';
@@ -1040,6 +1040,96 @@ async function runStrictTargetExpansionTestSuite() {
 
     assert(plan.hasHistoricalData === false, 'hasHistoricalData é falso');
     assert(uiDisplay === 'Sem histórico suficiente', 'UI exibe "Sem histórico suficiente" em vez de estimativa teórica');
+  }
+
+  // ========================================================================
+  // BLOCO 13: MOTOR DE EXPANSÃO POR JOBS RESUMÍVEIS (STEP-BY-STEP)
+  // ========================================================================
+  console.log('\n--- BLOCO 13: MOTOR DE JOBS RESUMÍVEIS PASSO A PASSO (STATE PERSISTENCE & RECOVERY) ---');
+  {
+    const targetCat = 'Acessórios de moda';
+    const subcats = ['Óculos', 'Relógios e acessórios'];
+    let state = await initializeExpansionJobState({
+      jobId: 'job_test_123',
+      studentCode: 'TEST_MENTOR',
+      selectedCategories: [targetCat],
+      selectedSubcategoriesMap: { [targetCat]: subcats },
+      categoryTargetLimit: 10,
+      perSubcategoryMax: 5,
+      categoryStats: [
+        {
+          category: targetCat,
+          productCount: 0,
+          coverageCount: 0,
+          subcategories: [],
+          lastCollectedAt: null,
+          status: 'Ativa',
+        },
+      ],
+    });
+
+    assert(state.jobId === 'job_test_123', 'Job inicializado com ID correto');
+    assert(state.plans.length === 1, 'Plano contém 1 categoria');
+    assert(state.plans[0].subcategories.length === 2, 'Categoria contém 2 subcategorias selecionadas');
+    assert(state.status === 'RUNNING', 'Estado inicial é RUNNING');
+    assert(state.currentCatIdx === 0, 'Inicia no índice 0 de categoria');
+    assert(state.currentSubIdx === 0, 'Inicia no índice 0 de subcategoria');
+    assert(state.currentPage === 1, 'Inicia na página 1');
+
+    // Executa Step 1: retorna 5 produtos válidos na Subcat 1 (Óculos)
+    const mockStep1Search = async () => ({
+      products: [1, 2, 3, 4, 5].map((i) => createMockProduct({
+        productId: `prod_step1_${i}`,
+        title: `Óculos de Sol Polarizado UV400 ${i}`,
+        category: 'Acessórios de moda > Óculos',
+      })),
+      creditsUsed: 1,
+      hasMore: false, // subcat esgota
+      totalReceived: 5,
+      insertedIds: [1, 2, 3, 4, 5].map((i) => `prod_step1_${i}`),
+    });
+
+    const step1 = await executeSubcategoryExpansionStep(state, mockStep1Search);
+    state = step1.state;
+
+    assert(state.catValidNewCount === 5, 'Step 1: 5 produtos válidos acumulados');
+    assert(state.totalCreditsUsed === 1, 'Step 1: 1 crédito consumido');
+    assert(state.isCompleted === false, 'Step 1: Job ainda não concluído');
+    assert(state.currentSubIdx === 1, 'Step 1: Avançou para a 2ª subcategoria (Relógios e acessórios)');
+    assert(state.currentPage === 1, 'Step 1: Resetou para a página 1 da nova subcategoria');
+
+    // Simula serialização e recuperação do JSON do MySQL
+    const serializedState = JSON.stringify(state);
+    const recoveredState = JSON.parse(serializedState);
+
+    // Executa Step 2 a partir do estado recuperado: retorna 5 produtos válidos na Subcat 2 (atingindo a meta de 10)
+    const mockStep2Search = async () => ({
+      products: [6, 7, 8, 9, 10].map((i) => createMockProduct({
+        productId: `prod_step2_${i}`,
+        title: `Relógio Masculino Luxo ${i}`,
+        category: 'Acessórios de moda > Relógios e acessórios',
+      })),
+      creditsUsed: 1,
+      hasMore: true,
+      totalReceived: 5,
+      insertedIds: [6, 7, 8, 9, 10].map((i) => `prod_step2_${i}`),
+    });
+
+    const step2 = await executeSubcategoryExpansionStep(recoveredState, mockStep2Search);
+    state = step2.state;
+
+    assert(state.catValidNewCount === 10, 'Step 2: 10 produtos válidos alcançados');
+    assert(state.totalCreditsUsed === 2, 'Step 2: 2 créditos consumidos no total');
+
+    // Executa Step final de consolidação
+    const step3 = await executeSubcategoryExpansionStep(state, mockStep2Search);
+    state = step3.state;
+
+    assert(state.isCompleted === true, 'Step 3: Job finalizado com sucesso');
+    assert(state.status === 'COMPLETED', 'Step 3: Status final é COMPLETED');
+    assert(step3.result !== undefined, 'Step 3: Resultado final emitido');
+    assert(step3.result?.totalValidNewForTarget === 10, 'Step 3: Total de 10 produtos válidos para a meta');
+    assert(step3.result?.categorySummaries[0]?.stopReason === 'TARGET_REACHED', 'Step 3: Stop reason TARGET_REACHED');
   }
 
   console.log('\n========================================================================');
