@@ -27,6 +27,7 @@ import {
   fetchSubcategoryExpansionPlan,
   executeSubcategoryExpansionApi,
   type CategoryExpansionPlan,
+  type CategoryExecutionSummaryApi,
 } from '../../services/productMinerApi';
 import {
   ScriptGeneratorModal,
@@ -5017,7 +5018,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     unclassifiedProducts: number;
     newProductsCount: number;
     updatedProductsCount: number;
+    totalProcessed: number;
     creditsUsed: number;
+    statusText?: string;
   } | null>(null);
   const [batchSummaryModal, setBatchSummaryModal] = useState<{
     open: boolean;
@@ -5030,31 +5033,66 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     creditsUsed: number;
     categoriesProcessed: number;
     totalCategoriesRequested: number;
+    categorySummaries: CategoryExecutionSummaryApi[];
   } | null>(null);
 
   const toggleSelectCategory = (catName: string) => {
-    setSelectedExpansionCategories((prev) =>
-      prev.includes(catName) ? prev.filter((c) => c !== catName) : [...prev, catName]
+    const isCurrentlySelected = selectedExpansionCategories.includes(catName);
+    const validSubs = (CATEGORY_CONFIG.find((c) => c.filterKey === catName)?.subcategories || []).filter(
+      (s) => s !== 'Todas'
     );
+
+    if (isCurrentlySelected) {
+      setSelectedExpansionCategories((prev) => prev.filter((c) => c !== catName));
+      setSelectedSubcategoriesMap((prev) => ({ ...prev, [catName]: [] }));
+    } else {
+      setSelectedExpansionCategories((prev) => [...prev, catName]);
+      setSelectedSubcategoriesMap((prev) => ({ ...prev, [catName]: [...validSubs] }));
+    }
   };
 
   const toggleSelectAllCategories = () => {
     const allCats = CATEGORY_CONFIG.map((c) => c.filterKey);
     if (selectedExpansionCategories.length === allCats.length) {
       setSelectedExpansionCategories([]);
+      setSelectedSubcategoriesMap({});
     } else {
       setSelectedExpansionCategories(allCats);
+      const newMap: Record<string, string[]> = {};
+      for (const cat of CATEGORY_CONFIG) {
+        newMap[cat.filterKey] = (cat.subcategories || []).filter((s) => s !== 'Todas');
+      }
+      setSelectedSubcategoriesMap(newMap);
     }
   };
 
   const toggleSelectSubcategory = (catName: string, subName: string) => {
-    setSelectedSubcategoriesMap((prev) => {
-      const current = prev[catName] || [];
-      const updated = current.includes(subName)
-        ? current.filter((s) => s !== subName)
-        : [...current, subName];
-      return { ...prev, [catName]: updated };
-    });
+    const current = selectedSubcategoriesMap[catName] || [];
+    const isCurrentlySelected = current.includes(subName);
+    const updated = isCurrentlySelected
+      ? current.filter((s) => s !== subName)
+      : [...current, subName];
+
+    setSelectedSubcategoriesMap((prev) => ({ ...prev, [catName]: updated }));
+
+    if (updated.length === 0) {
+      setSelectedExpansionCategories((prev) => prev.filter((c) => c !== catName));
+    } else {
+      setSelectedExpansionCategories((prev) => (prev.includes(catName) ? prev : [...prev, catName]));
+    }
+  };
+
+  const toggleSelectAllSubcategoriesInCategory = (catName: string, allSubs: string[]) => {
+    const current = selectedSubcategoriesMap[catName] || [];
+    const isAllSelected = allSubs.length > 0 && current.length === allSubs.length;
+
+    if (isAllSelected) {
+      setSelectedSubcategoriesMap((prev) => ({ ...prev, [catName]: [] }));
+      setSelectedExpansionCategories((prev) => prev.filter((c) => c !== catName));
+    } else {
+      setSelectedSubcategoriesMap((prev) => ({ ...prev, [catName]: [...allSubs] }));
+      setSelectedExpansionCategories((prev) => (prev.includes(catName) ? prev : [...prev, catName]));
+    }
   };
 
   const toggleCategoryDrawer = (catName: string) => {
@@ -5063,13 +5101,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   const handleExecuteBatchExpansion = async () => {
     setShowBatchConfirmModal(false);
-    if (selectedExpansionCategories.length === 0) return;
+    if (selectedExpansionCategories.length === 0 || isBatchExecuting) return;
 
     setIsBatchExecuting(true);
     setError('');
     setCollectorNotice(null);
 
-    const categoriesToProcess = selectedExpansionCategories;
+    const categoriesToProcess = [...selectedExpansionCategories];
 
     let totalProcessedCount = 0;
     let totalNewCount = 0;
@@ -5079,19 +5117,23 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     let totalUnclassifiedCount = 0;
     let totalCreditsUsed = 0;
     let processedCats = 0;
+    const allCategorySummaries: CategoryExecutionSummaryApi[] = [];
     const failedErrors: string[] = [];
 
-    for (const cat of categoriesToProcess) {
+    for (let i = 0; i < categoriesToProcess.length; i++) {
+      const cat = categoriesToProcess[i];
       setBatchProgress({
         currentCategory: cat,
         processedCategories: processedCats,
         totalCategories: categoriesToProcess.length,
+        totalProcessed: totalProcessedCount,
         validNewProductsForTarget: totalValidNewCount,
         offTargetProducts: totalOffTargetCount,
         unclassifiedProducts: totalUnclassifiedCount,
         newProductsCount: totalNewCount,
         updatedProductsCount: totalUpdatedCount,
         creditsUsed: totalCreditsUsed,
+        statusText: `Processando subcategorias da categoria "${cat}" (${i + 1}/${categoriesToProcess.length})...`,
       });
 
       try {
@@ -5101,6 +5143,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
         // Se a categoria já atingiu a meta ou deficit <= 0, avança para a próxima
         if (remainingTarget <= 0) {
+          allCategorySummaries.push({
+            category: cat,
+            initialValidCount: currentCount,
+            finalValidCount: currentCount,
+            categoryTargetLimit: expansionTargetCount,
+            validNewProductsForTarget: 0,
+            offTargetProducts: 0,
+            unclassifiedProducts: 0,
+            updatedProducts: 0,
+            totalReceived: 0,
+            creditsUsed: 0,
+            subcategoriesConsulted: 0,
+            stopReason: 'TARGET_REACHED',
+          });
           processedCats++;
           continue;
         }
@@ -5119,6 +5175,25 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         totalOffTargetCount += (result.totalOffTarget || 0);
         totalUnclassifiedCount += (result.totalUnclassified || 0);
         totalCreditsUsed += (result.totalCreditsUsed || 0);
+
+        if (Array.isArray(result.categorySummaries) && result.categorySummaries.length > 0) {
+          allCategorySummaries.push(...result.categorySummaries);
+        } else {
+          allCategorySummaries.push({
+            category: cat,
+            initialValidCount: currentCount,
+            finalValidCount: currentCount + (result.totalValidNewForTarget || 0),
+            categoryTargetLimit: expansionTargetCount,
+            validNewProductsForTarget: result.totalValidNewForTarget || 0,
+            offTargetProducts: result.totalOffTarget || 0,
+            unclassifiedProducts: result.totalUnclassified || 0,
+            updatedProducts: result.totalUpdated || 0,
+            totalReceived: result.totalProcessed || 0,
+            creditsUsed: result.totalCreditsUsed || 0,
+            subcategoriesConsulted: result.subcategoriesConsulted || 0,
+            stopReason: (result.totalValidNewForTarget || 0) >= remainingTarget ? 'TARGET_REACHED' : 'ALL_SUBCATEGORIES_EXHAUSTED',
+          });
+        }
 
         processedCats++;
       } catch (err: any) {
@@ -5144,6 +5219,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         creditsUsed: totalCreditsUsed,
         categoriesProcessed: processedCats,
         totalCategoriesRequested: categoriesToProcess.length,
+        categorySummaries: allCategorySummaries,
       });
     }
   };
@@ -6742,8 +6818,21 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         {/* Subcategories Accordion Drawer */}
                         {isDrawerOpen && (
                           <div className="pt-2 border-t border-slate-200/80 space-y-2 animate-fade-in">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                              Subcategorias de {catConfig.filterKey}:
+                            <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                <span>Subcategorias de {catConfig.filterKey}:</span>
+                                <span className="text-amber-700 font-extrabold normal-case">
+                                  ({selectedSubs.length} de {validSubcategories.length} selecionadas)
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => toggleSelectAllSubcategoriesInCategory(catConfig.filterKey, validSubcategories)}
+                                className="text-[11px] font-bold text-amber-700 hover:text-amber-900 hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
+                              >
+                                {selectedSubs.length === validSubcategories.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                              </button>
                             </div>
 
                             <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
@@ -7087,49 +7176,101 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       {/* MODAL 2: BATCH EXECUTION PROGRESS OVERLAY */}
       {isBatchExecuting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-amber-300 bg-white p-6 shadow-2xl text-center space-y-5">
-            <div className="w-14 h-14 mx-auto rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600">
-              <Loader2 className="w-7 h-7 animate-spin" />
-            </div>
-
-            <div>
-              <h3 className="font-black text-xl text-slate-900">
-                Expandindo Base de Produtos...
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Aguarde enquanto buscamos e processamos os produtos na SocialCrawl
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3 text-left">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                <span>Processando Categoria:</span>
-                <span className="text-amber-700">{batchProgress?.currentCategory}</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-amber-300 bg-white p-6 shadow-2xl space-y-5">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 shrink-0">
+                <Loader2 className="w-6 h-6 animate-spin" />
               </div>
 
-              {batchProgress?.currentSubcategory && (
-                <div className="flex items-center justify-between text-[11px] text-slate-600">
-                  <span>Subcategoria:</span>
-                  <span className="font-semibold text-slate-900">{batchProgress.currentSubcategory}</span>
+              <div>
+                <h3 className="font-black text-lg text-slate-900 leading-tight">
+                  Expandindo Base de Produtos...
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Coletando dados na SocialCrawl com classificação estrita
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                <span>Categoria Atual:</span>
+                <span className="text-amber-800 font-extrabold text-sm">{batchProgress?.currentCategory}</span>
+              </div>
+
+              {batchProgress?.statusText && (
+                <div className="text-[11px] text-slate-600 font-medium truncate">
+                  {batchProgress.statusText}
                 </div>
               )}
 
               {/* Progress bar */}
-              <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                <div
-                  className="bg-amber-500 h-2.5 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.round(((batchProgress?.processedCategories || 0) / (batchProgress?.totalCategories || 1)) * 100)}%`,
-                  }}
-                />
+              <div className="space-y-1">
+                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 h-2.5 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.max(5, Math.round(((batchProgress?.processedCategories || 0) / (batchProgress?.totalCategories || 1)) * 100))}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-500 font-bold">
+                  <span>Progresso: {batchProgress?.processedCategories} de {batchProgress?.totalCategories} categorias</span>
+                  <span>{Math.round(((batchProgress?.processedCategories || 0) / (batchProgress?.totalCategories || 1)) * 100)}%</span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                <span>Progresso: {batchProgress?.processedCategories} de {batchProgress?.totalCategories} categorias</span>
-                <span>Créditos: {batchProgress?.creditsUsed}</span>
+              {/* Live Metric Chips */}
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 text-left text-[11px]">
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-semibold">Créditos</div>
+                  <div className="font-black text-amber-800 text-xs mt-0.5">
+                    {batchProgress?.creditsUsed || 0} crs
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-semibold">Recebidos</div>
+                  <div className="font-black text-slate-900 text-xs mt-0.5">
+                    {batchProgress?.totalProcessed || 0} prods
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <div className="text-[10px] text-emerald-800 font-bold">Válidos (+Meta)</div>
+                  <div className="font-black text-emerald-700 text-xs mt-0.5">
+                    +{batchProgress?.validNewProductsForTarget || 0}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-semibold">Fora do Alvo</div>
+                  <div className="font-black text-slate-700 text-xs mt-0.5">
+                    {batchProgress?.offTargetProducts || 0}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-semibold">Sem Classif.</div>
+                  <div className="font-black text-slate-700 text-xs mt-0.5">
+                    {batchProgress?.unclassifiedProducts || 0}
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-lg bg-white border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-semibold">Atualizados</div>
+                  <div className="font-black text-slate-700 text-xs mt-0.5">
+                    {batchProgress?.updatedProductsCount || 0}
+                  </div>
+                </div>
               </div>
             </div>
+
+            <p className="text-[11px] text-slate-500 text-center">
+              🔒 As chamadas são realizadas sequencialmente para proteger a taxa da API e salvar produtos com integridade.
+            </p>
           </div>
         </div>
       )}
@@ -7137,56 +7278,150 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* MODAL 3: BATCH SUMMARY MODAL */}
       {batchSummaryModal?.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5 text-center">
-            <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 className="w-8 h-8" />
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-600 shrink-0">
+                  <CheckCircle2 className="w-7 h-7" />
+                </div>
+
+                <div>
+                  <h3 className="font-black text-xl text-slate-900">
+                    Expansão Concluída! 🎉
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Relatório consolidado de aquisição e classificação por categoria
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setBatchSummaryModal(null);
+                  await loadCategories();
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div>
-              <h3 className="font-black text-xl text-slate-900">
-                Expansão Concluída! 🎉
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                A base do Geração Z Pro foi atualizada com sucesso
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-left text-xs">
+            {/* Top KPI Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-left text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[11px] text-slate-500 font-medium">Categorias Processadas</div>
+                <div className="text-[11px] text-slate-500 font-medium">Categorias</div>
                 <div className="font-black text-slate-900 text-sm mt-0.5">
                   {batchSummaryModal.categoriesProcessed} de {batchSummaryModal.totalCategoriesRequested || CATEGORY_CONFIG.length}
                 </div>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[11px] text-slate-500 font-medium">Recebidos / Processados</div>
+                <div className="text-[11px] text-slate-500 font-medium">Total Recebido</div>
                 <div className="font-black text-slate-900 text-sm mt-0.5">
                   {batchSummaryModal.totalProcessed} prods
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200">
-                <div className="text-[11px] text-emerald-800 font-semibold">Novos Produtos Inseridos</div>
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300">
+                <div className="text-[11px] text-emerald-800 font-bold">Válidos Categoria-Alvo</div>
                 <div className="font-black text-emerald-700 text-sm mt-0.5">
-                  +{batchSummaryModal.newProducts} novos
+                  +{batchSummaryModal.validNewProductsForTarget} novos
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200">
+                <div className="text-[11px] text-amber-800 font-bold">Créditos SocialCrawl</div>
+                <div className="font-black text-amber-900 text-sm mt-0.5">
+                  {batchSummaryModal.creditsUsed} crs
                 </div>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[11px] text-slate-500 font-medium">Fora do Alvo (Outras)</div>
+                <div className="font-black text-slate-700 text-sm mt-0.5">
+                  {batchSummaryModal.offTargetProducts} prods
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[11px] text-slate-500 font-medium">Sem Classificação</div>
+                <div className="font-black text-slate-700 text-sm mt-0.5">
+                  {batchSummaryModal.unclassifiedProducts} prods
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 col-span-2">
                 <div className="text-[11px] text-slate-500 font-medium">Já Existentes / Atualizados</div>
                 <div className="font-black text-slate-700 text-sm mt-0.5">
                   {batchSummaryModal.updatedProducts} prods
                 </div>
               </div>
+            </div>
 
-              <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200 col-span-2">
-                <div className="text-[11px] text-amber-800 font-medium">Créditos SocialCrawl Consumidos</div>
-                <div className="font-black text-amber-900 text-sm mt-0.5">
-                  {batchSummaryModal.creditsUsed} créditos
+            {/* Category by Category Breakdown */}
+            {Array.isArray(batchSummaryModal.categorySummaries) && batchSummaryModal.categorySummaries.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Detalhamento por Categoria:
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-56 overflow-y-auto">
+                  {batchSummaryModal.categorySummaries.map((catSum) => {
+                    const getStopBadge = (reason?: string) => {
+                      switch (reason) {
+                        case 'TARGET_REACHED':
+                          return <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">🎯 Meta Atingida</span>;
+                        case 'MAX_CREDIT_BUDGET':
+                          return <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px]">💳 Limite Créditos</span>;
+                        case 'MAX_PAGES':
+                          return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">📄 Fim de Páginas</span>;
+                        case 'NO_MORE_RESULTS':
+                          return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">🏁 Fim Resultados</span>;
+                        case 'NO_VALID_RESULTS':
+                          return <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold text-[10px]">⚠️ Poucos Válidos</span>;
+                        case 'ALL_SUBCATEGORIES_EXHAUSTED':
+                          return <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold text-[10px]">✅ Subcats Concluídas</span>;
+                        case 'CANCELLED':
+                          return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold text-[10px]">⏹️ Cancelado</span>;
+                        default:
+                          return <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[10px]">✅ Concluído</span>;
+                      }
+                    };
+
+                    return (
+                      <div key={catSum.category} className="p-3 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div className="space-y-0.5">
+                          <div className="font-extrabold text-slate-900 text-sm">
+                            {catSum.category}
+                          </div>
+                          <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                            <span>Base: <strong>{catSum.initialValidCount}</strong> ➔ <strong>{catSum.finalValidCount}</strong> (Meta: {catSum.categoryTargetLimit})</span>
+                            <span>•</span>
+                            <span>{catSum.subcategoriesConsulted} subcats consultadas</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap shrink-0">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-extrabold text-[11px] border border-emerald-200">
+                            +{catSum.validNewProductsForTarget} válidos
+                          </span>
+                          {catSum.offTargetProducts > 0 && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px]">
+                              {catSum.offTargetProducts} fora do alvo
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-bold text-[10px] border border-amber-200">
+                            {catSum.creditsUsed} crs
+                          </span>
+                          {getStopBadge(catSum.stopReason)}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            </div>
+            )}
 
             <button
               type="button"
@@ -7194,7 +7429,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 setBatchSummaryModal(null);
                 await loadCategories();
               }}
-              className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-[1.01]"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-[1.005] cursor-pointer"
             >
               Fechar e Ver Base Atualizada
             </button>
