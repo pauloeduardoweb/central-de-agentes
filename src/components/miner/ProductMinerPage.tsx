@@ -5198,6 +5198,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           studentCode,
           {
             selectedCategories: [cat],
+            selectedSubcategoriesMap: selectedSubcategoriesMap,
             categoryTargetLimit: expansionTargetCount,
             perSubcategoryMax: 60,
           },
@@ -5253,7 +5254,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             updatedProducts: result.totalUpdated || 0,
             totalReceived: result.totalProcessed || 0,
             creditsUsed: result.totalCreditsUsed || 0,
+            requestsMade: result.totalRequestsMade || 0,
+            pagesProcessed: result.totalPagesProcessed || 0,
+            totalSelectedSubcategories: result.totalSelectedSubcategories || 0,
             subcategoriesConsulted: result.subcategoriesConsulted || 0,
+            subcategoriesExhausted: result.subcategoriesExhausted || 0,
             stopReason: (result.totalValidNewForTarget || 0) >= remainingTarget ? 'TARGET_REACHED' : 'ALL_SUBCATEGORIES_EXHAUSTED',
           });
         }
