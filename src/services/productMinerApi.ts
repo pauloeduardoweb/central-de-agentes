@@ -663,7 +663,7 @@ export interface CategoryExecutionSummaryApi {
   subcategoriesConsulted: number;
   coverageBefore?: number;
   coverageAfter?: number;
-  stopReason: 'TARGET_REACHED' | 'MAX_CREDIT_BUDGET' | 'MAX_PAGES' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
+  stopReason: 'TARGET_REACHED' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
 }
 
 export interface SubcategoryBatchProgressApi {
@@ -677,6 +677,7 @@ export interface SubcategoryBatchProgressApi {
   totalSubcategoriesInCategory: number;
 
   categoryTargetLimit: number;
+  initialValidCount?: number;
   currentValidTargetCount: number;
   remainingNeeded: number;
   validNewProductsForTarget: number;
@@ -718,26 +719,41 @@ export interface SubcategoryExpansionResultApi {
 
 /**
  * Calcula o percentual real da barra de progresso da categoria ativa.
- * Prioridade: creditsUsed / creditLimit (ex: 0/15=0%, 3/15=20%, 7/15=47%, 15/15=100%).
- * Se TARGET_REACHED: 100%.
+ * Baseado no crescimento confirmado em direção à meta da categoria (initial -> current -> target).
+ * Ex: Initial=136, Target=300 (Déficit=164). Se Current=218 (Crescimento=82) -> 82/164 = 50%.
+ * Se remainingNeeded <= 0 ou stopReason === 'TARGET_REACHED': 100%.
  */
 export function calculateCategoryProgressPercent(params: {
-  creditsUsed?: number;
-  creditLimit?: number;
+  currentValidTargetCount?: number;
+  initialValidCount?: number;
+  categoryTargetLimit?: number;
+  remainingNeeded?: number;
+  validNewProductsForTarget?: number;
   isTargetReached?: boolean;
   stopReason?: string;
+  creditsUsed?: number;
+  creditLimit?: number;
 }): number {
   if (params.isTargetReached || params.stopReason === 'TARGET_REACHED') {
     return 100;
   }
-  const limit = Math.max(1, params.creditLimit !== undefined && params.creditLimit > 0 ? params.creditLimit : 1);
-  const used = Math.max(0, params.creditsUsed || 0);
-
-  if (used >= limit) {
+  if (params.remainingNeeded !== undefined && params.remainingNeeded <= 0) {
     return 100;
   }
 
-  const raw = (used / limit) * 100;
+  const target = params.categoryTargetLimit || 300;
+  const initial = params.initialValidCount !== undefined ? params.initialValidCount : 0;
+  const current = params.currentValidTargetCount !== undefined
+    ? params.currentValidTargetCount
+    : initial + (params.validNewProductsForTarget || 0);
+
+  const initialDeficit = Math.max(0, target - initial);
+  if (initialDeficit <= 0 || current >= target) {
+    return 100;
+  }
+
+  const confirmedGrowth = Math.max(0, current - initial);
+  const raw = (confirmedGrowth / initialDeficit) * 100;
   return Math.max(0, Math.min(100, Math.round(raw)));
 }
 
