@@ -468,9 +468,12 @@ export interface CategoryExpansionPlan {
   category: string;
   currentProductCount: number;
   categoryTargetLimit: number;
-  subcategories: SubcategoryTargetPlan[];
+  remainingTarget: number;
   totalAllocated: number;
+  projectedFinalCount: number;
+  unallocatedGap: number;
   estimatedCredits: number;
+  subcategories: SubcategoryTargetPlan[];
 }
 
 export interface ExpansionPlanResponse {
