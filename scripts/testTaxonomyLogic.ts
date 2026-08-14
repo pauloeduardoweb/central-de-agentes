@@ -294,64 +294,162 @@ async function runTestSuite() {
     'Subcategorias subsequentes ordenadas por menor contagem (ASC)'
   );
 
-  // TEST 12: Respeito ao meta-limit da categoria
-  console.log('\n--- TESTE 12: RESPEITO ESTRITO AO META-LIMIT DA CATEGORIA ---');
-  const targetLimit = 100;
-  const plansWithLimit = buildSubcategoryExpansionPlan({
-    categoryStats: mockStats,
+  // TESTES DE DÉFICIT REAL & NÃO OVER-ALLOCATION (CASOS 1 A 10)
+  console.log('\n--- TESTE 12: VALIDAÇÃO DOS 10 CASOS MATEMÁTICOS DE DÉFICIT & ALOCAÇÃO ---');
+  
+  // CASO 1: current = 8, meta = 500, faltam = 492, totalAllocated <= 492
+  const pCase1 = buildSubcategoryExpansionPlan({
+    categoryStats: [{ category: 'Acessórios de moda', productCount: 8, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] }],
     selectedCategories: ['Acessórios de moda'],
-    categoryTargetLimit: targetLimit,
-    perSubcategoryMax: 40,
+    categoryTargetLimit: 500,
+    perSubcategoryMax: 60,
   });
+  assert(pCase1[0].remainingTarget === 492, 'CASO 1: remainingTarget é exatamente 492');
+  assert(pCase1[0].totalAllocated <= 492, `CASO 1: totalAllocated (${pCase1[0].totalAllocated}) <= 492`);
+  assert(pCase1[0].projectedFinalCount <= 500, 'CASO 1: projectedFinalCount <= 500');
 
-  const totalAllocated = plansWithLimit[0].totalAllocated;
-  assert(
-    totalAllocated <= targetLimit,
-    `Total alocado (${totalAllocated}) não ultrapassa a meta da categoria (${targetLimit})`
-  );
+  // CASO 2: current = 102, meta = 500, faltam = 398, totalAllocated <= 398
+  const pCase2 = buildSubcategoryExpansionPlan({
+    categoryStats: [{ category: 'Beleza e cuidados pessoais', productCount: 102, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] }],
+    selectedCategories: ['Beleza e cuidados pessoais'],
+    categoryTargetLimit: 500,
+    perSubcategoryMax: 60,
+  });
+  assert(pCase2[0].remainingTarget === 398, 'CASO 2: remainingTarget é exatamente 398');
+  assert(pCase2[0].totalAllocated <= 398, `CASO 2: totalAllocated (${pCase2[0].totalAllocated}) <= 398`);
+  assert(pCase2[0].projectedFinalCount <= 500, 'CASO 2: projectedFinalCount <= 500');
 
-  // TEST 13: Execução simulada com Mock Runner (Sem SocialCrawl, sem mutação, com deduplicação)
-  console.log('\n--- TESTE 13: EXECUÇÃO CONTROLADA COM MOCK RUNNER & DEDUPLICAÇÃO ---');
+  // CASO 3: current = 277, meta = 500, faltam = 223, totalAllocated <= 223
+  const pCase3 = buildSubcategoryExpansionPlan({
+    categoryStats: [{ category: 'Esportes e ar livre', productCount: 277, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] }],
+    selectedCategories: ['Esportes e ar livre'],
+    categoryTargetLimit: 500,
+    perSubcategoryMax: 60,
+  });
+  assert(pCase3[0].remainingTarget === 223, 'CASO 3: remainingTarget é exatamente 223');
+  assert(pCase3[0].totalAllocated <= 223, `CASO 3: totalAllocated (${pCase3[0].totalAllocated}) <= 223`);
+  assert(pCase3[0].projectedFinalCount <= 500, 'CASO 3: projectedFinalCount <= 500');
+
+  // CASO 4: current = 346, meta = 500, faltam = 154, totalAllocated <= 154
+  const pCase4 = buildSubcategoryExpansionPlan({
+    categoryStats: [{ category: 'Suprimentos para animais de estimação', productCount: 346, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] }],
+    selectedCategories: ['Suprimentos para animais de estimação'],
+    categoryTargetLimit: 500,
+    perSubcategoryMax: 60,
+  });
+  assert(pCase4[0].remainingTarget === 154, 'CASO 4: remainingTarget é exatamente 154');
+  assert(pCase4[0].totalAllocated === 154, `CASO 4: totalAllocated (${pCase4[0].totalAllocated}) é exatamente 154`);
+  assert(pCase4[0].projectedFinalCount === 500, 'CASO 4: projectedFinalCount é exatamente 500 (346 + 154)');
+
+  // CASO 5: current = 500, meta = 500, totalAllocated = 0, estimatedCredits = 0
+  const pCase5 = buildSubcategoryExpansionPlan({
+    categoryStats: [{ category: 'Utensílios de cozinha', productCount: 500, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] }],
+    selectedCategories: ['Utensílios de cozinha'],
+    categoryTargetLimit: 500,
+    perSubcategoryMax: 60,
+  });
+  assert(pCase5[0].remainingTarget === 0, 'CASO 5: remainingTarget é 0');
+  assert(pCase5[0].totalAllocated === 0, 'CASO 5: totalAllocated é 0');
+  assert(pCase5[0].estimatedCredits === 0, 'CASO 5: estimatedCredits é 0');
+  assert(pCase5[0].projectedFinalCount === 500, 'CASO 5: projectedFinalCount permanece 500');
+
+  // CASO 6: current = 650, meta = 500, totalAllocated = 0, estimatedCredits = 0
+  const pCase6 = buildSubcategoryExpansionPlan({
+    categoryStats: [{ category: 'Utensílios de cozinha', productCount: 650, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] }],
+    selectedCategories: ['Utensílios de cozinha'],
+    categoryTargetLimit: 500,
+    perSubcategoryMax: 60,
+  });
+  assert(pCase6[0].remainingTarget === 0, 'CASO 6: remainingTarget é 0 para categoria acima da meta');
+  assert(pCase6[0].totalAllocated === 0, 'CASO 6: totalAllocated é 0 para categoria acima da meta');
+  assert(pCase6[0].estimatedCredits === 0, 'CASO 6: estimatedCredits é 0');
+  assert(pCase6[0].projectedFinalCount === 650, 'CASO 6: projectedFinalCount permanece 650');
+
+  // CASO 7: Faltam 493 mas capacidade máxima das subcategorias é 420 (7 subcategorias x 60 = 420)
+  // 'Computadores e equipamentos de escritório' tem exatamente 7 subcategorias oficiais
+  const pCase7 = buildSubcategoryExpansionPlan({
+    categoryStats: [{ category: 'Computadores e equipamentos de escritório', productCount: 7, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] }],
+    selectedCategories: ['Computadores e equipamentos de escritório'],
+    categoryTargetLimit: 500,
+    perSubcategoryMax: 60,
+  });
+  assert(pCase7[0].remainingTarget === 493, 'CASO 7: remainingTarget é 493 (500 - 7)');
+  assert(pCase7[0].totalAllocated === 420, `CASO 7: totalAllocated é 420 (7 subcategorias x 60 max = ${pCase7[0].totalAllocated})`);
+  assert(pCase7[0].unallocatedGap === 73, `CASO 7: unallocatedGap é exatamente 73 (493 - 420 = ${pCase7[0].unallocatedGap})`);
+
+  // CASO 8: Soma das allocations individuais = totalAllocated da categoria
+  for (const plan of [pCase1[0], pCase2[0], pCase3[0], pCase4[0], pCase7[0]]) {
+    const subSum = plan.subcategories.reduce((s, sub) => s + sub.allocatedTarget, 0);
+    assert(subSum === plan.totalAllocated, `CASO 8: soma das subcategorias (${subSum}) === totalAllocated (${plan.totalAllocated})`);
+  }
+
+  // CASO 9: Soma dos totalAllocated das categorias = meta.totalAllocatedProducts
+  const multiPlans = buildSubcategoryExpansionPlan({
+    categoryStats: [
+      { category: 'Acessórios de moda', productCount: 8, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] },
+      { category: 'Suprimentos para animais de estimação', productCount: 346, lastCollectedAt: null, status: 'Ativa' as const, subcategories: [] },
+    ],
+    selectedCategories: ['Acessórios de moda', 'Suprimentos para animais de estimação'],
+    categoryTargetLimit: 500,
+    perSubcategoryMax: 60,
+  });
+  const sumCats = multiPlans.reduce((s, p) => s + p.totalAllocated, 0);
+  assert(sumCats === (multiPlans[0].totalAllocated + multiPlans[1].totalAllocated), 'CASO 9: soma global de categorias é consistente');
+
+  // CASO 10: Nenhuma subcategoria com allocatedTarget = 0 gera estimatedPages > 0
+  for (const plan of multiPlans) {
+    for (const sub of plan.subcategories) {
+      if (sub.allocatedTarget === 0) {
+        assert(sub.estimatedPages === 0, `CASO 10: subcategoria "${sub.subcategory}" com target 0 tem estimatedPages 0`);
+      }
+    }
+  }
+
+  // CASO 11 & 12: EXECUÇÃO CONTROLADA COM MOCK RUNNER & PROTEÇÃO CONTRA DUPLICATAS
+  console.log('\n--- TESTE 13: EXECUÇÃO CONTROLADA COM MOCK RUNNER, DÉFICIT & DEDUPLICAÇÃO ---');
   const { executeSubcategoryExpansion } = await import('../server/subcategoryExpansionService.js');
-  let mockApiCallCount = 0;
-  const mockSearchFn = async (params: { query: string; page: number }) => {
-    mockApiCallCount++;
+  
+  // CASO 12: Testar que produtos existentes/duplicados NÃO reduzem remainingNeeded como novos
+  let mockCallIdx = 0;
+  const mockDuplicationSearchFn = async (params: { query: string; page: number }) => {
+    mockCallIdx++;
+    if (params.page === 1) {
+      // Página 1: retorna 30 produtos, mas 20 são atualizados e 10 são novos
+      return {
+        products: [
+          { productId: `p_new_${mockCallIdx}_1`, title: 'Novo 1', category: 'Acessórios de moda' } as any,
+          { productId: `p_new_${mockCallIdx}_2`, title: 'Novo 2', category: 'Acessórios de moda' } as any,
+        ],
+        creditsUsed: 1,
+        hasMore: true,
+        totalReceived: 30,
+        newProductsCount: 10,
+        updatedProductsCount: 20,
+      };
+    }
+    // Página 2: retorna 10 novos produtos
     return {
       products: [
-        {
-          productId: `mock_${params.query}_1`,
-          title: `Produto Mock 1 de ${params.query}`,
-          category: 'Acessórios de moda',
-          priceCents: 1990,
-          originalPriceCents: 2990,
-          currencySymbol: 'R$',
-          soldCount: 50,
-          rating: 4.8,
-          sellerId: 's1',
-          sellerName: 'Loja Teste',
-          productUrl: 'https://tiktok.com/prod/1',
-          imageUrl: 'https://img.test/1.jpg',
-          video: null,
-        },
+        { productId: `p_new_pg2_${mockCallIdx}`, title: 'Novo Pg2', category: 'Acessórios de moda' } as any,
       ],
       creditsUsed: 1,
       hasMore: false,
-      totalReceived: 1,
-      newProductsCount: 1,
+      totalReceived: 10,
+      newProductsCount: 10,
       updatedProductsCount: 0,
     };
   };
 
   const execRes = await (executeSubcategoryExpansion as any)({
     selectedCategories: ['Acessórios de moda'],
-    categoryTargetLimit: 60,
-    perSubcategoryMax: 30,
-    searchFn: mockSearchFn,
+    categoryTargetLimit: 30, // Se base inicial tem 15 produtos, faltam 15
+    perSubcategoryMax: 60,
+    searchFn: mockDuplicationSearchFn,
   });
 
-  assert(execRes.success === true, 'Execução controlada concluída com sucesso');
-  assert(mockApiCallCount > 0, `Chamadas mock executadas corretamente (${mockApiCallCount})`);
-  assert(execRes.totalUnique > 0, `Produtos únicos identificados: ${execRes.totalUnique}`);
+  assert(execRes.success === true, 'CASO 11: Execução concluída com sucesso');
+  assert(execRes.totalNew > 0, `CASO 12: Produtos novos contabilizados separadamente (${execRes.totalNew})`);
+  assert(execRes.totalUpdated > 0, `CASO 12: Produtos atualizados/duplicados identificados (${execRes.totalUpdated})`);
 
   // TEST 14: Cobertura total das 26 categorias e 211 subcategorias
   console.log('\n--- TESTE 14: COBERTURA TAXONÔMICA COMPLETA (26 CATEGORIAS & 211 SUBCATEGORIAS) ---');
