@@ -52,6 +52,8 @@ export interface CategoryExecutionSummary {
 export interface SubcategoryBatchProgress {
   currentCategory: string;
   currentSubcategory: string;
+  currentPage: number;
+  maxPagesForThisSub: number;
   categoryIndex: number;
   totalCategories: number;
   subcategoryIndex: number;
@@ -64,6 +66,13 @@ export interface SubcategoryBatchProgress {
   validNewProductsForTarget: number;
   offTargetProducts: number;
   unclassifiedProducts: number;
+  catUpdatedCount: number;
+  catTotalReceived: number;
+  categoryCreditsUsed: number;
+  categoryCreditLimit: number;
+
+  // Status dinâmico da etapa
+  stepStatus: string;
 
   // Totais globais
   totalReceived: number;
@@ -374,6 +383,8 @@ export async function executeSubcategoryExpansion(options: {
         onProgress({
           currentCategory: catPlan.category,
           currentSubcategory: subPlan.subcategory,
+          currentPage: 1,
+          maxPagesForThisSub: 1,
           categoryIndex: catIdx + 1,
           totalCategories: plans.length,
           subcategoryIndex: subIdx + 1,
@@ -384,6 +395,11 @@ export async function executeSubcategoryExpansion(options: {
           validNewProductsForTarget: catValidNewCount,
           offTargetProducts: catOffTargetCount,
           unclassifiedProducts: catUnclassifiedCount,
+          catUpdatedCount,
+          catTotalReceived,
+          categoryCreditsUsed: catCreditsUsed,
+          categoryCreditLimit,
+          stepStatus: `Avançando para subcategoria "${subPlan.subcategory}"...`,
           totalReceived: totalProcessed,
           totalNewProducts: totalNew,
           totalUpdatedProducts: totalUpdated,
@@ -414,6 +430,35 @@ export async function executeSubcategoryExpansion(options: {
           break;
         }
 
+        if (onProgress) {
+          onProgress({
+            currentCategory: catPlan.category,
+            currentSubcategory: subPlan.subcategory,
+            currentPage: page,
+            maxPagesForThisSub,
+            categoryIndex: catIdx + 1,
+            totalCategories: plans.length,
+            subcategoryIndex: subIdx + 1,
+            totalSubcategoriesInCategory: catPlan.subcategories.length,
+            categoryTargetLimit: catPlan.categoryTargetLimit,
+            currentValidTargetCount,
+            remainingNeeded,
+            validNewProductsForTarget: catValidNewCount,
+            offTargetProducts: catOffTargetCount,
+            unclassifiedProducts: catUnclassifiedCount,
+            catUpdatedCount,
+            catTotalReceived,
+            categoryCreditsUsed: catCreditsUsed,
+            categoryCreditLimit,
+            stepStatus: 'Consultando SocialCrawl...',
+            totalReceived: totalProcessed,
+            totalNewProducts: totalNew,
+            totalUpdatedProducts: totalUpdated,
+            totalCreditsUsed,
+            isCompleted: false,
+          });
+        }
+
         try {
           // Chamada de aquisição para a subcategoria oficial
           const res = await searchFn({
@@ -435,6 +480,35 @@ export async function executeSubcategoryExpansion(options: {
           catTotalReceived += receivedThisPage;
           totalProcessed += receivedThisPage;
 
+          if (onProgress) {
+            onProgress({
+              currentCategory: catPlan.category,
+              currentSubcategory: subPlan.subcategory,
+              currentPage: page,
+              maxPagesForThisSub,
+              categoryIndex: catIdx + 1,
+              totalCategories: plans.length,
+              subcategoryIndex: subIdx + 1,
+              totalSubcategoriesInCategory: catPlan.subcategories.length,
+              categoryTargetLimit: catPlan.categoryTargetLimit,
+              currentValidTargetCount,
+              remainingNeeded,
+              validNewProductsForTarget: catValidNewCount,
+              offTargetProducts: catOffTargetCount,
+              unclassifiedProducts: catUnclassifiedCount,
+              catUpdatedCount,
+              catTotalReceived,
+              categoryCreditsUsed: catCreditsUsed,
+              categoryCreditLimit,
+              stepStatus: 'Processando resultados...',
+              totalReceived: totalProcessed,
+              totalNewProducts: totalNew,
+              totalUpdatedProducts: totalUpdated,
+              totalCreditsUsed,
+              isCompleted: false,
+            });
+          }
+
           // Conjunto de IDs novos inseridos nesta chamada
           const insertedIdsSet = res.insertedIds ? new Set(res.insertedIds.map(String)) : null;
 
@@ -442,6 +516,35 @@ export async function executeSubcategoryExpansion(options: {
           let pageOffTarget = 0;
           let pageUnclassified = 0;
           let pageUpdated = 0;
+
+          if (onProgress && (res.products?.length || 0) > 0) {
+            onProgress({
+              currentCategory: catPlan.category,
+              currentSubcategory: subPlan.subcategory,
+              currentPage: page,
+              maxPagesForThisSub,
+              categoryIndex: catIdx + 1,
+              totalCategories: plans.length,
+              subcategoryIndex: subIdx + 1,
+              totalSubcategoriesInCategory: catPlan.subcategories.length,
+              categoryTargetLimit: catPlan.categoryTargetLimit,
+              currentValidTargetCount,
+              remainingNeeded,
+              validNewProductsForTarget: catValidNewCount,
+              offTargetProducts: catOffTargetCount,
+              unclassifiedProducts: catUnclassifiedCount,
+              catUpdatedCount,
+              catTotalReceived,
+              categoryCreditsUsed: catCreditsUsed,
+              categoryCreditLimit,
+              stepStatus: 'Classificando produtos...',
+              totalReceived: totalProcessed,
+              totalNewProducts: totalNew,
+              totalUpdatedProducts: totalUpdated,
+              totalCreditsUsed,
+              isCompleted: false,
+            });
+          }
 
           for (const p of res.products || []) {
             const pId = p.productId ? String(p.productId) : null;
@@ -500,6 +603,8 @@ export async function executeSubcategoryExpansion(options: {
             onProgress({
               currentCategory: catPlan.category,
               currentSubcategory: subPlan.subcategory,
+              currentPage: page,
+              maxPagesForThisSub,
               categoryIndex: catIdx + 1,
               totalCategories: plans.length,
               subcategoryIndex: subIdx + 1,
@@ -510,6 +615,11 @@ export async function executeSubcategoryExpansion(options: {
               validNewProductsForTarget: catValidNewCount,
               offTargetProducts: catOffTargetCount,
               unclassifiedProducts: catUnclassifiedCount,
+              catUpdatedCount,
+              catTotalReceived,
+              categoryCreditsUsed: catCreditsUsed,
+              categoryCreditLimit,
+              stepStatus: 'Salvando produtos...',
               totalReceived: totalProcessed,
               totalNewProducts: totalNew,
               totalUpdatedProducts: totalUpdated,
@@ -584,6 +694,8 @@ export async function executeSubcategoryExpansion(options: {
     onProgress({
       currentCategory: lastPlan.category,
       currentSubcategory: lastPlan.subcategories[lastPlan.subcategories.length - 1]?.subcategory || '',
+      currentPage: 1,
+      maxPagesForThisSub: 1,
       categoryIndex: plans.length,
       totalCategories: plans.length,
       subcategoryIndex: lastPlan.subcategories.length,
@@ -594,6 +706,11 @@ export async function executeSubcategoryExpansion(options: {
       validNewProductsForTarget: totalValidNewForTarget,
       offTargetProducts: totalOffTarget,
       unclassifiedProducts: totalUnclassified,
+      catUpdatedCount: totalUpdated,
+      catTotalReceived: totalProcessed,
+      categoryCreditsUsed: totalCreditsUsed,
+      categoryCreditLimit: totalCreditsUsed,
+      stepStatus: 'Concluindo categoria...',
       totalReceived: totalProcessed,
       totalNewProducts: totalNew,
       totalUpdatedProducts: totalUpdated,

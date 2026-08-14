@@ -797,25 +797,50 @@ productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
   }
 });
 
-// Admin Route: Execute subcategory expansion (Mentor only)
-productMinerRouter.post('/admin/execute-subcategory-expansion', async (req, res) => {
+// Admin Route: Execute subcategory expansion with Real-time Stream (Mentor only)
+productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const sendEvent = (event: any) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
   try {
     const { executeSubcategoryExpansion } = await import('./subcategoryExpansionService.js');
     const selectedCategories = Array.isArray(req.body?.selectedCategories) ? req.body.selectedCategories : undefined;
     const categoryTargetLimit = req.body?.categoryTargetLimit ? Number(req.body.categoryTargetLimit) : 500;
     const perSubcategoryMax = req.body?.perSubcategoryMax ? Number(req.body.perSubcategoryMax) : 60;
+    const maxCreditBudgetPerCategory = req.body?.maxCreditBudgetPerCategory ? Number(req.body.maxCreditBudgetPerCategory) : undefined;
+
+    let isClientClosed = false;
+    req.on('close', () => {
+      isClientClosed = true;
+    });
 
     const result = await executeSubcategoryExpansion({
       selectedCategories,
       categoryTargetLimit,
       perSubcategoryMax,
+      maxCreditBudgetPerCategory,
+      shouldCancel: () => isClientClosed,
+      onProgress: (progress) => {
+        if (!isClientClosed) {
+          sendEvent({ type: 'PROGRESS', progress });
+        }
+      },
     });
 
-    return res.json(result);
+    sendEvent({ type: 'DONE', result });
+    res.end();
   } catch (error: any) {
-    console.error('[Execute Subcategory Expansion Error]:', error);
-    return res.status(500).json({ success: false, error: error?.message || 'EXPANSION_EXECUTION_ERROR' });
+    console.error('[Execute Subcategory Expansion Stream Error]:', error);
+    sendEvent({ type: 'ERROR', error: error?.message || 'EXPANSION_EXECUTION_ERROR' });
+    res.end();
   }
 });
 
