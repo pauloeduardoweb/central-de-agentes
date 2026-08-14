@@ -4929,6 +4929,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   // Coletor state
   const [collectorCategories, setCollectorCategories] = useState<CollectorCategoryStat[]>([]);
+  const [totalStoredProducts, setTotalStoredProducts] = useState<number>(0);
   const [collectorLoading, setCollectorLoading] = useState(false);
   const [refreshingCategory, setRefreshingCategory] = useState<string | null>(null);
   const [confirmModalCategory, setConfirmModalCategory] = useState<string | null>(null);
@@ -4943,9 +4944,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     try {
       const report = await runBaseReclassification(studentCode);
       setReclassifyReport(report);
-      const stats = await fetchCollectorCategories(studentCode);
-      setCollectorCategories(stats);
-      setCollectorNotice(`✨ ${report.totalClassified} de ${report.totalAnalyzed} produtos foram distribuídos nas 8 categorias com sucesso (0 créditos SocialCrawl consumidos)!`);
+      await loadCategories();
+      setCollectorNotice(`✨ ${report.totalClassified} de ${report.totalAnalyzed} produtos foram distribuídos nas ${CATEGORY_CONFIG.length} categorias com sucesso (0 créditos SocialCrawl consumidos)!`);
     } catch (err: any) {
       alert(`Erro ao reclassificar base: ${err?.message || 'Falha ao reclassificar'}`);
     } finally {
@@ -4974,11 +4974,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   } | null>(null);
   const [batchSummaryModal, setBatchSummaryModal] = useState<{
     open: boolean;
-    totalProducts: number;
+    totalProcessed: number;
     newProducts: number;
     updatedProducts: number;
     creditsUsed: number;
     categoriesProcessed: number;
+    totalCategoriesRequested: number;
   } | null>(null);
 
   const toggleSelectCategory = (catName: string) => {
@@ -5020,6 +5021,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
     const categoriesToProcess = selectedExpansionCategories;
 
+    let totalProcessedCount = 0;
     let totalNewCount = 0;
     let totalUpdatedCount = 0;
     let totalCreditsUsed = 0;
@@ -5042,15 +5044,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           for (const sub of selectedSubs) {
             setBatchProgress((prev) => prev ? { ...prev, currentSubcategory: sub } : null);
             const res = await refreshProducts(studentCode, sub, Math.min(150, expansionTargetCount));
-            totalNewCount += res.newProductsCount ?? res.uniqueProductsCount ?? res.products?.length ?? 0;
-            totalUpdatedCount += res.updatedProductsCount ?? 0;
-            totalCreditsUsed += res.creditsUsed ?? 1;
+            const receivedThisCall = res.totalReceived ?? res.products?.length ?? 0;
+            totalProcessedCount += receivedThisCall;
+            totalNewCount += (res.newProductsCount ?? 0);
+            totalUpdatedCount += (res.updatedProductsCount ?? 0);
+            totalCreditsUsed += (res.creditsUsed ?? 1);
           }
         } else {
           const res = await refreshProducts(studentCode, cat, expansionTargetCount);
-          totalNewCount += res.newProductsCount ?? res.uniqueProductsCount ?? res.products?.length ?? 0;
-          totalUpdatedCount += res.updatedProductsCount ?? 0;
-          totalCreditsUsed += res.creditsUsed ?? Math.ceil(expansionTargetCount / 30);
+          const receivedThisCall = res.totalReceived ?? res.products?.length ?? 0;
+          totalProcessedCount += receivedThisCall;
+          totalNewCount += (res.newProductsCount ?? 0);
+          totalUpdatedCount += (res.updatedProductsCount ?? 0);
+          totalCreditsUsed += (res.creditsUsed ?? Math.ceil(expansionTargetCount / 30));
         }
         processedCats++;
       } catch (err: any) {
@@ -5060,18 +5066,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
 
     setIsBatchExecuting(false);
-    loadCategories();
+    await loadCategories();
 
     if (processedCats === 0 && failedErrors.length > 0) {
       setError(`Falha ao expandir categorias: ${failedErrors.join('; ')}`);
     } else {
       setBatchSummaryModal({
         open: true,
-        totalProducts: totalNewCount + totalUpdatedCount,
+        totalProcessed: totalProcessedCount,
         newProducts: totalNewCount,
         updatedProducts: totalUpdatedCount,
         creditsUsed: totalCreditsUsed,
         categoriesProcessed: processedCats,
+        totalCategoriesRequested: categoriesToProcess.length,
       });
     }
   };
@@ -5353,15 +5360,26 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
   };
 
-  const loadCategories = () => {
+  const loadCategories = async () => {
     if (!canRefresh) return;
 
     setCollectorLoading(true);
 
-    fetchCollectorCategories(studentCode)
-      .then((cats) => setCollectorCategories(cats))
-      .catch((err) => setError(err?.message || 'Falha ao carregar categorias do coletor.'))
-      .finally(() => setCollectorLoading(false));
+    try {
+      const stats = await fetchCollectorCategories(studentCode);
+      setCollectorCategories(
+        Array.isArray(stats.categories)
+          ? stats.categories
+          : []
+      );
+      setTotalStoredProducts(
+        Number(stats.totalStoredProducts) || 0
+      );
+    } catch (err: any) {
+      setError(err?.message || 'Falha ao carregar categorias do coletor.');
+    } finally {
+      setCollectorLoading(false);
+    }
 
     loadDailyStatus();
   };
@@ -5397,7 +5415,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         const notice = `Atualização Diária concluída! ${result.categoriesProcessed} de ${result.totalCategories} categorias processadas (${result.uniqueProductsCount} produtos únicos, ${result.creditsUsed} créditos utilizados).`;
         setCollectorNotice(notice);
       }
-      loadCategories();
+      await loadCategories();
     } catch (err: any) {
       setIsDailyRefreshing(false);
       setError(err?.message || 'Falha ao executar atualização diária da base.');
@@ -5421,10 +5439,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         selectedMaxProducts,
       );
 
-      const count =
-        res.uniqueProductsCount ??
+      const received =
+        res.totalReceived ??
         res.products?.length ??
         0;
+
+      const newProds = res.newProductsCount ?? 0;
+      const updatedProds = res.updatedProductsCount ?? 0;
 
       const pages =
         res.pagesConsulted ??
@@ -5436,7 +5457,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       let notice =
         `Coleta concluída para ${cat}! ` +
-        `${count} produtos únicos coletados em ${pages} ` +
+        `${received} produtos recebidos (${newProds} novos inseridos, ${updatedProds} atualizados) em ${pages} ` +
         `${pages === 1 ? 'página' : 'páginas'} ` +
         `(${creditsUsed} ${creditsUsed === 1 ? 'crédito utilizado' : 'créditos utilizados'}).`;
 
@@ -5446,7 +5467,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       setCollectorNotice(notice);
       setConfirmModalCategory(null);
-      loadCategories();
+      await loadCategories();
     } catch (err: any) {
       setError(
         err?.message ||
@@ -6416,7 +6437,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div>
                   <div className="flex items-center gap-2 text-amber-900 font-extrabold text-sm">
                     <Database className="w-4 h-4 text-amber-600" />
-                    <span>Organização Automática da Base Existente (~1.495 produtos)</span>
+                    <span>Organização Automática da Base Existente ({totalStoredProducts > 0 ? `~${totalStoredProducts.toLocaleString('pt-BR')} produtos` : 'Base MySQL'})</span>
                   </div>
                   <p className="text-xs text-amber-800/80 mt-1 max-w-2xl">
                     Sua base possui produtos armazenados no MySQL. Clique para reclassificá-los e distribuí-los automaticamente entre as {CATEGORY_CONFIG.length} categorias e subcategorias sem chamar o SocialCrawl (<strong>0 créditos consumidos</strong>).
@@ -6556,12 +6577,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     const isCatSelected = selectedExpansionCategories.includes(catConfig.filterKey);
                     const isDrawerOpen = Boolean(openCategoryDrawers[catConfig.filterKey]);
                     const selectedSubs = selectedSubcategoriesMap[catConfig.filterKey] || [];
-                    const stat = collectorCategories.find((c) => c.category === catConfig.filterKey);
-                    const subtotalFromSubs = stat?.subcategories?.reduce((acc, s) => acc + (s.productCount || 0), 0) || 0;
-                    const productCount = Math.max(stat?.productCount ?? 0, subtotalFromSubs);
-                    const activeSubCount = stat?.subcategories?.filter((s) => (s.productCount || 0) > 0).length || 0;
-                    const coverageCount = Math.max(stat?.coverageCount ?? 0, activeSubCount);
-                    const isActive = productCount > 0 || stat?.status === 'Ativa';
+                    const safeCollectorCategories = Array.isArray(collectorCategories) ? collectorCategories : [];
+                    const stat = safeCollectorCategories.find((c) => c.category === catConfig.filterKey);
+                    // Strictly use productCount from TRIM(query_source) in MySQL
+                    const productCount = stat?.productCount ?? 0;
+                    const coverageCount = stat?.coverageCount ?? (productCount > 0 ? 1 : 0);
+                    const isActive = productCount > 0;
 
                     return (
                       <div
@@ -7027,28 +7048,48 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
             <div className="grid grid-cols-2 gap-3 text-left text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[11px] text-slate-500">Categorias Processadas</div>
-                <div className="font-black text-slate-900 text-sm mt-0.5">{batchSummaryModal.categoriesProcessed} de {CATEGORY_CONFIG.length}</div>
+                <div className="text-[11px] text-slate-500 font-medium">Categorias Processadas</div>
+                <div className="font-black text-slate-900 text-sm mt-0.5">
+                  {batchSummaryModal.categoriesProcessed} de {batchSummaryModal.totalCategoriesRequested || CATEGORY_CONFIG.length}
+                </div>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[11px] text-slate-500">Produtos Adquiridos</div>
-                <div className="font-black text-amber-700 text-sm mt-0.5">+{batchSummaryModal.totalProducts} prods</div>
+                <div className="text-[11px] text-slate-500 font-medium">Recebidos / Processados</div>
+                <div className="font-black text-slate-900 text-sm mt-0.5">
+                  {batchSummaryModal.totalProcessed} prods
+                </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 col-span-2">
-                <div className="text-[11px] text-slate-500">Créditos SocialCrawl Consumidos</div>
-                <div className="font-black text-slate-900 text-sm mt-0.5">{batchSummaryModal.creditsUsed} créditos</div>
+              <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200">
+                <div className="text-[11px] text-emerald-800 font-semibold">Novos Produtos Inseridos</div>
+                <div className="font-black text-emerald-700 text-sm mt-0.5">
+                  +{batchSummaryModal.newProducts} novos
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[11px] text-slate-500 font-medium">Já Existentes / Atualizados</div>
+                <div className="font-black text-slate-700 text-sm mt-0.5">
+                  {batchSummaryModal.updatedProducts} prods
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200 col-span-2">
+                <div className="text-[11px] text-amber-800 font-medium">Créditos SocialCrawl Consumidos</div>
+                <div className="font-black text-amber-900 text-sm mt-0.5">
+                  {batchSummaryModal.creditsUsed} créditos
+                </div>
               </div>
             </div>
 
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 setBatchSummaryModal(null);
-                loadCategories();
+                await loadCategories();
               }}
-              className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md shadow-amber-500/20"
+              className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-[1.01]"
             >
               Fechar e Ver Base Atualizada
             </button>
