@@ -6890,19 +6890,24 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                           </span>
                           {isCatSelected && catPlan && deficit > 0 ? (
                             <span
-                              className="text-[10px] px-2 py-0.5 rounded-md font-bold border border-amber-300 bg-amber-100/80 text-amber-900 flex items-center gap-1"
-                              title={catPlan.hasHistoricalData ? `Baseada em dados reais: ~${catPlan.historicalValidPerCredit?.toFixed(1)} produtos válidos/crédito` : 'Estimativa teórica inicial'}
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${
+                                catPlan.hasHistoricalData
+                                  ? 'border border-amber-300 bg-amber-100/80 text-amber-900'
+                                  : 'border border-slate-200 bg-slate-100 text-slate-600 font-semibold'
+                              }`}
+                              title={
+                                catPlan.hasHistoricalData
+                                  ? `Baseada no histórico da categoria: ~${catPlan.historicalValidPerCredit?.toFixed(2)} válidos confirmados/crédito`
+                                  : 'A primeira execução desta categoria será utilizada para calcular a estimativa real de consumo.'
+                              }
                             >
                               {catPlan.hasHistoricalData ? (
                                 <>
                                   <span>📊 ~{catPlan.minEstimatedCredits}–{catPlan.maxEstimatedCredits} crs</span>
-                                  <span className="text-[9px] text-amber-700 font-normal">({catPlan.historicalValidPerCredit?.toFixed(1)} v/cr)</span>
+                                  <span className="text-[9px] text-amber-700 font-normal">({catPlan.historicalValidPerCredit?.toFixed(2)} v/cr)</span>
                                 </>
                               ) : (
-                                <>
-                                  <span>~{catPlan.estimatedCredits} crs</span>
-                                  <span className="text-[9px] text-slate-500 font-normal">(teórica)</span>
-                                </>
+                                <span>Sem histórico suficiente</span>
                               )}
                             </span>
                           ) : isCatSelected && deficit === 0 ? (
@@ -7009,8 +7014,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     <div className="flex items-center gap-2 text-amber-800 text-xs font-black uppercase tracking-wider">
                       <Gauge className="w-4 h-4 text-amber-600" />
                       {expansionSummary.hasHistoricalDataCount > 0
-                        ? 'Estimativa Baseada no Histórico Real de Rendimento'
-                        : 'Estimativa Baseada no Plano Real da Categoria'}
+                        ? 'Estimativa Real de Créditos • Baseada no Histórico'
+                        : 'Estimativa de Créditos • Gestão da Base'}
                     </div>
                     <h3 className="mt-1 text-lg font-black text-slate-900">
                       Resumo da Operação de Aquisição
@@ -7025,11 +7030,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   >
                     <Rocket className="w-4.5 h-4.5" />
                     <span>
-                      🚀 Iniciar Expansão da Base (
+                      🚀 Iniciar Expansão da Base
                       {expansionSummary.hasHistoricalDataCount > 0
-                        ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} crs estimados`
-                        : `~${expansionSummary.totalEstimatedCredits} crs estimados`}
-                      )
+                        ? ` (~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} crs estimados)`
+                        : ''}
                     </span>
                   </button>
                 </div>
@@ -7065,20 +7069,36 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex items-center justify-between">
-                    <div>
-                      <div className="text-[11px] text-slate-500 font-medium">Estimativa Inicial de Créditos</div>
-                      <div className="font-black text-amber-900 text-base mt-0.5">
-                        {expansionSummary.hasHistoricalDataCount > 0
-                          ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} créditos`
-                          : `~${expansionSummary.totalEstimatedCredits} créditos`}
+                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex flex-col justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-[11px] text-slate-500 font-medium">
+                          {expansionSummary.hasHistoricalDataCount > 0
+                            ? 'Estimativa Real de Créditos'
+                            : 'Estimativa de Créditos'}
+                        </div>
+                        <div className="font-black text-amber-900 text-base mt-0.5">
+                          {expansionSummary.hasHistoricalDataCount > 0
+                            ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} créditos`
+                            : 'Sem histórico suficiente'}
+                        </div>
                       </div>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded border shrink-0 ${
+                        expansionSummary.hasHistoricalDataCount > 0
+                          ? 'bg-amber-100/90 text-amber-800 border-amber-300'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}>
+                        {expansionSummary.hasHistoricalDataCount > 0
+                          ? `📊 Baseada no histórico (${expansionSummary.hasHistoricalDataCount} de ${expansionSummary.totalCats} cats)`
+                          : 'Aguardando 1ª execução'}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-amber-100/90 text-amber-800 border border-amber-300">
-                      {expansionSummary.hasHistoricalDataCount > 0
-                        ? `📊 Baseada no histórico (${expansionSummary.hasHistoricalDataCount} de ${expansionSummary.totalCats} cats)`
-                        : 'Informativo • Sem trava artificial'}
-                    </span>
+
+                    {expansionSummary.hasHistoricalDataCount === 0 && (
+                      <p className="text-[11px] text-slate-500 leading-snug">
+                        A primeira execução desta categoria será utilizada para calcular a estimativa real de consumo.
+                      </p>
+                    )}
                   </div>
 
                   <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex items-center justify-between">
@@ -7271,10 +7291,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div>• Produtos Atuais na Base: <strong className="text-slate-900">{expansionSummary.totalCurrentProducts.toLocaleString('pt-BR')} produtos</strong></div>
                 <div>• Novos Produtos Planejados: <strong className="text-slate-900">até {expansionSummary.totalAllocatedProducts.toLocaleString('pt-BR')} novos produtos</strong></div>
                 <div>
-                  • Estimativa Inicial: <strong className="text-slate-900">
+                  • Estimativa de Créditos: <strong className="text-slate-900">
                     {expansionSummary.hasHistoricalDataCount > 0
                       ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} créditos SocialCrawl (baseada no histórico de rendimento)`
-                      : `~${expansionSummary.totalEstimatedCredits} créditos SocialCrawl (estimativa teórica inicial)`}
+                      : 'Sem histórico suficiente (a primeira execução desta categoria será utilizada para calcular a estimativa real de consumo)'}
                   </strong>
                 </div>
               </div>
@@ -7300,11 +7320,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               >
                 <Rocket className="w-4 h-4" />
                 <span>
-                  Confirmar e Iniciar (
+                  Confirmar e Iniciar
                   {expansionSummary.hasHistoricalDataCount > 0
-                    ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} crs`
-                    : `~${expansionSummary.totalEstimatedCredits} crs`}
-                  )
+                    ? ` (~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} crs)`
+                    : ''}
                 </span>
               </button>
             </div>
