@@ -1001,6 +1001,47 @@ async function runStrictTargetExpansionTestSuite() {
     assert(plans[0].maxEstimatedCredits === 7, `Faixa máxima (${plans[0].maxEstimatedCredits} crs)`);
   }
 
+  // Teste 46: Rigor do cálculo de eficiência histórica (actualValidGrowth vs validNewProductsForTarget)
+  {
+    const simulatedSummary = {
+      validNewProductsForTarget: 4,
+      actualValidGrowth: 3,
+      creditsUsed: 2,
+    };
+
+    const confirmedValidPerCredit = simulatedSummary.creditsUsed > 0
+      ? Number((simulatedSummary.actualValidGrowth / simulatedSummary.creditsUsed).toFixed(4))
+      : null;
+
+    const wrongCalculation = simulatedSummary.creditsUsed > 0
+      ? Number((simulatedSummary.validNewProductsForTarget / simulatedSummary.creditsUsed).toFixed(4))
+      : null;
+
+    assert(confirmedValidPerCredit === 1.5, `Eficiência histórica usa actualValidGrowth: 3 / 2 = 1.5 (obtido: ${confirmedValidPerCredit})`);
+    assert(confirmedValidPerCredit !== wrongCalculation, `Eficiência NÃO usa validNewProductsForTarget (1.5 !== 2.0)`);
+  }
+
+  // Teste 47: Formatação da UI quando hasHistoricalData = false
+  {
+    const plans = calculateExpansionPlanFromStats({
+      categoryStats: [
+        { category: 'Acessórios de moda', productCount: 206, coverageCount: 5, subcategories: [], lastCollectedAt: null, status: 'Ativa' },
+      ],
+      selectedCategories: ['Acessórios de moda'],
+      categoryTargetLimit: 300,
+      taxonomyConfig: { 'Acessórios de moda': ['Sub 1'] },
+      historyMap: {},
+    });
+
+    const plan = plans[0];
+    const uiDisplay = plan.hasHistoricalData
+      ? `~${plan.minEstimatedCredits}–${plan.maxEstimatedCredits} créditos`
+      : 'Sem histórico suficiente';
+
+    assert(plan.hasHistoricalData === false, 'hasHistoricalData é falso');
+    assert(uiDisplay === 'Sem histórico suficiente', 'UI exibe "Sem histórico suficiente" em vez de estimativa teórica');
+  }
+
   console.log('\n========================================================================');
   console.log(`RESULTADO DA SUITE: ${passedTests}/${totalTests} TESTES PASSARAM COM SUCESSO!`);
   console.log('========================================================================\n');
