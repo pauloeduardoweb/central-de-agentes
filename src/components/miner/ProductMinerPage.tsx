@@ -5114,6 +5114,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     setShowBatchConfirmModal(false);
     if (selectedExpansionCategories.length === 0 || isBatchExecuting) return;
 
+    // Reset integral do estado de progresso de qualquer execução anterior
+    setBatchProgress(null);
     setIsBatchExecuting(true);
     setError('');
     setCollectorNotice(null);
@@ -5137,6 +5139,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       const currentCount = catStat?.productCount || 0;
       const remainingTarget = Math.max(0, expansionTargetCount - currentCount);
 
+      // Orçamento de créditos derivado EXCLUSIVAMENTE do plano atual da categoria
+      const catPlan = activeExpansionPlans.find((p) => p.category === cat);
+      const catCreditBudget = catPlan?.estimatedCredits !== undefined && catPlan.estimatedCredits > 0
+        ? catPlan.estimatedCredits
+        : Math.max(1, Math.ceil(remainingTarget / 30));
+
       setBatchProgress({
         currentCategory: cat,
         currentSubcategory: 'Iniciando análise...',
@@ -5145,12 +5153,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         categoryIndex: i + 1,
         totalCategories: categoriesToProcess.length,
         subcategoryIndex: 1,
-        totalSubcategoriesInCategory: 1,
+        totalSubcategoriesInCategory: catPlan?.subcategories?.filter((s) => s.allocatedTarget > 0).length || 1,
         categoryTargetLimit: expansionTargetCount,
         currentValidTargetCount: currentCount,
         remainingNeeded: remainingTarget,
         categoryCreditsUsed: 0,
-        categoryCreditLimit: 15,
+        categoryCreditLimit: catCreditBudget,
         validNewProductsForTarget: totalValidNewCount,
         offTargetProducts: totalOffTargetCount,
         unclassifiedProducts: totalUnclassifiedCount,
@@ -5168,6 +5176,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             category: cat,
             initialValidCount: currentCount,
             finalValidCount: currentCount,
+            actualValidGrowth: 0,
             categoryTargetLimit: expansionTargetCount,
             validNewProductsForTarget: 0,
             offTargetProducts: 0,
@@ -5189,6 +5198,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             selectedCategories: [cat],
             categoryTargetLimit: expansionTargetCount,
             perSubcategoryMax: 60,
+            maxCreditBudgetPerCategory: catCreditBudget,
           },
           (progress) => {
             setBatchProgress({
@@ -5204,7 +5214,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               currentValidTargetCount: progress.currentValidTargetCount,
               remainingNeeded: progress.remainingNeeded,
               categoryCreditsUsed: progress.categoryCreditsUsed,
-              categoryCreditLimit: progress.categoryCreditLimit || 15,
+              categoryCreditLimit: progress.categoryCreditLimit || catCreditBudget,
               validNewProductsForTarget: totalValidNewCount + progress.validNewProductsForTarget,
               offTargetProducts: totalOffTargetCount + progress.offTargetProducts,
               unclassifiedProducts: totalUnclassifiedCount + progress.unclassifiedProducts,
@@ -5233,6 +5243,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             category: cat,
             initialValidCount: currentCount,
             finalValidCount: currentCount + (result.totalValidNewForTarget || 0),
+            actualValidGrowth: result.totalValidNewForTarget || 0,
             categoryTargetLimit: expansionTargetCount,
             validNewProductsForTarget: result.totalValidNewForTarget || 0,
             offTargetProducts: result.totalOffTarget || 0,
@@ -5253,6 +5264,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
 
     setIsBatchExecuting(false);
+    setBatchProgress(null);
+
+    // RELEITURA OBRIGATÓRIA DOS STATS OFICIAIS DO MYSQL ANTES DE EXIBIR O MODAL
     await loadCategories();
 
     if (processedCats === 0 && failedErrors.length > 0) {
@@ -7292,7 +7306,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               {(() => {
                 const catProgressPercent = calculateCategoryProgressPercent({
                   creditsUsed: batchProgress?.categoryCreditsUsed,
-                  creditLimit: batchProgress?.categoryCreditLimit || 15,
+                  creditLimit: batchProgress?.categoryCreditLimit ?? 1,
                   isTargetReached: (batchProgress?.remainingNeeded ?? 1) <= 0,
                   stopReason: batchProgress?.stopReason,
                 });
@@ -7301,7 +7315,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
                       <span>
-                        Progresso: {batchProgress?.categoryCreditsUsed || 0} de {batchProgress?.categoryCreditLimit || 15} créditos consumidos
+                        Progresso: {batchProgress?.categoryCreditsUsed || 0} de {batchProgress?.categoryCreditLimit || 0} créditos consumidos
                       </span>
                       <span className="text-amber-800 font-extrabold text-xs">{catProgressPercent}%</span>
                     </div>
@@ -7372,7 +7386,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div className="p-1.5 rounded-lg bg-amber-50 border border-amber-200">
                   <div className="text-[9px] text-amber-800 font-bold leading-tight">Créditos Categoria</div>
                   <div className="font-black text-amber-800 text-xs mt-0.5">
-                    {batchProgress?.categoryCreditsUsed || 0}/{batchProgress?.categoryCreditLimit || 15}
+                    {batchProgress?.categoryCreditsUsed || 0}/{batchProgress?.categoryCreditLimit || 0}
                   </div>
                 </div>
               </div>
@@ -7400,7 +7414,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     Expansão Concluída! 🎉
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Relatório consolidado de aquisição e classificação por categoria
+                    Relatório consolidado de aquisição e classificação por categoria (Fonte Oficial MySQL)
                   </p>
                 </div>
               </div>
@@ -7433,12 +7447,28 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300">
-                <div className="text-[11px] text-emerald-800 font-bold">Válidos Categoria-Alvo</div>
-                <div className="font-black text-emerald-700 text-sm mt-0.5">
-                  +{batchSummaryModal.validNewProductsForTarget} novos
-                </div>
-              </div>
+              {/* Confirmed Valid Growth KPI */}
+              {(() => {
+                const totalConfirmedGrowth = (batchSummaryModal.categorySummaries || []).reduce(
+                  (sum, c) => sum + (c.actualValidGrowth ?? (c.finalValidCount - c.initialValidCount)),
+                  0
+                );
+                const totalOpValid = batchSummaryModal.validNewProductsForTarget;
+
+                return (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300">
+                    <div className="text-[11px] text-emerald-800 font-bold">Crescimento Confirmado</div>
+                    <div className="font-black text-emerald-700 text-sm mt-0.5">
+                      +{totalConfirmedGrowth} válidos
+                    </div>
+                    {totalOpValid !== totalConfirmedGrowth && (
+                      <div className="text-[10px] text-emerald-600 font-medium mt-0.5">
+                        ({totalOpValid} validados na coleta)
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200">
                 <div className="text-[11px] text-amber-800 font-bold">Créditos SocialCrawl</div>
@@ -7473,7 +7503,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             {Array.isArray(batchSummaryModal.categorySummaries) && batchSummaryModal.categorySummaries.length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Detalhamento por Categoria:
+                  Detalhamento por Categoria (Confirmado no Banco):
                 </div>
 
                 <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-56 overflow-y-auto">
@@ -7499,23 +7529,37 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       }
                     };
 
+                    const confirmedGrowth = catSum.actualValidGrowth ?? (catSum.finalValidCount - catSum.initialValidCount);
+                    const opValid = catSum.validNewProductsForTarget;
+
                     return (
                       <div key={catSum.category} className="p-3 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                         <div className="space-y-0.5">
                           <div className="font-extrabold text-slate-900 text-sm">
                             {catSum.category}
                           </div>
-                          <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                          <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
                             <span>Base: <strong>{catSum.initialValidCount}</strong> ➔ <strong>{catSum.finalValidCount}</strong> (Meta: {catSum.categoryTargetLimit})</span>
                             <span>•</span>
                             <span>{catSum.subcategoriesConsulted} subcats consultadas</span>
+                            {catSum.coverageBefore !== undefined && catSum.coverageAfter !== undefined && (
+                              <>
+                                <span>•</span>
+                                <span>Cobertura: {catSum.coverageBefore} ➔ {catSum.coverageAfter} subcats</span>
+                              </>
+                            )}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap shrink-0">
                           <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-extrabold text-[11px] border border-emerald-200">
-                            +{catSum.validNewProductsForTarget} válidos
+                            +{confirmedGrowth} confirmados
                           </span>
+                          {opValid !== confirmedGrowth && (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-50/60 text-emerald-700 text-[10px] border border-emerald-100">
+                              +{opValid} na coleta
+                            </span>
+                          )}
                           {catSum.offTargetProducts > 0 && (
                             <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px]">
                               {catSum.offTargetProducts} fora do alvo
