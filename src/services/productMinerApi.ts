@@ -213,10 +213,17 @@ export async function fetchCollectorCategories(studentCode: string): Promise<Col
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw accessError(data);
-  const categories = (data.categories || []) as CollectorCategoryStat[];
-  const totalStoredProducts = typeof data.totalStoredProducts === 'number'
-    ? data.totalStoredProducts
-    : categories.reduce((sum, c) => sum + (c.productCount || 0), 0);
+  const categories = (
+    Array.isArray(data.categories)
+      ? data.categories
+      : Array.isArray(data)
+      ? data
+      : []
+  ) as CollectorCategoryStat[];
+  const totalStoredProducts =
+    typeof data.totalStoredProducts === 'number'
+      ? data.totalStoredProducts
+      : Number(data.totalStoredProducts) || categories.reduce((sum, c) => sum + (c.productCount || 0), 0);
   return { categories, totalStoredProducts };
 }
 
