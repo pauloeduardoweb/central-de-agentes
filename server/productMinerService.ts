@@ -604,16 +604,17 @@ export async function persistProducts(
 ): Promise<{
   insertedCount: number;
   updatedCount: number;
+  insertedIds: string[];
   totalValid: number;
 }> {
   if (!isDatabaseConfigured() || products.length === 0) {
-    return { insertedCount: 0, updatedCount: 0, totalValid: 0 };
+    return { insertedCount: 0, updatedCount: 0, insertedIds: [], totalValid: 0 };
   }
   await ensureProductMinerTables();
 
   const validProducts = products.filter((product) => product.productId && String(product.productId).trim() !== '');
   if (validProducts.length === 0) {
-    return { insertedCount: 0, updatedCount: 0, totalValid: 0 };
+    return { insertedCount: 0, updatedCount: 0, insertedIds: [], totalValid: 0 };
   }
 
   const ids = validProducts.map((product) => product.productId);
@@ -634,7 +635,8 @@ export async function persistProducts(
     console.warn('[persistProducts check existing warning]:', err?.message || err);
   }
 
-  const insertedCount = ids.filter((id) => !existingSet.has(id)).length;
+  const insertedIds = ids.filter((id) => !existingSet.has(id));
+  const insertedCount = insertedIds.length;
   const updatedCount = ids.length - insertedCount;
 
   const productRows = validProducts.map((product) => [
@@ -751,6 +753,7 @@ export async function persistProducts(
   return {
     insertedCount,
     updatedCount,
+    insertedIds,
     totalValid: validProducts.length,
   };
 }
@@ -1746,6 +1749,7 @@ export async function searchTikTokShopProducts(params: {
   requestId: string | null;
   newProductsCount?: number;
   updatedProductsCount?: number;
+  insertedIds?: string[];
   totalReceived?: number;
   rejectedCount?: number;
 }> {
@@ -2226,6 +2230,7 @@ export async function searchTikTokShopProducts(params: {
     requestId: payload.request_id || null,
     newProductsCount: persistStats.insertedCount,
     updatedProductsCount: persistStats.updatedCount,
+    insertedIds: persistStats.insertedIds,
     totalReceived: rawItems.length,
   };
 }
