@@ -810,14 +810,37 @@ productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
 productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
   const sendEvent = (event: any) => {
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
+    try {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+        (res as any).flush?.();
+      }
+    } catch (writeErr) {
+      console.warn('[SSE sendEvent Error]:', writeErr);
+    }
   };
+
+  // Heartbeat keep-alive para evitar timeouts de proxies reversos e browsers
+  const pingInterval = setInterval(() => {
+    try {
+      if (!res.writableEnded) {
+        res.write(': ping\n\n');
+        (res as any).flush?.();
+      }
+    } catch {}
+  }, 3000);
+
+  let isClientClosed = false;
+  req.on('close', () => {
+    isClientClosed = true;
+  });
 
   try {
     const { executeSubcategoryExpansion } = await import('./subcategoryExpansionService.js');
@@ -828,11 +851,6 @@ productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (re
     const categoryTargetLimit = req.body?.categoryTargetLimit ? Number(req.body.categoryTargetLimit) : 500;
     const perSubcategoryMax = req.body?.perSubcategoryMax ? Number(req.body.perSubcategoryMax) : 60;
     const maxCreditBudgetPerCategory = req.body?.maxCreditBudgetPerCategory ? Number(req.body.maxCreditBudgetPerCategory) : undefined;
-
-    let isClientClosed = false;
-    req.on('close', () => {
-      isClientClosed = true;
-    });
 
     const result = await executeSubcategoryExpansion({
       selectedCategories,
@@ -848,12 +866,18 @@ productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (re
       },
     });
 
+    clearInterval(pingInterval);
+    // Emissão do evento terminal com alias duplo (COMPLETE e DONE)
+    sendEvent({ type: 'COMPLETE', result });
     sendEvent({ type: 'DONE', result });
     res.end();
   } catch (error: any) {
+    clearInterval(pingInterval);
     console.error('[Execute Subcategory Expansion Stream Error]:', error);
     sendEvent({ type: 'ERROR', error: error?.message || 'EXPANSION_EXECUTION_ERROR' });
     res.end();
+  } finally {
+    clearInterval(pingInterval);
   }
 });
 

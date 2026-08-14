@@ -463,8 +463,7 @@ export async function executeSubcategoryExpansion(options: {
         });
       }
 
-      // Paginação real: continua enquanto houver has_more e remainingNeeded > 0
-      // Teto técnico preventivo de 30 páginas por subcategoria para salvaguarda de loop infinito
+      let isSubConsulted = false;
       let consecutiveNoValidPages = 0;
       let hasMoreInSub = true;
       let isSubExhausted = false;
@@ -473,6 +472,12 @@ export async function executeSubcategoryExpansion(options: {
         if (shouldCancel && shouldCancel()) {
           catStopReason = 'CANCELLED';
           break;
+        }
+
+        if (!isSubConsulted) {
+          isSubConsulted = true;
+          catSubcategoriesConsulted++;
+          subcategoriesConsulted++;
         }
 
         remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - currentValidTargetCount);
@@ -525,11 +530,6 @@ export async function executeSubcategoryExpansion(options: {
             collectionCategory: catPlan.category,
             collectionSubcategory: subPlan.subcategory,
           });
-
-          if (page === 1) {
-            catSubcategoriesConsulted++;
-            subcategoriesConsulted++;
-          }
 
           catRequestsMade++;
           totalRequestsMade++;
@@ -770,17 +770,6 @@ export async function executeSubcategoryExpansion(options: {
       }
     }
 
-    if (remainingNeeded <= 0) {
-      catStopReason = 'TARGET_REACHED';
-    } else if (catStopReason !== 'CANCELLED') {
-      // Se percorreu todas as subcategorias selecionadas e remainingNeeded ainda > 0
-      if (catSubcategoriesConsulted >= catPlan.subcategories.length) {
-        catStopReason = 'ALL_SUBCATEGORIES_EXHAUSTED';
-      } else {
-        catStopReason = 'NO_MORE_RESULTS';
-      }
-    }
-
     // Releitura OBRIGATÓRIA dos stats oficiais pós-persistência para fonte única de verdade
     const statsAfterCat = await getCollectorCategoriesStats().catch(() => ({ totalStoredProducts: 0, categories: [] }));
     const catStatAfter = statsAfterCat.categories.find((c) => c.category === catPlan.category);
@@ -791,6 +780,16 @@ export async function executeSubcategoryExpansion(options: {
     const initialCatStat = initialCategories.find((c) => c.category === catPlan.category);
     const coverageBefore = initialCatStat?.coverageCount || 0;
     const coverageAfter = catStatAfter?.coverageCount || 0;
+
+    if (officialFinalValidCount >= catPlan.categoryTargetLimit || remainingNeeded <= 0) {
+      catStopReason = 'TARGET_REACHED';
+    } else if (catStopReason !== 'CANCELLED') {
+      if (catSubcategoriesConsulted >= catPlan.subcategories.length) {
+        catStopReason = 'ALL_SUBCATEGORIES_EXHAUSTED';
+      } else {
+        catStopReason = 'NO_MORE_RESULTS';
+      }
+    }
 
     categorySummaries.push({
       category: catPlan.category,
