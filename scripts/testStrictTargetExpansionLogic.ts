@@ -551,6 +551,226 @@ async function runStrictTargetExpansionTestSuite() {
     assert(summary.finalValidCount >= 20, `Contagem final de válidos (${summary.finalValidCount}) alcançou a meta planejada de 20`);
   }
 
+  // ========================================================================
+  // CASO 11: Contagem Exata de Créditos SocialCrawl (creditsUsed = 0 não vira 1)
+  // ========================================================================
+  console.log('\n--- CASO 11: CONTAGEM EXATA DE CRÉDITOS (creditsUsed = 0 NÃO VIRA 1 CRÉDITO) ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 10,
+      categoryTargetLimit: 20,
+      subcategories: [
+        { subcategory: 'Acessórios para cabelos', currentCount: 5, allocatedTarget: 10, priority: 1, estimatedCredits: 2 },
+      ],
+    })];
+
+    // 2 chamadas: uma com creditsUsed = 0, outra com creditsUsed = 1. Total real = 1.
+    let callIdx = 0;
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 20,
+      plans: testPlans,
+      searchFn: async () => {
+        callIdx++;
+        const credits = callIdx === 1 ? 0 : 1;
+        return {
+          products: [
+            createMockProduct({ productId: `p_cred_${callIdx}`, title: `Brinco Prata ${callIdx}`, category: targetCategory }),
+          ],
+          creditsUsed: credits,
+          hasMore: callIdx < 2,
+          newProductsCount: 1,
+          updatedProductsCount: 0,
+        };
+      },
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(summary.creditsUsed === 1, `Créditos usados na categoria é exatamente 1 (0 + 1), e não 2. Recebido: ${summary.creditsUsed}`);
+    assert(res.totalCreditsUsed === 1, `Total global de créditos é exatamente 1. Recebido: ${res.totalCreditsUsed}`);
+    assert(summary.requestsMade === 2, `Total de requests realizados é 2. Recebido: ${summary.requestsMade}`);
+  }
+
+  // ========================================================================
+  // CASO 12: Subcategoria 1 para por 3 páginas sem válidos -> avança para Subcategoria 2
+  // ========================================================================
+  console.log('\n--- CASO 12: PULO DE SUBCATEGORIA POR 3 PÁGINAS SEM VÁLIDOS NÃO ABORTA AS DEMAIS ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 0,
+      categoryTargetLimit: 10,
+      subcategories: [
+        { subcategory: 'Chapéus', currentCount: 0, allocatedTarget: 5, priority: 0, estimatedCredits: 1 },
+        { subcategory: 'Bijuterias e acessórios', currentCount: 0, allocatedTarget: 5, priority: 0, estimatedCredits: 1 },
+      ],
+    })];
+
+    const consultedSubs: string[] = [];
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 10,
+      plans: testPlans,
+      searchFn: async (params) => {
+        if (!consultedSubs.includes(params.collectionSubcategory || '')) {
+          consultedSubs.push(params.collectionSubcategory || '');
+        }
+
+        if (params.collectionSubcategory === 'Chapéus') {
+          // Retorna apenas off-target para Chapéus (3 páginas)
+          return {
+            products: [createMockProduct({ productId: `p_off_${params.page}`, title: 'Boné Esportivo', category: 'Esportes' })],
+            creditsUsed: 1,
+            hasMore: true,
+            newProductsCount: 1,
+            updatedProductsCount: 0,
+            insertedIds: [`p_off_${params.page}`],
+          };
+        } else {
+          // Retorna válidos para Bijuterias (atinge a meta)
+          return {
+            products: [
+              createMockProduct({ productId: 'b1', title: 'Brinco Prata', category: targetCategory }),
+              createMockProduct({ productId: 'b2', title: 'Colar Ouro', category: targetCategory }),
+              createMockProduct({ productId: 'b3', title: 'Pulseira Fina', category: targetCategory }),
+              createMockProduct({ productId: 'b4', title: 'Anel Elegante', category: targetCategory }),
+              createMockProduct({ productId: 'b5', title: 'Tornozeleira Prata', category: targetCategory }),
+              createMockProduct({ productId: 'b6', title: 'Pingente Luxo', category: targetCategory }),
+              createMockProduct({ productId: 'b7', title: 'Chaveiro Moda', category: targetCategory }),
+              createMockProduct({ productId: 'b8', title: 'Brinco Argola', category: targetCategory }),
+              createMockProduct({ productId: 'b9', title: 'Colar Pérola', category: targetCategory }),
+              createMockProduct({ productId: 'b10', title: 'Brinco Ponto de Luz', category: targetCategory }),
+            ],
+            creditsUsed: 1,
+            hasMore: false,
+            newProductsCount: 10,
+            updatedProductsCount: 0,
+            insertedIds: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10'],
+          };
+        }
+      },
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(consultedSubs.includes('Chapéus') && consultedSubs.includes('Bijuterias e acessórios'), 'Ambas as subcategorias foram consultadas');
+    assert(summary.subcategoriesConsulted === 2, `subcategoriesConsulted = 2. Recebido: ${summary.subcategoriesConsulted}`);
+    assert(summary.subcategoriesExhausted === 1, `subcategoriesExhausted = 1 (apenas Chapéus esgotou). Recebido: ${summary.subcategoriesExhausted}`);
+    assert(summary.stopReason === 'TARGET_REACHED', `Meta alcançada na segunda subcategoria (stopReason: ${summary.stopReason})`);
+    assert(summary.validNewProductsForTarget === 10, `validNewProductsForTarget = 10. Recebido: ${summary.validNewProductsForTarget}`);
+  }
+
+  // ========================================================================
+  // CASO 13: ALL_SUBCATEGORIES_EXHAUSTED somente após percorrer todas as subcategorias
+  // ========================================================================
+  console.log('\n--- CASO 13: ALL_SUBCATEGORIES_EXHAUSTED SOMENTE APÓS TODAS AS SUBCATS CONSULTADAS ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const subList = [
+      'Acessórios para cabelos',
+      'Acessórios para roupas',
+      'Bijuterias e acessórios',
+      'Chapéus',
+      'Coleiras e broches',
+    ];
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 0,
+      categoryTargetLimit: 100,
+      subcategories: subList.map((s) => ({
+        subcategory: s,
+        currentCount: 0,
+        allocatedTarget: 20,
+        priority: 0,
+        estimatedCredits: 1,
+      })),
+    })];
+
+    const consultedSubs: string[] = [];
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async (params) => {
+        const sub = params.collectionSubcategory || '';
+        if (!consultedSubs.includes(sub)) consultedSubs.push(sub);
+        // Cada subcategoria retorna apenas 1 produto válido e encerra (hasMore: false)
+        return {
+          products: [
+            createMockProduct({ productId: `p_${sub}_1`, title: `Item ${sub} 1`, category: targetCategory }),
+          ],
+          creditsUsed: 1,
+          hasMore: false,
+          newProductsCount: 1,
+          updatedProductsCount: 0,
+          insertedIds: [`p_${sub}_1`],
+        };
+      },
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(consultedSubs.length === 5, `Todas as 5 subcategorias foram consultadas (${consultedSubs.length}/5)`);
+    assert(summary.subcategoriesConsulted === 5, `subcategoriesConsulted é 5`);
+    assert(summary.subcategoriesExhausted === 5, `subcategoriesExhausted é 5`);
+    assert(summary.stopReason === 'ALL_SUBCATEGORIES_EXHAUSTED', `stopReason é ALL_SUBCATEGORIES_EXHAUSTED porque todas foram esgotadas e meta de 100 não foi atingida (ficou em ${summary.finalValidCount})`);
+  }
+
+  // ========================================================================
+  // CASO 14: Subcategorias com allocatedTarget = 0 no plano NÃO são ignoradas se houver déficit
+  // ========================================================================
+  console.log('\n--- CASO 14: SUBCATEGORIAS COM ALLOCATED = 0 SÃO NAVEGADAS SE HOUVER DÉFICIT ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 0,
+      categoryTargetLimit: 50,
+      subcategories: [
+        { subcategory: 'Sub 1', currentCount: 0, allocatedTarget: 30, priority: 0, estimatedCredits: 1 },
+        { subcategory: 'Sub 2', currentCount: 0, allocatedTarget: 20, priority: 0, estimatedCredits: 1 },
+        { subcategory: 'Sub 3', currentCount: 0, allocatedTarget: 0, priority: 0, estimatedCredits: 0 }, // allocated 0 pelo orçamento inicial
+      ],
+    })];
+
+    const visitedSubs: string[] = [];
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 50,
+      plans: testPlans,
+      searchFn: async (params) => {
+        const sub = params.collectionSubcategory || '';
+        if (!visitedSubs.includes(sub)) visitedSubs.push(sub);
+        // Sub 1 e Sub 2 retornam 0 produtos válidos (esgotam rápido)
+        if (sub === 'Sub 1' || sub === 'Sub 2') {
+          return {
+            products: [],
+            creditsUsed: 1,
+            hasMore: false,
+            newProductsCount: 0,
+            updatedProductsCount: 0,
+          };
+        }
+        // Sub 3 fornece produtos válidos
+        return {
+          products: [
+            createMockProduct({ productId: 's3_1', title: 'Produto Sub 3', category: targetCategory }),
+          ],
+          creditsUsed: 1,
+          hasMore: false,
+          newProductsCount: 1,
+          updatedProductsCount: 0,
+          insertedIds: ['s3_1'],
+        };
+      },
+    });
+
+    assert(visitedSubs.includes('Sub 3'), 'Sub 3 (que tinha allocatedTarget = 0 no plano) foi navegada com sucesso porque o déficit ainda existia');
+    assert(res.totalValidNewForTarget === 1, 'Produto da Sub 3 foi validado e contabilizado');
+  }
+
   console.log('\n========================================================================');
   console.log(`RESULTADO DA SUITE: ${passedTests}/${totalTests} TESTES PASSARAM COM SUCESSO!`);
   console.log('========================================================================\n');
