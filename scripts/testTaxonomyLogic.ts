@@ -6,7 +6,7 @@ import {
 } from '../server/taxonomy.js';
 import { inferUnclassifiedSubcategory } from '../server/unclassifiedAuditService.js';
 
-function runTestSuite() {
+async function runTestSuite() {
   console.log('====================================================');
   console.log('SUITE DE TESTES: AUDITORIA E INTEGRIDADE DA TAXONOMIA');
   console.log('====================================================');
@@ -259,6 +259,112 @@ function runTestSuite() {
       'Sem child category segura, retorna null'
     );
   }
+
+  // TEST 11: Priorização estrita de subcategorias (0 produtos primeiro, depois menor contagem)
+  console.log('\n--- TESTE 11: PRIORIZAÇÃO DE EXPANSÃO POR SUBCATEGORIA (0 PRODUTOS PRIMEIRO) ---');
+  const { buildSubcategoryExpansionPlan } = await import('../server/subcategoryExpansionService.js');
+  const mockStats = [
+    {
+      category: 'Acessórios de moda',
+      productCount: 15,
+      lastCollectedAt: null,
+      status: 'Ativa' as const,
+      subcategories: [
+        { subcategory: 'Óculos', productCount: 10, isLowBase: false },
+        { subcategory: 'Chapéus', productCount: 5, isLowBase: false },
+        { subcategory: 'Acessórios para cabelos', productCount: 0, isLowBase: true },
+        { subcategory: 'Bijuterias e acessórios', productCount: 0, isLowBase: true },
+      ],
+    },
+  ];
+
+  const plans = buildSubcategoryExpansionPlan({
+    categoryStats: mockStats,
+    selectedCategories: ['Acessórios de moda'],
+    categoryTargetLimit: 120,
+    perSubcategoryMax: 60,
+  });
+
+  assert(plans.length === 1, 'Plano gerado com sucesso para a categoria selecionada');
+  const subs = plans[0].subcategories;
+  assert(subs[0].isZeroCount === true, 'Primeira subcategoria no plano tem 0 produtos (Prioridade 1)');
+  assert(subs[1].isZeroCount === true, 'Segunda subcategoria no plano tem 0 produtos (Prioridade 1)');
+  assert(
+    subs[2].currentCount <= subs[3].currentCount,
+    'Subcategorias subsequentes ordenadas por menor contagem (ASC)'
+  );
+
+  // TEST 12: Respeito ao meta-limit da categoria
+  console.log('\n--- TESTE 12: RESPEITO ESTRITO AO META-LIMIT DA CATEGORIA ---');
+  const targetLimit = 100;
+  const plansWithLimit = buildSubcategoryExpansionPlan({
+    categoryStats: mockStats,
+    selectedCategories: ['Acessórios de moda'],
+    categoryTargetLimit: targetLimit,
+    perSubcategoryMax: 40,
+  });
+
+  const totalAllocated = plansWithLimit[0].totalAllocated;
+  assert(
+    totalAllocated <= targetLimit,
+    `Total alocado (${totalAllocated}) não ultrapassa a meta da categoria (${targetLimit})`
+  );
+
+  // TEST 13: Execução simulada com Mock Runner (Sem SocialCrawl, sem mutação, com deduplicação)
+  console.log('\n--- TESTE 13: EXECUÇÃO CONTROLADA COM MOCK RUNNER & DEDUPLICAÇÃO ---');
+  const { executeSubcategoryExpansion } = await import('../server/subcategoryExpansionService.js');
+  let mockApiCallCount = 0;
+  const mockSearchFn = async (params: { query: string; page: number }) => {
+    mockApiCallCount++;
+    return {
+      products: [
+        {
+          productId: `mock_${params.query}_1`,
+          title: `Produto Mock 1 de ${params.query}`,
+          category: 'Acessórios de moda',
+          priceCents: 1990,
+          originalPriceCents: 2990,
+          currencySymbol: 'R$',
+          soldCount: 50,
+          rating: 4.8,
+          sellerId: 's1',
+          sellerName: 'Loja Teste',
+          productUrl: 'https://tiktok.com/prod/1',
+          imageUrl: 'https://img.test/1.jpg',
+          video: null,
+        },
+      ],
+      creditsUsed: 1,
+      hasMore: false,
+      totalReceived: 1,
+      newProductsCount: 1,
+      updatedProductsCount: 0,
+    };
+  };
+
+  const execRes = await (executeSubcategoryExpansion as any)({
+    selectedCategories: ['Acessórios de moda'],
+    categoryTargetLimit: 60,
+    perSubcategoryMax: 30,
+    searchFn: mockSearchFn,
+  });
+
+  assert(execRes.success === true, 'Execução controlada concluída com sucesso');
+  assert(mockApiCallCount > 0, `Chamadas mock executadas corretamente (${mockApiCallCount})`);
+  assert(execRes.totalUnique > 0, `Produtos únicos identificados: ${execRes.totalUnique}`);
+
+  // TEST 14: Cobertura total das 26 categorias e 211 subcategorias
+  console.log('\n--- TESTE 14: COBERTURA TAXONÔMICA COMPLETA (26 CATEGORIAS & 211 SUBCATEGORIAS) ---');
+  assert(COLLECTOR_CATEGORIES.length === 26, `Exatamente 26 categorias coletoras oficiais (Recebido: ${COLLECTOR_CATEGORIES.length})`);
+  let totalSubcategoriesCount = 0;
+  for (const cat of COLLECTOR_CATEGORIES) {
+    const sList = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
+    totalSubcategoriesCount += sList.length;
+  }
+  assert(
+    totalSubcategoriesCount === 211,
+    `Exatamente 211 subcategorias oficiais distribuídas (Recebido: ${totalSubcategoriesCount})`
+  );
 
   console.log('\n====================================================');
   console.log(`RESULTADO FINAL DOS TESTES: ${passedTests}/${totalTests} PASSARAM!`);
