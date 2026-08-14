@@ -429,9 +429,16 @@ productMinerRouter.get('/ranking', async (req, res) => {
 // Coletor: Mentor-only category statistics
 productMinerRouter.get('/collector/categories', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
-    const categories = await getCollectorCategoriesStats();
-    return res.json({ success: true, categories });
+    const statsResult = await getCollectorCategoriesStats();
+    return res.json({
+      success: true,
+      categories: statsResult.categories,
+      totalStoredProducts: statsResult.totalStoredProducts,
+    });
   } catch (error: any) {
     console.error('[Product Miner Collector Stats Error]:', error?.message || error);
     return res.status(500).json({ error: 'PRODUCT_MINER_COLLECTOR_STATS_ERROR' });
