@@ -25,10 +25,12 @@ import {
   type ReclassificationReport,
   calculateExpansionPlanFromStats,
   fetchSubcategoryExpansionPlan,
+  fetchCategoryExecutionHistory,
   executeSubcategoryExpansionApi,
   calculateCategoryProgressPercent,
   type CategoryExpansionPlan,
   type CategoryExecutionSummaryApi,
+  type CategoryHistoryStatApi,
 } from '../../services/productMinerApi';
 import {
   ScriptGeneratorModal,
@@ -4965,6 +4967,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [selectedExpansionCategories, setSelectedExpansionCategories] = useState<string[]>([]);
   const [selectedSubcategoriesMap, setSelectedSubcategoriesMap] = useState<Record<string, string[]>>({});
   const [openCategoryDrawers, setOpenCategoryDrawers] = useState<Record<string, boolean>>({});
+  const [categoryHistoryMap, setCategoryHistoryMap] = useState<Record<string, CategoryHistoryStatApi>>({});
 
   // Mapeamento de taxonomia oficial das categorias
   const categoryTaxonomyMap = useMemo(() => {
@@ -4975,7 +4978,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     return map;
   }, []);
 
-  // Cálculo reativo do plano de expansão com base estrita no déficit real e nas categorias selecionadas
+  // Cálculo reativo do plano de expansão com base estrita no déficit real, histórico de rendimento e nas categorias selecionadas
   const activeExpansionPlans = useMemo(() => {
     const safeCollectorCategories = Array.isArray(collectorCategories) ? collectorCategories : [];
     return calculateExpansionPlanFromStats({
@@ -4984,10 +4987,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       categoryTargetLimit: expansionTargetCount,
       perSubcategoryMax: 60,
       taxonomyConfig: categoryTaxonomyMap,
+      historyMap: categoryHistoryMap,
     });
-  }, [collectorCategories, selectedExpansionCategories, expansionTargetCount, categoryTaxonomyMap]);
+  }, [collectorCategories, selectedExpansionCategories, expansionTargetCount, categoryTaxonomyMap, categoryHistoryMap]);
 
-  // Resumo consolidado do plano real
+  // Resumo consolidado do plano real com estimativa baseada no histórico de rendimento
   const expansionSummary = useMemo(() => {
     const totalCats = selectedExpansionCategories.length;
     const totalCurrentProducts = activeExpansionPlans.reduce((sum, p) => sum + p.currentProductCount, 0);
@@ -4995,6 +4999,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     const totalAllocatedProducts = activeExpansionPlans.reduce((sum, p) => sum + p.totalAllocated, 0);
     const totalUnallocatedGap = activeExpansionPlans.reduce((sum, p) => sum + p.unallocatedGap, 0);
     const totalEstimatedCredits = activeExpansionPlans.reduce((sum, p) => sum + p.estimatedCredits, 0);
+    const totalMinEstimatedCredits = activeExpansionPlans.reduce((sum, p) => sum + (p.minEstimatedCredits ?? p.estimatedCredits), 0);
+    const totalMaxEstimatedCredits = activeExpansionPlans.reduce((sum, p) => sum + (p.maxEstimatedCredits ?? p.estimatedCredits), 0);
+    const hasHistoricalDataCount = activeExpansionPlans.filter((p) => p.hasHistoricalData).length;
 
     return {
       totalCats,
@@ -5003,6 +5010,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       totalAllocatedProducts,
       totalUnallocatedGap,
       totalEstimatedCredits,
+      totalMinEstimatedCredits,
+      totalMaxEstimatedCredits,
+      hasHistoricalDataCount,
     };
   }, [selectedExpansionCategories.length, activeExpansionPlans]);
 
@@ -5579,7 +5589,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     setCollectorLoading(true);
 
     try {
-      const stats = await fetchCollectorCategories(studentCode);
+      const [stats, history] = await Promise.all([
+        fetchCollectorCategories(studentCode),
+        fetchCategoryExecutionHistory(studentCode).catch(() => ({})),
+      ]);
       setCollectorCategories(
         Array.isArray(stats.categories)
           ? stats.categories
@@ -5588,6 +5601,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       setTotalStoredProducts(
         Number(stats.totalStoredProducts) || 0
       );
+      setCategoryHistoryMap(history || {});
     } catch (err: any) {
       setError(err?.message || 'Falha ao carregar categorias do coletor.');
     } finally {
@@ -6801,6 +6815,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       : 0;
                     const coverageCount = stat?.coverageCount ?? coveredFromStats;
                     const isActive = productCount > 0;
+                    const catPlan = activeExpansionPlans.find((p) => p.category === catConfig.filterKey);
+                    const deficit = Math.max(0, expansionTargetCount - productCount);
 
                     return (
                       <div
@@ -6867,11 +6883,33 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         </div>
 
                         {/* Status bar */}
-                        <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-slate-100">
+                        <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-slate-100 flex-wrap gap-1">
                           <span>Armazenados: <strong className="text-slate-900 font-extrabold">{productCount} prods</strong></span>
                           <span>
                             Cobertura: <strong className="text-amber-700 font-extrabold">{coverageCount}/{totalSubcats} subcats</strong>
                           </span>
+                          {isCatSelected && catPlan && deficit > 0 ? (
+                            <span
+                              className="text-[10px] px-2 py-0.5 rounded-md font-bold border border-amber-300 bg-amber-100/80 text-amber-900 flex items-center gap-1"
+                              title={catPlan.hasHistoricalData ? `Baseada em dados reais: ~${catPlan.historicalValidPerCredit?.toFixed(1)} produtos válidos/crédito` : 'Estimativa teórica inicial'}
+                            >
+                              {catPlan.hasHistoricalData ? (
+                                <>
+                                  <span>📊 ~{catPlan.minEstimatedCredits}–{catPlan.maxEstimatedCredits} crs</span>
+                                  <span className="text-[9px] text-amber-700 font-normal">({catPlan.historicalValidPerCredit?.toFixed(1)} v/cr)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>~{catPlan.estimatedCredits} crs</span>
+                                  <span className="text-[9px] text-slate-500 font-normal">(teórica)</span>
+                                </>
+                              )}
+                            </span>
+                          ) : isCatSelected && deficit === 0 ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              🎯 Meta Atingida
+                            </span>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => setConfirmModalCategory(catConfig.filterKey)}
@@ -6970,7 +7008,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   <div>
                     <div className="flex items-center gap-2 text-amber-800 text-xs font-black uppercase tracking-wider">
                       <Gauge className="w-4 h-4 text-amber-600" />
-                      Estimativa Baseada no Plano Real da Categoria
+                      {expansionSummary.hasHistoricalDataCount > 0
+                        ? 'Estimativa Baseada no Histórico Real de Rendimento'
+                        : 'Estimativa Baseada no Plano Real da Categoria'}
                     </div>
                     <h3 className="mt-1 text-lg font-black text-slate-900">
                       Resumo da Operação de Aquisição
@@ -6984,7 +7024,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     className="px-6 py-3.5 rounded-xl font-black text-xs md:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] flex items-center justify-center gap-2.5 disabled:opacity-50"
                   >
                     <Rocket className="w-4.5 h-4.5" />
-                    <span>🚀 Iniciar Expansão da Base (~{expansionSummary.totalEstimatedCredits} crs estimados)</span>
+                    <span>
+                      🚀 Iniciar Expansão da Base (
+                      {expansionSummary.hasHistoricalDataCount > 0
+                        ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} crs estimados`
+                        : `~${expansionSummary.totalEstimatedCredits} crs estimados`}
+                      )
+                    </span>
                   </button>
                 </div>
 
@@ -7023,11 +7069,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     <div>
                       <div className="text-[11px] text-slate-500 font-medium">Estimativa Inicial de Créditos</div>
                       <div className="font-black text-amber-900 text-base mt-0.5">
-                        ~{expansionSummary.totalEstimatedCredits} créditos
+                        {expansionSummary.hasHistoricalDataCount > 0
+                          ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} créditos`
+                          : `~${expansionSummary.totalEstimatedCredits} créditos`}
                       </div>
                     </div>
                     <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-amber-100/90 text-amber-800 border border-amber-300">
-                      Informativo • Sem trava artificial
+                      {expansionSummary.hasHistoricalDataCount > 0
+                        ? `📊 Baseada no histórico (${expansionSummary.hasHistoricalDataCount} de ${expansionSummary.totalCats} cats)`
+                        : 'Informativo • Sem trava artificial'}
                     </span>
                   </div>
 
@@ -7220,7 +7270,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 <div>• Meta por Categoria: <strong className="text-slate-900">{expansionTargetCount} produtos por categoria</strong></div>
                 <div>• Produtos Atuais na Base: <strong className="text-slate-900">{expansionSummary.totalCurrentProducts.toLocaleString('pt-BR')} produtos</strong></div>
                 <div>• Novos Produtos Planejados: <strong className="text-slate-900">até {expansionSummary.totalAllocatedProducts.toLocaleString('pt-BR')} novos produtos</strong></div>
-                <div>• Estimativa Inicial: <strong className="text-slate-900">~{expansionSummary.totalEstimatedCredits} créditos SocialCrawl (1 cr / pág)</strong></div>
+                <div>
+                  • Estimativa Inicial: <strong className="text-slate-900">
+                    {expansionSummary.hasHistoricalDataCount > 0
+                      ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} créditos SocialCrawl (baseada no histórico de rendimento)`
+                      : `~${expansionSummary.totalEstimatedCredits} créditos SocialCrawl (estimativa teórica inicial)`}
+                  </strong>
+                </div>
               </div>
 
               <p className="text-slate-600 text-[11px] leading-relaxed pt-1 border-t border-amber-200/60">
@@ -7243,7 +7299,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-amber-500/20"
               >
                 <Rocket className="w-4 h-4" />
-                <span>Confirmar e Iniciar (~{expansionSummary.totalEstimatedCredits} crs estimados)</span>
+                <span>
+                  Confirmar e Iniciar (
+                  {expansionSummary.hasHistoricalDataCount > 0
+                    ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} crs`
+                    : `~${expansionSummary.totalEstimatedCredits} crs`}
+                  )
+                </span>
               </button>
             </div>
           </div>
