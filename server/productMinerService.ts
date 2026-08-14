@@ -2492,6 +2492,7 @@ export type CollectorCategoryStat = {
   subcategories?: CollectorSubcategoryStat[];
   coverageCount?: number;
   totalSubcategories?: number;
+  unclassifiedProductsCount?: number;
 };
 
 export function classifyProductToCategoryAndSubcategory(product: {
@@ -2514,8 +2515,15 @@ export type ReclassificationReport = {
   totalMaintained: number;
   totalClassified: number;
   totalUnclassified: number;
+  totalWithSubcategory: number;
+  totalWithoutSubcategory: number;
+  totalWithChildCategory: number;
+  totalWithoutChildCategory: number;
+  conflictsBeforeResolution: number;
+  conflictsAfterResolution: 0;
   categoryCounts: Record<string, number>;
   subcategoryCounts: Record<string, number>;
+  unclassifiedByCategory: Record<string, number>;
   leftInfantil: number;
   enteredInfantil: number;
   remainedInInfantil: number;
@@ -2532,8 +2540,15 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
       totalMaintained: 0,
       totalClassified: 0,
       totalUnclassified: 0,
+      totalWithSubcategory: 0,
+      totalWithoutSubcategory: 0,
+      totalWithChildCategory: 0,
+      totalWithoutChildCategory: 0,
+      conflictsBeforeResolution: 0,
+      conflictsAfterResolution: 0,
       categoryCounts: {},
       subcategoryCounts: {},
+      unclassifiedByCategory: {},
       leftInfantil: 0,
       enteredInfantil: 0,
       remainedInInfantil: 0,
@@ -2550,12 +2565,18 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
 
   const products = Array.isArray(rows) ? rows : [];
   const categoryCounts: Record<string, number> = {};
+  const unclassifiedByCategory: Record<string, number> = {};
   for (const cat of COLLECTOR_CATEGORIES) {
     categoryCounts[cat] = 0;
+    unclassifiedByCategory[cat] = 0;
   }
 
   const subcategoryCounts: Record<string, number> = {};
   let classifiedCount = 0;
+  let withSubcategoryCount = 0;
+  let withoutSubcategoryCount = 0;
+  let withChildCount = 0;
+  let withoutChildCount = 0;
   let totalChanged = 0;
   let totalMaintained = 0;
 
@@ -2574,8 +2595,21 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
       classifiedCount++;
       categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     }
+
     if (subcategory) {
+      withSubcategoryCount++;
       subcategoryCounts[subcategory] = (subcategoryCounts[subcategory] || 0) + 1;
+    } else {
+      withoutSubcategoryCount++;
+      if (category) {
+        unclassifiedByCategory[category] = (unclassifiedByCategory[category] || 0) + 1;
+      }
+    }
+
+    if (childCategory) {
+      withChildCount++;
+    } else {
+      withoutChildCount++;
     }
 
     const hasChanged = oldPath !== newPath || oldQuerySource !== newQuerySource;
@@ -2613,8 +2647,15 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
     totalMaintained,
     totalClassified: classifiedCount,
     totalUnclassified: products.length - classifiedCount,
+    totalWithSubcategory: withSubcategoryCount,
+    totalWithoutSubcategory: withoutSubcategoryCount,
+    totalWithChildCategory: withChildCount,
+    totalWithoutChildCategory: withoutChildCount,
+    conflictsBeforeResolution: 0,
+    conflictsAfterResolution: 0,
     categoryCounts,
     subcategoryCounts,
+    unclassifiedByCategory,
     leftInfantil: 0,
     enteredInfantil: 0,
     remainedInInfantil: 0,
@@ -2639,6 +2680,7 @@ export async function getCollectorCategoriesStats(): Promise<{
         subcategories: subs.map((sub) => ({ subcategory: sub, productCount: 0, isLowBase: true })),
         coverageCount: 0,
         totalSubcategories: subs.length,
+        unclassifiedProductsCount: 0,
       };
     });
     return { categories: fallbackCategories, totalStoredProducts: 0 };
@@ -2647,74 +2689,56 @@ export async function getCollectorCategoriesStats(): Promise<{
   await ensureProductMinerTables();
 
   let totalStoredProducts = 0;
-  try {
-    const [totRows]: any = await db.query(
-      `SELECT COUNT(*) AS totalStored FROM tiktok_shop_products`
-    );
-    if (Array.isArray(totRows) && totRows[0]) {
-      totalStoredProducts = Number(totRows[0].totalStored || 0);
-    }
-  } catch (err: any) {
-    console.warn('[getCollectorCategoriesStats Total Count Error]:', err?.message || err);
-  }
-
-  // 1. Direct READ-ONLY SQL query for main category product counts strictly via query_source
-  const categoryCountsMap: Record<string, number> = {};
-  const lastSeenMap: Record<string, string | null> = {};
+  let rows: any[] = [];
 
   try {
-    const [qRows]: any = await db.query(
-      `SELECT TRIM(query_source) AS query_source,
-              COUNT(*) AS productCount,
-              MAX(last_seen_at) AS max_seen,
-              MAX(updated_at) AS max_updated
-       FROM tiktok_shop_products
-       WHERE query_source IS NOT NULL AND query_source != ''
-       GROUP BY TRIM(query_source)`
+    const [pRows]: any = await db.query(
+      `SELECT product_id, title, category_path, query_source, last_seen_at, updated_at
+       FROM tiktok_shop_products`
     );
-
-    if (Array.isArray(qRows)) {
-      for (const row of qRows) {
-        const q = String(row.query_source || '').trim();
-        const cnt = Number(row.productCount || 0);
-        if (q) {
-          categoryCountsMap[q] = (categoryCountsMap[q] || 0) + cnt;
-
-          const maxDate = row.max_seen || row.max_updated;
-          if (maxDate) {
-            const iso = new Date(maxDate).toISOString();
-            if (!lastSeenMap[q] || iso > lastSeenMap[q]!) {
-              lastSeenMap[q] = iso;
-            }
-          }
-        }
-      }
+    if (Array.isArray(pRows)) {
+      rows = pRows;
+      totalStoredProducts = rows.length;
     }
   } catch (err: any) {
     console.warn('[getCollectorCategoriesStats SQL Query Error]:', err?.message || err);
   }
 
-  // 2. Direct READ-ONLY SQL query for subcategory breakdown strictly via category_path
-  const pathCountsMap: Record<string, number> = {};
-  try {
-    const [pRows]: any = await db.query(
-      `SELECT TRIM(category_path) AS category_path, COUNT(*) AS subCount
-       FROM tiktok_shop_products
-       WHERE category_path IS NOT NULL AND category_path != ''
-       GROUP BY TRIM(category_path)`
-    );
+  // Aggregate counts with strict single-winner classification per product
+  const categoryProductsMap: Record<string, number> = {};
+  const subcategoryProductsMap: Record<string, Record<string, number>> = {};
+  const unclassifiedProductsMap: Record<string, number> = {};
+  const lastSeenMap: Record<string, string | null> = {};
 
-    if (Array.isArray(pRows)) {
-      for (const row of pRows) {
-        const cp = String(row.category_path || '').trim();
-        const cnt = Number(row.subCount || 0);
-        if (cp) {
-          pathCountsMap[cp] = (pathCountsMap[cp] || 0) + cnt;
+  for (const cat of COLLECTOR_CATEGORIES) {
+    categoryProductsMap[cat] = 0;
+    subcategoryProductsMap[cat] = {};
+    unclassifiedProductsMap[cat] = 0;
+    for (const sub of OFFICIAL_TIKTOK_TAXONOMY[cat] || []) {
+      subcategoryProductsMap[cat][sub] = 0;
+    }
+  }
+
+  for (const p of rows) {
+    const { category, subcategory } = classifyProductFull(p);
+
+    if (category && categoryProductsMap[category] !== undefined) {
+      categoryProductsMap[category]++;
+
+      const maxDate = p.last_seen_at || p.updated_at;
+      if (maxDate) {
+        const iso = new Date(maxDate).toISOString();
+        if (!lastSeenMap[category] || iso > lastSeenMap[category]!) {
+          lastSeenMap[category] = iso;
         }
       }
+
+      if (subcategory && subcategoryProductsMap[category][subcategory] !== undefined) {
+        subcategoryProductsMap[category][subcategory]++;
+      } else {
+        unclassifiedProductsMap[category]++;
+      }
     }
-  } catch (err: any) {
-    console.warn('[getCollectorCategoriesStats Subcategory SQL Query Error]:', err?.message || err);
   }
 
   // 3. Assemble stats strictly for each of the 26 OFFICIAL COLLECTOR CATEGORIES
@@ -2722,40 +2746,13 @@ export async function getCollectorCategoriesStats(): Promise<{
 
   for (const cat of COLLECTOR_CATEGORIES) {
     const subNames = OFFICIAL_TIKTOK_TAXONOMY[cat] || [];
+    const productCount = categoryProductsMap[cat] || 0;
+    const catSubMap = subcategoryProductsMap[cat] || {};
+    const unclassifiedCount = unclassifiedProductsMap[cat] || 0;
 
-    // Exact count strictly from TRIM(query_source) in MySQL
-    let productCount = categoryCountsMap[cat] || 0;
-    if (productCount === 0) {
-      const lowerCat = cat.toLowerCase();
-      for (const [k, v] of Object.entries(categoryCountsMap)) {
-        if (k.toLowerCase() === lowerCat) {
-          productCount += v;
-        }
-      }
-    }
-
-    // Subcategories breakdown strictly informational, does NOT override category productCount
     let coveredCount = 0;
     const subStats: CollectorSubcategoryStat[] = subNames.map((subName) => {
-      let subCount = 0;
-      if (subName !== 'Geral' && subName !== 'Todas') {
-        const expectedExact = `${cat} > ${subName}`;
-        const expectedPrefix = `${cat} > ${subName} >`;
-        const expectedEnd = `> ${subName}`;
-        const aliases = getSubcategoryAliases(subName);
-
-        for (const [cp, count] of Object.entries(pathCountsMap)) {
-          if (
-            cp === expectedExact ||
-            cp.startsWith(expectedPrefix) ||
-            cp.endsWith(expectedEnd) ||
-            aliases.some((a) => cp.includes(`> ${a}`) || cp.includes(`>${a}`))
-          ) {
-            subCount += count;
-          }
-        }
-      }
-
+      const subCount = catSubMap[subName] || 0;
       if (subCount > 0) {
         coveredCount++;
       }
@@ -2771,12 +2768,13 @@ export async function getCollectorCategoriesStats(): Promise<{
 
     statsList.push({
       category: cat,
-      productCount, // STRICTLY from query_source
+      productCount,
       lastCollectedAt,
       status: productCount > 0 ? 'Ativa' : 'Pendente',
       subcategories: subStats,
-      coverageCount: productCount > 0 ? Math.max(1, coveredCount) : 0,
+      coverageCount: coveredCount,
       totalSubcategories: subNames.length,
+      unclassifiedProductsCount: unclassifiedCount,
     });
   }
 

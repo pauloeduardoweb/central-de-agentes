@@ -300,185 +300,327 @@ export const OFFICIAL_TIKTOK_TAXONOMY: Record<string, string[]> = {
   ],
 };
 
+export const CATEGORY_ALIASES_MAP: Record<string, string[]> = {
+  'Acessórios de moda': ['Fashion Accessories', 'Fashion Accessories & Jewelry', 'Acessorios de moda', 'Acessórios'],
+  'Alimentos e bebidas': ['Food & Beverages', 'Food & Drinks', 'Alimentos', 'Bebidas e Alimentos'],
+  'Automotivo e moto': ['Automotive & Motorcycle', 'Automotive & Motor', 'Auto & Moto', 'Automotivo', 'Veículos'],
+  'Bebê e maternidade': ['Baby & Maternity', 'Baby & Mother', 'Bebê', 'Maternidade', 'Infantil e Bebê'],
+  'Beleza e cuidados pessoais': ['Beauty & Personal Care', 'Beauty', 'Personal Care', 'Beleza', 'Cuidados Pessoais', 'Cosméticos'],
+  'Brinquedos e passatempos': ['Toys & Hobbies', 'Toys & Games', 'Brinquedos', 'Passatempos', 'Jogos'],
+  'Computadores e equipamentos de escritório': ['Computers & Office Equipment', 'Computers & Office', 'Informática', 'Escritório', 'TI'],
+  'Eletrodomésticos': ['Home Appliances', 'Appliances', 'Eletros', 'Linha Branca'],
+  'Esportes e atividades ao ar livre': ['Sports & Outdoors', 'Sports & Outdoor', 'Esportes', 'Fitness', 'Academia'],
+  'Ferramentas e hardware': ['Tools & Hardware', 'Tools', 'Hardware', 'Ferramentas'],
+  'Joias, acessórios e derivados': ['Jewelry & Accessories', 'Jewelry, Accessories & Derivatives', 'Joias', 'Semi Joias', 'Semijoias', 'Joias e Acessórios'],
+  'Livros, revistas e áudios': ['Books, Magazines & Audio', 'Books & Audio', 'Livros', 'Revistas', 'Educação'],
+  'Malas e bolsas': ['Luggage & Bags', 'Bags & Luggage', 'Bolsas', 'Malas', 'Mochilas'],
+  'Moda muçulmana': ['Muslim Fashion', 'Islamic Fashion', 'Moda Islamica'],
+  'Moda para crianças': ["Kids' Fashion", 'Children Fashion', 'Moda Infantil', 'Roupas Infantis', 'Infantil'],
+  'Móveis': ['Furniture', 'Home Furniture', 'Moveis', 'Decoração de Móveis'],
+  'Reformas residenciais': ['Home Improvement', 'Home Renovations', 'Construção', 'Reformas'],
+  'Roupas femininas e roupas íntimas femininas': ["Women's Clothing & Underwear", "Women's Apparel", "Women's Fashion", 'Moda Feminina', 'Roupas Femininas', 'Lingerie'],
+  'Roupas masculinas e roupas íntimas masculinas': ["Men's Clothing & Underwear", "Men's Apparel", "Men's Fashion", 'Moda Masculina', 'Roupas Masculinas'],
+  'Sapatos': ['Shoes', 'Footwear', 'Calçados', 'Calcados', 'Tênis e Calçados'],
+  'Saúde': ['Health', 'Health & Wellness', 'Saude', 'Suplementos e Saúde'],
+  'Suprimentos domésticos': ['Home Supplies', 'Household Supplies', 'Casa e Limpeza', 'Utilidades Domésticas', 'Utilidades'],
+  'Suprimentos para animais de estimação': ['Pet Supplies', 'Pet Care', 'Pets', 'Pet Shop', 'Animais de Estimação'],
+  'Telefones e eletrônicos': ['Phones & Electronics', 'Consumer Electronics', 'Eletrônicos', 'Eletronicos', 'Celulares'],
+  'Têxteis e móveis': ['Textiles & Soft Furnishings', 'Home Textiles', 'Cama Mesa e Banho', 'Têxteis', 'Texteis'],
+  'Utensílios de cozinha': ['Kitchenware', 'Kitchen Utensils', 'Cozinha', 'Utensilios de Cozinha'],
+};
+
+export const SUBCATEGORY_ALIASES_MAP: Record<string, string[]> = {
+  // Acessórios de moda
+  'Acessórios para cabelos': ['Hair Accessories', 'Hair Ties', 'Headbands', 'Presilha', 'Tiara', 'Elástico de cabelo', 'Piranha de cabelo', 'Faixa de cabelo', 'Prendedor de cabelo'],
+  'Acessórios para roupas': ['Clothing Accessories', 'Belts', 'Cintos', 'Lenços', 'Cachecol', 'Suspensório', 'Cinto feminino', 'Cinto masculino'],
+  'Bijuterias e acessórios': ['Fashion Jewelry', 'Bijuterias', 'Brincos', 'Colares', 'Pulseiras', 'Anéis bijuteria', 'Tornozeleira'],
+  'Chapéus': ['Hats & Caps', 'Hats', 'Caps', 'Boné', 'Chapéu', 'Gorro', 'Viseira', 'Bucket hat', 'Boina'],
+  'Coleiras e broches': ['Brooches & Pins', 'Broches', 'Pins', 'Broche'],
+  'Extensões de cabelo e perucas': ['Hair Extensions & Wigs', 'Wigs', 'Perucas', 'Aplique de cabelo', 'Mega hair', 'Cabelo bio vegetal', 'Lace'],
+  'Óculos': ['Eyewear', 'Sunglasses', 'Óculos de sol', 'Armação de óculos', 'Óculos de grau', 'Oculos escuros', 'Oculos anti luz azul'],
+  'Relógios e acessórios': ['Watches & Accessories', 'Watches', 'Relógio de pulso', 'Pulseira de relógio', 'Relógio analógico', 'Relógio digital', 'Relogio'],
+  'Tecidos para costura': ['Sewing Fabrics', 'Tecidos', 'Tecido'],
+  'Acessórios para casamento': ['Wedding Accessories', 'Grinalda', 'Véu de noiva', 'Véu', 'Coroa de noiva'],
+
+  // Alimentos e bebidas
+  'Comida instantânea': ['Instant Food', 'Miojo', 'Macarrão instantâneo', 'Sopa instantânea', 'Ramen', 'Lámen'],
+  'Bebidas': ['Beverages', 'Drinks', 'Refrigerante', 'Suco', 'Energético', 'Água mineral', 'Chá pronto', 'Isotônico', 'Kombucha'],
+  'Lanches': ['Snacks', 'Salgadinho', 'Biscoito', 'Bolacha', 'Chips', 'Chocolate', 'Doces', 'Balas', 'Pipoca', 'Castanhas', 'Amendoim'],
+  'Produtos básicos e essenciais para cozinhar': ['Cooking Essentials', 'Azeite', 'Óleo de cozinha', 'Arroz', 'Feijão', 'Temperos', 'Sal', 'Açúcar', 'Molho de tomate', 'Especiarias', 'Vinagre'],
+  'Panificação': ['Bakery', 'Pães', 'Torradas', 'Mistura para bolo', 'Farinha', 'Fermento'],
+  'Leite e laticínios': ['Dairy & Milk', 'Milk & Dairy', 'Leite', 'Queijo', 'Iogurte', 'Manteiga', 'Requeijão', 'Leite condensado'],
+  'Alimentos frescos e congelados': ['Fresh & Frozen Food', 'Congelados', 'Carnes', 'Polpa de frutas', 'Frango'],
+  'Cerveja, vinho e destilados': ['Beer, Wine & Spirits', 'Cerveja', 'Vinho', 'Whisky', 'Gin', 'Vodka', 'Cachaça', 'Licor', 'Espumante'],
+
+  // Automotivo e moto
+  'Acessórios interiores de veículos': ['Car Interior Accessories', 'Interior Accessories', 'Suporte celular veicular', 'Capa de volante', 'Tapete automotivo', 'Aromatizante carro', 'Organizador veicular', 'Cheirinho carro', 'Almofada de pescoço carro'],
+  'Lavagem e manutenção de carros': ['Car Wash & Maintenance', 'Shampoo automotivo', 'Cera automotiva', 'Pretinho pneu', 'Microfibra automotiva', 'Lavagem a seco', 'Polidor automotivo', 'Desengraxante automotivo'],
+  'Ferramentas de reparo de veículos': ['Vehicle Repair Tools', 'Macaco hidráulico', 'Chave de roda', 'Scanner automotivo OBD2', 'Kit reparo pneu', 'Compressor de ar portátil'],
+  'Sistema eletrônico de veículos': ['Vehicle Electronics', 'Car Electronics', 'Som automotivo', 'Câmera de ré', 'Sensor de estacionamento', 'Rastreador GPS', 'Carregador veicular rápido', 'Central multimídia', 'Transmissor FM bluetooth'],
+  'Luzes do veículo': ['Vehicle Lights', 'Car Lights', 'Lâmpada LED automotiva', 'Farol de milha', 'Fita LED carro', 'Super branca automotiva', 'Lanterna traseira'],
+  'Acessórios exteriores de veículos': ['Car Exterior Accessories', 'Exterior Accessories', 'Capa para carro', 'Palheta limpador', 'Calha de chuva', 'Protetor de para-choque', 'Adesivo automotivo'],
+  'Acessórios e peças para motos': ['Motorcycle Accessories & Parts', 'Capacete moto', 'Luva motoqueiro', 'Capa de moto', 'Baú moto', 'Suporte moto', 'Capa de chuva motoqueiro', 'Mochila motoboy'],
+  'Quadriciclos, motorhomes e barcos': ['ATVs, RVs & Boats', 'Quadriciclos', 'Barcos', 'Jet ski'],
+  'Peças de reposição automotivas': ['Automotive Replacement Parts', 'Filtro de óleo', 'Pastilha de freio', 'Vela de ignição', 'Amortecedor', 'Filtro de ar automotivo'],
+  'Peças de motos': ['Motorcycle Parts', 'Pastilha moto', 'Relação moto', 'Retrovisor moto', 'Manete moto', 'Escapamento moto'],
+
+  // Bebê e maternidade
+  'Cuidados com bebê e saúde': ['Baby Care & Health', 'Baby Care', 'Fralda descartável', 'Fraldas', 'Lenço umedecido bebê', 'Pomada assadura', 'Aspirador nasal bebê', 'Termômetro bebê', 'Shampoo bebê', 'Colônia bebê'],
+  'Roupas e sapatos para bebês': ['Baby Clothing & Shoes', 'Baby Clothes', 'Body bebê', 'Macacão bebê', 'Sapatinho bebê', 'Mijão bebê', 'Conjunto bebê', 'Romper bebê', 'Touca bebê'],
+  'Móveis para bebês': ['Baby Furniture', 'Berço', 'Cômoda bebê', 'Trocador', 'Cadeira de alimentação', 'Poltrona de amamentação', 'Cercado bebê'],
+  'Suprimentos para maternidade': ['Maternity Supplies', 'Maternity', 'Sutiã amamentação', 'Cinta pós-parto', 'Bolsa maternidade', 'Almofada de amamentação', 'Absorvente pós-parto', 'Concha de amamentação'],
+  'Brinquedos para bebês': ['Baby Toys', 'Mordedor', 'Chocalho', 'Tapete de atividades bebê', 'Móbile berço', 'Brinquedo de banho bebê', 'Livro de pano bebê'],
+  'Segurança de bebês': ['Baby Safety', 'Babá eletrônica', 'Grade de cama', 'Protetor de quina', 'Trava gaveta', 'Portão de segurança bebê'],
+  'Artigos essenciais para viagens de bebês': ['Baby Travel Essentials', 'Carrinho de bebê', 'Bebê conforto', 'Cadeirinha auto', 'Mochila maternidade', 'Canguru bebê', 'Carregador ergonômico'],
+  'Acessórios fashion para bebês': ['Baby Fashion Accessories', 'Laço bebê', 'Faixa de cabelo bebê', 'Babador bandana', 'Óculos bebê', 'Turbante bebê'],
+  'Enfermagem e alimentação': ['Nursing & Feeding', 'Mamadeira', 'Chupeta', 'Bomba tira-leite', 'Copo de transição', 'Pratinho bebê', 'Babador silicone', 'Porta leite em pó', 'Esterilizador mamadeira'],
+
+  // Beleza e cuidados pessoais
+  'Cuidados com as mãos e os pés': ['Hands & Feet Care', 'Manicure', 'Pedicure', 'Lixa de unha', 'Esmalte', 'Cabine LED unhas', 'Alicate cutícula', 'Unhas postiças', 'Gel para unhas', 'Removedor de esmalte'],
+  'Cuidados com os olhos e ouvidos': ['Eye & Ear Care', 'Colírio', 'Protetor auricular', 'Lentes de contato', 'Limpador de ouvido'],
+  'Itens de cuidados pessoais': ['Personal Care Items', 'Algodão', 'Cotonete', 'Lenço umedecido', 'Desodorante', 'Antitranspirante', 'Gilete', 'Cera depilatória'],
+  'Maquiagem': ['Makeup', 'Batom', 'Base facial', 'Rímel', 'Sombra', 'Pó compacto', 'Corretivo', 'Gloss', 'Delineador', 'Blush', 'Pincel de maquiagem', 'Iluminador', 'Contorno facial', 'Paleta de sombras', 'Bruma fixadora'],
+  'Fragrâncias': ['Fragrances', 'Perfume', 'Perfumes', 'Body Splash', 'Colônia', 'Deo Parfum', 'Eau de Parfum', 'Perfume feminino', 'Perfume masculino', 'Decant'],
+  'Cuidados com a pele': ['Skincare', 'Sérum', 'Protetor solar', 'Hidratante facial', 'Tônico facial', 'Sabonete facial', 'Ácido hialurônico', 'Vitamina C facial', 'Anti-idade', 'Argila facial', 'Máscara facial', 'Água micelar', 'Retinol'],
+  'Cuidados com cabelos e penteados': ['Hair Care & Styling', 'Shampoo', 'Condicionador', 'Máscara capilar', 'Óleo capilar', 'Secador', 'Prancha', 'Babyliss', 'Escova secadora', 'Tonalizante', 'Tinta de cabelo', 'Reparador de pontas', 'Leave-in', 'Gelatina capilar', 'Acidificante capilar'],
+  'Cuidados nasais e orais': ['Oral & Nasal Care', 'Escova de dentes', 'Pasta de dente', 'Fio dental', 'Enxaguante bucal', 'Irrigador oral', 'Clareador dental', 'Escova elétrica', 'Limpador de língua'],
+  'Banho e cuidados com o corpo': ['Bath & Body Care', 'Sabonete líquido', 'Esfoliante corporal', 'Hidratante corporal', 'Óleo corporal', 'Esponja de banho', 'Creme corporal', 'Manteiga corporal'],
+  'Cuidados pessoais especiais': ['Special Personal Care', 'Cuidados especiais'],
+  'Cuidados masculinos': ["Men's Grooming", 'Pomada modeladora', 'Óleo para barba', 'Balm barba', 'Shampoo masculino', 'Barbeador elétrico', 'Navalhete', 'Pente para barba'],
+  'Cuidados femininos': ["Women's Care", 'Absorvente', 'Sabonete íntimo', 'Coletor menstrual', 'Absorvente noturno', 'Protetor diário'],
+
+  // Brinquedos e passatempos
+  'Brinquedos clássicos e inovadores': ['Classic & Novelty Toys', 'Action figures', 'Fidget toys', 'Pop it', 'Carrinho de brinquedo', 'Massinha de modelar', 'Pista de carrinhos', 'Bonecos de ação', 'Beyblade', 'Ioiô'],
+  'Bonecas e ursos de pelúcia': ['Dolls & Stuffed Toys', 'Boneca Barbie', 'Boneca reborn', 'Urso de pelúcia', 'Pelúcia', 'Bonecas', 'Bebê reborn', 'Polvo do humor'],
+  'Jogos e quebra-cabeças': ['Games & Puzzles', 'Jogos de tabuleiro', 'Quebra-cabeça', 'Jogo de cartas', 'Uno', 'Dominó', 'Banco imobiliário', 'Cubo mágico', 'Baralho'],
+  'Esportes e brincadeiras ao ar livre': ['Outdoor Sports & Play', 'Pipa', 'Lança bolhas', 'Bolas infantis', 'Pula pula', 'Cama elástica infantil', 'Pistola de água'],
+  'Brinquedos educativos': ['Educational Toys', 'Blocos de montar', 'Lego', 'Brinquedo montessori', 'Brinquedo sensorial', 'Kit ciências infantil', 'Brinquedo pedagógico', 'Ábaco'],
+  'Bricolage e artesanato': ['DIY & Crafts', 'Kit pintura infantil', 'Slime', 'Miçangas', 'Kit pulseiras', 'Massinha de biscuit', 'Telas para pintura'],
+  'Brinquedos elétricos e de controle remoto': ['RC & Electric Toys', 'Carrinho controle remoto', 'Drone brinquedo', 'Robô de brinquedo', 'Helicóptero controle remoto', 'Barco controle remoto'],
+  'Instrumentos musicais e acessórios': ['Musical Instruments & Accessories', 'Teclado musical infantil', 'Violão infantil', 'Flauta', 'Bateria infantil', 'Ukulele infantil', 'Xilofone'],
+
+  // Computadores e equipamentos de escritório
+  'Artigos de papelaria e suprimentos para escritório': ['Stationery & Office Supplies', 'Papelaria', 'Canetas', 'Cadernos', 'Post-it', 'Grampeador', 'Organizador de mesa', 'Marca texto', 'Estojo', 'Fita corretiva', 'Bloco de notas'],
+  'Armazenamento de dados e software': ['Data Storage & Software', 'SSD', 'Pendrive', 'HD externo', 'Cartão de memória MicroSD', 'SSD NVMe', 'Pen drive 64gb'],
+  'Periféricos e acessórios': ['Peripherals & Accessories', 'Teclado mecânico', 'Mouse gamer', 'Mousepad grande', 'Headset gamer', 'Webcam', 'Microfone USB', 'Suporte notebook', 'Teclado sem fio', 'Mouse sem fio'],
+  'Equipamentos de escritório': ['Office Equipment', 'Impressora', 'Calculadora', 'Fragmentadora de papel', 'Plastificadora', 'Impressora térmica', 'Etiquetadora'],
+  'Componentes para desktop e laptop': ['Desktop & Laptop Components', 'Placa de vídeo', 'Memória RAM', 'Processador', 'Cooler', 'Fonte PC', 'Gabinete', 'Pasta térmica'],
+  'Componentes de rede': ['Networking Components', 'Roteador Wi-Fi', 'Repetidor Wi-Fi', 'Switch de rede', 'Cabo de rede RJ45', 'Adaptador Wi-Fi USB', 'Antena Wi-Fi'],
+  'Computadores desktop, laptops e tablets': ['Desktops, Laptops & Tablets', 'Computers & Tablets', 'Notebook', 'MacBook', 'Tablet', 'Computador completo', 'All in one', 'PC Gamer'],
+
+  // Eletrodomésticos
+  'Eletrodomésticos': ['Small Appliances', 'Air Fryer', 'Fritadeira sem óleo', 'Liquidificador', 'Batedeira', 'Sanduicheira', 'Mixer', 'Aspirador de pó', 'Robô aspirador', 'Ferro de passar', 'Ventilador', 'Umidificador de ar', 'Cafeteira elétrica', 'Chaleira elétrica', 'Microondas'],
+  'Utensílios de cozinha': ['Kitchen Appliances', 'Pipoqueira elétrica', 'Processador de alimentos', 'Panela elétrica', 'Panela de arroz elétrica', 'Moedor de café elétrico', 'Torradeira'],
+  'Eletrodomésticos grandes': ['Major Appliances', 'Geladeira', 'Máquina de lavar', 'Fogão', 'Ar condicionado', 'Lava-louças', 'Freezer', 'Cooktop', 'Forno de embutir'],
+  'Eletrodomésticos comerciais': ['Commercial Appliances', 'Fritadeira industrial', 'Chapa comercial', 'Liquidificador industrial', 'Forno industrial'],
+
+  // Esportes e atividades ao ar livre
+  'Acessórios esportivos e para atividades ao ar livre': ['Sports Accessories', 'Garrafa squeeze', 'Mochila hidratação', 'Munhequeira', 'Joelheira', 'Braçadeira celular', 'Luva academia', 'Faixa elástica', 'Cinta abdominal esportiva'],
+  'Roupas esportivas e para atividades ao ar livre': ['Activewear', 'Sportswear', 'Camiseta dry fit', 'Short corrida', 'Top esportivo', 'Calça legging academia', 'Conjunto academia', 'Regata academia', 'Bermuda compressão'],
+  'Equipamento de ginástica': ['Fitness Equipment', 'Gym Equipment', 'Halteres', 'Elástico extensor', 'Kettlebell', 'Corda de pular', 'Colchonete yoga', 'Roda abdominal', 'Barra fixa', 'Hand grip', 'Faixas mini band'],
+  'Trajes de banho, surfe e natação': ['Swimwear & Surfing', 'Natação', 'Óculos natação', 'Touca natação', 'Maiô natação', 'Sunga', 'Roupa de mergulho', 'Biquíni esportivo'],
+  'Calçados esportivos': ['Athletic Shoes', 'Running Shoes', 'Tênis de corrida', 'Tênis academia', 'Chuteira campo', 'Chuteira futsal', 'Chuteira society', 'Tênis crossfit'],
+  'Equipamentos para acampamento e caminhada': ['Camping & Hiking', 'Barraca camping', 'Saco de dormir', 'Lanterna tática', 'Isolante térmico', 'Canivete tático', 'Bússola', 'Fogareiro portátil'],
+  'Equipamentos para esportes com bola': ['Ball Sports', 'Bola de futebol', 'Bola de basquete', 'Bola de vôlei', 'Raquete de beach tennis', 'Beach tennis', 'Raqueteira', 'Bomba de encher bola', 'Bola de handebol'],
+  'Equipamentos para esportes aquáticos': ['Water Sports', 'Prancha stand up paddle', 'Máscara mergulho', 'Nadadeira', 'Colete salva-vidas', 'Snorkel'],
+  'Lazer e recreação ao ar livre': ['Outdoor Recreation', 'Skate', 'Patinete', 'Patins', 'Bicicleta', 'Acessórios bike', 'Capacete bike', 'Luz bike', 'Bolsa de quadro bike'],
+  'Equipamentos para esportes de inverno': ['Winter Sports', 'Esqui', 'Snowboard'],
+  'Loja oficial': ['Official Sports Shop'],
+  'Jogos de jardim': ['Lawn Games', 'Frescolobol', 'Peteca', 'Boccia'],
+
+  // Ferramentas e hardware
+  'Ferramentas de medição': ['Measurement & Analysis Instruments', 'Trena', 'Paquímetro', 'Nível laser', 'Multímetro digital', 'Termômetro infravermelho', 'Alicate amperímetro', 'Esquadro'],
+  'Ferramentas elétricas': ['Power Tools', 'Furadeira', 'Parafusadeira', 'Esmerilhadeira', 'Serra tico-tico', 'Lixadeira', 'Tupia', 'Soprador térmico', 'Martelete', 'Serra circular'],
+  'Ferramentas de jardim': ['Garden Tools', 'Cortador de grama', 'Tesoura de poda', 'Aparador de cerca', 'Motosserra', 'Roçadeira', 'Mangueira', 'Pá de jardim'],
+  'Hardware': ['Hardware', 'Parafusos', 'Porcas', 'Dobradiças', 'Fechos', 'Bucha de fixação', 'Trilhos', 'Ganchos', 'Rebites'],
+  'Equipamento de solda': ['Welding Equipment', 'Ferro de solda', 'Máquina de solda inversora', 'Estanho de solda', 'Máscara de solda', 'Eletrodo', 'Pasta de solda'],
+  'Ferramentas manuais': ['Hand Tools', 'Chave de fenda', 'Alicate universal', 'Martelo', 'Jogo de chaves combinadas', 'Chave inglesa', 'Chave philips', 'Chave torx', 'Chave allen', 'Estilete profissional'],
+  'Bombas e encanamento': ['Pumps & Plumbing', 'Bomba d água', 'Conexões PVC', 'Válvulas', 'Pressurizador', 'Torneira boia', 'Sifão'],
+  'Organizadores de ferramentas': ['Tool Organizers', 'Maleta de ferramentas', 'Caixa de ferramentas', 'Bolsa para ferramentas', 'Painel de ferramentas', 'Cinto porta ferramentas'],
+
+  // Joias, acessórios e derivados
+  'Cristal natural': ['Natural Crystal', 'Quartzo', 'Ametista natural', 'Cristal bruto', 'Pedra da lua'],
+  'Pedras preciosas artificiais': ['Lab-Grown Gemstones', 'Zircônia', 'Moissanite', 'Pedra sintética'],
+  'Platina e ouro quilate': ['Platinum & Karat Gold', 'Ouro 18k', 'Joias em ouro', 'Platina', 'Cordão 18k'],
+  'Prata': ['Silver', 'Silver Jewelry', 'Prata 925', 'Colar de prata', 'Pulseira de prata', 'Brinco de prata', 'Anel de prata 925', 'Corrente prata'],
+  'Cristal artificial': ['Synthetic Crystal', 'Cristais sintéticos', 'Strass'],
+  'Jade': ['Jade Jewelry', 'Pedra jade', 'Gua sha jade'],
+  'Pedras semipreciosas': ['Semiprecious Stones', 'Pedras naturais', 'Turmalina', 'Ágata', 'Olho de tigre', 'Citrino'],
+  'Pérola': ['Pearl', 'Colar de pérolas', 'Brinco de pérola', 'Pérola de água doce'],
+  'Âmbar': ['Amber', 'Colar de âmbar báltico'],
+  'Ouro': ['Gold', 'Cordão de ouro', 'Anel de ouro', 'Brinco de ouro', 'Pulseira de ouro'],
+  'Diamante': ['Diamond', 'Aliança de diamante', 'Solitário diamante'],
+  'Rubi, safira e esmeralda': ['Ruby, Sapphire & Emerald', 'Esmeralda', 'Safira', 'Rubi'],
+
+  // Livros, revistas e áudios
+  'Ciências humanas e sociais': ['Humanities & Social Sciences', 'História', 'Filosofia', 'Sociologia', 'Psicologia', 'Antropologia', 'Política'],
+  'Estilo de vida e hobbies': ['Lifestyle & Hobbies', 'Autoajuda', 'Culinária livro', 'Desenho livro', 'Espiritualidade', 'Jardinagem livro', 'Mindfulness'],
+  'Literatura e arte': ['Literature & Art', 'Romances', 'Ficção', 'Poesia', 'Clássicos da literatura', 'Contos', 'Livro de fantasia'],
+  'Educação e escolarização': ['Education & Schooling', 'Livros didáticos', 'Gramática', 'Dicionário', 'Concursos', 'Apostila', 'ENEM'],
+  'Livros para bebês e infantis': ["Baby & Children's Books", 'Livros infantis', 'Livro de colorir', 'Historinhas para dormir', 'Livro pop-up', 'Livro sensorial infantil'],
+  'Economia e gestão': ['Economics & Management', 'Finanças pessoais', 'Investimentos livro', 'Empreendedorismo', 'Administração', 'Marketing livro'],
+  'Ciências e tecnologia': ['Science & Technology', 'Programação livro', 'Engenharia', 'Medicina livro', 'Física', 'Química'],
+  'Revistas e jornais': ['Magazines & Newspapers', 'Revistas', 'HQs', 'Gibis', 'Mangás'],
+  'Vídeo e música': ['Video & Music', 'CDs', 'DVDs', 'Vinil', 'Partituras'],
+
+  // Malas e bolsas
+  'Bolsas para mulheres': ["Women's Bags", 'Bolsa feminina', 'Bolsa tiracolo', 'Bolsa transversal', 'Bolsa de ombro', 'Clutch', 'Bolsa tote', 'Bolsa sacola', 'Bolsa baú'],
+  'Bolsas para homens': ["Men's Bags", 'Bolsa masculina', 'Shoulder bag masculina', 'Pochete masculina', 'Pasta executiva', 'Bolsa carteiro'],
+  'Bolsas funcionais': ['Functional Bags', 'Mochila executiva', 'Mochila antifurto', 'Mochila para notebook', 'Pochete', 'Shoulder bag', 'Mochila impermeável'],
+  'Malas e bolsas de viagem': ['Luggage & Travel Bags', 'Mala de viagem', 'Mala de bordo', 'Mochila de viagem', 'Necessaire de viagem', 'Bolsa de viagem dobrável', 'Frasqueira'],
+  'Acessórios para bolsas': ['Bag Accessories', 'Alça para bolsa', 'Organizador de bolsa', 'Cadeado para mala', 'Tag de mala', 'Capa para mala'],
+
+  // Moda muçulmana
+  'Hijabs': ['Hijab', 'Lenço hijab', 'Turban', 'Véu islâmico'],
+  'Roupas islâmicas femininas': ["Women's Islamic Clothing", 'Abaya', 'Vestido islâmico', 'Túnica', 'Kaftan'],
+  'Roupas islâmicas masculinas': ["Men's Islamic Clothing", 'Thobe', 'Kandura', 'Jubba'],
+  'Acessórios islâmicos': ['Islamic Accessories', 'Tasbih', 'Terço islâmico'],
+  'Traje e equipamento de oração': ['Prayer Attire & Equipment', 'Tapete de oração', 'Vestimenta de oração'],
+  'Roupas esportivas islâmicas': ['Islamic Sportswear', 'Burkini'],
+  'Agasalhos': ['Outerwear', 'Sobretudo modesto'],
+  'Roupas islâmicas infantis': ["Kids' Islamic Clothing"],
+  'Equipamento para umra': ['Umrah Equipment'],
+
+  // Moda para crianças
+  'Calçados para meninas': ["Girls' Shoes", 'Sandália infantil menina', 'Tênis menina', 'Sapatilha menina', 'Bota infantil menina', 'Chinelo menina', 'Galocha infantil'],
+  'Roupas para meninos': ["Boys' Clothing", 'Conjunto menino', 'Camiseta menino', 'Bermuda menino', 'Calça infantil menino', 'Camisa polo infantil menino', 'Moletom menino'],
+  'Roupas para meninas': ["Girls' Clothing", 'Vestido infantil', 'Conjunto menina', 'Blusa menina', 'Saia infantil', 'Shorts menina', 'Macacão infantil menina'],
+  'Acessórios de moda infantil': ["Kids' Fashion Accessories", 'Laços de cabelo infantil', 'Bolsinha infantil', 'Óculos infantil', 'Boné infantil', 'Tiara infantil', 'Cinto infantil'],
+  'Calçados para meninos': ["Boys' Shoes", 'Tênis menino', 'Sandália menino', 'Chinelo infantil menino', 'Chuteira infantil', 'Bota menino', 'Mocassim infantil'],
+
+  // Móveis
+  'Móveis comerciais': ['Commercial Furniture', 'Cadeira de escritório ergonômica', 'Mesa de escritório', 'Cadeira gamer', 'Armário de escritório', 'Gaveteiro'],
+  'Móveis para ambientes externos': ['Outdoor Furniture', 'Móveis de jardim', 'Conjunto varanda', 'Espreguiçadeira', 'Ombrelone', 'Banco de jardim'],
+  'Móveis para ambientes internos': ['Indoor Furniture', 'Home Furniture', 'Sofá', 'Mesa de jantar', 'Rack para TV', 'Painel de TV', 'Guarda-roupa', 'Cama box', 'Cômoda', 'Mesa de centro', 'Aparador', 'Estante', 'Poltrona', 'Puff', 'Sapateira'],
+  'Móveis para crianças': ["Kids' Furniture", 'Berço montessoriano', 'Cama infantil', 'Mesa infantil de estudos', 'Armário infantil', 'Organizador de brinquedos'],
+
+  // Reformas residenciais
+  'Acessórios de banheiro': ['Bathroom Fixtures', 'Chuveiro elétrico', 'Ducha higiênica', 'Torneira banheiro', 'Porta toalha', 'Ralo inteligente', 'Kit banheiro', 'Papeleira'],
+  'Artigos de jardinagem': ['Gardening Supplies', 'Mangueira de jardim mágica', 'Vaso de planta', 'Regador', 'Adubo', 'Pulverizador', 'Suporte para plantas'],
+  'Luzes e Iluminação': ['Lights & Lighting', 'Lâmpada LED', 'Fita LED RGB', 'Lustre pendente', 'Plafon LED', 'Refletor LED', 'Arandela', 'Spot LED', 'Luminária de mesa', 'Luminária de teto'],
+  'Materiais de construção': ['Building Materials', 'Fita veda rosca', 'Silicone selante', 'Fita dupla face', 'Argamassa', 'Impermeabilizante', 'Tinta de parede', 'Rolo de pintura'],
+  'Acessórios de cozinha': ['Kitchen Fixtures', 'Torneira gourmet', 'Cuba inox', 'Pia de cozinha', 'Triturador de alimentos', 'Dispenser detergente embutir', 'Válvula de pia'],
+  'Equipamentos e suprimentos elétricos': ['Electrical Equipment & Supplies', 'Tomada 3 pinos', 'Interruptor touch', 'Disjuntor', 'Fios e cabos', 'Fita isolante', 'Extensão elétrica', 'Filtro de linha', 'Adaptador Benjamin'],
+  'Segurança e proteção': ['Safety & Security', 'Câmera de segurança Wi-Fi', 'Fechadura digital eletrônica', 'Alarme residencial', 'Sensor de presença', 'Interfone com câmera', 'Câmera lâmpada'],
+  'Sistemas domésticos inteligentes': ['Smart Home Systems', 'Interruptor inteligente Wi-Fi', 'Lâmpada inteligente Wi-Fi', 'Tomada inteligente', 'Controle universal inteligente IR', 'Sensor de porta e janela smart'],
+  'Energia solar e eólica': ['Solar & Wind Energy', 'Luminária solar de parede', 'Refletor solar', 'Placa solar portátil', 'Inversor solar', 'Poste solar LED'],
+
+  // Roupas femininas e roupas íntimas femininas
+  'Roupas íntimas femininas': ["Women's Underwear", 'Calcinha', 'Sutiã', 'Conjunto lingerie', 'Lingerie', 'Baby doll', 'Cinta modeladora', 'Body rendado', 'Top sem costura', 'Calcinha sem costura', 'Sutiã push up'],
+  'Ternos e macacões femininos': ["Women's Suits & Overalls", 'Macacão feminino', 'Macaquinho feminino', 'Blazer feminino', 'Terno feminino', 'Jardineira feminina'],
+  'Vestidos femininos': ["Women's Dresses", 'Vestido longo', 'Vestido curto', 'Vestido midi', 'Vestido casual', 'Vestido canelado', 'Vestido estampado', 'Vestido de festa', 'Vestido tubinho'],
+  'Peças femininas para parte superior': ["Women's Tops", 'Blusa feminina', 'Camiseta feminina', 'Cropped', 'Camisa feminina', 'Regata feminina', 'Cardigan', 'Suéter feminino', 'Moletom feminino', 'Body feminino', 'T-shirt feminina'],
+  'Moda feminina de dormir e lazer': ["Women's Sleepwear & Loungewear", 'Pijama feminino', 'Camisola', 'Roupão feminino', 'Pijama de cetim', 'Pijama curto', 'Short doll'],
+  'Peças femininas para parte inferior': ["Women's Bottoms", 'Calça jeans feminina', 'Calça pantalona', 'Short feminino', 'Saia feminina', 'Calça alfaiataria feminina', 'Short jeans', 'Saia jeans', 'Bermuda ciclista'],
+  'Roupas especiais para mulheres': ["Women's Special Clothing", 'Roupas gestante', 'Roupas plus size femininas'],
+  'Conjuntos de roupas para família': ['Family Matching Outfits', 'Conjunto mãe e filha', 'Look família'],
+  'Fantasias e acessórios': ['Costumes & Accessories', 'Fantasia feminina', 'Cosplay'],
+  'Leggings': ['Leggings', 'Calça legging', 'Legging suplex', 'Legging térmica', 'Calça montaria', 'Legging cós alto', 'Legging academia feminina'],
+
+  // Roupas masculinas e roupas íntimas masculinas
+  'Peças masculinas para parte superior': ["Men's Tops", 'Camisa masculina', 'Camiseta masculina', 'Camisa polo', 'Regata masculina', 'Moletom masculino', 'Jaqueta masculina', 'Casaco masculino', 'Blusa de frio masculina', 'Camisa social masculina', 'Camiseta oversized masculina'],
+  'Peças masculinas para parte inferior': ["Men's Bottoms", 'Calça jeans masculina', 'Calça cargo masculina', 'Calça moletom masculina', 'Bermuda masculina', 'Bermuda jeans masculina', 'Short tactel masculino', 'Calça sarja', 'Short praia masculino'],
+  'Ternos e macacões masculinos': ["Men's Suits & Overalls", 'Smoking masculino', 'Jardineira masculina', 'Macacão masculino'],
+  'Roupas íntimas masculinas': ["Men's Underwear", 'Cueca boxer', 'Cueca slip', 'Kit cuecas', 'Cueca sem costura', 'Cuecas', 'Sunga masculina'],
+  'Moda masculina de dormir e lazer': ["Men's Sleepwear & Loungewear", 'Pijama masculino', 'Samba canção', 'Pijama longo masculino'],
+  'Roupas especiais masculinas': ["Men's Special Clothing", 'Uniformes profissionais masculinos', 'Roupas plus size masculinas'],
+  'Conjuntos': ["Men's Sets", 'Conjunto moletom masculino', 'Conjunto bermuda e camiseta', 'Kit camisa e bermuda', 'Conjunto masculino'],
+  'Ternos': ['Suits', 'Terno masculino', 'Blazer masculino', 'Costume masculino', 'Paletó'],
+  'Meias': ['Socks', 'Meias masculinas', 'Kit meias', 'Meia cano longo', 'Meia cano curto', 'Meia sapatilha', 'Meia esportiva', 'Meias'],
+  'Roupões, robes e macacões': ['Robes & Jumpsuits', 'Roupão masculino', 'Robe masculino'],
+
+  // Sapatos
+  'Acessórios para sapatos': ['Shoe Accessories', 'Palmilha ortopédica', 'Cadarço', 'Calçadeira', 'Graxa para sapatos', 'Protetor de calcanhar', 'Limpador de tênis'],
+  'Sapatos femininos': ["Women's Shoes", 'Sandália feminina', 'Tênis feminino', 'Scarpin', 'Bota feminina', 'Mocassim feminino', 'Rasteirinha', 'Tamanco', 'Sapatilha feminina', 'Salto alto', 'Papete feminina', 'Mule feminino'],
+  'Sapatos masculinos': ["Men's Shoes", 'Tênis masculino', 'Sapato social masculino', 'Bota masculina', 'Sapatênis', 'Mocassim masculino', 'Chinelo masculino', 'Sandália masculina', 'Coturno masculino', 'Slide masculino'],
+
+  // Saúde
+  'Suplementos alimentares': ['Food Supplements', 'Dietary Supplements', 'Creatina', 'Whey Protein', 'Multivitamínico', 'Colágeno', 'Ômega 3', 'Magnésio', 'Melatonina', 'BCAA', 'Glutamina', 'Pré treino', 'Coenzima Q10', 'Vitamina D3', 'Spirulina', 'Termogênico', 'Suplemento'],
+  'Medicamentos e tratamentos alternativos': ['Alternative Medicine & Treatments', 'Óleo essencial', 'Homeopatia', 'Fitoterápicos', 'Florais', 'Pomada para alívio muscular', 'Bálsamo', 'Óleo de massagem relaxante'],
+  'Suprimentos médicos': ['Medical Supplies', 'Medidor de pressão digital', 'Termômetro digital', 'Inalador nebulizador', 'Oxímetro de pulso', 'Glicosímetro', 'Tornozeleira ortopédica', 'Faixa lombar', 'Corretor postural', 'Máscaras cirúrgicas', 'Curativos'],
+
+  // Suprimentos domésticos
+  'Suprimentos para cuidados domésticos': ['Household Cleaning Supplies', 'Mop giratório', 'Rodo mágico', 'Panos de microfibra', 'Escova de limpeza elétrica', 'Detergente concentrado', 'Desinfetante', 'Esponja de limpeza', 'Limpador multiuso', 'Tira manchas', 'Lustra móveis'],
+  'Suprimentos para banheiro': ['Bathroom Supplies', 'Porta escova de dentes', 'Dispenser sabonete', 'Lixeira banheiro', 'Escova sanitária', 'Tapete de banheiro absorvente', 'Cortina de box', 'Saboneteira'],
+  'Organizadores domésticos': ['Home Organizers', 'Organizador de gaveta', 'Caixa organizadora', 'Cabides', 'Colmeia organizadora', 'Saco a vácuo para roupas', 'Sapateira vertical', 'Organizador de maquiagem', 'Cesto organizador'],
+  'Decoração de casa': ['Home Decor', 'Quadro decorativo', 'Relógio de parede', 'Almofada decorativa', 'Velas aromáticas', 'Difusor de aromas', 'Espelho decorativo', 'Tapete sala', 'Estatueta', 'Porta retrato'],
+  'Artigos festivos e para festas': ['Festive & Party Supplies', 'Balões de festa', 'Enfeites de aniversário', 'Artigos descartáveis para festa', 'Painel de festa', 'Lembrancinhas', 'Vela de aniversário', 'Topo de bolo'],
+  'Ferramentas e acessórios para lavanderia': ['Laundry Tools & Accessories', 'Varal retrátil', 'Varal de chão', 'Prendedor de roupas', 'Saco para lavar roupas na máquina', 'Cesto de roupas sujas', 'Tábua de passar', 'Bolinha para máquina de lavar'],
+  'Garrafas e frascos de armazenamento': ['Storage Bottles & Jars', 'Potes herméticos', 'Potes de vidro mantimentos', 'Frasco porta temperos', 'Bandeja organizadora', 'Porta condimentos', 'Garrafa de vidro'],
+  'Guarda-chuvas': ['Umbrellas', 'Guarda-chuva automático', 'Sombrinha', 'Guarda-chuva reforçado', 'Guarda-chuva invertido'],
+  'Vasos e enchimentos': ['Vases & Fillers', 'Vaso de cerâmica', 'Flores artificiais', 'Planta artificial decorativa', 'Vaso de vidro', 'Pedras decorativas'],
+  'Variedades para casas': ['Sundries', 'Utilidades domésticas em geral', 'Protetor de tomada', 'Fita veda fresta', 'Feltro para pés de cadeira'],
+
+  // Suprimentos para animais de estimação
+  'Adestramento de cães e gatos': ['Dog & Cat Grooming & Training', 'Grooming', 'Training', 'Máquina de tosa pet', 'Rasqueadeira pet', 'Cortador de unha pet', 'Escova tira pelos pet', 'Apito adestramento', 'Clicker', 'Luva tira pelos pet'],
+  'Areia para cães e gatos': ['Cat & Dog Litter', 'Litter & Housebreaking', 'Areia sanitária para gatos', 'Pá para areia', 'Caixa de areia para gatos', 'Banheiro de gato fechado', 'Tapete higiênico para cães', 'Sanitário canino', 'Granulado sanitário'],
+  'Acessórios para cães e gatos': ['Cat & Dog Accessories', 'Coleira antipulgas', 'Peitoral para cachorro', 'Guia retrátil', 'Comedouro inox', 'Bebedouro fonte para gatos', 'Brinquedo mordedor cães', 'Bolinha para pet', 'Laser brinquedo gato', 'Bebedouro automático pet', 'Tag identificação pet'],
+  'Peixes e suprimentos aquáticos': ['Fish & Aquatic Supplies', 'Filtro para aquário', 'Termostato aquário', 'Ração para peixes', 'Bomba de ar aquário', 'Enfeite para aquário', 'Aquário de vidro'],
+  'Saúde para cães e gatos': ['Cat & Dog Health Care', 'Vermífugo pet', 'Antipulgas e carrapatos pet', 'Shampoo pet bactericida', 'Suplemento vitamínico pet', 'Limpador de ouvidos pet', 'Pasta de dente pet', 'Spray cicatrizante pet'],
+  'Suprimentos para animais pequenos': ['Small Animal Supplies', 'Gaiola para hamster', 'Ração para coelho', 'Bebedouro para roedores', 'Serragem para hamster', 'Roda para hamster'],
+  'Roupas para cães e gatos': ['Cat & Dog Apparel', 'Roupa para cachorro', 'Capa de chuva pet', 'Moletom pet', 'Vestido para cachorrinha', 'Bandana pet', 'Sapatinho pet'],
+  'Comida para cães e gatos': ['Cat & Dog Food', 'Ração seca cachorro', 'Ração úmida sachê', 'Petisco pet biscoito', 'Bifinho para cães', 'Churu para gatos', 'Ração para gatos', 'Patê pet'],
+  'Suprimentos para animais de fazenda e aves': ['Farm Animal & Poultry Supplies', 'Bebedouro aves', 'Comedouro frangos'],
+  'Móveis para cães e gatos': ['Cat & Dog Furniture', 'Caminha para cachorro', 'Cama nuvem pet', 'Arranhador para gatos com casinha', 'Toca para gatos', 'Casinha de cachorro', 'Rede para gatos'],
+  'Suprimentos para pássaros': ['Bird Supplies', 'Gaiola para passarinhos', 'Ração para calopsita', 'Brinquedo para pássaros', 'Poleiro', 'Banheira para pássaros'],
+  'Suprimentos para répteis e anfíbios': ['Reptile & Amphibian Supplies', 'Lâmpada aquecimento répteis', 'Terrário', 'Termômetro terrário'],
+
+  // Telefones e eletrônicos
+  'Acessórios para telefone': ['Phone Accessories', 'Capa celular', 'Capinha iPhone', 'Película de vidro 3D', 'Carregador iPhone turbo', 'Cabo Tipo C rápido', 'Suporte de celular para mesa', 'Suporte magnético', 'Carregador por indução', 'Cabo lightning', 'Película de privacidade', 'Adaptador fone celular'],
+  'Áudio e vídeo': ['Audio & Video', 'Fone de ouvido bluetooth sem fio', 'AirPods', 'Caixa de som bluetooth potente', 'Headset over-ear', 'Microfone de lapela sem fio', 'Fone in-ear', 'Soundbar'],
+  'Dispositivos inteligentes e tecnologia vestível': ['Smart Devices & Wearables', 'Smartwatch unissex', 'Pulseira inteligente smartband', 'Relógio inteligente fitness', 'Smart band', 'Rastreador inteligente'],
+  'Câmeras e fotografia': ['Cameras & Photography', 'Ring light de mesa com tripé', 'Tripé para celular articulado', 'Mini impressora térmica fotográfica', 'Luz selfie', 'Gimbal estabilizador celular', 'Lente para celular'],
+  'Acessórios universais': ['Universal Accessories', 'Power Bank bateria portátil', 'Adaptador de tomada universal', 'Hub USB Tipo C 7 em 1', 'Carregador veicular turbo', 'Organizador de cabos'],
+  'Jogos e consoles': ['Gaming & Consoles', 'Controle sem fio para celular/PC', 'Console portátil retro games', 'Gatilhos para celular Free Fire', 'Joystick', 'Controle bluetooth'],
+  'Telefones e tablets': ['Phones & Tablets', 'Smartphone Android', 'Celular Xiaomi', 'iPhone', 'Tablet Android', 'iPad'],
+  'Acessórios para tablets e computadores': ['Tablet & Computer Accessories', 'Capa com teclado para tablet', 'Caneta stylus touch pen', 'Suporte articulado para tablet/notebook', 'Película para tablet', 'Capa para iPad'],
+  'Eletrônicos recondicionados': ['Refurbished Electronics'],
+  'Dispositivos de educação': ['Educational Devices', 'Tablet infantil educativo', 'Lousa mágica digital LCD', 'Calculadora gráfica'],
+
+  // Têxteis e móveis
+  'Roupas de cama': ['Bedding', 'Jogo de lençol casal', 'Lençol queen', 'Edredom casal', 'Travesseiro ortopédico NASA', 'Fronha de cetim', 'Cobre leito', 'Protetor de colchão impermeável', 'Manta microfibra', 'Saia para cama box', 'Travesseiro'],
+  'Têxteis domésticos': ['Home Textiles', 'Cortina blackout sala', 'Toalha de banho gigante', 'Jogo de toalhas banho', 'Toalha de mesa impermeável', 'Capa de almofada decorativa', 'Tapete felpudo', 'Pano de prato atoalhado', 'Toalha de rosto'],
+  'Tecidos e suprimentos de costura': ['Fabrics & Sewing Supplies', 'Máquina de costura portátil', 'Kit linhas de costura', 'Fita métrica costura', 'Tecido tricoline', 'Tesoura de costura', 'Agulhas de costura'],
+
+  // Utensílios de cozinha
+  'Utensílios para bebidas': ['Drinkware', 'Copo térmico Stanley', 'Garrafa térmica inox', 'Caneca de cerâmica', 'Xícara de café', 'Taça de vinho/champanhe', 'Garrafa squeeze água', 'Canudo inox', 'Jarra de vidro', 'Copo de vidro', 'Caneca térmica'],
+  'Utensílios e aparelhos de cozinha': ['Kitchen Tools & Gadgets', 'Descascador de legumes', 'Ralador de queijo inox', 'Espátula de silicone resistente', 'Pegador de alimentos inox', 'Balança digital de cozinha', 'Timer de cozinha', 'Escorredor de louça/macarrão', 'Abridor de latas multifuncional', 'Porta temperos giratório', 'Tábua de corte antibacteriana', 'Potes organizadores de geladeira', 'Lancheira térmica', 'Triturador manual de alho/cebola', 'Cortador de legumes'],
+  'Utensílios para forno': ['Bakeware', 'Forma de bolo de silicone', 'Forma de pizza antiaderente', 'Assadeira de vidro marinex', 'Forma para pão/cupcake', 'Tapete culinário de silicone', 'Assadeira antiaderente', 'Forma de silicone'],
+  'Facas de cozinha': ['Kitchen Knives', 'Jogo de facas de chef aço inox', 'Faca do chef japonesa', 'Faca de pão serrilhada', 'Afiador de facas diamantado', 'Chaira de afiar', 'Tesoura culinária multifunção', 'Cepilho facas'],
+  'Utensílios para cozinhar': ['Cookware', 'Jogo de panelas antiaderente cerâmica', 'Frigideira antiaderente teflon', 'Panela de pressão fechamento externo', 'Panela Wok', 'Caçarola de ferro fundido', 'Fervedor leiteira', 'Panela antiaderente'],
+  'Utensílios para bares e vinhos': ['Bar & Wine Utensils', 'Coqueteleira inox profissional', 'Abridor saca-rolhas elétrico', 'Dosador de bebidas duplo', 'Balde de gelo térmico', 'Bico dosador garrafas', 'Kit barman', 'Forma de gelo esfera/silicone'],
+  'Talheres e serviços de mesa': ['Cutlery & Tableware', 'Jogo de talheres inox 24 peças', 'Faqueiro completo inox', 'Aparelho de jantar porcelana', 'Pratos rasos/fundos', 'Sousplat decorativo', 'Bowl tigela cerâmica', 'Molheira', 'Colher inox', 'Garfo inox', 'Faca de mesa'],
+  'Churrasco': ['Barbecue', 'BBQ', 'Kit churrasco inox com maleta', 'Grelha moeda inox para churrasqueira', 'Espetos giratórios churrasco', 'Pegador de carne churrasco', 'Garfo trinchante churrasco', 'Tábua rústica churrasco', 'Acendedor de carvão elétrico', 'Soprador de churrasqueira'],
+  'Utensílios para chá e café': ['Tea & Coffee Ware', 'Prensa francesa vidro/inox', 'Cafeteira italiana moka', 'Chaleira de bico fino inox', 'Moedor manual de grãos de café', 'Filtro coador de café permanente inox', 'Bule térmico café', 'Espumador de leite mixer manual', 'Xícara de chá'],
+};
+
 export function removeAccents(str: string): string {
-  return String(str || '')
+  if (!str) return '';
+  return str
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
 }
 
-// Category English/Variant Aliases
-export const CATEGORY_ALIASES_MAP: Record<string, string[]> = {
-  'Acessórios de moda': ['Fashion Accessories', 'Fashion Acc', 'Accessories'],
-  'Alimentos e bebidas': ['Food & Beverages', 'Food and Beverages', 'Food & Drinks', 'Food & Drink', 'Groceries', 'Food'],
-  'Automotivo e moto': ['Automotive & Motorcycle', 'Automotive and Motorcycle', 'Automotive & Moto', 'Auto & Moto', 'Automotive', 'Motorcycle'],
-  'Bebê e maternidade': ['Baby & Maternity', 'Baby and Maternity', 'Baby & Kids Care', 'Baby Care', 'Maternity', 'Baby'],
-  'Beleza e cuidados pessoais': ['Beauty & Personal Care', 'Beauty and Personal Care', 'Personal Care', 'Beauty', 'Skincare & Makeup'],
-  'Brinquedos e passatempos': ['Toys & Hobbies', 'Toys and Hobbies', 'Toys & Games', 'Toys', 'Hobbies'],
-  'Computadores e equipamentos de escritório': ['Computers & Office Equipment', 'Computers & Office', 'Computers and Office', 'Office Equipment', 'Computers'],
-  'Eletrodomésticos': ['Appliances', 'Home Appliances', 'Small Appliances', 'Major Appliances', 'Kitchen Appliances'],
-  'Esportes e atividades ao ar livre': ['Sports & Outdoor', 'Sports and Outdoor', 'Sports & Outdoors', 'Sports and Outdoors', 'Outdoor & Sports', 'Sports', 'Fitness'],
-  'Ferramentas e hardware': ['Tools & Hardware', 'Tools and Hardware', 'Hardware & Tools', 'Tools', 'Hardware'],
-  'Joias, acessórios e derivados': ['Jewelry, Accessories & Derivatives', 'Jewelry & Accessories', 'Fine Jewelry', 'Jewelry', 'Fashion Jewelry'],
-  'Livros, revistas e áudios': ['Books, Magazines & Audio', 'Books & Media', 'Books and Magazines', 'Books', 'Audiobooks'],
-  'Malas e bolsas': ['Luggage & Bags', 'Luggage and Bags', 'Bags & Luggage', 'Bags and Luggage', 'Bags', 'Luggage'],
-  'Moda muçulmana': ['Muslim Fashion', 'Islamic Fashion', 'Muslim Wear', 'Islamic Clothing'],
-  'Moda para crianças': ["Kids' Fashion", "Children's Fashion", 'Kids Fashion', 'Children Fashion', 'Kids Clothing', 'Children Clothing', 'Infantil'],
-  'Móveis': ['Furniture', 'Home Furniture', 'Office Furniture', 'Outdoor Furniture'],
-  'Reformas residenciais': ['Home Improvement', 'Home Renovations', 'Home Improvement & Tools', 'Home Renovation'],
-  'Roupas femininas e roupas íntimas femininas': ["Womenswear & Underwear", "Women's Clothing & Underwear", "Women's Fashion", 'Womenswear', 'Women Fashion', 'Roupas Femininas'],
-  'Roupas masculinas e roupas íntimas masculinas': ["Menswear & Underwear", "Men's Clothing & Underwear", "Men's Fashion", 'Menswear', 'Men Fashion', 'Roupas Masculinas'],
-  'Sapatos': ['Shoes', 'Footwear', 'Men and Women Shoes', 'Sapatos e Calçados', 'Calçados'],
-  'Saúde': ['Health', 'Health & Wellness', 'Healthcare', 'Health Care', 'Medical & Health', 'Saude'],
-  'Suprimentos domésticos': ['Home Supplies', 'Household Supplies', 'Home Care', 'Cleaning Supplies', 'Houseware'],
-  'Suprimentos para animais de estimação': ['Pet Supplies', 'Pet Care', 'Pets', 'Pet'],
-  'Telefones e eletrônicos': ['Phones & Electronics', 'Phones and Electronics', 'Consumer Electronics', 'Electronics & Phones', 'Electronics', 'Phones'],
-  'Têxteis e móveis': ['Textiles & Soft Furnishings', 'Home Textiles', 'Bedding & Textiles', 'Textiles'],
-  'Utensílios de cozinha': ['Kitchenware', 'Kitchen Utensils', 'Kitchenware & Tableware', 'Kitchenware and Tableware', 'Cookware & Kitchenware', 'Kitchen'],
-};
-
-export function getCategoryAliases(category: string): string[] {
-  const norm = removeAccents(category);
-  const aliases = new Set<string>([category]);
-
-  for (const [officialCat, list] of Object.entries(CATEGORY_ALIASES_MAP)) {
-    if (removeAccents(officialCat) === norm) {
-      aliases.add(officialCat);
-      for (const a of list) aliases.add(a);
-    }
-  }
-
-  return Array.from(aliases);
+export function getSubcategoryAliases(subName: string): string[] {
+  const custom = SUBCATEGORY_ALIASES_MAP[subName] || [];
+  return Array.from(new Set([subName, ...custom]));
 }
 
-// Subcategory Aliases
-export const SUBCATEGORY_ALIASES_MAP: Record<string, string[]> = {
-  // Utensílios de cozinha
-  'utensilios para bebidas': ['Drinkware', 'Beverage Utensils', 'Drink Utensils', 'Copos', 'Canecas', 'Garrafas térmicas', 'Xícaras', 'Tumbler', 'Garrafa termica', 'Copo termico', 'Caneca'],
-  'utensilios e aparelhos de cozinha': ['Kitchen Tools & Gadgets', 'Kitchen Utensils & Gadgets', 'Kitchen Tools and Gadgets', 'Kitchen Gadgets', 'Utensílios de cozinha', 'Descascador', 'Ralador', 'Espatula', 'Pegador'],
-  'utensilios para forno': ['Bakeware', 'Ovenware', 'Formas de bolo', 'Assadeiras', 'Forma de silicone', 'Forma', 'Assadeira'],
-  'facas de cozinha': ['Kitchen Knives', 'Kitchen Cutlery', 'Facas de cozinha e acessórios', 'Facas e tábuas', 'Faca de chef', 'Jogo de facas', 'Afiador de facas', 'Faca'],
-  'utensilios para cozinhar': ['Cookware', 'Cooking Utensils', 'Panelas', 'Frigideiras', 'Panela de pressão', 'Wok', 'Cacarola', 'Jogo de panelas', 'Panela', 'Frigideira'],
-  'utensilios para bares e vinhos': ['Bar & Wine Utensils', 'Bar and Wine Utensils', 'Barware', 'Abridor de vinho', 'Coqueteleira', 'Saca rolhas', 'Dosador', 'Vinho'],
-  'talheres e servicos de mesa': ['Cutlery & Tableware', 'Cutlery and Tableware', 'Tableware & Flatware', 'Tableware', 'Talheres', 'Aparelho de jantar', 'Pratos', 'Jogo de talheres', 'Sousplat', 'Prato', 'Garfo', 'Colher'],
-  'churrasco': ['Barbecue', 'BBQ', 'Barbecue & Grill', 'Grelha', 'Espeto', 'Acessórios churrasco', 'Pegador churrasco', 'Faca churrasco', 'Churrasqueira'],
-  'utensilios para cha e cafe': ['Tea & Coffee Ware', 'Tea and Coffee Ware', 'Coffee & Tea Ware', 'Prensa francesa', 'Cafeteira italiana', 'Bule', 'Chaleira', 'Filtro de cafe', 'Moedor de cafe', 'Cafe', 'Cha'],
-
-  // Saúde
-  'suplementos alimentares': ['Food Supplements', 'Dietary Supplements', 'Supplements', 'Suplementos', 'Creatina', 'Whey Protein', 'Vitaminas', 'Colágeno', 'Ômega 3', 'Magnésio', 'Melatonina', 'BCAA', 'Glutamina', 'Pre treino', 'Creatine', 'Whey', 'Multivitaminico'],
-  'medicamentos e tratamentos alternativos': ['Alternative Medicine & Treatments', 'Alternative Medicine', 'Óleos essenciais', 'Homeopatia', 'Fitoterápicos', 'Florais', 'Pomadas', 'Oleo essencial'],
-  'suprimentos medicos': ['Medical Supplies', 'Medidor de pressão', 'Termômetro', 'Inalador', 'Nebulizador', 'Oxímetro', 'Máscaras', 'Ortopédico', 'Faixas', 'Curativos', 'Glicosimetro'],
-
-  // Móveis
-  'moveis comerciais': ['Commercial Furniture', 'Cadeiras de escritório', 'Mesas comerciais', 'Balcões'],
-  'moveis para ambientes externos': ['Outdoor Furniture', 'Patio Furniture', 'Móveis de jardim', 'Varanda', 'Espreguiçadeira'],
-  'moveis para ambientes internos': ['Indoor Furniture', 'Home Furniture', 'Sofá', 'Mesa de centro', 'Estante', 'Rack', 'Guarda-roupa', 'Cama', 'Cômoda', 'Mesa', 'Cadeira'],
-  'moveis para criancas': ["Kids' Furniture", "Children's Furniture", 'Móveis infantis', 'Berço', 'Cama infantil'],
-
-  // Reformas residenciais
-  'acessorios de banheiro': ['Bathroom Fixtures', 'Bathroom Accessories', 'Chuveiro', 'Ducha', 'Torneira banheiro', 'Porta toalha'],
-  'artigos de jardinagem': ['Gardening Supplies', 'Lawn & Garden', 'Gardening', 'Mangueira', 'Vaso', 'Pá de jardim'],
-  'luzes e iluminacao': ['Lights & Lighting', 'Lighting', 'Lâmpada LED', 'Fita LED', 'Lustre', 'Plafon', 'Refletor', 'Led', 'Lampada'],
-  'materiais de construcao': ['Building Materials', 'Cimento', 'Argamassa', 'Tinta', 'Piso', 'Revestimento'],
-  'acessorios de cozinha': ['Kitchen Fixtures', 'Kitchen Accessories', 'Torneira cozinha', 'Cuba', 'Pia'],
-  'equipamentos e suprimentos eletricos': ['Electrical Equipment & Supplies', 'Electrical Equipment', 'Electrical Supplies', 'Tomada', 'Interruptor', 'Disjuntor', 'Fios e cabos'],
-  'seguranca e protecao': ['Safety & Security', 'Security & Protection', 'Câmera segurança', 'Fechadura digital', 'Alarme', 'Sensor de presença'],
-  'sistemas domesticos inteligentes': ['Smart Home Systems', 'Smart Home', 'Automação residencial', 'Interruptor inteligente', 'Lâmpada inteligente'],
-  'energia solar e eolica': ['Solar & Wind Energy', 'Solar and Wind Energy', 'Placa solar', 'Inversor solar', 'Luminária solar'],
-
-  // Suprimentos para animais de estimação
-  'adestramento de caes e gatos': ['Dog & Cat Grooming', 'Cat & Dog Grooming', 'Grooming & Training', 'Grooming', 'Training', 'Tosa', 'Banho e tosa', 'Rasqueadeira'],
-  'areia para caes e gatos': ['Cat & Dog Litter & Housebreaking', 'Cat Litter', 'Litter & Housebreaking', 'Dog & Cat Litter & Housebreaking', 'Tapete higiênico', 'Caixa de areia', 'Areia sanitária'],
-  'acessorios para caes e gatos': ['Cat & Dog Accessories', 'Dog & Cat Accessories', 'Coleira', 'Guia', 'Peitoral', 'Brinquedo pet', 'Comedouro', 'Bebedouro pet'],
-  'peixes e suprimentos aquaticos': ['Fish & Aquatic Supplies', 'Aquatic Supplies', 'Aquário', 'Filtro aquário', 'Ração peixe'],
-  'saude para caes e gatos': ['Cat & Dog Health Care', 'Dog & Cat Health Care', 'Cat & Dog Health', 'Vermífugo pet', 'Antipulgas', 'Shampoo pet', 'Vitaminas pet'],
-  'suprimentos para animais pequenos': ['Small Animal Supplies', 'Gaiola hamster', 'Ração coelho'],
-  'roupas para caes e gatos': ['Cat & Dog Apparel', 'Dog & Cat Apparel', 'Dog & Cat Clothing', 'Roupa pet', 'Capa de chuva pet', 'Vestido pet'],
-  'comida para caes e gatos': ['Cat & Dog Food', 'Dog & Cat Food', 'Ração cachorro', 'Ração gato', 'Petisco pet', 'Sachê pet', 'Racao'],
-  'suprimentos para animais de fazenda e aves': ['Farm Animal & Poultry Supplies', 'Farm Animal Supplies'],
-  'moveis para caes e gatos': ['Cat & Dog Furniture', 'Dog & Cat Furniture', 'Caminha pet', 'Arranhador gato', 'Casinha cachorro'],
-  'suprimentos para passaros': ['Bird Supplies', 'Gaiola passarinho', 'Ração pássaros'],
-  'suprimentos para repteis e anfibios': ['Reptile & Amphibian Supplies', 'Reptile Supplies', 'Terrário'],
-
-  // Esportes e atividades ao ar livre
-  'acessorios esportivos e para atividades ao ar livre': ['Sports Accessories', 'Garrafa squeeze', 'Mochila hidratação', 'Munhequeira', 'Joelheira'],
-  'roupas esportivas e para atividades ao ar livre': ['Activewear', 'Sportswear', 'Camiseta dry fit', 'Short corrida', 'Top esportivo'],
-  'equipamento de ginastica': ['Fitness Equipment', 'Gym Equipment', 'Halteres', 'Elástico extensor', 'Kettlebell', 'Corda de pular', 'Colchonete yoga'],
-  'trajes de banho, surfe e natacao': ['Swimwear & Surfing', 'Natação', 'Óculos natação', 'Touca natação', 'Maiô natação', 'Sunga'],
-  'calcados esportivos': ['Athletic Shoes', 'Running Shoes', 'Tênis de corrida', 'Tênis academia', 'Chuteira'],
-  'equipamentos para acampamento e caminhada': ['Camping & Hiking', 'Barraca camping', 'Saco de dormir', 'Lanterna tática', 'Isolante térmico'],
-  'equipamentos para esportes com bola': ['Ball Sports', 'Bola de futebol', 'Bola de basquete', 'Bola de vôlei', 'Raquete de beach tennis', 'Beach tennis'],
-  'equipamentos para esportes aquaticos': ['Water Sports', 'Prancha stand up', 'Máscara mergulho', 'Nadadeira'],
-  'lazer e recreacao ao ar livre': ['Outdoor Recreation', 'Skate', 'Patinete', 'Patins', 'Bicicleta', 'Acessórios bike'],
-  'equipamentos para esportes de inverno': ['Winter Sports'],
-  'loja oficial': ['Official Sports Shop'],
-  'jogos de jardim': ['Lawn Games'],
-
-  // Computadores e equipamentos de escritório
-  'artigos de papelaria e suprimentos para escritorio': ['Stationery & Office Supplies', 'Office Supplies', 'Papelaria', 'Canetas', 'Cadernos'],
-  'armazenamento de dados e software': ['Data Storage & Software', 'SSD', 'Pendrive', 'HD externo', 'Cartão de memória'],
-  'perifericos e acessorios': ['Peripherals & Accessories', 'Teclado', 'Mouse', 'Mousepad', 'Headset gamer', 'Webcam'],
-  'equipamentos de escritorio': ['Office Equipment', 'Impressora', 'Calculadora', 'Fragmentadora'],
-  'componentes para desktop e laptop': ['Desktop & Laptop Components', 'Placa de vídeo', 'Memória RAM', 'Processador', 'Cooler'],
-  'componentes de rede': ['Networking Components', 'Roteador', 'Repetidor Wi-Fi', 'Switch de rede', 'Cabo de rede'],
-  'computadores desktop, laptops e tablets': ['Desktops, Laptops & Tablets', 'Computers & Tablets', 'Notebook', 'MacBook', 'Tablet', 'Computador'],
-
-  // Ferramentas e hardware
-  'ferramentas de medicao': ['Measurement & Analysis Instruments', 'Measuring Tools', 'Measurement Instruments', 'Trena', 'Paquímetro', 'Nível laser'],
-  'ferramentas eletricas': ['Power Tools', 'Furadeira', 'Parafusadeira', 'Esmerilhadeira', 'Serra tico-tico'],
-  'ferramentas de jardim': ['Garden Tools', 'Gardening Tools', 'Cortador de grama', 'Tesoura de poda', 'Aparador'],
-  'hardware': ['Hardware', 'Parafusos', 'Porcas', 'Dobradiças', 'Fechos'],
-  'equipamento de solda': ['Welding Equipment', 'Welding & Soldering Supplies', 'Ferro de solda', 'Máquina de solda'],
-  'ferramentas manuais': ['Hand Tools', 'Chave de fenda', 'Alicate', 'Martelo', 'Jogo de chaves'],
-  'bombas e encanamento': ['Pumps & Plumbing', 'Bomba d água', 'Conexões PVC', 'Válvulas'],
-  'organizadores de ferramentas': ['Tool Organizers', 'Maleta de ferramentas', 'Caixa de ferramentas'],
-
-  // Beleza e cuidados pessoais
-  'cuidados com as maos e os pes': ['Hands & Feet Care', 'Manicure', 'Pedicure', 'Lixa de unha', 'Esmalte'],
-  'cuidados com os olhos e ouvidos': ['Eye & Ear Care', 'Colírio', 'Protetor auricular'],
-  'itens de cuidados pessoais': ['Personal Care Items', 'Algodão', 'Cotonete', 'Lenço umedecido'],
-  'maquiagem': ['Makeup', 'Batom', 'Base facial', 'Rímel', 'Sombra', 'Pó compacto', 'Corretivo', 'Gloss'],
-  'fragrancias': ['Fragrances', 'Perfume', 'Perfumes', 'Body Splash', 'Colônia', 'Deo Parfum', 'Eau de Parfum'],
-  'cuidados com a pele': ['Skincare', 'Sérum', 'Protetor solar', 'Hidratante facial', 'Tônico facial', 'Sabonete facial', 'Ácido hialurônico'],
-  'cuidados com cabelos e penteados': ['Hair Care & Styling', 'Shampoo', 'Condicionador', 'Máscara capilar', 'Óleo capilar', 'Secador', 'Prancha', 'Babyliss'],
-  'cuidados nasais e orais': ['Oral & Nasal Care', 'Escova de dentes', 'Pasta de dente', 'Fio dental', 'Enxaguante bucal'],
-  'banho e cuidados com o corpo': ['Bath & Body Care', 'Sabonete líquido', 'Esfoliante corporal', 'Hidratante corporal', 'Óleo corporal'],
-  'cuidados pessoais especiais': ['Special Personal Care'],
-  'cuidados masculinos': ["Men's Grooming", 'Pomada modeladora', 'Óleo para barba', 'Balm barba', 'Shampoo masculino'],
-  'cuidados femininos': ["Women's Care", 'Absorvente', 'Sabonete íntimo'],
-
-  // Telefones e eletrônicos
-  'acessorios para telefone': ['Phone Accessories', 'Capinha celular', 'Película celular', 'Carregador celular', 'Cabo iPhone', 'Cabo Tipo C', 'Suporte celular'],
-  'audio e video': ['Audio & Video', 'Fone bluetooth', 'Caixa de som bluetooth', 'Headphone', 'Microfone lapela'],
-  'dispositivos inteligentes e tecnologia vestivel': ['Smart Devices & Wearables', 'Smartwatch', 'Pulseira inteligente', 'Smartband'],
-  'cameras e fotografia': ['Cameras & Photography', 'Ring light', 'Tripé', 'Câmera digital', 'Lente celular'],
-  'acessorios universais': ['Universal Accessories', 'Power bank', 'Adaptador de tomada', 'Carregador veicular'],
-  'jogos e consoles': ['Gaming & Consoles', 'Controle videogame', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Console retro'],
-  'telefones e tablets': ['Phones & Tablets', 'Smartphone', 'Celular', 'iPhone', 'Tablet'],
-  'acessorios para tablets e computadores': ['Tablet & Computer Accessories', 'Capa tablet', 'Teclado bluetooth tablet', 'Caneta touch'],
-  'eletronicos recondicionados': ['Refurbished Electronics'],
-  'dispositivos de educacao': ['Educational Devices'],
-
-  // Eletrodomésticos
-  'eletrodomesticos': ['Small Appliances', 'Air Fryer', 'Fritadeira sem óleo', 'Liquidificador', 'Batedeira', 'Sanduicheira', 'Mixer', 'Aspirador de pó', 'Robô aspirador', 'Ferro de passar'],
-  'eletrodomesticos grandes': ['Major Appliances', 'Geladeira', 'Máquina de lavar', 'Fogão', 'Ar condicionado'],
-  'eletrodomesticos comerciais': ['Commercial Appliances'],
-};
-
-export function getSubcategoryAliases(sub: string): string[] {
-  const norm = removeAccents(sub);
-  if (!norm || norm === 'todas' || norm === 'todos') return [sub];
-
-  const aliases = new Set<string>([sub]);
-  if (SUBCATEGORY_ALIASES_MAP[norm]) {
-    for (const a of SUBCATEGORY_ALIASES_MAP[norm]) aliases.add(a);
-  }
-
-  return Array.from(aliases);
+export function getCategoryAliases(catName: string): string[] {
+  const custom = CATEGORY_ALIASES_MAP[catName] || [];
+  return Array.from(new Set([catName, ...custom]));
 }
 
-// Classification Engine
+/**
+ * Strict single-winner classification engine.
+ * Guarantees:
+ * 1. Exactly 1 Category (out of the 26 official categories)
+ * 2. At most 1 Subcategory (strictly belonging to the Category)
+ * 3. At most 1 Child Category (strictly belonging to the Subcategory)
+ * 4. Zero overlap across sibling subcategories.
+ */
 export function classifyProductFull(product: {
   title?: string;
   category_path?: string;
@@ -489,6 +631,7 @@ export function classifyProductFull(product: {
   subcategory: string | null;
   childCategory: string | null;
   resolvedPath: string;
+  source: 'category_path' | 'alias' | 'title';
 } {
   const rawPath = String(product.category_path || '').trim();
   const rawQuery = String(product.query_source || '').trim();
@@ -497,21 +640,25 @@ export function classifyProductFull(product: {
   let resolvedCat: string | null = null;
   let resolvedSub: string | null = null;
   let resolvedChild: string | null = null;
+  let resolutionSource: 'category_path' | 'alias' | 'title' = 'category_path';
 
   // ----------------------------------------------------
-  // STEP 1: RESOLVE CATEGORY
-  // Priority 1: category_path first token
-  // Priority 2: query_source
-  // Priority 3: category aliases in path / title
+  // STEP 1: RESOLVE MAIN CATEGORY
+  // Priority 1: Exact first token of category_path
+  // Priority 2: query_source matching official category
+  // Priority 3: category_path contains alias
+  // Priority 4: title contains alias
+  // Fallback: query_source or default
   // ----------------------------------------------------
   if (rawPath) {
-    const pathTokens = rawPath.split(/[>/]/).map((t) => t.trim()).filter(Boolean);
-    if (pathTokens.length > 0) {
-      const firstTokenNorm = removeAccents(pathTokens[0]);
+    const firstToken = rawPath.split(/[>/]/)[0]?.trim();
+    if (firstToken) {
+      const firstTokenNorm = removeAccents(firstToken);
       for (const cat of COLLECTOR_CATEGORIES) {
         const catAliases = getCategoryAliases(cat).map(removeAccents);
         if (catAliases.includes(firstTokenNorm)) {
           resolvedCat = cat;
+          resolutionSource = 'category_path';
           break;
         }
       }
@@ -519,11 +666,12 @@ export function classifyProductFull(product: {
   }
 
   if (!resolvedCat && rawQuery) {
-    const queryNorm = removeAccents(rawQuery);
+    const rawQueryNorm = removeAccents(rawQuery);
     for (const cat of COLLECTOR_CATEGORIES) {
       const catAliases = getCategoryAliases(cat).map(removeAccents);
-      if (catAliases.includes(queryNorm)) {
+      if (catAliases.includes(rawQueryNorm)) {
         resolvedCat = cat;
+        resolutionSource = 'alias';
         break;
       }
     }
@@ -535,18 +683,19 @@ export function classifyProductFull(product: {
       const catAliases = getCategoryAliases(cat).map(removeAccents);
       if (catAliases.some((a) => pathNorm.includes(a))) {
         resolvedCat = cat;
+        resolutionSource = 'alias';
         break;
       }
     }
   }
 
-  if (!resolvedCat) {
-    // Fallback category detection via title keywords
+  if (!resolvedCat && rawTitle) {
     const titleNorm = removeAccents(rawTitle);
     for (const cat of COLLECTOR_CATEGORIES) {
       const catAliases = getCategoryAliases(cat).map(removeAccents);
       if (catAliases.some((a) => titleNorm.includes(a))) {
         resolvedCat = cat;
+        resolutionSource = 'title';
         break;
       }
     }
@@ -560,15 +709,18 @@ export function classifyProductFull(product: {
   }
 
   // ----------------------------------------------------
-  // STEP 2: RESOLVE SUBCATEGORY (Within resolved category)
-  // Priority 1: category_path second token
-  // Priority 2: category_path aliases match
-  // Priority 3: title fallback match
+  // STEP 2: RESOLVE SUBCATEGORY (Strict Winner within resolved category)
+  // Priority 1: Exact 2nd level token in category_path matching official subcategory or exact alias
+  // Priority 2: 2nd level token normalized alias match
+  // Priority 3: Contextual alias match in subsequent category_path tokens
+  // Priority 4: Title keyword/alias match (sorted by length descending for precision)
   // ----------------------------------------------------
   const officialSubs = OFFICIAL_TIKTOK_TAXONOMY[resolvedCat] || [];
 
   if (rawPath) {
     const pathTokens = rawPath.split(/[>/]/).map((t) => t.trim()).filter(Boolean);
+    
+    // Priority 1 & 2: Evaluate 2nd token
     if (pathTokens.length >= 2) {
       const secondTokenNorm = removeAccents(pathTokens[1]);
       if (secondTokenNorm !== 'geral' && secondTokenNorm !== 'todas') {
@@ -576,49 +728,71 @@ export function classifyProductFull(product: {
           const subAliases = getSubcategoryAliases(sub).map(removeAccents);
           if (subAliases.includes(secondTokenNorm)) {
             resolvedSub = sub;
+            resolutionSource = 'category_path';
             break;
           }
         }
       }
     }
 
+    // Priority 3: Check remaining path tokens or full path against aliases
     if (!resolvedSub) {
       const pathNorm = removeAccents(rawPath);
+      // Sort subcategories to match the longest alias match first
+      let bestSubMatch: { sub: string; aliasLen: number } | null = null;
       for (const sub of officialSubs) {
         const subAliases = getSubcategoryAliases(sub).map(removeAccents);
-        if (subAliases.some((a) => pathNorm.includes(a))) {
-          resolvedSub = sub;
-          break;
+        for (const a of subAliases) {
+          if (pathNorm.includes(a) && (!bestSubMatch || a.length > bestSubMatch.aliasLen)) {
+            bestSubMatch = { sub, aliasLen: a.length };
+          }
         }
+      }
+      if (bestSubMatch) {
+        resolvedSub = bestSubMatch.sub;
+        resolutionSource = 'alias';
       }
     }
   }
 
-  // Fallback: title search ONLY if subcategory was not found from path/aliases
-  if (!resolvedSub) {
-    const titleNorm = removeAccents(rawTitle);
+  // Priority 4: Fallback title search ONLY if category_path didn't identify a subcategory
+  if (!resolvedSub && rawTitle) {
+    const titleNorm = ` ${removeAccents(rawTitle)} `;
+    let bestTitleMatch: { sub: string; aliasLen: number } | null = null;
+
     for (const sub of officialSubs) {
       const subAliases = getSubcategoryAliases(sub).map(removeAccents);
-      if (subAliases.some((a) => titleNorm.includes(a))) {
-        resolvedSub = sub;
-        break;
+      for (const a of subAliases) {
+        // Require meaningful matching phrase (at least 3 characters or framed by spaces)
+        if (a.length >= 3 && titleNorm.includes(a)) {
+          if (!bestTitleMatch || a.length > bestTitleMatch.aliasLen) {
+            bestTitleMatch = { sub, aliasLen: a.length };
+          }
+        }
       }
+    }
+
+    if (bestTitleMatch) {
+      resolvedSub = bestTitleMatch.sub;
+      resolutionSource = 'title';
     }
   }
 
   // ----------------------------------------------------
-  // STEP 3: RESOLVE CHILD CATEGORY (3rd Level Filter)
+  // STEP 3: RESOLVE CHILD CATEGORY (3rd Level Filter - Child of resolvedSub)
   // ----------------------------------------------------
   if (resolvedSub && rawPath) {
     const pathTokens = rawPath.split(/[>/]/).map((t) => t.trim()).filter(Boolean);
     if (pathTokens.length >= 3) {
-      const thirdTokenNorm = removeAccents(pathTokens[2]);
+      const thirdToken = pathTokens[2].trim();
+      const thirdTokenNorm = removeAccents(thirdToken);
       if (thirdTokenNorm !== 'geral' && thirdTokenNorm !== 'todas') {
-        resolvedChild = pathTokens[2];
+        resolvedChild = thirdToken;
       }
     }
   }
 
+  // Format the resolved category_path
   let resolvedPath = resolvedCat;
   if (resolvedSub) {
     resolvedPath = resolvedChild ? `${resolvedCat} > ${resolvedSub} > ${resolvedChild}` : `${resolvedCat} > ${resolvedSub}`;
@@ -629,5 +803,6 @@ export function classifyProductFull(product: {
     subcategory: resolvedSub,
     childCategory: resolvedChild,
     resolvedPath,
+    source: resolutionSource,
   };
 }
