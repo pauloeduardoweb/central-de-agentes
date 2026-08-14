@@ -25,9 +25,12 @@ export interface CategoryExpansionPlan {
   category: string;
   currentProductCount: number;
   categoryTargetLimit: number;
-  subcategories: SubcategoryTargetPlan[];
+  remainingTarget: number;
   totalAllocated: number;
+  projectedFinalCount: number;
+  unallocatedGap: number;
   estimatedCredits: number;
+  subcategories: SubcategoryTargetPlan[];
 }
 
 export interface SubcategoryBatchProgress {
@@ -39,6 +42,7 @@ export interface SubcategoryBatchProgress {
   totalSubcategoriesInCategory: number;
   categoryProductsCollected: number;
   categoryTargetLimit: number;
+  remainingNeeded: number;
   totalNewProducts: number;
   totalUpdatedProducts: number;
   totalCreditsUsed: number;
@@ -62,11 +66,19 @@ export interface SubcategoryExpansionResult {
 
 /**
  * Constrói o plano ordenado e determinístico de expansão por subcategorias oficiais.
- * Regras estritas:
- * 1. Prioridade Máxima: Subcategorias com 0 produtos na base (isZeroCount: true).
- * 2. Segunda Prioridade: Subcategorias com menor contagem existente (ordem crescente).
- * 3. Critério de desempate determinístico: Nome da subcategoria em ordem alfabética.
- * 4. Meta-limit por categoria: A soma alocada não ultrapassa o limite da categoria.
+ * 
+ * Regra Absoluta da Meta:
+ * - categoryTargetLimit = META FINAL APROXIMADA DA CATEGORIA (ex: 500 produtos únicos).
+ * - remainingTarget = Math.max(0, categoryTargetLimit - currentProductCount).
+ * - totalAllocated <= remainingTarget.
+ * - projectedFinalCount = currentProductCount + totalAllocated (obrigatoriamente <= categoryTargetLimit, exceto se já estava acima).
+ * - unallocatedGap = Math.max(0, remainingTarget - totalAllocated).
+ * 
+ * Regras estritas de priorização:
+ * 1. Prioridade 1: Subcategorias com 0 produtos na base (isZeroCount: true).
+ * 2. Prioridade 2: Subcategorias com menor contagem existente (ordem crescente).
+ * 3. Prioridade 3 (Desempate): Nome da subcategoria em ordem alfabética determinística.
+ * 4. Orçamento: Cota alocada reduz o remainingBudget até 0 e então PARA.
  */
 export function buildSubcategoryExpansionPlan(params: {
   categoryStats: CollectorCategoryStat[];
@@ -88,6 +100,9 @@ export function buildSubcategoryExpansionPlan(params: {
     const catStat = categoryStats.find((c) => c.category === catName);
     const currentProductCount = catStat?.productCount || 0;
     const officialSubs = OFFICIAL_TIKTOK_TAXONOMY[catName] || [];
+
+    // Déficit real necessário para a categoria atingir a meta final
+    const remainingTarget = Math.max(0, categoryTargetLimit - currentProductCount);
 
     // Mapear contagem atual por subcategoria
     const subCountMap = new Map<string, number>();
@@ -122,14 +137,14 @@ export function buildSubcategoryExpansionPlan(params: {
       return a.subcategory.localeCompare(b.subcategory, 'pt-BR');
     });
 
-    // Alocar cotas respeitando a meta global da categoria
-    let remainingCategoryQuota = Math.max(0, categoryTargetLimit);
+    // Alocar cotas respeitando estritamente o orçamento restante da categoria
+    let remainingBudget = remainingTarget;
     let rank = 1;
     const subPlans: SubcategoryTargetPlan[] = [];
 
     for (const subItem of rawSubList) {
-      if (remainingCategoryQuota <= 0) {
-        // Se a meta da categoria já foi preenchida pela cota das anteriores
+      if (remainingBudget <= 0) {
+        // Se a meta da categoria já foi preenchida pela cota das anteriores ou se remainingTarget === 0
         subPlans.push({
           category: catName,
           subcategory: subItem.subcategory,
@@ -142,10 +157,10 @@ export function buildSubcategoryExpansionPlan(params: {
         continue;
       }
 
-      // Aloca até perSubcategoryMax ou o que resta da quota da categoria
-      const allocated = Math.min(perSubcategoryMax, remainingCategoryQuota);
-      const estimatedPages = Math.max(1, Math.ceil(allocated / 30));
-      remainingCategoryQuota -= allocated;
+      // Aloca até perSubcategoryMax ou o que resta do orçamento da categoria
+      const allocated = Math.min(perSubcategoryMax, remainingBudget);
+      const estimatedPages = allocated > 0 ? Math.max(1, Math.ceil(allocated / 30)) : 0;
+      remainingBudget -= allocated;
 
       subPlans.push({
         category: catName,
@@ -159,15 +174,20 @@ export function buildSubcategoryExpansionPlan(params: {
     }
 
     const totalAllocated = subPlans.reduce((sum, s) => sum + s.allocatedTarget, 0);
+    const projectedFinalCount = currentProductCount + totalAllocated;
+    const unallocatedGap = Math.max(0, remainingTarget - totalAllocated);
     const estimatedCredits = subPlans.reduce((sum, s) => sum + s.estimatedPages, 0);
 
     plans.push({
       category: catName,
       currentProductCount,
       categoryTargetLimit,
-      subcategories: subPlans,
+      remainingTarget,
       totalAllocated,
+      projectedFinalCount,
+      unallocatedGap,
       estimatedCredits,
+      subcategories: subPlans,
     });
   }
 
@@ -176,6 +196,9 @@ export function buildSubcategoryExpansionPlan(params: {
 
 /**
  * Executa a expansão iterando pelas subcategorias oficiais com priorização real e limite por categoria.
+ * Proteção dupla:
+ * - remainingNeeded baseado no déficit real (categoryTargetLimit - total acumulado).
+ * - Apenas PRODUTOS NOVOS reduzem o remainingNeeded (produtos já existentes/duplicados não reduzem o déficit).
  */
 export async function executeSubcategoryExpansion(options: {
   selectedCategories?: string[];
@@ -228,19 +251,29 @@ export async function executeSubcategoryExpansion(options: {
     if (shouldCancel && shouldCancel()) break;
 
     const catPlan = plans[catIdx];
-    let categoryCollectedCount = 0;
+    const initialCategoryCount = catPlan.currentProductCount;
+    let categoryNewProductsCount = 0;
+
+    // Se a categoria já atingiu/ultrapassou a meta ou se totalAllocated === 0, ignorar sem gastar créditos
+    let remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - (initialCategoryCount + categoryNewProductsCount));
+    if (remainingNeeded <= 0 || catPlan.totalAllocated <= 0) {
+      console.log(`[Subcategory Expansion] Categoria "${catPlan.category}" já possui ${initialCategoryCount} produtos (Meta: ${catPlan.categoryTargetLimit}). 0 novas requisições necessárias.`);
+      categoriesCompleted++;
+      continue;
+    }
 
     for (let subIdx = 0; subIdx < catPlan.subcategories.length; subIdx++) {
       if (shouldCancel && shouldCancel()) break;
 
-      const subPlan = catPlan.subcategories[subIdx];
-      if (subPlan.allocatedTarget <= 0) continue;
-
-      // Se a categoria já atingiu a meta global nesta execução
-      if (categoryCollectedCount >= catPlan.categoryTargetLimit) {
-        console.log(`[Subcategory Expansion] Categoria "${catPlan.category}" atingiu a meta de ${catPlan.categoryTargetLimit} produtos. Passando para próxima categoria.`);
+      // Recalcula remainingNeeded antes de iniciar cada subcategoria
+      remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - (initialCategoryCount + categoryNewProductsCount));
+      if (remainingNeeded <= 0) {
+        console.log(`[Subcategory Expansion] Categoria "${catPlan.category}" atingiu a meta de ${catPlan.categoryTargetLimit} produtos únicos.`);
         break;
       }
+
+      const subPlan = catPlan.subcategories[subIdx];
+      if (subPlan.allocatedTarget <= 0) continue;
 
       if (onProgress) {
         onProgress({
@@ -250,8 +283,9 @@ export async function executeSubcategoryExpansion(options: {
           totalCategories: plans.length,
           subcategoryIndex: subIdx + 1,
           totalSubcategoriesInCategory: catPlan.subcategories.length,
-          categoryProductsCollected: categoryCollectedCount,
+          categoryProductsCollected: categoryNewProductsCount,
           categoryTargetLimit: catPlan.categoryTargetLimit,
+          remainingNeeded,
           totalNewProducts: totalNew,
           totalUpdatedProducts: totalUpdated,
           totalCreditsUsed,
@@ -259,11 +293,17 @@ export async function executeSubcategoryExpansion(options: {
         });
       }
 
-      const maxPagesForThisSub = subPlan.estimatedPages;
-      let subcategoryReceivedThisRun = 0;
+      const subTarget = Math.min(subPlan.allocatedTarget, remainingNeeded);
+      const maxPagesForThisSub = Math.max(1, Math.ceil(subTarget / 30));
+      let subcategoryNewReceived = 0;
 
       for (let page = 1; page <= maxPagesForThisSub; page++) {
         if (shouldCancel && shouldCancel()) break;
+
+        remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - (initialCategoryCount + categoryNewProductsCount));
+        if (remainingNeeded <= 0 || subcategoryNewReceived >= subTarget) {
+          break;
+        }
 
         try {
           // Chamada de aquisição para a subcategoria oficial
@@ -276,13 +316,18 @@ export async function executeSubcategoryExpansion(options: {
 
           subcategoriesConsulted++;
           const receivedThisPage = res.totalReceived ?? res.products?.length ?? 0;
+          const newInPage = res.newProductsCount ?? 0;
+          const updatedInPage = res.updatedProductsCount ?? 0;
+
           totalProcessed += receivedThisPage;
-          subcategoryReceivedThisRun += receivedThisPage;
-          categoryCollectedCount += receivedThisPage;
+          totalNew += newInPage;
+          totalUpdated += updatedInPage;
           totalCreditsUsed += (res.creditsUsed || 1);
 
-          totalNew += (res.newProductsCount || 0);
-          totalUpdated += (res.updatedProductsCount || 0);
+          // Apenas produtos NOVOS únicos reduzem o déficit restante para a meta
+          categoryNewProductsCount += newInPage;
+          subcategoryNewReceived += newInPage;
+          remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - (initialCategoryCount + categoryNewProductsCount));
 
           for (const p of res.products || []) {
             if (p.productId) seenProductIds.add(p.productId);
@@ -293,8 +338,8 @@ export async function executeSubcategoryExpansion(options: {
             break;
           }
 
-          // Se atingiu o limite da subcategoria ou da categoria
-          if (subcategoryReceivedThisRun >= subPlan.allocatedTarget || categoryCollectedCount >= catPlan.categoryTargetLimit) {
+          // Se atingiu o limite da subcategoria ou a meta da categoria
+          if (subcategoryNewReceived >= subTarget || remainingNeeded <= 0) {
             break;
           }
 
@@ -322,8 +367,9 @@ export async function executeSubcategoryExpansion(options: {
       totalCategories: plans.length,
       subcategoryIndex: lastPlan.subcategories.length,
       totalSubcategoriesInCategory: lastPlan.subcategories.length,
-      categoryProductsCollected: 0,
+      categoryProductsCollected: totalNew,
       categoryTargetLimit: lastPlan.categoryTargetLimit,
+      remainingNeeded: 0,
       totalNewProducts: totalNew,
       totalUpdatedProducts: totalUpdated,
       totalCreditsUsed,
