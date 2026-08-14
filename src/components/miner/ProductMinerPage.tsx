@@ -5039,25 +5039,71 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       });
 
       try {
-        const selectedSubs = selectedSubcategoriesMap[cat] || [];
-        if (selectedSubs.length > 0) {
-          for (const sub of selectedSubs) {
-            setBatchProgress((prev) => prev ? { ...prev, currentSubcategory: sub } : null);
-            const res = await refreshProducts(studentCode, sub, Math.min(150, expansionTargetCount));
-            const receivedThisCall = res.totalReceived ?? res.products?.length ?? 0;
-            totalProcessedCount += receivedThisCall;
-            totalNewCount += (res.newProductsCount ?? 0);
-            totalUpdatedCount += (res.updatedProductsCount ?? 0);
-            totalCreditsUsed += (res.creditsUsed ?? 1);
+        const catStat = collectorCategories.find((c) => c.category === cat);
+        const configItem = CATEGORY_CONFIG.find((c) => c.filterKey === cat);
+
+        // Obter lista de subcategorias a processar
+        let subsToProcess: string[] = selectedSubcategoriesMap[cat] || [];
+
+        if (subsToProcess.length === 0) {
+          // Se o usuário não marcou subcategorias manuais no drawer, usar todas as oficiais
+          const officialSubs = (configItem?.subcategories || []).filter((s) => s !== 'Todas' && s !== 'Todos');
+
+          // Mapear contagens existentes para ordenação por prioridade
+          const subCountMap = new Map<string, number>();
+          if (catStat?.subcategories) {
+            for (const s of catStat.subcategories) {
+              subCountMap.set(s.subcategory, s.productCount || 0);
+            }
           }
-        } else {
-          const res = await refreshProducts(studentCode, cat, expansionTargetCount);
+
+          // Priorização: 1º: 0 produtos; 2º: menor contagem ASC; 3º: alfabética
+          subsToProcess = [...officialSubs].sort((a, b) => {
+            const countA = subCountMap.get(a) || 0;
+            const countB = subCountMap.get(b) || 0;
+            const zeroA = countA === 0;
+            const zeroB = countB === 0;
+            if (zeroA !== zeroB) return zeroA ? -1 : 1;
+            if (countA !== countB) return countA - countB;
+            return a.localeCompare(b, 'pt-BR');
+          });
+        }
+
+        // Se ainda assim não houver subcategorias, usar o nome da categoria como fallback de busca
+        if (subsToProcess.length === 0) {
+          subsToProcess = [cat];
+        }
+
+        let categoryCollected = 0;
+        const categoryLimit = expansionTargetCount;
+        const perSubMax = 60;
+
+        for (const sub of subsToProcess) {
+          if (categoryCollected >= categoryLimit) {
+            break;
+          }
+
+          setBatchProgress((prev) => prev ? { ...prev, currentSubcategory: sub } : null);
+
+          const subTarget = Math.min(perSubMax, categoryLimit - categoryCollected);
+          const isSubcategorySearch = sub !== cat;
+
+          const res = await refreshProducts(
+            studentCode,
+            sub,
+            subTarget,
+            cat,
+            isSubcategorySearch ? sub : null
+          );
+
           const receivedThisCall = res.totalReceived ?? res.products?.length ?? 0;
           totalProcessedCount += receivedThisCall;
+          categoryCollected += receivedThisCall;
           totalNewCount += (res.newProductsCount ?? 0);
           totalUpdatedCount += (res.updatedProductsCount ?? 0);
-          totalCreditsUsed += (res.creditsUsed ?? Math.ceil(expansionTargetCount / 30));
+          totalCreditsUsed += (res.creditsUsed ?? 1);
         }
+
         processedCats++;
       } catch (err: any) {
         console.warn(`[Batch Expansion Error for ${cat}]:`, err?.message || err);
