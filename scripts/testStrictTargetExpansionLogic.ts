@@ -1,0 +1,566 @@
+import { executeSubcategoryExpansion, CategoryExpansionPlan } from '../server/subcategoryExpansionService.js';
+import { classifyProductFull } from '../server/taxonomy.js';
+import type { MinedProduct } from '../server/productMinerService.js';
+
+function createMockProduct(partial: Partial<MinedProduct> & { productId: string; title: string }): MinedProduct {
+  return {
+    productId: partial.productId,
+    title: partial.title,
+    category: partial.category || null,
+    imageUrl: partial.imageUrl || null,
+    priceCents: partial.priceCents || 1000,
+    originalPriceCents: partial.originalPriceCents || 1000,
+    discountPercent: partial.discountPercent || 0,
+    currencySymbol: 'R$',
+    rating: partial.rating ?? 4.8,
+    soldCount: partial.soldCount ?? 50,
+    sellerId: partial.sellerId || 'seller_1',
+    sellerName: partial.sellerName || 'Loja Teste',
+    productUrl: partial.productUrl || null,
+    video: null,
+    lastSeenAt: new Date().toISOString(),
+    ...partial,
+  };
+}
+
+function createMockPlan(params: {
+  category: string;
+  currentProductCount: number;
+  categoryTargetLimit: number;
+  subcategories: Array<{
+    subcategory: string;
+    currentCount: number;
+    allocatedTarget: number;
+    priority: 0 | 1 | 2;
+    estimatedCredits: number;
+  }>;
+}): CategoryExpansionPlan {
+  const totalAllocated = params.subcategories.reduce((sum, s) => sum + s.allocatedTarget, 0);
+  const remainingTarget = Math.max(0, params.categoryTargetLimit - params.currentProductCount);
+  return {
+    category: params.category,
+    currentProductCount: params.currentProductCount,
+    categoryTargetLimit: params.categoryTargetLimit,
+    remainingTarget,
+    totalAllocated,
+    projectedFinalCount: params.currentProductCount + totalAllocated,
+    unallocatedGap: Math.max(0, remainingTarget - totalAllocated),
+    estimatedCredits: Math.ceil(totalAllocated / 30),
+    subcategories: params.subcategories.map((s, idx) => ({
+      category: params.category,
+      subcategory: s.subcategory,
+      currentCount: s.currentCount,
+      allocatedTarget: s.allocatedTarget,
+      priority: s.priority,
+      priorityRank: idx + 1,
+      isZeroCount: s.currentCount === 0,
+      estimatedPages: Math.ceil(s.allocatedTarget / 30),
+      estimatedCredits: s.estimatedCredits,
+    })),
+  };
+}
+
+async function runStrictTargetExpansionTestSuite() {
+  console.log('========================================================================');
+  console.log('SUITE DE TESTES: EXPANSÃO ESTRITA POR CATEGORIA-ALVO (CASOS 1 A 10)');
+  console.log('========================================================================');
+
+  let passedTests = 0;
+  let totalTests = 0;
+
+  function assert(condition: boolean, testName: string, details?: string) {
+    totalTests++;
+    if (condition) {
+      passedTests++;
+      console.log(`✅ [PASS] ${testName}`);
+    } else {
+      console.error(`❌ [FAIL] ${testName}${details ? ` -> ${details}` : ''}`);
+    }
+  }
+
+  // ========================================================================
+  // CASO 1: 30 novos recebidos, 10 válidos para target, 20 off-target -> remainingNeeded cai SOMENTE 10
+  // ========================================================================
+  console.log('\n--- CASO 1: 30 NOVOS (10 VÁLIDOS TARGET, 20 OFF-TARGET) -> DÉFICIT CAI APENAS 10 ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const mockProducts: MinedProduct[] = [];
+    for (let i = 1; i <= 10; i++) {
+      mockProducts.push(createMockProduct({
+        productId: `prod_target_c1_${i}`,
+        title: `Brinco de Prata Elegante Feminino ${i}`,
+        category: 'Acessórios de moda',
+        sellerName: 'Loja Joias',
+      }));
+    }
+    for (let i = 11; i <= 30; i++) {
+      mockProducts.push(createMockProduct({
+        productId: `prod_off_c1_${i}`,
+        title: `Vestido Infantil Menina Festa Bebê ${i}`,
+        category: 'Moda para crianças',
+        sellerName: 'Loja Kids',
+      }));
+    }
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 8,
+      categoryTargetLimit: 100,
+      subcategories: [{
+        subcategory: 'Acessórios para cabelos',
+        currentCount: 8,
+        allocatedTarget: 60,
+        priority: 1,
+        estimatedCredits: 2,
+      }],
+    })];
+
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async () => ({
+        products: mockProducts,
+        creditsUsed: 1,
+        hasMore: false,
+        newProductsCount: 30,
+        updatedProductsCount: 0,
+        insertedIds: mockProducts.map((p) => p.productId),
+      }),
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(summary !== undefined, 'Resumo da categoria gerado');
+    assert(summary.initialValidCount === 8, 'Contagem inicial válida = 8', `Recebido: ${summary.initialValidCount}`);
+    assert(summary.validNewProductsForTarget === 10, 'validNewProductsForTarget é exatamente 10', `Recebido: ${summary.validNewProductsForTarget}`);
+    assert(summary.offTargetProducts === 20, 'offTargetProducts é exatamente 20', `Recebido: ${summary.offTargetProducts}`);
+    assert(summary.finalValidCount === 18, 'finalValidCount é 18 (8 + 10 válidos, ignorando os 20 off-target)', `Recebido: ${summary.finalValidCount}`);
+    assert(res.totalValidNewForTarget === 10, 'totalValidNewForTarget global é 10');
+    assert(res.totalOffTarget === 20, 'totalOffTarget global é 20');
+  }
+
+  // ========================================================================
+  // CASO 2: Produto com collection_category = Acessórios de moda mas classificação = Moda para crianças NÃO reduz déficit
+  // ========================================================================
+  console.log('\n--- CASO 2: PRODUTO OFF-TARGET NÃO REDUZ DÉFICIT DE ACESSÓRIOS DE MODA ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const offTargetProduct = createMockProduct({
+      productId: 'prod_kids_c2_1',
+      title: 'Conjunto Infantil Menina Verão',
+      category: 'Moda para crianças',
+      sellerName: 'Kids Shop',
+    });
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 8,
+      categoryTargetLimit: 100,
+      subcategories: [{
+        subcategory: 'Acessórios para cabelos',
+        currentCount: 8,
+        allocatedTarget: 60,
+        priority: 1,
+        estimatedCredits: 2,
+      }],
+    })];
+
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async () => ({
+        products: [offTargetProduct],
+        creditsUsed: 1,
+        hasMore: false,
+        newProductsCount: 1,
+        updatedProductsCount: 0,
+        insertedIds: ['prod_kids_c2_1'],
+      }),
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(summary.validNewProductsForTarget === 0, 'Nenhum produto válido adicionado para a meta de Acessórios de moda');
+    assert(summary.offTargetProducts === 1, 'Produto registrado corretamente como off-target');
+    assert(summary.finalValidCount === 8, 'finalValidCount permaneceu inalterado em 8');
+  }
+
+  // ========================================================================
+  // CASO 3: Produto com category_path NULL e classificação inconclusiva NÃO reduz déficit
+  // ========================================================================
+  console.log('\n--- CASO 3: CATEGORY_PATH NULL E INCONCLUSIVO NÃO REDUZ DÉFICIT ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const inconclusiveProduct = createMockProduct({
+      productId: 'prod_null_unknown_c3_1',
+      title: 'Item Aleatório Promocional Especial 2026',
+      category: undefined,
+      sellerName: 'Vendedor Geral',
+    });
+
+    const classification = classifyProductFull({
+      category_path: inconclusiveProduct.category,
+      title: inconclusiveProduct.title,
+      query_source: 'Acessórios para cabelos',
+    });
+
+    assert(classification.category === null, 'Classificador retorna category: null para título genérico sem correspondência');
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 8,
+      categoryTargetLimit: 100,
+      subcategories: [{
+        subcategory: 'Acessórios para cabelos',
+        currentCount: 8,
+        allocatedTarget: 60,
+        priority: 1,
+        estimatedCredits: 2,
+      }],
+    })];
+
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async () => ({
+        products: [inconclusiveProduct],
+        creditsUsed: 1,
+        hasMore: false,
+        newProductsCount: 1,
+        updatedProductsCount: 0,
+        insertedIds: ['prod_null_unknown_c3_1'],
+      }),
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(summary.validNewProductsForTarget === 0, 'Produto com category NULL não reduziu o déficit da meta');
+    assert(summary.unclassifiedProducts === 1, 'Produto registrado como unclassifiedProducts');
+  }
+
+  // ========================================================================
+  // CASO 4: remainingNeeded ainda > 0 depois da primeira subcategoria -> continua para a próxima
+  // ========================================================================
+  console.log('\n--- CASO 4: CONTINUAÇÃO OBRIGATÓRIA PARA AS PRÓXIMAS SUBCATEGORIAS ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const subcategoriesCalled: string[] = [];
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 8,
+      categoryTargetLimit: 100,
+      subcategories: [
+        {
+          subcategory: 'Acessórios para cabelos',
+          currentCount: 8,
+          allocatedTarget: 30,
+          priority: 1,
+          estimatedCredits: 1,
+        },
+        {
+          subcategory: 'Bijuterias e acessórios',
+          currentCount: 0,
+          allocatedTarget: 60,
+          priority: 0,
+          estimatedCredits: 2,
+        },
+        {
+          subcategory: 'Relógios e acessórios',
+          currentCount: 0,
+          allocatedTarget: 60,
+          priority: 0,
+          estimatedCredits: 2,
+        },
+      ],
+    })];
+
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async (params) => {
+        if (params.collectionSubcategory) {
+          subcategoriesCalled.push(params.collectionSubcategory);
+        }
+        const prods: MinedProduct[] = [];
+        for (let i = 1; i <= 10; i++) {
+          prods.push(createMockProduct({
+            productId: `prod_${params.collectionSubcategory}_${params.page}_${i}`,
+            title: `Brinco Colar Joia ${i}`,
+            category: 'Acessórios de moda',
+            sellerName: 'Joias Shop',
+          }));
+        }
+        return {
+          products: prods,
+          creditsUsed: 1,
+          hasMore: false,
+          newProductsCount: 10,
+          updatedProductsCount: 0,
+          insertedIds: prods.map((p) => p.productId),
+        };
+      },
+    });
+
+    assert(subcategoriesCalled.length > 1, 'Executor não parou na primeira subcategoria e avançou pelas seguintes', `Subcategorias chamadas: ${subcategoriesCalled.join(', ')}`);
+    assert(res.subcategoriesConsulted > 1, 'Mais de 1 subcategoria foi consultada');
+  }
+
+  // ========================================================================
+  // CASO 5: Categoria chega à meta com produtos válidos -> executor para imediatamente
+  // ========================================================================
+  console.log('\n--- CASO 5: CATEGORIA ATINGE A META -> PARADA IMEDIATA ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    let callsCount = 0;
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 8,
+      categoryTargetLimit: 100,
+      subcategories: [
+        { subcategory: 'Acessórios para cabelos', currentCount: 8, allocatedTarget: 60, priority: 1, estimatedCredits: 2 },
+        { subcategory: 'Bijuterias e acessórios', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
+      ],
+    })];
+
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async () => {
+        callsCount++;
+        const prods: MinedProduct[] = [];
+        for (let i = 1; i <= 100; i++) {
+          prods.push(createMockProduct({
+            productId: `prod_target_bulk_c5_${i}`,
+            title: `Joia Acessório de Moda ${i}`,
+            category: 'Acessórios de moda',
+            sellerName: 'Joias Shop',
+          }));
+        }
+        return {
+          products: prods,
+          creditsUsed: 1,
+          hasMore: true,
+          newProductsCount: 100,
+          updatedProductsCount: 0,
+          insertedIds: prods.map((p) => p.productId),
+        };
+      },
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(summary.stopReason === 'TARGET_REACHED', 'stopReason é TARGET_REACHED', `Recebido: ${summary.stopReason}`);
+    assert(callsCount === 1, 'Executor parou imediatamente após a 1ª chamada bater a meta');
+    assert(summary.finalValidCount >= 100, 'Meta de produtos válidos foi alcançada');
+  }
+
+  // ========================================================================
+  // CASO 6: Produto off-target continua registrado/processado normalmente
+  // ========================================================================
+  console.log('\n--- CASO 6: PRESERVAÇÃO INTEGRAL DE PRODUTOS OFF-TARGET ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const mixedProducts: MinedProduct[] = [
+      createMockProduct({
+        productId: 'p_valid_c6_1',
+        title: 'Anel de Ouro 18k',
+        category: 'Acessórios de moda',
+        sellerName: 'Joalheria',
+      }),
+      createMockProduct({
+        productId: 'p_off_c6_1',
+        title: 'Fritadeira Air Fryer 4L',
+        category: 'Eletrodomésticos',
+        sellerName: 'Eletro Store',
+      }),
+    ];
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 8,
+      categoryTargetLimit: 100,
+      subcategories: [
+        { subcategory: 'Acessórios para cabelos', currentCount: 8, allocatedTarget: 60, priority: 1, estimatedCredits: 2 },
+      ],
+    })];
+
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async () => ({
+        products: mixedProducts,
+        creditsUsed: 1,
+        hasMore: false,
+        newProductsCount: 2,
+        updatedProductsCount: 0,
+        insertedIds: ['p_valid_c6_1', 'p_off_c6_1'],
+      }),
+    });
+
+    assert(res.totalNew === 2, 'Todos os produtos novos (válido + off-target) foram registrados no totalNew');
+    assert(res.totalOffTarget === 1, 'Produto de Eletrodomésticos contabilizado como off-target');
+    assert(res.totalValidNewForTarget === 1, 'Apenas o Anel de Ouro contabilizado para a meta de Acessórios');
+  }
+
+  // ========================================================================
+  // CASO 7: collection_category e collection_subcategory permanecem preservados nos parâmetros de busca
+  // ========================================================================
+  console.log('\n--- CASO 7: PRESERVAÇÃO DE COLLECTION_CATEGORY E COLLECTION_SUBCATEGORY ---');
+  {
+    let capturedCollectionCat: string | null | undefined = null;
+    let capturedCollectionSub: string | null | undefined = null;
+
+    const testPlans = [createMockPlan({
+      category: 'Acessórios de moda',
+      currentProductCount: 8,
+      categoryTargetLimit: 100,
+      subcategories: [
+        { subcategory: 'Acessórios para casamento', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
+      ],
+    })];
+
+    await executeSubcategoryExpansion({
+      selectedCategories: ['Acessórios de moda'],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async (params) => {
+        capturedCollectionCat = params.collectionCategory;
+        capturedCollectionSub = params.collectionSubcategory;
+        return {
+          products: [],
+          creditsUsed: 1,
+          hasMore: false,
+          newProductsCount: 0,
+          updatedProductsCount: 0,
+        };
+      },
+    });
+
+    assert(capturedCollectionCat === 'Acessórios de moda', 'collectionCategory enviado para persistência é Acessórios de moda');
+    assert(capturedCollectionSub === 'Acessórios para casamento', 'collectionSubcategory enviado para persistência é Acessórios para casamento');
+  }
+
+  // ========================================================================
+  // CASO 8: COUNT(collection_subcategory) NÃO é utilizado como classificação oficial
+  // ========================================================================
+  console.log('\n--- CASO 8: ORIGEM DA BUSCA É APENAS RASTREAMENTO, NÃO CLASSIFICAÇÃO OFICIAL ---');
+  {
+    const productMochila = createMockProduct({
+      productId: 'p_mochila_1',
+      title: 'Mochila de Viagem Impermeável Grande',
+      category: 'Malas e bolsas',
+      sellerName: 'Bolsas & Cia',
+    });
+
+    const classified = classifyProductFull({
+      category_path: productMochila.category,
+      title: productMochila.title,
+      query_source: 'Acessórios para casamento',
+    });
+
+    assert(classified.category === 'Malas e bolsas', 'Classificação oficial é Malas e bolsas, IGNORANDO que a busca foi Acessórios para casamento');
+    assert(classified.category !== 'Acessórios de moda', 'Produto NÃO foi classificado como Acessórios de moda');
+  }
+
+  // ========================================================================
+  // CASO 9: 3 páginas consecutivas sem produto válido acionam proteção de parada da subcategoria
+  // ========================================================================
+  console.log('\n--- CASO 9: 3 PÁGINAS CONSECUTIVAS SEM PRODUTO VÁLIDO ACIONAM PULO DE SUBCATEGORIA ---');
+  {
+    let pagesInFirstSub = 0;
+    const targetCategory = 'Acessórios de moda';
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 8,
+      categoryTargetLimit: 100,
+      subcategories: [
+        { subcategory: 'Acessórios para cabelos', currentCount: 8, allocatedTarget: 90, priority: 1, estimatedCredits: 3 },
+      ],
+    })];
+
+    await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 100,
+      plans: testPlans,
+      searchFn: async (params) => {
+        pagesInFirstSub++;
+        return {
+          products: [
+            createMockProduct({
+              productId: `p_off_c9_${pagesInFirstSub}`,
+              title: `Produto Outra Categoria ${pagesInFirstSub}`,
+              category: 'Eletrônicos',
+              sellerName: 'Loja',
+            }),
+          ],
+          creditsUsed: 1,
+          hasMore: true,
+          newProductsCount: 1,
+          updatedProductsCount: 0,
+          insertedIds: [`p_off_c9_${pagesInFirstSub}`],
+        };
+      },
+    });
+
+    assert(pagesInFirstSub === 3, `Parou exatamente após 3 páginas consecutivas sem produtos válidos da categoria (executou ${pagesInFirstSub} páginas)`);
+  }
+
+  // ========================================================================
+  // CASO 10: Nenhum loop infinito ou consumo ilimitado de créditos (Teto de Segurança)
+  // ========================================================================
+  console.log('\n--- CASO 10: TETO DE SEGURANÇA CONTRA LOOP INFINITO OU CONSUMO ILIMITADO ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const maxCreditBudget = 5;
+
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 8,
+      categoryTargetLimit: 1000,
+      subcategories: [
+        { subcategory: 'Acessórios para cabelos', currentCount: 8, allocatedTarget: 60, priority: 1, estimatedCredits: 2 },
+        { subcategory: 'Bijuterias e acessórios', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
+        { subcategory: 'Relógios e acessórios', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
+        { subcategory: 'Óculos', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
+        { subcategory: 'Chapéus', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
+        { subcategory: 'Acessórios para casamento', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
+      ],
+    })];
+
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 1000,
+      maxCreditBudgetPerCategory: maxCreditBudget,
+      plans: testPlans,
+      searchFn: async () => ({
+        products: [],
+        creditsUsed: 1,
+        hasMore: true,
+        newProductsCount: 0,
+        updatedProductsCount: 0,
+      }),
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(summary.creditsUsed <= maxCreditBudget, `Créditos consumidos (${summary.creditsUsed}) respeitam o teto estrito de ${maxCreditBudget}`);
+    assert(summary.stopReason === 'MAX_CREDIT_BUDGET', `stopReason registrado corretamente: ${summary.stopReason}`);
+  }
+
+  console.log('\n========================================================================');
+  console.log(`RESULTADO DA SUITE: ${passedTests}/${totalTests} TESTES PASSARAM COM SUCESSO!`);
+  console.log('========================================================================\n');
+
+  if (passedTests !== totalTests) {
+    process.exit(1);
+  }
+}
+
+runStrictTargetExpansionTestSuite().catch((err) => {
+  console.error('Erro na suíte:', err);
+  process.exit(1);
+});
