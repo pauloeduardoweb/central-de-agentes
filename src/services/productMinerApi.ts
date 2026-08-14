@@ -165,12 +165,17 @@ export interface CollectorRefreshResponse extends ProductSearchResponse {
 export async function refreshProducts(
   studentCode: string,
   query: string,
-  maxProductsOrPage: number = 90
+  maxProductsOrPage: number = 90,
+  collectionCategory?: string | null,
+  collectionSubcategory?: string | null
 ): Promise<CollectorRefreshResponse> {
   const isMultiPageRequest = maxProductsOrPage >= 30;
-  const body = isMultiPageRequest
+  const body: any = isMultiPageRequest
     ? { query, maxProducts: maxProductsOrPage }
     : { query, page: maxProductsOrPage };
+
+  if (collectionCategory) body.collectionCategory = collectionCategory;
+  if (collectionSubcategory) body.collectionSubcategory = collectionSubcategory;
 
   const response = await fetch('/api/product-miner/refresh', {
     method: 'POST',
@@ -448,4 +453,95 @@ export async function trackProductInteraction(
     console.warn('[trackProductInteraction Error]', err);
   }
 }
+
+export interface SubcategoryTargetPlan {
+  category: string;
+  subcategory: string;
+  currentCount: number;
+  isZeroCount: boolean;
+  priorityRank: number;
+  allocatedTarget: number;
+  estimatedPages: number;
+}
+
+export interface CategoryExpansionPlan {
+  category: string;
+  currentProductCount: number;
+  categoryTargetLimit: number;
+  subcategories: SubcategoryTargetPlan[];
+  totalAllocated: number;
+  estimatedCredits: number;
+}
+
+export interface ExpansionPlanResponse {
+  success: boolean;
+  readOnly: boolean;
+  meta: {
+    totalCategories: number;
+    totalSubcategories: number;
+    zeroCountSubcategories: number;
+    totalAllocatedProducts: number;
+    totalEstimatedCredits: number;
+    categoryTargetLimit: number;
+    perSubcategoryMax: number;
+  };
+  plans: CategoryExpansionPlan[];
+}
+
+export async function fetchSubcategoryExpansionPlan(
+  studentCode: string,
+  categoryTargetLimit = 500,
+  perSubcategoryMax = 60,
+  categories?: string[]
+): Promise<ExpansionPlanResponse> {
+  const params = new URLSearchParams({
+    categoryTargetLimit: String(categoryTargetLimit),
+    perSubcategoryMax: String(perSubcategoryMax),
+  });
+  if (categories && categories.length > 0) {
+    params.set('categories', categories.join(','));
+  }
+
+  const response = await fetch(`/api/product-miner/admin/expansion-plan-readonly?${params.toString()}`, {
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data as ExpansionPlanResponse;
+}
+
+export async function executeSubcategoryExpansionApi(
+  studentCode: string,
+  payload: {
+    selectedCategories?: string[];
+    categoryTargetLimit?: number;
+    perSubcategoryMax?: number;
+  }
+): Promise<{
+  success: boolean;
+  totalProcessed: number;
+  totalUnique: number;
+  totalNew: number;
+  totalUpdated: number;
+  totalCreditsUsed: number;
+  categoriesCompleted: number;
+  subcategoriesConsulted: number;
+  subcategoriesCoverageBefore: number;
+  subcategoriesCoverageAfter: number;
+  plans: CategoryExpansionPlan[];
+  errors: string[];
+}> {
+  const response = await fetch('/api/product-miner/admin/execute-subcategory-expansion', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data;
+}
+
 
