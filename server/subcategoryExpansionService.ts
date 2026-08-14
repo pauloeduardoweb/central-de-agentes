@@ -46,7 +46,11 @@ export interface CategoryExecutionSummary {
   updatedProducts: number;
   totalReceived: number;
   creditsUsed: number;
+  requestsMade: number;
+  pagesProcessed: number;
+  totalSelectedSubcategories: number;
   subcategoriesConsulted: number;
+  subcategoriesExhausted: number;
   coverageBefore?: number;
   coverageAfter?: number;
   stopReason: 'TARGET_REACHED' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
@@ -74,6 +78,8 @@ export interface SubcategoryBatchProgress {
   catTotalReceived: number;
   categoryCreditsUsed: number;
   categoryCreditLimit: number;
+  categoryRequestsMade: number;
+  categoryPagesProcessed: number;
 
   // Status dinâmico da etapa
   stepStatus: string;
@@ -83,6 +89,8 @@ export interface SubcategoryBatchProgress {
   totalNewProducts: number;
   totalUpdatedProducts: number;
   totalCreditsUsed: number;
+  totalRequestsMade: number;
+  totalPagesProcessed: number;
   isCompleted: boolean;
   stopReason?: string;
 }
@@ -97,8 +105,12 @@ export interface SubcategoryExpansionResult {
   totalOffTarget: number;
   totalUnclassified: number;
   totalCreditsUsed: number;
+  totalRequestsMade: number;
+  totalPagesProcessed: number;
   categoriesCompleted: number;
+  totalSelectedSubcategories: number;
   subcategoriesConsulted: number;
+  subcategoriesExhausted: number;
   subcategoriesCoverageBefore: number;
   subcategoriesCoverageAfter: number;
   categorySummaries: CategoryExecutionSummary[];
@@ -120,17 +132,19 @@ export interface SubcategoryExpansionResult {
  * 1. Prioridade 1: Subcategorias com 0 produtos na base (isZeroCount: true).
  * 2. Prioridade 2: Subcategorias com menor contagem existente (ordem crescente).
  * 3. Prioridade 3 (Desempate): Nome da subcategoria em ordem alfabética determinística.
- * 4. Orçamento: Cota alocada reduz o remainingBudget até 0 e então PARA.
+ * 4. Orçamento: Cota alocada reduz o remainingBudget até 0 e então define allocatedTarget = 0 para fins de estimativa.
  */
 export function buildSubcategoryExpansionPlan(params: {
   categoryStats: CollectorCategoryStat[];
   selectedCategories?: string[];
+  selectedSubcategoriesMap?: Record<string, string[]>;
   categoryTargetLimit?: number;
   perSubcategoryMax?: number;
 }): CategoryExpansionPlan[] {
   const {
     categoryStats,
     selectedCategories = COLLECTOR_CATEGORIES,
+    selectedSubcategoriesMap,
     categoryTargetLimit = 500,
     perSubcategoryMax = 60,
   } = params;
@@ -141,7 +155,13 @@ export function buildSubcategoryExpansionPlan(params: {
   for (const catName of targetCats) {
     const catStat = categoryStats.find((c) => c.category === catName);
     const currentProductCount = catStat?.productCount || 0;
-    const officialSubs = OFFICIAL_TIKTOK_TAXONOMY[catName] || [];
+    
+    // Subcategorias oficiais ou filtradas pelas selecionadas
+    let targetSubList = OFFICIAL_TIKTOK_TAXONOMY[catName] || [];
+    if (selectedSubcategoriesMap && Array.isArray(selectedSubcategoriesMap[catName]) && selectedSubcategoriesMap[catName].length > 0) {
+      const allowedSubs = new Set(selectedSubcategoriesMap[catName].filter((s) => s !== 'Todas'));
+      targetSubList = targetSubList.filter((s) => allowedSubs.has(s));
+    }
 
     // Déficit real necessário para a categoria atingir a meta final
     const remainingTarget = Math.max(0, categoryTargetLimit - currentProductCount);
@@ -155,7 +175,7 @@ export function buildSubcategoryExpansionPlan(params: {
     }
 
     // Criar lista de subcategorias para ordenação
-    const rawSubList = officialSubs.map((sub) => {
+    const rawSubList = targetSubList.map((sub) => {
       const currentCount = subCountMap.get(sub) || 0;
       return {
         category: catName,
@@ -179,7 +199,7 @@ export function buildSubcategoryExpansionPlan(params: {
       return a.subcategory.localeCompare(b.subcategory, 'pt-BR');
     });
 
-    // Alocar cotas respeitando estritamente o orçamento restante da categoria
+    // Alocar cotas respeitando estritamente o orçamento restante da categoria para fins de estimativa
     let remainingBudget = remainingTarget;
     let rank = 1;
     const subPlans: SubcategoryTargetPlan[] = [];
@@ -237,18 +257,23 @@ export function buildSubcategoryExpansionPlan(params: {
 }
 
 /**
- * Executa a expansão iterando pelas subcategorias oficiais com priorização real e limite por categoria.
+ * Executa a expansão iterando por TODAS as subcategorias selecionadas com priorização real e limite por categoria.
  * 
  * Regra Estrita da Meta de Categoria:
  * - Um produto novo só reduz o déficit (remainingNeeded) se, após passar pelo classificador oficial (classifyProductFull),
  *   sua categoria final for exatamente igual à categoria-alvo (catPlan.category).
  * - Produtos pertencentes a outras categorias (off-target) ou sem classificação confiável (unclassified)
  *   são salvos no banco normalmente para preservação, mas NÃO reduzem a meta da categoria-alvo.
- * - Produtos com category_path NULL não recebem classificação automática e continuam null se não houver evidência segura no título.
- * - O executor continua consultando as próximas subcategorias ordenadas por prioridade até bater a meta ou esgotar subcategorias/créditos.
+ * - O plano serve apenas como estimativa inicial de créditos. O executor NUNCA interrompe a navegação pelas subcategorias
+ *   selecionadas simplesmente porque o plano alocou 0 para elas. O executor continua navegando por TODAS as subcategorias
+ *   selecionadas enquanto houver déficit (remainingNeeded > 0).
+ * - Proteção de 3 páginas: 3 páginas consecutivas sem produtos válidos da categoria encerram SOMENTE a subcategoria atual,
+ *   avançando imediatamente para a próxima subcategoria selecionada.
+ * - ALL_SUBCATEGORIES_EXHAUSTED só ocorre quando TODAS as subcategorias selecionadas tiverem sido efetivamente consultadas/esgotadas.
  */
 export async function executeSubcategoryExpansion(options: {
   selectedCategories?: string[];
+  selectedSubcategoriesMap?: Record<string, string[]>;
   categoryTargetLimit?: number;
   perSubcategoryMax?: number;
   maxCreditBudgetPerCategory?: number;
@@ -276,6 +301,7 @@ export async function executeSubcategoryExpansion(options: {
 }): Promise<SubcategoryExpansionResult> {
   const {
     selectedCategories,
+    selectedSubcategoriesMap,
     categoryTargetLimit = 500,
     perSubcategoryMax = 60,
     maxCreditBudgetPerCategory,
@@ -297,6 +323,7 @@ export async function executeSubcategoryExpansion(options: {
   const plans = customPlans || buildSubcategoryExpansionPlan({
     categoryStats: initialCategories,
     selectedCategories,
+    selectedSubcategoriesMap,
     categoryTargetLimit,
     perSubcategoryMax,
   });
@@ -313,8 +340,12 @@ export async function executeSubcategoryExpansion(options: {
   let totalOffTarget = 0;
   let totalUnclassified = 0;
   let totalCreditsUsed = 0;
+  let totalRequestsMade = 0;
+  let totalPagesProcessed = 0;
   let categoriesCompleted = 0;
+  let totalSelectedSubcategories = 0;
   let subcategoriesConsulted = 0;
+  let subcategoriesExhausted = 0;
   const seenProductIds = new Set<string>();
   const categorySummaries: CategoryExecutionSummary[] = [];
   const errors: string[] = [];
@@ -331,15 +362,21 @@ export async function executeSubcategoryExpansion(options: {
     let catUpdatedCount = 0;
     let catTotalReceived = 0;
     let catCreditsUsed = 0;
+    let catRequestsMade = 0;
+    let catPagesProcessed = 0;
     let catSubcategoriesConsulted = 0;
+    let catSubcategoriesExhausted = 0;
+    const catTotalSelectedSubcategories = catPlan.subcategories.length;
+    totalSelectedSubcategories += catTotalSelectedSubcategories;
+
     let catStopReason: CategoryExecutionSummary['stopReason'] = 'ALL_SUBCATEGORIES_EXHAUSTED';
 
     // Estimativa informativa de créditos para a categoria
     const categoryEstimatedCredits = Math.max(1, catPlan.estimatedCredits);
 
-    // Se a categoria já atingiu/ultrapassou a meta inicial ou se totalAllocated === 0, ignorar sem gastar créditos
+    // Se a categoria já atingiu/ultrapassou a meta inicial, ignorar sem gastar créditos
     let remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - currentValidTargetCount);
-    if (remainingNeeded <= 0 || catPlan.totalAllocated <= 0) {
+    if (remainingNeeded <= 0) {
       console.log(`[Subcategory Expansion] Categoria "${catPlan.category}" já possui ${initialValidCount} produtos válidos (Meta: ${catPlan.categoryTargetLimit}). 0 novas requisições necessárias.`);
       catStopReason = 'TARGET_REACHED';
       const initialCatStat = initialCategories.find((c) => c.category === catPlan.category);
@@ -355,7 +392,11 @@ export async function executeSubcategoryExpansion(options: {
         updatedProducts: 0,
         totalReceived: 0,
         creditsUsed: 0,
+        requestsMade: 0,
+        pagesProcessed: 0,
+        totalSelectedSubcategories: catTotalSelectedSubcategories,
         subcategoriesConsulted: 0,
+        subcategoriesExhausted: 0,
         coverageBefore: initialCatStat?.coverageCount || 0,
         coverageAfter: initialCatStat?.coverageCount || 0,
         stopReason: catStopReason,
@@ -366,6 +407,7 @@ export async function executeSubcategoryExpansion(options: {
 
     let isFatalCreditError = false;
 
+    // O loop percorre TODAS as subcategorias selecionadas para a categoria, sem pular por allocatedTarget <= 0
     for (let subIdx = 0; subIdx < catPlan.subcategories.length; subIdx++) {
       if (shouldCancel && shouldCancel()) {
         catStopReason = 'CANCELLED';
@@ -386,7 +428,6 @@ export async function executeSubcategoryExpansion(options: {
       }
 
       const subPlan = catPlan.subcategories[subIdx];
-      if (subPlan.allocatedTarget <= 0) continue;
 
       if (onProgress) {
         onProgress({
@@ -409,11 +450,15 @@ export async function executeSubcategoryExpansion(options: {
           catTotalReceived,
           categoryCreditsUsed: catCreditsUsed,
           categoryCreditLimit: categoryEstimatedCredits,
+          categoryRequestsMade: catRequestsMade,
+          categoryPagesProcessed: catPagesProcessed,
           stepStatus: `Avançando para subcategoria "${subPlan.subcategory}"...`,
           totalReceived: totalProcessed,
           totalNewProducts: totalNew,
           totalUpdatedProducts: totalUpdated,
           totalCreditsUsed,
+          totalRequestsMade,
+          totalPagesProcessed,
           isCompleted: false,
         });
       }
@@ -422,6 +467,7 @@ export async function executeSubcategoryExpansion(options: {
       // Teto técnico preventivo de 30 páginas por subcategoria para salvaguarda de loop infinito
       let consecutiveNoValidPages = 0;
       let hasMoreInSub = true;
+      let isSubExhausted = false;
 
       for (let page = 1; page <= 30 && hasMoreInSub; page++) {
         if (shouldCancel && shouldCancel()) {
@@ -456,11 +502,15 @@ export async function executeSubcategoryExpansion(options: {
             catTotalReceived,
             categoryCreditsUsed: catCreditsUsed,
             categoryCreditLimit: categoryEstimatedCredits,
+            categoryRequestsMade: catRequestsMade,
+            categoryPagesProcessed: catPagesProcessed,
             stepStatus: 'Consultando SocialCrawl...',
             totalReceived: totalProcessed,
             totalNewProducts: totalNew,
             totalUpdatedProducts: totalUpdated,
             totalCreditsUsed,
+            totalRequestsMade,
+            totalPagesProcessed,
             isCompleted: false,
           });
         }
@@ -480,8 +530,18 @@ export async function executeSubcategoryExpansion(options: {
             catSubcategoriesConsulted++;
             subcategoriesConsulted++;
           }
+
+          catRequestsMade++;
+          totalRequestsMade++;
+          catPagesProcessed++;
+          totalPagesProcessed++;
+
           const receivedThisPage = res.totalReceived ?? res.products?.length ?? 0;
-          const creditsThisCall = res.creditsUsed || 1;
+          
+          // CONTAGEM ESTRITA DE CRÉDITOS: Nunca inflar 0 créditos para 1
+          const creditsThisCall = (typeof res.creditsUsed === 'number' && Number.isFinite(res.creditsUsed))
+            ? res.creditsUsed
+            : (res.creditsUsed !== undefined && res.creditsUsed !== null ? Number(res.creditsUsed) : 0);
 
           catCreditsUsed += creditsThisCall;
           totalCreditsUsed += creditsThisCall;
@@ -509,11 +569,15 @@ export async function executeSubcategoryExpansion(options: {
               catTotalReceived,
               categoryCreditsUsed: catCreditsUsed,
               categoryCreditLimit: categoryEstimatedCredits,
+              categoryRequestsMade: catRequestsMade,
+              categoryPagesProcessed: catPagesProcessed,
               stepStatus: 'Processando resultados...',
               totalReceived: totalProcessed,
               totalNewProducts: totalNew,
               totalUpdatedProducts: totalUpdated,
               totalCreditsUsed,
+              totalRequestsMade,
+              totalPagesProcessed,
               isCompleted: false,
             });
           }
@@ -547,11 +611,15 @@ export async function executeSubcategoryExpansion(options: {
               catTotalReceived,
               categoryCreditsUsed: catCreditsUsed,
               categoryCreditLimit: categoryEstimatedCredits,
+              categoryRequestsMade: catRequestsMade,
+              categoryPagesProcessed: catPagesProcessed,
               stepStatus: 'Classificando produtos...',
               totalReceived: totalProcessed,
               totalNewProducts: totalNew,
               totalUpdatedProducts: totalUpdated,
               totalCreditsUsed,
+              totalRequestsMade,
+              totalPagesProcessed,
               isCompleted: false,
             });
           }
@@ -629,11 +697,15 @@ export async function executeSubcategoryExpansion(options: {
               catTotalReceived,
               categoryCreditsUsed: catCreditsUsed,
               categoryCreditLimit: categoryEstimatedCredits,
+              categoryRequestsMade: catRequestsMade,
+              categoryPagesProcessed: catPagesProcessed,
               stepStatus: 'Salvando produtos...',
               totalReceived: totalProcessed,
               totalNewProducts: totalNew,
               totalUpdatedProducts: totalUpdated,
               totalCreditsUsed,
+              totalRequestsMade,
+              totalPagesProcessed,
               isCompleted: false,
             });
           }
@@ -642,7 +714,8 @@ export async function executeSubcategoryExpansion(options: {
           if (pageValidNew === 0) {
             consecutiveNoValidPages++;
             if (consecutiveNoValidPages >= 3) {
-              console.log(`[Subcategory Expansion] 3 páginas consecutivas sem produtos válidos da categoria "${catPlan.category}" na subcategoria "${subPlan.subcategory}". Avançando para próxima subcategoria.`);
+              console.log(`[Subcategory Expansion] 3 páginas consecutivas sem produtos válidos da categoria "${catPlan.category}" na subcategoria "${subPlan.subcategory}". Avançando para próxima subcategoria selecionada.`);
+              isSubExhausted = true;
               break;
             }
           } else {
@@ -652,10 +725,11 @@ export async function executeSubcategoryExpansion(options: {
           // Se a API não retornou itens ou não tem mais páginas, passa para a próxima subcategoria
           if (receivedThisPage === 0 || !res.hasMore) {
             hasMoreInSub = false;
+            isSubExhausted = true;
             break;
           }
 
-          // Se atingiu a meta da categoria, finaliza
+          // Se atingiu a meta da categoria, finaliza imediatamente
           if (remainingNeeded <= 0) {
             catStopReason = 'TARGET_REACHED';
             break;
@@ -676,8 +750,18 @@ export async function executeSubcategoryExpansion(options: {
             catStopReason = 'CANCELLED';
             break;
           }
+          isSubExhausted = true;
           break;
         }
+      }
+
+      if (remainingNeeded <= 0 || catStopReason === 'TARGET_REACHED') {
+        isSubExhausted = false;
+      }
+
+      if (isSubExhausted) {
+        catSubcategoriesExhausted++;
+        subcategoriesExhausted++;
       }
 
       if (remainingNeeded <= 0) {
@@ -688,6 +772,13 @@ export async function executeSubcategoryExpansion(options: {
 
     if (remainingNeeded <= 0) {
       catStopReason = 'TARGET_REACHED';
+    } else if (catStopReason !== 'CANCELLED') {
+      // Se percorreu todas as subcategorias selecionadas e remainingNeeded ainda > 0
+      if (catSubcategoriesConsulted >= catPlan.subcategories.length) {
+        catStopReason = 'ALL_SUBCATEGORIES_EXHAUSTED';
+      } else {
+        catStopReason = 'NO_MORE_RESULTS';
+      }
     }
 
     // Releitura OBRIGATÓRIA dos stats oficiais pós-persistência para fonte única de verdade
@@ -713,7 +804,11 @@ export async function executeSubcategoryExpansion(options: {
       updatedProducts: catUpdatedCount,
       totalReceived: catTotalReceived,
       creditsUsed: catCreditsUsed,
+      requestsMade: catRequestsMade,
+      pagesProcessed: catPagesProcessed,
+      totalSelectedSubcategories: catTotalSelectedSubcategories,
       subcategoriesConsulted: catSubcategoriesConsulted,
+      subcategoriesExhausted: catSubcategoriesExhausted,
       coverageBefore,
       coverageAfter,
       stopReason: catStopReason,
@@ -744,11 +839,15 @@ export async function executeSubcategoryExpansion(options: {
       catTotalReceived: totalProcessed,
       categoryCreditsUsed: totalCreditsUsed,
       categoryCreditLimit: totalCreditsUsed,
+      categoryRequestsMade: totalRequestsMade,
+      categoryPagesProcessed: totalPagesProcessed,
       stepStatus: 'Concluindo categoria...',
       totalReceived: totalProcessed,
       totalNewProducts: totalNew,
       totalUpdatedProducts: totalUpdated,
       totalCreditsUsed,
+      totalRequestsMade,
+      totalPagesProcessed,
       isCompleted: true,
       stopReason: 'COMPLETED',
     });
@@ -770,8 +869,12 @@ export async function executeSubcategoryExpansion(options: {
     totalOffTarget,
     totalUnclassified,
     totalCreditsUsed,
+    totalRequestsMade,
+    totalPagesProcessed,
     categoriesCompleted,
+    totalSelectedSubcategories,
     subcategoriesConsulted,
+    subcategoriesExhausted,
     subcategoriesCoverageBefore: initialCoverage,
     subcategoriesCoverageAfter: finalCoverage,
     categorySummaries,

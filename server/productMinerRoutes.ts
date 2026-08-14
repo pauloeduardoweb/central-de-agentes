@@ -760,11 +760,20 @@ productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
     const targetLimit = Number(req.query.categoryTargetLimit || 500);
     const perSubMax = Number(req.query.perSubcategoryMax || 60);
     const selectedCatsParam = req.query.categories ? String(req.query.categories).split(',') : undefined;
+    let selectedSubcategoriesMap: Record<string, string[]> | undefined = undefined;
+    if (req.query.subcategoriesMap && typeof req.query.subcategoriesMap === 'string') {
+      try {
+        selectedSubcategoriesMap = JSON.parse(req.query.subcategoriesMap);
+      } catch {
+        // ignore
+      }
+    }
 
     const stats = await getCollectorCategoriesStats();
     const plans = buildSubcategoryExpansionPlan({
       categoryStats: stats.categories,
       selectedCategories: selectedCatsParam,
+      selectedSubcategoriesMap,
       categoryTargetLimit: targetLimit,
       perSubcategoryMax: perSubMax,
     });
@@ -813,6 +822,9 @@ productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (re
   try {
     const { executeSubcategoryExpansion } = await import('./subcategoryExpansionService.js');
     const selectedCategories = Array.isArray(req.body?.selectedCategories) ? req.body.selectedCategories : undefined;
+    const selectedSubcategoriesMap = (req.body?.selectedSubcategoriesMap && typeof req.body.selectedSubcategoriesMap === 'object')
+      ? req.body.selectedSubcategoriesMap
+      : undefined;
     const categoryTargetLimit = req.body?.categoryTargetLimit ? Number(req.body.categoryTargetLimit) : 500;
     const perSubcategoryMax = req.body?.perSubcategoryMax ? Number(req.body.perSubcategoryMax) : 60;
     const maxCreditBudgetPerCategory = req.body?.maxCreditBudgetPerCategory ? Number(req.body.maxCreditBudgetPerCategory) : undefined;
@@ -824,6 +836,7 @@ productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (re
 
     const result = await executeSubcategoryExpansion({
       selectedCategories,
+      selectedSubcategoriesMap,
       categoryTargetLimit,
       perSubcategoryMax,
       maxCreditBudgetPerCategory,
