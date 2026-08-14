@@ -660,7 +660,11 @@ export interface CategoryExecutionSummaryApi {
   updatedProducts: number;
   totalReceived: number;
   creditsUsed: number;
+  requestsMade?: number;
+  pagesProcessed?: number;
+  totalSelectedSubcategories?: number;
   subcategoriesConsulted: number;
+  subcategoriesExhausted?: number;
   coverageBefore?: number;
   coverageAfter?: number;
   stopReason: 'TARGET_REACHED' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
@@ -687,6 +691,8 @@ export interface SubcategoryBatchProgressApi {
   catTotalReceived: number;
   categoryCreditsUsed: number;
   categoryCreditLimit: number;
+  categoryRequestsMade?: number;
+  categoryPagesProcessed?: number;
 
   stepStatus: string;
 
@@ -694,6 +700,8 @@ export interface SubcategoryBatchProgressApi {
   totalNewProducts: number;
   totalUpdatedProducts: number;
   totalCreditsUsed: number;
+  totalRequestsMade?: number;
+  totalPagesProcessed?: number;
   isCompleted: boolean;
   stopReason?: string;
 }
@@ -708,8 +716,12 @@ export interface SubcategoryExpansionResultApi {
   totalOffTarget: number;
   totalUnclassified: number;
   totalCreditsUsed: number;
+  totalRequestsMade?: number;
+  totalPagesProcessed?: number;
   categoriesCompleted: number;
+  totalSelectedSubcategories?: number;
   subcategoriesConsulted: number;
+  subcategoriesExhausted?: number;
   subcategoriesCoverageBefore: number;
   subcategoriesCoverageAfter: number;
   categorySummaries?: CategoryExecutionSummaryApi[];
@@ -761,6 +773,7 @@ export async function executeSubcategoryExpansionStreamApi(
   studentCode: string,
   payload: {
     selectedCategories?: string[];
+    selectedSubcategoriesMap?: Record<string, string[]>;
     categoryTargetLimit?: number;
     perSubcategoryMax?: number;
     maxCreditBudgetPerCategory?: number;
@@ -847,6 +860,7 @@ export async function executeSubcategoryExpansionApi(
   studentCode: string,
   payload: {
     selectedCategories?: string[];
+    selectedSubcategoriesMap?: Record<string, string[]>;
     categoryTargetLimit?: number;
     perSubcategoryMax?: number;
     maxCreditBudgetPerCategory?: number;
