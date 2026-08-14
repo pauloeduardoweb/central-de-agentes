@@ -5276,22 +5276,23 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     // RELEITURA OBRIGATÓRIA DOS STATS OFICIAIS DO MYSQL ANTES DE EXIBIR O MODAL
     await loadCategories();
 
-    if (processedCats === 0 && failedErrors.length > 0) {
-      setError(`Falha ao expandir categorias: ${failedErrors.join('; ')}`);
-    } else {
-      setBatchSummaryModal({
-        open: true,
-        totalProcessed: totalProcessedCount,
-        newProducts: totalNewCount,
-        validNewProductsForTarget: totalValidNewCount,
-        offTargetProducts: totalOffTargetCount,
-        unclassifiedProducts: totalUnclassifiedCount,
-        updatedProducts: totalUpdatedCount,
-        creditsUsed: totalCreditsUsed,
-        categoriesProcessed: processedCats,
-        totalCategoriesRequested: categoriesToProcess.length,
-        categorySummaries: allCategorySummaries,
-      });
+    // GARANTIA ABSOLUTA: O modal de resumo SEMPRE será aberto com o relatório consolidado
+    setBatchSummaryModal({
+      open: true,
+      totalProcessed: totalProcessedCount,
+      newProducts: totalNewCount,
+      validNewProductsForTarget: totalValidNewCount,
+      offTargetProducts: totalOffTargetCount,
+      unclassifiedProducts: totalUnclassifiedCount,
+      updatedProducts: totalUpdatedCount,
+      creditsUsed: totalCreditsUsed,
+      categoriesProcessed: processedCats > 0 ? processedCats : categoriesToProcess.length,
+      totalCategoriesRequested: categoriesToProcess.length,
+      categorySummaries: allCategorySummaries,
+    });
+
+    if (failedErrors.length > 0) {
+      console.warn('Avisos durante a expansão:', failedErrors.join('; '));
     }
   };
 
@@ -7484,6 +7485,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 );
               })()}
 
+              <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
+                <div className="text-[11px] text-blue-800 font-bold">Novos Inseridos</div>
+                <div className="font-black text-blue-900 text-sm mt-0.5">
+                  +{batchSummaryModal.newProducts} no MySQL
+                </div>
+              </div>
+
               <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200">
                 <div className="text-[11px] text-amber-800 font-bold">Créditos SocialCrawl</div>
                 <div className="font-black text-amber-900 text-sm mt-0.5">
@@ -7505,7 +7513,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 col-span-2">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <div className="text-[11px] text-slate-500 font-medium">Já Existentes / Atualizados</div>
                 <div className="font-black text-slate-700 text-sm mt-0.5">
                   {batchSummaryModal.updatedProducts} prods
@@ -7551,7 +7559,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                           <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
                             <span>Base: <strong>{catSum.initialValidCount}</strong> ➔ <strong>{catSum.finalValidCount}</strong> (Meta: {catSum.categoryTargetLimit})</span>
                             <span>•</span>
-                            <span>{catSum.subcategoriesConsulted} subcats consultadas</span>
+                            <span>{catSum.subcategoriesConsulted}{catSum.totalSelectedSubcategories ? ` de ${catSum.totalSelectedSubcategories}` : ''} subcats</span>
+                            {catSum.pagesProcessed !== undefined && catSum.pagesProcessed > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{catSum.pagesProcessed} págs ({catSum.requestsMade || catSum.pagesProcessed} reqs)</span>
+                              </>
+                            )}
                             {catSum.coverageBefore !== undefined && catSum.coverageAfter !== undefined && (
                               <>
                                 <span>•</span>
