@@ -729,4 +729,17 @@ productMinerRouter.get('/admin/audit-taxonomy-readonly', async (req, res) => {
   }
 });
 
+// Admin Route: 100% READ-ONLY Deep audit of unclassified subcategories
+productMinerRouter.get('/admin/audit-unclassified-products-readonly', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+  try {
+    const { runDeepUnclassifiedAudit } = await import('./unclassifiedAuditService.js');
+    const result = await runDeepUnclassifiedAudit();
+    return res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[Audit Unclassified ReadOnly Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'AUDIT_ERROR' });
+  }
+});
+
 
