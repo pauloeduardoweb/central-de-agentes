@@ -511,44 +511,44 @@ async function runStrictTargetExpansionTestSuite() {
   }
 
   // ========================================================================
-  // CASO 10: Nenhum loop infinito ou consumo ilimitado de créditos (Teto de Segurança)
+  // CASO 10: Expansão Contínua Além da Estimativa Inicial até Concluir ou Esgotar
   // ========================================================================
-  console.log('\n--- CASO 10: TETO DE SEGURANÇA CONTRA LOOP INFINITO OU CONSUMO ILIMITADO ---');
+  console.log('\n--- CASO 10: EXPANSÃO CONTÍNUA ATÉ A META (SEM TRAVA ARTIFICIAL DE CRÉDITOS) ---');
   {
     const targetCategory = 'Acessórios de moda';
-    const maxCreditBudget = 5;
 
     const testPlans = [createMockPlan({
       category: targetCategory,
       currentProductCount: 8,
-      categoryTargetLimit: 1000,
+      categoryTargetLimit: 20, // Meta pequena para testar parada por meta
       subcategories: [
-        { subcategory: 'Acessórios para cabelos', currentCount: 8, allocatedTarget: 60, priority: 1, estimatedCredits: 2 },
-        { subcategory: 'Bijuterias e acessórios', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
-        { subcategory: 'Relógios e acessórios', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
-        { subcategory: 'Óculos', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
-        { subcategory: 'Chapéus', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
-        { subcategory: 'Acessórios para casamento', currentCount: 0, allocatedTarget: 60, priority: 0, estimatedCredits: 2 },
+        { subcategory: 'Acessórios para cabelos', currentCount: 8, allocatedTarget: 6, priority: 1, estimatedCredits: 2 },
+        { subcategory: 'Bijuterias e acessórios', currentCount: 0, allocatedTarget: 6, priority: 0, estimatedCredits: 2 },
       ],
     })];
 
+    // Simula produtos válidos por página
+    let prodCounter = 1;
     const res = await executeSubcategoryExpansion({
       selectedCategories: [targetCategory],
-      categoryTargetLimit: 1000,
-      maxCreditBudgetPerCategory: maxCreditBudget,
+      categoryTargetLimit: 20,
       plans: testPlans,
       searchFn: async () => ({
-        products: [],
+        products: [
+          createMockProduct({ productId: `p_${prodCounter++}`, title: 'Brinco Pérola Luxo', category: targetCategory }),
+          createMockProduct({ productId: `p_${prodCounter++}`, title: 'Colar Dourado Elegante', category: targetCategory }),
+          createMockProduct({ productId: `p_${prodCounter++}`, title: 'Pulseira Prata Fina', category: targetCategory }),
+        ],
         creditsUsed: 1,
         hasMore: true,
-        newProductsCount: 0,
+        newProductsCount: 3,
         updatedProductsCount: 0,
       }),
     });
 
     const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
-    assert(summary.creditsUsed <= maxCreditBudget, `Créditos consumidos (${summary.creditsUsed}) respeitam o teto estrito de ${maxCreditBudget}`);
-    assert(summary.stopReason === 'MAX_CREDIT_BUDGET', `stopReason registrado corretamente: ${summary.stopReason}`);
+    assert(summary.stopReason === 'TARGET_REACHED', `Expansão atingiu a meta com sucesso (stopReason: ${summary.stopReason})`);
+    assert(summary.finalValidCount >= 20, `Contagem final de válidos (${summary.finalValidCount}) alcançou a meta planejada de 20`);
   }
 
   console.log('\n========================================================================');
