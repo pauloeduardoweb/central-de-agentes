@@ -25,6 +25,7 @@ import {
   type ReclassificationReport,
   calculateExpansionPlanFromStats,
   fetchSubcategoryExpansionPlan,
+  executeSubcategoryExpansionApi,
   type CategoryExpansionPlan,
 } from '../../services/productMinerApi';
 import {
@@ -5011,6 +5012,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     currentSubcategory?: string;
     processedCategories: number;
     totalCategories: number;
+    validNewProductsForTarget: number;
+    offTargetProducts: number;
+    unclassifiedProducts: number;
     newProductsCount: number;
     updatedProductsCount: number;
     creditsUsed: number;
@@ -5019,6 +5023,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     open: boolean;
     totalProcessed: number;
     newProducts: number;
+    validNewProductsForTarget: number;
+    offTargetProducts: number;
+    unclassifiedProducts: number;
     updatedProducts: number;
     creditsUsed: number;
     categoriesProcessed: number;
@@ -5067,6 +5074,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     let totalProcessedCount = 0;
     let totalNewCount = 0;
     let totalUpdatedCount = 0;
+    let totalValidNewCount = 0;
+    let totalOffTargetCount = 0;
+    let totalUnclassifiedCount = 0;
     let totalCreditsUsed = 0;
     let processedCats = 0;
     const failedErrors: string[] = [];
@@ -5076,6 +5086,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         currentCategory: cat,
         processedCategories: processedCats,
         totalCategories: categoriesToProcess.length,
+        validNewProductsForTarget: totalValidNewCount,
+        offTargetProducts: totalOffTargetCount,
+        unclassifiedProducts: totalUnclassifiedCount,
         newProductsCount: totalNewCount,
         updatedProductsCount: totalUpdatedCount,
         creditsUsed: totalCreditsUsed,
@@ -5083,7 +5096,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       try {
         const catStat = collectorCategories.find((c) => c.category === cat);
-        const configItem = CATEGORY_CONFIG.find((c) => c.filterKey === cat);
         const currentCount = catStat?.productCount || 0;
         const remainingTarget = Math.max(0, expansionTargetCount - currentCount);
 
@@ -5093,72 +5105,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           continue;
         }
 
-        // Obter lista de subcategorias a processar
-        let subsToProcess: string[] = selectedSubcategoriesMap[cat] || [];
+        // Chamar o serviço oficial de expansão do backend com classificação estrita
+        const result = await executeSubcategoryExpansionApi(studentCode, {
+          selectedCategories: [cat],
+          categoryTargetLimit: expansionTargetCount,
+          perSubcategoryMax: 60,
+        });
 
-        if (subsToProcess.length === 0) {
-          // Se o usuário não marcou subcategorias manuais no drawer, usar todas as oficiais
-          const officialSubs = (configItem?.subcategories || []).filter((s) => s !== 'Todas' && s !== 'Todos');
-
-          // Mapear contagens existentes para ordenação por prioridade
-          const subCountMap = new Map<string, number>();
-          if (catStat?.subcategories) {
-            for (const s of catStat.subcategories) {
-              subCountMap.set(s.subcategory, s.productCount || 0);
-            }
-          }
-
-          // Priorização: 1º: 0 produtos; 2º: menor contagem ASC; 3º: alfabética
-          subsToProcess = [...officialSubs].sort((a, b) => {
-            const countA = subCountMap.get(a) || 0;
-            const countB = subCountMap.get(b) || 0;
-            const zeroA = countA === 0;
-            const zeroB = countB === 0;
-            if (zeroA !== zeroB) return zeroA ? -1 : 1;
-            if (countA !== countB) return countA - countB;
-            return a.localeCompare(b, 'pt-BR');
-          });
-        }
-
-        // Se ainda assim não houver subcategorias, usar o nome da categoria como fallback de busca
-        if (subsToProcess.length === 0) {
-          subsToProcess = [cat];
-        }
-
-        let categoryNewCollected = 0;
-        let remainingNeeded = remainingTarget;
-        const perSubMax = 60;
-
-        for (const sub of subsToProcess) {
-          if (remainingNeeded <= 0) {
-            break;
-          }
-
-          setBatchProgress((prev) => prev ? { ...prev, currentSubcategory: sub } : null);
-
-          const subTarget = Math.min(perSubMax, remainingNeeded);
-          const isSubcategorySearch = sub !== cat;
-
-          const res = await refreshProducts(
-            studentCode,
-            sub,
-            subTarget,
-            cat,
-            isSubcategorySearch ? sub : null
-          );
-
-          const receivedThisCall = res.totalReceived ?? res.products?.length ?? 0;
-          const newThisCall = res.newProductsCount ?? 0;
-          const updatedThisCall = res.updatedProductsCount ?? 0;
-
-          totalProcessedCount += receivedThisCall;
-          categoryNewCollected += newThisCall;
-          remainingNeeded = Math.max(0, remainingTarget - categoryNewCollected);
-
-          totalNewCount += newThisCall;
-          totalUpdatedCount += updatedThisCall;
-          totalCreditsUsed += (res.creditsUsed ?? 1);
-        }
+        totalProcessedCount += (result.totalProcessed || 0);
+        totalNewCount += (result.totalNew || 0);
+        totalUpdatedCount += (result.totalUpdated || 0);
+        totalValidNewCount += (result.totalValidNewForTarget || 0);
+        totalOffTargetCount += (result.totalOffTarget || 0);
+        totalUnclassifiedCount += (result.totalUnclassified || 0);
+        totalCreditsUsed += (result.totalCreditsUsed || 0);
 
         processedCats++;
       } catch (err: any) {
@@ -5177,6 +5137,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         open: true,
         totalProcessed: totalProcessedCount,
         newProducts: totalNewCount,
+        validNewProductsForTarget: totalValidNewCount,
+        offTargetProducts: totalOffTargetCount,
+        unclassifiedProducts: totalUnclassifiedCount,
         updatedProducts: totalUpdatedCount,
         creditsUsed: totalCreditsUsed,
         categoriesProcessed: processedCats,
