@@ -6581,7 +6581,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     const stat = safeCollectorCategories.find((c) => c.category === catConfig.filterKey);
                     // Strictly use productCount from TRIM(query_source) in MySQL
                     const productCount = stat?.productCount ?? 0;
-                    const coverageCount = stat?.coverageCount ?? (productCount > 0 ? 1 : 0);
+                    const validSubcategories = (catConfig.subcategories || []).filter((s) => s !== 'Todas');
+                    const totalSubcats = validSubcategories.length;
+                    const coveredFromStats = stat?.subcategories
+                      ? stat.subcategories.filter((s) => s.subcategory !== 'Todas' && (s.productCount > 0 || (s as any).count > 0)).length
+                      : 0;
+                    const coverageCount = stat?.coverageCount ?? (productCount > 0 ? Math.max(1, coveredFromStats) : 0);
                     const isActive = productCount > 0;
 
                     return (
@@ -6642,7 +6647,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                               onClick={() => toggleCategoryDrawer(catConfig.filterKey)}
                               className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-amber-700 text-[11px] font-bold flex items-center gap-1"
                             >
-                              <span>Subcats ({catConfig.subcategories.length})</span>
+                              <span>Subcats ({totalSubcats})</span>
                               {isDrawerOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                             </button>
                           </div>
@@ -6652,7 +6657,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-slate-100">
                           <span>Armazenados: <strong className="text-slate-900 font-extrabold">{productCount} prods</strong></span>
                           <span>
-                            Cobertura: <strong className="text-amber-700 font-extrabold">{coverageCount}/{catConfig.subcategories.length} subcats</strong>
+                            Cobertura: <strong className="text-amber-700 font-extrabold">{coverageCount}/{totalSubcats} subcats</strong>
                           </span>
                           <button
                             type="button"
@@ -6677,7 +6682,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                             </div>
 
                             <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                              {catConfig.subcategories.map((subName) => {
+                              {validSubcategories.map((subName) => {
                                 const isSubChecked = selectedSubs.includes(subName);
                                 const subStat = stat?.subcategories?.find((s) => s.subcategory === subName || (s as any).name === subName);
                                 const count = subStat?.productCount ?? 0;
