@@ -4,6 +4,7 @@ import {
   OFFICIAL_TIKTOK_CHILD_CATEGORIES,
   classifyProductFull,
 } from '../server/taxonomy.js';
+import { inferUnclassifiedSubcategory } from '../server/unclassifiedAuditService.js';
 
 function runTestSuite() {
   console.log('====================================================');
@@ -171,6 +172,93 @@ function runTestSuite() {
     totalChildrenCount > 1500,
     `Child categories oficiais sincronizadas: ${totalChildrenCount}`
   );
+
+  // TEST 7: Motor de inferência em memória para produtos sem subcategoria
+  console.log('\n--- TESTE 7: MOTOR DE INFERÊNCIA EM MEMÓRIA (PRIORIDADES E CONFIANÇA) ---');
+  // High confidence via unambiguous alias
+  const unclassifiedProd1 = {
+    product_id: '101',
+    title: 'Fritadeira Elétrica Air Fryer 4L sem Óleo 1500W',
+    category_path: 'Eletrodomésticos',
+    query_source: 'Eletrodomésticos',
+  };
+  const infRes1 = inferUnclassifiedSubcategory(unclassifiedProd1);
+  assert(
+    infRes1.currentCategory === 'Eletrodomésticos',
+    'Categoria mantida corretamente em Eletrodomésticos'
+  );
+  assert(
+    infRes1.suggestedSubcategory === 'Eletrodomésticos',
+    'Subcategoria sugerida corretamente via alias inequívoco "Air Fryer"'
+  );
+  assert(
+    infRes1.confidence === 'ALTA',
+    'Confiança ALTA atribuída para alias forte'
+  );
+
+  // Test 8: Restrição estrita de escopo de categoria (não sugere subcategoria de outra categoria)
+  console.log('\n--- TESTE 8: RESTRIÇÃO ESTRITA À CATEGORIA PAI (SEM VAZAMENTO CROSS-CATEGORY) ---');
+  const beautyProductWithCarWord = {
+    product_id: '102',
+    title: 'Batom Matte Longa Duração Cor Vermelho Carro Luxo',
+    category_path: 'Beleza e cuidados pessoais',
+    query_source: 'Beleza e cuidados pessoais',
+  };
+  const infRes2 = inferUnclassifiedSubcategory(beautyProductWithCarWord);
+  assert(
+    infRes2.currentCategory === 'Beleza e cuidados pessoais',
+    'Categoria identificada como Beleza e cuidados pessoais'
+  );
+  assert(
+    infRes2.suggestedSubcategory === 'Maquiagem',
+    'Subcategoria sugerida estritamente dentro de Beleza (Maquiagem) e ignorou termo automotivo',
+    `Recebido: ${infRes2.suggestedSubcategory}`
+  );
+  assert(
+    OFFICIAL_TIKTOK_TAXONOMY['Beleza e cuidados pessoais'].includes(infRes2.suggestedSubcategory!),
+    'Subcategoria sugerida pertence comprovadamente a Beleza e cuidados pessoais'
+  );
+
+  // Test 9: Ambiguidade / Conflito resulta em NENHUMA (sem chute arbitrário)
+  console.log('\n--- TESTE 9: TRATAMENTO DE AMBIGUIDADE (CONFIDENCE NENHUMA QUANDO HÁ CONFLITO) ---');
+  const ambiguousProduct = {
+    product_id: '103',
+    title: 'Produto Especial para Casa e Cozinha Geral',
+    category_path: 'Suprimentos domésticos',
+    query_source: 'Suprimentos domésticos',
+  };
+  const infRes3 = inferUnclassifiedSubcategory(ambiguousProduct);
+  assert(
+    infRes3.confidence === 'NENHUMA' || infRes3.confidence === 'BAIXA',
+    'Produto sem termos fortes ou conflitante recebe NENHUMA ou BAIXA',
+    `Confiança: ${infRes3.confidence}`
+  );
+  assert(
+    infRes3.suggestedSubcategory === null || OFFICIAL_TIKTOK_TAXONOMY['Suprimentos domésticos'].includes(infRes3.suggestedSubcategory!),
+    'Se sugerido algo, obrigatoriamente pertence a Suprimentos domésticos'
+  );
+
+  // Test 10: Child category estrita na inferência
+  console.log('\n--- TESTE 10: INFERÊNCIA ESTRITA DE CHILD CATEGORY ---');
+  const shoesProduct = {
+    product_id: '104',
+    title: 'Tênis de Corrida Masculino Esportivo Leve e Respirável',
+    category_path: 'Sapatos',
+    query_source: 'Sapatos',
+  };
+  const infRes4 = inferUnclassifiedSubcategory(shoesProduct);
+  if (infRes4.suggestedSubcategory && infRes4.suggestedChildCategory) {
+    const validChildren = OFFICIAL_TIKTOK_CHILD_CATEGORIES['Sapatos']?.[infRes4.suggestedSubcategory] || [];
+    assert(
+      validChildren.includes(infRes4.suggestedChildCategory),
+      `Child category "${infRes4.suggestedChildCategory}" pertence à whitelist de "${infRes4.suggestedSubcategory}"`
+    );
+  } else {
+    assert(
+      infRes4.suggestedChildCategory === null,
+      'Sem child category segura, retorna null'
+    );
+  }
 
   console.log('\n====================================================');
   console.log(`RESULTADO FINAL DOS TESTES: ${passedTests}/${totalTests} PASSARAM!`);
