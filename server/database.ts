@@ -1028,6 +1028,25 @@ export function ensureProductMinerTables(): Promise<void> {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
+      try {
+        const [tspCols]: any = await db.query(`SHOW COLUMNS FROM tiktok_shop_products`);
+        const tspColNames = Array.isArray(tspCols) ? tspCols.map((c: any) => c.Field) : [];
+        if (!tspColNames.includes('classified_category')) {
+          await db.query(`ALTER TABLE tiktok_shop_products ADD COLUMN classified_category VARCHAR(120) DEFAULT NULL`).catch(() => {});
+        }
+        if (!tspColNames.includes('classified_subcategory')) {
+          await db.query(`ALTER TABLE tiktok_shop_products ADD COLUMN classified_subcategory VARCHAR(120) DEFAULT NULL`).catch(() => {});
+        }
+        if (!tspColNames.includes('classified_child_category')) {
+          await db.query(`ALTER TABLE tiktok_shop_products ADD COLUMN classified_child_category VARCHAR(120) DEFAULT NULL`).catch(() => {});
+        }
+        if (!tspColNames.includes('classification_source')) {
+          await db.query(`ALTER TABLE tiktok_shop_products ADD COLUMN classification_source VARCHAR(50) DEFAULT NULL`).catch(() => {});
+        }
+      } catch (tspColErr: any) {
+        console.warn('[MySQL tiktok_shop_products Columns Check Warning]:', tspColErr?.message || tspColErr);
+      }
+
       await db.query(`
         CREATE TABLE IF NOT EXISTS tiktok_shop_product_snapshots (
           id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

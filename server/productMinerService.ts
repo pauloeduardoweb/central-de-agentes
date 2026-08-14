@@ -2503,7 +2503,7 @@ export function classifyProductToCategoryAndSubcategory(product: {
 }): { category: string; subcategory: string; childCategory: string | null } {
   const res = classifyProductFull(product);
   return {
-    category: res.category,
+    category: res.category || 'Não classificado',
     subcategory: res.subcategory || 'Geral',
     childCategory: res.childCategory,
   };
@@ -2519,15 +2519,9 @@ export type ReclassificationReport = {
   totalWithoutSubcategory: number;
   totalWithChildCategory: number;
   totalWithoutChildCategory: number;
-  conflictsBeforeResolution: number;
-  conflictsAfterResolution: 0;
   categoryCounts: Record<string, number>;
   subcategoryCounts: Record<string, number>;
   unclassifiedByCategory: Record<string, number>;
-  leftInfantil: number;
-  enteredInfantil: number;
-  remainedInInfantil: number;
-  movedFromInfantilTo: Record<string, number>;
   socialCrawlCalled: false;
   creditsConsumed: 0;
 };
@@ -2544,15 +2538,9 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
       totalWithoutSubcategory: 0,
       totalWithChildCategory: 0,
       totalWithoutChildCategory: 0,
-      conflictsBeforeResolution: 0,
-      conflictsAfterResolution: 0,
       categoryCounts: {},
       subcategoryCounts: {},
       unclassifiedByCategory: {},
-      leftInfantil: 0,
-      enteredInfantil: 0,
-      remainedInInfantil: 0,
-      movedFromInfantilTo: {},
       socialCrawlCalled: false,
       creditsConsumed: 0,
     };
@@ -2560,7 +2548,9 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
   await ensureProductMinerTables();
 
   const [rows]: any = await db.query(
-    `SELECT product_id, title, category_path, query_source, seller_name FROM tiktok_shop_products`
+    `SELECT product_id, title, category_path, query_source, seller_name,
+            classified_category, classified_subcategory, classified_child_category, classification_source
+     FROM tiktok_shop_products`
   );
 
   const products = Array.isArray(rows) ? rows : [];
@@ -2580,16 +2570,17 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
   let totalChanged = 0;
   let totalMaintained = 0;
 
-  // Group products by (newPath, newQuerySource) to execute clean bulk SQL updates
-  const groupMap = new Map<string, { newPath: string; newQuerySource: string; ids: string[] }>();
+  // Group products by derived classification to execute bulk updates without touching category_path or query_source
+  const groupMap = new Map<string, {
+    classifiedCat: string | null;
+    classifiedSub: string | null;
+    classifiedChild: string | null;
+    source: string;
+    ids: string[];
+  }>();
 
   for (const p of products) {
-    const oldPath = String(p.category_path || '');
-    const oldQuerySource = String(p.query_source || '');
-
-    const { category, subcategory, childCategory, resolvedPath } = classifyProductFull(p);
-    const newPath = resolvedPath;
-    const newQuerySource = category;
+    const { category, subcategory, childCategory, source } = classifyProductFull(p);
 
     if (category) {
       classifiedCount++;
@@ -2612,13 +2603,28 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
       withoutChildCount++;
     }
 
-    const hasChanged = oldPath !== newPath || oldQuerySource !== newQuerySource;
+    const prevCat = p.classified_category || null;
+    const prevSub = p.classified_subcategory || null;
+    const prevChild = p.classified_child_category || null;
+    const prevSource = p.classification_source || null;
+
+    const hasChanged =
+      prevCat !== category ||
+      prevSub !== subcategory ||
+      prevChild !== childCategory ||
+      prevSource !== source;
 
     if (hasChanged) {
       totalChanged++;
-      const key = `${newPath}|||${newQuerySource}`;
+      const key = `${category ?? '__NULL__'}|||${subcategory ?? '__NULL__'}|||${childCategory ?? '__NULL__'}|||${source}`;
       if (!groupMap.has(key)) {
-        groupMap.set(key, { newPath, newQuerySource, ids: [] });
+        groupMap.set(key, {
+          classifiedCat: category,
+          classifiedSub: subcategory,
+          classifiedChild: childCategory,
+          source,
+          ids: [],
+        });
       }
       groupMap.get(key)!.ids.push(String(p.product_id));
     } else {
@@ -2626,17 +2632,17 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
     }
   }
 
-  // Execute bulk updates in chunks of 200 IDs for safety and efficiency
+  // Execute bulk updates on derived columns ONLY — NEVER overwrite raw category_path or query_source
   for (const group of groupMap.values()) {
-    const { newPath, newQuerySource, ids } = group;
+    const { classifiedCat, classifiedSub, classifiedChild, source, ids } = group;
     for (let i = 0; i < ids.length; i += 200) {
       const chunk = ids.slice(i, i + 200);
       const placeholders = chunk.map(() => '?').join(',');
       await db.query(
         `UPDATE tiktok_shop_products
-         SET category_path = ?, query_source = ?
+         SET classified_category = ?, classified_subcategory = ?, classified_child_category = ?, classification_source = ?
          WHERE product_id IN (${placeholders})`,
-        [newPath, newQuerySource, ...chunk]
+        [classifiedCat, classifiedSub, classifiedChild, source, ...chunk]
       );
     }
   }
@@ -2651,15 +2657,9 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
     totalWithoutSubcategory: withoutSubcategoryCount,
     totalWithChildCategory: withChildCount,
     totalWithoutChildCategory: withoutChildCount,
-    conflictsBeforeResolution: 0,
-    conflictsAfterResolution: 0,
     categoryCounts,
     subcategoryCounts,
     unclassifiedByCategory,
-    leftInfantil: 0,
-    enteredInfantil: 0,
-    remainedInInfantil: 0,
-    movedFromInfantilTo: {},
     socialCrawlCalled: false,
     creditsConsumed: 0,
   };

@@ -32,7 +32,8 @@ export const COLLECTOR_CATEGORIES = [
 
 export type CollectorCategoryName = (typeof COLLECTOR_CATEGORIES)[number];
 
-export const OFFICIAL_TIKTOK_CHILD_CATEGORIES: Record<string, Record<string, string[]>> = {};
+export { OFFICIAL_TIKTOK_CHILD_CATEGORIES } from './childTaxonomyData.js';
+import { OFFICIAL_TIKTOK_CHILD_CATEGORIES } from './childTaxonomyData.js';
 
 export const OFFICIAL_TIKTOK_TAXONOMY: Record<string, string[]> = {
   'Acessórios de moda': [
@@ -616,10 +617,11 @@ export function getCategoryAliases(catName: string): string[] {
 /**
  * Strict single-winner classification engine.
  * Guarantees:
- * 1. Exactly 1 Category (out of the 26 official categories)
- * 2. At most 1 Subcategory (strictly belonging to the Category)
- * 3. At most 1 Child Category (strictly belonging to the Subcategory)
+ * 1. At most 1 Category (out of the 26 official categories, or null if unclassifiable)
+ * 2. At most 1 Subcategory (strictly belonging to the Category, or null)
+ * 3. At most 1 Child Category (strictly belonging to the Subcategory from OFFICIAL_TIKTOK_CHILD_CATEGORIES, or null)
  * 4. Zero overlap across sibling subcategories.
+ * 5. Zero arbitrary fallbacks (no forced fallback to Utensílios de cozinha).
  */
 export function classifyProductFull(product: {
   title?: string;
@@ -627,11 +629,11 @@ export function classifyProductFull(product: {
   query_source?: string;
   seller_name?: string;
 }): {
-  category: string;
+  category: string | null;
   subcategory: string | null;
   childCategory: string | null;
   resolvedPath: string;
-  source: 'category_path' | 'alias' | 'title';
+  source: 'category_path' | 'alias' | 'title' | 'none';
 } {
   const rawPath = String(product.category_path || '').trim();
   const rawQuery = String(product.query_source || '').trim();
@@ -640,7 +642,7 @@ export function classifyProductFull(product: {
   let resolvedCat: string | null = null;
   let resolvedSub: string | null = null;
   let resolvedChild: string | null = null;
-  let resolutionSource: 'category_path' | 'alias' | 'title' = 'category_path';
+  let resolutionSource: 'category_path' | 'alias' | 'title' | 'none' = 'none';
 
   // ----------------------------------------------------
   // STEP 1: RESOLVE MAIN CATEGORY
@@ -648,7 +650,7 @@ export function classifyProductFull(product: {
   // Priority 2: query_source matching official category
   // Priority 3: category_path contains alias
   // Priority 4: title contains alias
-  // Fallback: query_source or default
+  // No arbitrary fallback to Utensílios: if not resolved, category = null.
   // ----------------------------------------------------
   if (rawPath) {
     const firstToken = rawPath.split(/[>/]/)[0]?.trim();
@@ -701,11 +703,15 @@ export function classifyProductFull(product: {
     }
   }
 
+  // If category cannot be determined with confidence, return all nulls
   if (!resolvedCat) {
-    resolvedCat = rawQuery || 'Utensílios de cozinha';
-    if (!COLLECTOR_CATEGORIES.includes(resolvedCat as any)) {
-      resolvedCat = 'Utensílios de cozinha';
-    }
+    return {
+      category: null,
+      subcategory: null,
+      childCategory: null,
+      resolvedPath: '',
+      source: 'none',
+    };
   }
 
   // ----------------------------------------------------
@@ -779,15 +785,62 @@ export function classifyProductFull(product: {
   }
 
   // ----------------------------------------------------
-  // STEP 3: RESOLVE CHILD CATEGORY (3rd Level Filter - Child of resolvedSub)
+  // STEP 3: RESOLVE CHILD CATEGORY (3rd Level Filter - Whitelisted Child of resolvedSub)
+  // Whitelist rule: Must exist in OFFICIAL_TIKTOK_CHILD_CATEGORIES[resolvedCat][resolvedSub]
   // ----------------------------------------------------
-  if (resolvedSub && rawPath) {
-    const pathTokens = rawPath.split(/[>/]/).map((t) => t.trim()).filter(Boolean);
-    if (pathTokens.length >= 3) {
-      const thirdToken = pathTokens[2].trim();
-      const thirdTokenNorm = removeAccents(thirdToken);
-      if (thirdTokenNorm !== 'geral' && thirdTokenNorm !== 'todas') {
-        resolvedChild = thirdToken;
+  if (resolvedSub) {
+    const officialChildren = (OFFICIAL_TIKTOK_CHILD_CATEGORIES[resolvedCat]?.[resolvedSub] || []).filter(
+      (c) => c !== 'Todas'
+    );
+
+    if (officialChildren.length > 0) {
+      // 3.1: Check 3rd level token from category_path
+      if (rawPath) {
+        const pathTokens = rawPath.split(/[>/]/).map((t) => t.trim()).filter(Boolean);
+        if (pathTokens.length >= 3) {
+          const thirdToken = pathTokens[2].trim();
+          const thirdTokenNorm = removeAccents(thirdToken);
+          if (thirdTokenNorm !== 'geral' && thirdTokenNorm !== 'todas') {
+            // Check exact or normalized match against official children
+            for (const child of officialChildren) {
+              if (removeAccents(child) === thirdTokenNorm) {
+                resolvedChild = child;
+                break;
+              }
+            }
+          }
+        }
+
+        // 3.2: Check subsequent tokens or full path against official children
+        if (!resolvedChild && pathTokens.length > 3) {
+          for (let i = 3; i < pathTokens.length; i++) {
+            const tokNorm = removeAccents(pathTokens[i]);
+            for (const child of officialChildren) {
+              if (removeAccents(child) === tokNorm) {
+                resolvedChild = child;
+                break;
+              }
+            }
+            if (resolvedChild) break;
+          }
+        }
+      }
+
+      // 3.3: Textual search in title ONLY within the official children of the winning subcategory
+      if (!resolvedChild && rawTitle) {
+        const titleNorm = ` ${removeAccents(rawTitle)} `;
+        let bestChildMatch: { child: string; len: number } | null = null;
+        for (const child of officialChildren) {
+          const childNorm = removeAccents(child);
+          if (childNorm.length >= 3 && titleNorm.includes(childNorm)) {
+            if (!bestChildMatch || childNorm.length > bestChildMatch.len) {
+              bestChildMatch = { child, len: childNorm.length };
+            }
+          }
+        }
+        if (bestChildMatch) {
+          resolvedChild = bestChildMatch.child;
+        }
       }
     }
   }
