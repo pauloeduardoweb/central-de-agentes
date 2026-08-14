@@ -771,6 +771,144 @@ async function runStrictTargetExpansionTestSuite() {
     assert(res.totalValidNewForTarget === 1, 'Produto da Sub 3 foi validado e contabilizado');
   }
 
+  // ========================================================================
+  // CASO 15: Meta atingida no meio das subcategorias (ex: na sub 6 de 10) encerra com TARGET_REACHED
+  // ========================================================================
+  console.log('\n--- CASO 15: META ATINGIDA ENCERRA COM TARGET_REACHED E CONSULTAS PARCIAIS ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 173,
+      categoryTargetLimit: 300, // déficit de 127
+      subcategories: Array.from({ length: 10 }, (_, i) => ({
+        subcategory: `Subcat ${i + 1}`,
+        currentCount: 0,
+        allocatedTarget: 20,
+        priority: 0,
+        estimatedCredits: 1,
+      })),
+    })];
+
+    const visitedSubs: string[] = [];
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 300,
+      plans: testPlans,
+      searchFn: async (params) => {
+        const sub = params.collectionSubcategory || '';
+        if (!visitedSubs.includes(sub)) visitedSubs.push(sub);
+        // Cada subcategoria entrega 30 produtos válidos
+        const prods = Array.from({ length: 30 }, (_, pIdx) =>
+          createMockProduct({ productId: `p_${sub}_${pIdx}`, title: `Produto ${sub} ${pIdx}`, category: targetCategory })
+        );
+        return {
+          products: prods,
+          creditsUsed: 1,
+          hasMore: true,
+          newProductsCount: 30,
+          updatedProductsCount: 0,
+          insertedIds: prods.map((p) => p.productId),
+        };
+      },
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(summary.stopReason === 'TARGET_REACHED', 'stopReason é TARGET_REACHED');
+    assert(summary.finalValidCount >= 300, `finalValidCount atingiu a meta (${summary.finalValidCount} >= 300)`);
+    assert(summary.subcategoriesConsulted < 10, `Interrompeu a navegação assim que bateu a meta (${summary.subcategoriesConsulted} consultadas < 10)`);
+  }
+
+  // ========================================================================
+  // CASO 16: 10 subcategorias esgotadas sem bater a meta encerra com ALL_SUBCATEGORIES_EXHAUSTED
+  // ========================================================================
+  console.log('\n--- CASO 16: 10 SUBCATEGORIAS ESGOTADAS ENCERRAM COM ALL_SUBCATEGORIES_EXHAUSTED ---');
+  {
+    const targetCategory = 'Acessórios de moda';
+    const testPlans = [createMockPlan({
+      category: targetCategory,
+      currentProductCount: 173,
+      categoryTargetLimit: 300, // déficit de 127
+      subcategories: Array.from({ length: 10 }, (_, i) => ({
+        subcategory: `Subcat ${i + 1}`,
+        currentCount: 0,
+        allocatedTarget: 12,
+        priority: 0,
+        estimatedCredits: 1,
+      })),
+    })];
+
+    const visitedSubs: string[] = [];
+    const res = await executeSubcategoryExpansion({
+      selectedCategories: [targetCategory],
+      categoryTargetLimit: 300,
+      plans: testPlans,
+      searchFn: async (params) => {
+        const sub = params.collectionSubcategory || '';
+        if (!visitedSubs.includes(sub)) visitedSubs.push(sub);
+        // Cada subcategoria entrega apenas 2 produtos e esgota imediatamente
+        const prods = Array.from({ length: 2 }, (_, pIdx) =>
+          createMockProduct({ productId: `p_${sub}_${pIdx}`, title: `Produto ${sub} ${pIdx}`, category: targetCategory })
+        );
+        return {
+          products: prods,
+          creditsUsed: 1,
+          hasMore: false,
+          newProductsCount: 2,
+          updatedProductsCount: 0,
+          insertedIds: prods.map((p) => p.productId),
+        };
+      },
+    });
+
+    const summary = res.categorySummaries.find((c) => c.category === targetCategory)!;
+    assert(visitedSubs.length === 10, 'Todas as 10 subcategorias foram consultadas');
+    assert(summary.subcategoriesConsulted === 10, 'subcategoriesConsulted é 10');
+    assert(summary.subcategoriesExhausted === 10, 'subcategoriesExhausted é 10');
+    assert(summary.stopReason === 'ALL_SUBCATEGORIES_EXHAUSTED', 'stopReason é ALL_SUBCATEGORIES_EXHAUSTED');
+    assert(summary.finalValidCount === 173 + 20, `Contagem final é 193 (${summary.finalValidCount})`);
+  }
+
+  // ========================================================================
+  // CASO 17: Simulação de Parser SSE Frontend (Verificação de eventos COMPLETE e buffers fragmentados)
+  // ========================================================================
+  console.log('\n--- CASO 17: PARSER SSE DECODIFICA EVENTOS COMPLETE E CHUNKS FRAGMENTADOS ---');
+  {
+    const ssePayload = [
+      ': ping\n\n',
+      'data: {"type":"PROGRESS","progress":{"currentCategory":"Acessórios de moda","currentSubcategory":"Sub 1","initialValidCount":173,"currentValidTargetCount":188,"validNewProductsForTarget":15,"totalCreditsUsed":2}}\n\n',
+      ': ping\n\n',
+      'data: {"type":"COMPLETE","result":{"success":true,"totalProcessed":30,"totalNew":15,"totalValidNewForTarget":15,"totalCreditsUsed":2,"categorySummaries":[{"category":"Acessórios de moda","initialValidCount":173,"finalValidCount":188,"actualValidGrowth":15,"categoryTargetLimit":300,"validNewProductsForTarget":15,"offTargetProducts":0,"unclassifiedProducts":0,"updatedProducts":0,"totalReceived":30,"creditsUsed":2,"requestsMade":2,"pagesProcessed":2,"totalSelectedSubcategories":10,"subcategoriesConsulted":1,"subcategoriesExhausted":1,"stopReason":"ALL_SUBCATEGORIES_EXHAUSTED"}]}}\n\n',
+    ];
+
+    let finalResult: any = null;
+    let buffer = '';
+    let progressCalls = 0;
+
+    for (const chunk of ssePayload) {
+      buffer += chunk;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith(':')) continue;
+        if (trimmed.startsWith('data: ')) {
+          const jsonStr = trimmed.slice(6).trim();
+          if (jsonStr) {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.type === 'PROGRESS') progressCalls++;
+            if (parsed.type === 'COMPLETE' || parsed.type === 'DONE') finalResult = parsed.result;
+          }
+        }
+      }
+    }
+
+    assert(progressCalls === 1, 'Progresso SSE recebido e despachado');
+    assert(finalResult !== null, 'Evento COMPLETE recebido e decodificado antes do encerramento');
+    assert(finalResult?.categorySummaries?.[0]?.finalValidCount === 188, 'Valores do sumário final decodificados corretamente');
+  }
+
   console.log('\n========================================================================');
   console.log(`RESULTADO DA SUITE: ${passedTests}/${totalTests} TESTES PASSARAM COM SUCESSO!`);
   console.log('========================================================================\n');
