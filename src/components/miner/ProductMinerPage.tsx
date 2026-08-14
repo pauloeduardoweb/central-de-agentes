@@ -4987,9 +4987,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       categoryTargetLimit: expansionTargetCount,
       perSubcategoryMax: 60,
       taxonomyConfig: categoryTaxonomyMap,
+      selectedSubcategoriesMap,
       historyMap: categoryHistoryMap,
     });
-  }, [collectorCategories, selectedExpansionCategories, expansionTargetCount, categoryTaxonomyMap, categoryHistoryMap]);
+  }, [collectorCategories, selectedExpansionCategories, expansionTargetCount, categoryTaxonomyMap, selectedSubcategoriesMap, categoryHistoryMap]);
 
   // Resumo consolidado do plano real com estimativa baseada no histórico de rendimento
   const expansionSummary = useMemo(() => {
@@ -5164,7 +5165,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         categoryIndex: i + 1,
         totalCategories: categoriesToProcess.length,
         subcategoryIndex: 1,
-        totalSubcategoriesInCategory: catPlan?.subcategories?.filter((s) => s.allocatedTarget > 0).length || 1,
+        totalSubcategoriesInCategory: catPlan?.subcategories?.length || 1,
         categoryTargetLimit: expansionTargetCount,
         initialValidCount: currentCount,
         currentValidTargetCount: currentCount,
@@ -5252,25 +5253,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         if (Array.isArray(result.categorySummaries) && result.categorySummaries.length > 0) {
           allCategorySummaries.push(...result.categorySummaries);
         } else {
-          allCategorySummaries.push({
-            category: cat,
-            initialValidCount: currentCount,
-            finalValidCount: currentCount + (result.totalValidNewForTarget || 0),
-            actualValidGrowth: result.totalValidNewForTarget || 0,
-            categoryTargetLimit: expansionTargetCount,
-            validNewProductsForTarget: result.totalValidNewForTarget || 0,
-            offTargetProducts: result.totalOffTarget || 0,
-            unclassifiedProducts: result.totalUnclassified || 0,
-            updatedProducts: result.totalUpdated || 0,
-            totalReceived: result.totalProcessed || 0,
-            creditsUsed: result.totalCreditsUsed || 0,
-            requestsMade: result.totalRequestsMade || 0,
-            pagesProcessed: result.totalPagesProcessed || 0,
-            totalSelectedSubcategories: result.totalSelectedSubcategories || 0,
-            subcategoriesConsulted: result.subcategoriesConsulted || 0,
-            subcategoriesExhausted: result.subcategoriesExhausted || 0,
-            stopReason: (result.totalValidNewForTarget || 0) >= remainingTarget ? 'TARGET_REACHED' : 'ALL_SUBCATEGORIES_EXHAUSTED',
-          });
+          console.error('[Expansion Job Error]: Ausência de categorySummaries no resultado oficial:', result);
+          throw new Error('EXPANSION_RESULT_MISSING_SUMMARY: O servidor concluiu a expansão sem o relatório consolidado de categorias.');
         }
 
         processedCats++;
@@ -5296,7 +5280,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       unclassifiedProducts: totalUnclassifiedCount,
       updatedProducts: totalUpdatedCount,
       creditsUsed: totalCreditsUsed,
-      categoriesProcessed: processedCats > 0 ? processedCats : categoriesToProcess.length,
+      categoriesProcessed: processedCats,
       totalCategoriesRequested: categoriesToProcess.length,
       categorySummaries: allCategorySummaries,
     });
