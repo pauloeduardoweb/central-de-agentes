@@ -923,7 +923,7 @@ async function runStrictTargetExpansionTestSuite() {
   {
     const plans = calculateExpansionPlanFromStats({
       categoryStats: [
-        { category: 'Acessórios de moda', productCount: 206, coverageCount: 5, subcategories: [] },
+        { category: 'Acessórios de moda', productCount: 206, coverageCount: 5, subcategories: [], lastCollectedAt: null, status: 'Ativa' },
       ],
       selectedCategories: ['Acessórios de moda'],
       categoryTargetLimit: 300,
@@ -944,7 +944,7 @@ async function runStrictTargetExpansionTestSuite() {
   {
     const plans = calculateExpansionPlanFromStats({
       categoryStats: [
-        { category: 'Acessórios de moda', productCount: 206, coverageCount: 5, subcategories: [] },
+        { category: 'Acessórios de moda', productCount: 206, coverageCount: 5, subcategories: [], lastCollectedAt: null, status: 'Ativa' },
       ],
       selectedCategories: ['Acessórios de moda'],
       categoryTargetLimit: 300,
@@ -954,12 +954,10 @@ async function runStrictTargetExpansionTestSuite() {
         'Acessórios de moda': {
           category: 'Acessórios de moda',
           sampleCount: 3,
-          avgValidPerCredit: 1.25,
-          medianValidPerCredit: 1.2,
           historicalValidPerCredit: 1.2,
-          lastValidPerCredit: 1.15,
-          totalValidYield: 36,
-          totalCreditsUsed: 30,
+          averageGrowth: 12,
+          averageCredits: 10,
+          lastExecutionDate: new Date().toISOString(),
         },
       },
     });
@@ -978,7 +976,7 @@ async function runStrictTargetExpansionTestSuite() {
   {
     const plans = calculateExpansionPlanFromStats({
       categoryStats: [
-        { category: 'Beleza', productCount: 100, coverageCount: 5, subcategories: [] },
+        { category: 'Beleza', productCount: 100, coverageCount: 5, subcategories: [], lastCollectedAt: null, status: 'Ativa' },
       ],
       selectedCategories: ['Beleza'],
       categoryTargetLimit: 200,
@@ -988,12 +986,10 @@ async function runStrictTargetExpansionTestSuite() {
         'Beleza': {
           category: 'Beleza',
           sampleCount: 5,
-          avgValidPerCredit: 18.0,
-          medianValidPerCredit: 18.0,
           historicalValidPerCredit: 18.0,
-          lastValidPerCredit: 18.5,
-          totalValidYield: 180,
-          totalCreditsUsed: 10,
+          averageGrowth: 36,
+          averageCredits: 2,
+          lastExecutionDate: new Date().toISOString(),
         },
       },
     });
