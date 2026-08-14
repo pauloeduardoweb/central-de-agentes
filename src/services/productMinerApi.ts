@@ -464,6 +464,17 @@ export interface SubcategoryTargetPlan {
   estimatedPages: number;
 }
 
+export interface CategoryHistoryStatApi {
+  category: string;
+  sampleCount: number;
+  historicalValidPerCredit: number | null;
+  minEstimatedYield?: number;
+  maxEstimatedYield?: number;
+  averageGrowth: number;
+  averageCredits: number;
+  lastExecutionDate: string | null;
+}
+
 export interface CategoryExpansionPlan {
   category: string;
   currentProductCount: number;
@@ -473,6 +484,11 @@ export interface CategoryExpansionPlan {
   projectedFinalCount: number;
   unallocatedGap: number;
   estimatedCredits: number;
+  minEstimatedCredits: number;
+  maxEstimatedCredits: number;
+  hasHistoricalData: boolean;
+  historicalValidPerCredit?: number;
+  sampleCount: number;
   subcategories: SubcategoryTargetPlan[];
 }
 
@@ -485,10 +501,30 @@ export interface ExpansionPlanResponse {
     zeroCountSubcategories: number;
     totalAllocatedProducts: number;
     totalEstimatedCredits: number;
+    totalMinEstimatedCredits?: number;
+    totalMaxEstimatedCredits?: number;
+    hasHistoricalDataCount?: number;
     categoryTargetLimit: number;
     perSubcategoryMax: number;
   };
+  historyMap?: Record<string, CategoryHistoryStatApi>;
   plans: CategoryExpansionPlan[];
+}
+
+export async function fetchCategoryExecutionHistory(
+  studentCode: string,
+  categories?: string[]
+): Promise<Record<string, CategoryHistoryStatApi>> {
+  const params = new URLSearchParams();
+  if (categories && categories.length > 0) {
+    params.set('categories', categories.join(','));
+  }
+  const response = await fetch(`/api/product-miner/admin/category-execution-history?${params.toString()}`, {
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data.historyMap || {};
 }
 
 export async function fetchSubcategoryExpansionPlan(
@@ -514,13 +550,16 @@ export async function fetchSubcategoryExpansionPlan(
 }
 
 /**
- * Calcula localmente o plano de expansão com base nas estatísticas das categorias,
- * seguindo com precisão matemática a mesma regra do backend subcategoryExpansionService:
+ * Calcula localmente o plano de expansão com base nas estatísticas das categorias e no histórico de eficiência real:
  * 
- * remainingTarget = Math.max(0, categoryTargetLimit - currentProductCount)
- * allocatedTarget = Math.min(perSubcategoryMax, remainingBudget)
- * estimatedPages = allocatedTarget > 0 ? Math.max(1, Math.ceil(allocatedTarget / 30)) : 0
- * estimatedCredits = SUM(estimatedPages)
+ * Se houver histórico:
+ * baseEstimate = remainingTarget / historicalValidPerCredit
+ * estimatedCredits = Math.ceil(baseEstimate * 1.15) (15% margem de segurança)
+ * minEstimatedCredits = Math.max(1, Math.round(baseEstimate * 0.9))
+ * maxEstimatedCredits = Math.max(minEstimatedCredits, Math.ceil(baseEstimate * 1.25))
+ * 
+ * Se não houver histórico:
+ * Fallback para estimativa teórica por páginas
  * 
  * Zero créditos para categorias já na meta ou acima (remainingTarget <= 0).
  */
@@ -530,6 +569,7 @@ export function calculateExpansionPlanFromStats(params: {
   categoryTargetLimit: number;
   perSubcategoryMax?: number;
   taxonomyConfig?: Record<string, string[]>;
+  historyMap?: Record<string, CategoryHistoryStatApi>;
 }): CategoryExpansionPlan[] {
   const {
     categoryStats,
@@ -537,6 +577,7 @@ export function calculateExpansionPlanFromStats(params: {
     categoryTargetLimit,
     perSubcategoryMax = 60,
     taxonomyConfig,
+    historyMap,
   } = params;
 
   if (!selectedCategories || selectedCategories.length === 0) {
@@ -630,7 +671,35 @@ export function calculateExpansionPlanFromStats(params: {
     const totalAllocated = subPlans.reduce((sum, s) => sum + s.allocatedTarget, 0);
     const projectedFinalCount = currentProductCount + totalAllocated;
     const unallocatedGap = Math.max(0, remainingTarget - totalAllocated);
-    const estimatedCredits = subPlans.reduce((sum, s) => sum + s.estimatedPages, 0);
+    const theoreticalCredits = subPlans.reduce((sum, s) => sum + s.estimatedPages, 0);
+
+    const catHistory = historyMap?.[catName];
+    const hasHistoricalData = Boolean(
+      catHistory &&
+      catHistory.sampleCount > 0 &&
+      catHistory.historicalValidPerCredit !== null &&
+      catHistory.historicalValidPerCredit > 0
+    );
+
+    let estimatedCredits = theoreticalCredits;
+    let minEstimatedCredits = theoreticalCredits;
+    let maxEstimatedCredits = theoreticalCredits;
+    let historicalValidPerCredit: number | undefined = undefined;
+    let sampleCount = 0;
+
+    if (remainingTarget === 0) {
+      estimatedCredits = 0;
+      minEstimatedCredits = 0;
+      maxEstimatedCredits = 0;
+    } else if (hasHistoricalData && catHistory?.historicalValidPerCredit) {
+      const yieldRate = Math.max(0.05, catHistory.historicalValidPerCredit);
+      const baseEstimate = remainingTarget / yieldRate;
+      estimatedCredits = Math.ceil(baseEstimate * 1.15); // 15% margem de segurança
+      minEstimatedCredits = Math.max(1, Math.round(baseEstimate * 0.9));
+      maxEstimatedCredits = Math.max(minEstimatedCredits, Math.ceil(baseEstimate * 1.25));
+      historicalValidPerCredit = Number(catHistory.historicalValidPerCredit.toFixed(2));
+      sampleCount = catHistory.sampleCount;
+    }
 
     plans.push({
       category: catName,
@@ -641,6 +710,11 @@ export function calculateExpansionPlanFromStats(params: {
       projectedFinalCount,
       unallocatedGap,
       estimatedCredits,
+      minEstimatedCredits,
+      maxEstimatedCredits,
+      hasHistoricalData,
+      historicalValidPerCredit,
+      sampleCount,
       subcategories: subPlans,
     });
   }
@@ -892,6 +966,8 @@ export async function executeSubcategoryExpansionStreamApi(
         subcategoriesExhausted: lastProgress?.subcategoryIndex || 0,
         subcategoriesCoverageBefore: 0,
         subcategoriesCoverageAfter: catStat?.coverageCount || 0,
+        plans: [],
+        errors: [],
         categorySummaries: [
           {
             category: catName,
