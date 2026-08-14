@@ -23,6 +23,9 @@ import {
   type CollectorCategoryStat,
   type ProductSearchSource,
   type ReclassificationReport,
+  calculateExpansionPlanFromStats,
+  fetchSubcategoryExpansionPlan,
+  type CategoryExpansionPlan,
 } from '../../services/productMinerApi';
 import {
   ScriptGeneratorModal,
@@ -4960,6 +4963,46 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [selectedSubcategoriesMap, setSelectedSubcategoriesMap] = useState<Record<string, string[]>>({});
   const [openCategoryDrawers, setOpenCategoryDrawers] = useState<Record<string, boolean>>({});
 
+  // Mapeamento de taxonomia oficial das categorias
+  const categoryTaxonomyMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const cat of CATEGORY_CONFIG) {
+      map[cat.filterKey] = (cat.subcategories || []).filter((s) => s !== 'Todas');
+    }
+    return map;
+  }, []);
+
+  // Cálculo reativo do plano de expansão com base estrita no déficit real e nas categorias selecionadas
+  const activeExpansionPlans = useMemo(() => {
+    const safeCollectorCategories = Array.isArray(collectorCategories) ? collectorCategories : [];
+    return calculateExpansionPlanFromStats({
+      categoryStats: safeCollectorCategories,
+      selectedCategories: selectedExpansionCategories,
+      categoryTargetLimit: expansionTargetCount,
+      perSubcategoryMax: 60,
+      taxonomyConfig: categoryTaxonomyMap,
+    });
+  }, [collectorCategories, selectedExpansionCategories, expansionTargetCount, categoryTaxonomyMap]);
+
+  // Resumo consolidado do plano real
+  const expansionSummary = useMemo(() => {
+    const totalCats = selectedExpansionCategories.length;
+    const totalCurrentProducts = activeExpansionPlans.reduce((sum, p) => sum + p.currentProductCount, 0);
+    const totalRemainingTarget = activeExpansionPlans.reduce((sum, p) => sum + p.remainingTarget, 0);
+    const totalAllocatedProducts = activeExpansionPlans.reduce((sum, p) => sum + p.totalAllocated, 0);
+    const totalUnallocatedGap = activeExpansionPlans.reduce((sum, p) => sum + p.unallocatedGap, 0);
+    const totalEstimatedCredits = activeExpansionPlans.reduce((sum, p) => sum + p.estimatedCredits, 0);
+
+    return {
+      totalCats,
+      totalCurrentProducts,
+      totalRemainingTarget,
+      totalAllocatedProducts,
+      totalUnallocatedGap,
+      totalEstimatedCredits,
+    };
+  }, [selectedExpansionCategories.length, activeExpansionPlans]);
+
   // Batch Execution Modal and Progress State
   const [showBatchConfirmModal, setShowBatchConfirmModal] = useState<boolean>(false);
   const [isBatchExecuting, setIsBatchExecuting] = useState<boolean>(false);
@@ -6580,10 +6623,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { count: 100, label: '100 produtos', desc: '~4 págs / 20 crs por cat', tag: 'Rápido' },
-                    { count: 300, label: '300 produtos', desc: '~10 págs / 50 crs por cat', tag: '✨ Recomendado' },
-                    { count: 500, label: '500 produtos', desc: '~17 págs / 85 crs por cat', tag: 'Aprofundado' },
-                    { count: 1000, label: '1.000 produtos', desc: '~34 págs / 170 crs por cat', tag: 'Avançado' },
+                    { count: 100, label: '100 produtos', desc: 'Meta final por categoria', tag: 'Rápido' },
+                    { count: 300, label: '300 produtos', desc: 'Meta final por categoria', tag: '✨ Recomendado' },
+                    { count: 500, label: '500 produtos', desc: 'Meta final por categoria', tag: 'Aprofundado' },
+                    { count: 1000, label: '1.000 produtos', desc: 'Meta final por categoria', tag: 'Avançado' },
                   ].map((opt) => (
                     <button
                       key={opt.count}
@@ -6798,70 +6841,93 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               </div>
 
               {/* Card 3: Execution Estimation & Trigger Panel */}
-              {(() => {
-                const totalCats = selectedExpansionCategories.length;
-                const pagesPerCat = Math.ceil(expansionTargetCount / 30);
-                const estimatedCreditsTotal = totalCats * pagesPerCat * 5;
-                const totalTargetProducts = totalCats * expansionTargetCount;
-
-                return (
-                  <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-amber-50/80 p-5 md:p-6 shadow-md space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 text-amber-800 text-xs font-black uppercase tracking-wider">
-                          <Gauge className="w-4 h-4 text-amber-600" />
-                          Estimativa Pré-Execução de Expansão
-                        </div>
-                        <h3 className="mt-1 text-lg font-black text-slate-900">
-                          Resumo da Operação de Aquisição
-                        </h3>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowBatchConfirmModal(true)}
-                        disabled={isBatchExecuting || totalCats === 0}
-                        className="px-6 py-3.5 rounded-xl font-black text-xs md:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] flex items-center justify-center gap-2.5 disabled:opacity-50"
-                      >
-                        <Rocket className="w-4.5 h-4.5" />
-                        <span>🚀 Iniciar Expansão da Base ({estimatedCreditsTotal} crs)</span>
-                      </button>
+              <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-amber-50/80 p-5 md:p-6 shadow-md space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-amber-800 text-xs font-black uppercase tracking-wider">
+                      <Gauge className="w-4 h-4 text-amber-600" />
+                      Estimativa Baseada no Plano Real da Categoria
                     </div>
+                    <h3 className="mt-1 text-lg font-black text-slate-900">
+                      Resumo da Operação de Aquisição
+                    </h3>
+                  </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-200/60 text-xs">
-                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
-                        <div className="text-[11px] text-slate-500 font-medium">Categorias Ativas</div>
-                        <div className="font-black text-amber-900 text-sm mt-0.5">
-                          {totalCats} de {CATEGORY_CONFIG.length} selecionadas
-                        </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowBatchConfirmModal(true)}
+                    disabled={isBatchExecuting || expansionSummary.totalCats === 0}
+                    className="px-6 py-3.5 rounded-xl font-black text-xs md:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] flex items-center justify-center gap-2.5 disabled:opacity-50"
+                  >
+                    <Rocket className="w-4.5 h-4.5" />
+                    <span>🚀 Iniciar Expansão da Base ({expansionSummary.totalEstimatedCredits} crs)</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-200/60 text-xs">
+                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                    <div className="text-[11px] text-slate-500 font-medium">Categorias Ativas</div>
+                    <div className="font-black text-amber-900 text-sm mt-0.5">
+                      {expansionSummary.totalCats} de {CATEGORY_CONFIG.length} selecionadas
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                    <div className="text-[11px] text-slate-500 font-medium">Meta Final</div>
+                    <div className="font-black text-amber-900 text-sm mt-0.5">
+                      {expansionTargetCount} produtos por categoria
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                    <div className="text-[11px] text-slate-500 font-medium">Produtos Atuais nas Selecionadas</div>
+                    <div className="font-black text-amber-900 text-sm mt-0.5">
+                      {expansionSummary.totalCurrentProducts.toLocaleString('pt-BR')} produtos
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                    <div className="text-[11px] text-slate-500 font-medium">Déficit Planejado</div>
+                    <div className="font-black text-amber-900 text-sm mt-0.5">
+                      até {expansionSummary.totalAllocatedProducts.toLocaleString('pt-BR')} novos prods
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex items-center justify-between">
+                    <div>
+                      <div className="text-[11px] text-slate-500 font-medium">Créditos SocialCrawl Estimados</div>
+                      <div className="font-black text-amber-900 text-base mt-0.5">
+                        {expansionSummary.totalEstimatedCredits} créditos
                       </div>
+                    </div>
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-amber-100/90 text-amber-800 border border-amber-300">
+                      1 cr / página SocialCrawl
+                    </span>
+                  </div>
 
-                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
-                        <div className="text-[11px] text-slate-500 font-medium">Meta Total de Produtos</div>
-                        <div className="font-black text-amber-900 text-sm mt-0.5">
-                          ~{totalTargetProducts.toLocaleString('pt-BR')} prods
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
-                        <div className="text-[11px] text-slate-500 font-medium">Créditos SocialCrawl Estimados</div>
-                        <div className="font-black text-amber-900 text-sm mt-0.5">
-                          ~{estimatedCreditsTotal} créditos
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
-                        <div className="text-[11px] text-slate-500 font-medium">Saldo Disponível na Conta</div>
-                        <div className="font-black text-emerald-700 text-sm mt-0.5">
-                          {credits?.remaining !== null && credits?.remaining !== undefined
-                            ? `${credits.remaining} créditos`
-                            : 'Ativo via SocialCrawl'}
-                        </div>
+                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex items-center justify-between">
+                    <div>
+                      <div className="text-[11px] text-slate-500 font-medium">Saldo Disponível na Conta</div>
+                      <div className="font-black text-emerald-700 text-base mt-0.5">
+                        {credits?.remaining !== null && credits?.remaining !== undefined
+                          ? `${credits.remaining} créditos`
+                          : 'Ativo via SocialCrawl'}
                       </div>
                     </div>
                   </div>
-                );
-              })()}
+                </div>
+
+                {expansionSummary.totalUnallocatedGap > 0 && (
+                  <div className="p-3 rounded-xl bg-amber-100/80 border border-amber-300 text-amber-950 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>
+                      Gap de capacidade: <strong>{expansionSummary.totalUnallocatedGap} produtos</strong> não possuem subcategorias adicionais disponíveis para atingir a meta integral nesta rodada.
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -7021,15 +7087,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 Resumo da Chamada SocialCrawl:
               </div>
 
-              <div className="space-y-1 text-slate-700">
+              <div className="space-y-1.5 text-slate-700">
                 <div>• Categorias Selecionadas: <strong className="text-slate-900">{selectedExpansionCategories.join(', ')}</strong></div>
-                <div>• Meta por Categoria: <strong className="text-slate-900">{expansionTargetCount} produtos</strong></div>
-                <div>• Total de Produtos Alvo: <strong className="text-slate-900">~{(selectedExpansionCategories.length * expansionTargetCount).toLocaleString('pt-BR')} produtos</strong></div>
-                <div>• Estimativa de Consumo: <strong className="text-slate-900">~{selectedExpansionCategories.length * Math.ceil(expansionTargetCount / 30)} créditos</strong></div>
+                <div>• Meta por Categoria: <strong className="text-slate-900">{expansionTargetCount} produtos por categoria</strong></div>
+                <div>• Produtos Atuais na Base: <strong className="text-slate-900">{expansionSummary.totalCurrentProducts.toLocaleString('pt-BR')} produtos</strong></div>
+                <div>• Novos Produtos Planejados: <strong className="text-slate-900">até {expansionSummary.totalAllocatedProducts.toLocaleString('pt-BR')} novos produtos</strong></div>
+                <div>• Estimativa de Consumo: <strong className="text-slate-900">{expansionSummary.totalEstimatedCredits} créditos SocialCrawl (1 cr / pág)</strong></div>
               </div>
 
               <p className="text-slate-600 text-[11px] leading-relaxed pt-1 border-t border-amber-200/60">
-                A operação fará buscas sequenciais na SocialCrawl para alimentar o banco do Geração Z Pro. Todos os novos produtos serão gravados com score e métricas completas.
+                A operação fará buscas sequenciais na SocialCrawl priorizando subcategorias com 0 produtos e respeitando rigorosamente o déficit da categoria.
               </p>
             </div>
 
@@ -7048,7 +7115,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-amber-500/20"
               >
                 <Rocket className="w-4 h-4" />
-                Confirmar e Iniciar
+                <span>Confirmar e Iniciar ({expansionSummary.totalEstimatedCredits} crs)</span>
               </button>
             </div>
           </div>
