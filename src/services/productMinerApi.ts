@@ -513,6 +513,141 @@ export async function fetchSubcategoryExpansionPlan(
   return data as ExpansionPlanResponse;
 }
 
+/**
+ * Calcula localmente o plano de expansão com base nas estatísticas das categorias,
+ * seguindo com precisão matemática a mesma regra do backend subcategoryExpansionService:
+ * 
+ * remainingTarget = Math.max(0, categoryTargetLimit - currentProductCount)
+ * allocatedTarget = Math.min(perSubcategoryMax, remainingBudget)
+ * estimatedPages = allocatedTarget > 0 ? Math.max(1, Math.ceil(allocatedTarget / 30)) : 0
+ * estimatedCredits = SUM(estimatedPages)
+ * 
+ * Zero créditos para categorias já na meta ou acima (remainingTarget <= 0).
+ */
+export function calculateExpansionPlanFromStats(params: {
+  categoryStats: CollectorCategoryStat[];
+  selectedCategories: string[];
+  categoryTargetLimit: number;
+  perSubcategoryMax?: number;
+  taxonomyConfig?: Record<string, string[]>;
+}): CategoryExpansionPlan[] {
+  const {
+    categoryStats,
+    selectedCategories,
+    categoryTargetLimit,
+    perSubcategoryMax = 60,
+    taxonomyConfig,
+  } = params;
+
+  if (!selectedCategories || selectedCategories.length === 0) {
+    return [];
+  }
+
+  const plans: CategoryExpansionPlan[] = [];
+
+  for (const catName of selectedCategories) {
+    const catStat = categoryStats.find((c) => c.category === catName);
+    const currentProductCount = catStat?.productCount || 0;
+    
+    // Obter lista oficial de subcategorias
+    let officialSubs: string[] = [];
+    if (taxonomyConfig && taxonomyConfig[catName]) {
+      officialSubs = taxonomyConfig[catName].filter((s) => s !== 'Todas');
+    } else if (catStat?.subcategories && catStat.subcategories.length > 0) {
+      officialSubs = catStat.subcategories
+        .map((s) => s.subcategory)
+        .filter((s) => s !== 'Todas');
+    }
+
+    const remainingTarget = Math.max(0, categoryTargetLimit - currentProductCount);
+
+    const subCountMap = new Map<string, number>();
+    if (catStat?.subcategories) {
+      for (const s of catStat.subcategories) {
+        if (s.subcategory !== 'Todas') {
+          subCountMap.set(s.subcategory, s.productCount || (s as any).count || 0);
+        }
+      }
+    }
+
+    const rawSubList = officialSubs.map((sub) => {
+      const currentCount = subCountMap.get(sub) || 0;
+      return {
+        category: catName,
+        subcategory: sub,
+        currentCount,
+        isZeroCount: currentCount === 0,
+      };
+    });
+
+    // Ordenação estrita por prioridade:
+    // 1º: isZeroCount === true
+    // 2º: currentCount ASC
+    // 3º: nome da subcategoria ASC
+    rawSubList.sort((a, b) => {
+      if (a.isZeroCount !== b.isZeroCount) {
+        return a.isZeroCount ? -1 : 1;
+      }
+      if (a.currentCount !== b.currentCount) {
+        return a.currentCount - b.currentCount;
+      }
+      return a.subcategory.localeCompare(b.subcategory, 'pt-BR');
+    });
+
+    let remainingBudget = remainingTarget;
+    let rank = 1;
+    const subPlans: SubcategoryTargetPlan[] = [];
+
+    for (const subItem of rawSubList) {
+      if (remainingBudget <= 0) {
+        subPlans.push({
+          category: catName,
+          subcategory: subItem.subcategory,
+          currentCount: subItem.currentCount,
+          isZeroCount: subItem.isZeroCount,
+          priorityRank: rank++,
+          allocatedTarget: 0,
+          estimatedPages: 0,
+        });
+        continue;
+      }
+
+      const allocated = Math.min(perSubcategoryMax, remainingBudget);
+      const estimatedPages = allocated > 0 ? Math.max(1, Math.ceil(allocated / 30)) : 0;
+      remainingBudget -= allocated;
+
+      subPlans.push({
+        category: catName,
+        subcategory: subItem.subcategory,
+        currentCount: subItem.currentCount,
+        isZeroCount: subItem.isZeroCount,
+        priorityRank: rank++,
+        allocatedTarget: allocated,
+        estimatedPages,
+      });
+    }
+
+    const totalAllocated = subPlans.reduce((sum, s) => sum + s.allocatedTarget, 0);
+    const projectedFinalCount = currentProductCount + totalAllocated;
+    const unallocatedGap = Math.max(0, remainingTarget - totalAllocated);
+    const estimatedCredits = subPlans.reduce((sum, s) => sum + s.estimatedPages, 0);
+
+    plans.push({
+      category: catName,
+      currentProductCount,
+      categoryTargetLimit,
+      remainingTarget,
+      totalAllocated,
+      projectedFinalCount,
+      unallocatedGap,
+      estimatedCredits,
+      subcategories: subPlans,
+    });
+  }
+
+  return plans;
+}
+
 export async function executeSubcategoryExpansionApi(
   studentCode: string,
   payload: {
