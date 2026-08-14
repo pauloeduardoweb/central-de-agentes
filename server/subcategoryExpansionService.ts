@@ -38,6 +38,7 @@ export interface CategoryExecutionSummary {
   category: string;
   initialValidCount: number;
   finalValidCount: number;
+  actualValidGrowth: number;
   categoryTargetLimit: number;
   validNewProductsForTarget: number;
   offTargetProducts: number;
@@ -46,6 +47,8 @@ export interface CategoryExecutionSummary {
   totalReceived: number;
   creditsUsed: number;
   subcategoriesConsulted: number;
+  coverageBefore?: number;
+  coverageAfter?: number;
   stopReason: 'TARGET_REACHED' | 'MAX_CREDIT_BUDGET' | 'MAX_PAGES' | 'NO_MORE_RESULTS' | 'NO_VALID_RESULTS' | 'ALL_SUBCATEGORIES_EXHAUSTED' | 'CANCELLED';
 }
 
@@ -330,18 +333,22 @@ export async function executeSubcategoryExpansion(options: {
     let catSubcategoriesConsulted = 0;
     let catStopReason: CategoryExecutionSummary['stopReason'] = 'ALL_SUBCATEGORIES_EXHAUSTED';
 
-    // Orçamento máximo de créditos por categoria (teto de segurança)
-    const categoryCreditLimit = maxCreditBudgetPerCategory || Math.max(15, Math.ceil(catPlan.estimatedCredits * 2.5));
+    // Orçamento máximo de créditos por categoria (estritamente o planejado para a execução atual)
+    const categoryCreditLimit = maxCreditBudgetPerCategory !== undefined && maxCreditBudgetPerCategory > 0
+      ? maxCreditBudgetPerCategory
+      : Math.max(1, catPlan.estimatedCredits);
 
     // Se a categoria já atingiu/ultrapassou a meta inicial ou se totalAllocated === 0, ignorar sem gastar créditos
     let remainingNeeded = Math.max(0, catPlan.categoryTargetLimit - currentValidTargetCount);
     if (remainingNeeded <= 0 || catPlan.totalAllocated <= 0) {
       console.log(`[Subcategory Expansion] Categoria "${catPlan.category}" já possui ${initialValidCount} produtos válidos (Meta: ${catPlan.categoryTargetLimit}). 0 novas requisições necessárias.`);
       catStopReason = 'TARGET_REACHED';
+      const initialCatStat = initialCategories.find((c) => c.category === catPlan.category);
       categorySummaries.push({
         category: catPlan.category,
         initialValidCount,
-        finalValidCount: currentValidTargetCount,
+        finalValidCount: initialValidCount,
+        actualValidGrowth: 0,
         categoryTargetLimit: catPlan.categoryTargetLimit,
         validNewProductsForTarget: 0,
         offTargetProducts: 0,
@@ -350,6 +357,8 @@ export async function executeSubcategoryExpansion(options: {
         totalReceived: 0,
         creditsUsed: 0,
         subcategoriesConsulted: 0,
+        coverageBefore: initialCatStat?.coverageCount || 0,
+        coverageAfter: initialCatStat?.coverageCount || 0,
         stopReason: catStopReason,
       });
       categoriesCompleted++;
@@ -470,8 +479,10 @@ export async function executeSubcategoryExpansion(options: {
             collectionSubcategory: subPlan.subcategory,
           });
 
-          catSubcategoriesConsulted++;
-          subcategoriesConsulted++;
+          if (page === 1) {
+            catSubcategoriesConsulted++;
+            subcategoriesConsulted++;
+          }
           const receivedThisPage = res.totalReceived ?? res.products?.length ?? 0;
           const creditsThisCall = res.creditsUsed || 1;
 
@@ -670,10 +681,20 @@ export async function executeSubcategoryExpansion(options: {
       catStopReason = 'TARGET_REACHED';
     }
 
+    // Releitura OBRIGATÓRIA dos stats oficiais pós-persistência para fonte única de verdade
+    const statsAfterCat = await getCollectorCategoriesStats();
+    const catStatAfter = statsAfterCat.categories.find((c) => c.category === catPlan.category);
+    const officialFinalValidCount = catStatAfter?.productCount ?? currentValidTargetCount;
+    const actualValidGrowth = officialFinalValidCount - initialValidCount;
+    const initialCatStat = initialCategories.find((c) => c.category === catPlan.category);
+    const coverageBefore = initialCatStat?.coverageCount || 0;
+    const coverageAfter = catStatAfter?.coverageCount || 0;
+
     categorySummaries.push({
       category: catPlan.category,
       initialValidCount,
-      finalValidCount: currentValidTargetCount,
+      finalValidCount: officialFinalValidCount,
+      actualValidGrowth,
       categoryTargetLimit: catPlan.categoryTargetLimit,
       validNewProductsForTarget: catValidNewCount,
       offTargetProducts: catOffTargetCount,
@@ -682,6 +703,8 @@ export async function executeSubcategoryExpansion(options: {
       totalReceived: catTotalReceived,
       creditsUsed: catCreditsUsed,
       subcategoriesConsulted: catSubcategoriesConsulted,
+      coverageBefore,
+      coverageAfter,
       stopReason: catStopReason,
     });
 
