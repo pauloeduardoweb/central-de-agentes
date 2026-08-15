@@ -862,7 +862,11 @@ export async function saveVideosToProductVideosTable(productId: string, videos: 
   }
 }
 
-export async function attachAssociatedVideos(products: MinedProduct[]): Promise<MinedProduct[]> {
+export async function attachAssociatedVideos(
+  products: MinedProduct[],
+  minVideoViews: number | null = null,
+  maxVideoViews: number | null = null
+): Promise<MinedProduct[]> {
   if (!isDatabaseConfigured() || !products || products.length === 0) return products;
   await ensureProductMinerTables();
 
@@ -913,7 +917,17 @@ export async function attachAssociatedVideos(products: MinedProduct[]): Promise<
       const vList = videoMap.get(p.productId) || [];
       if (vList.length > 0) {
         p.associatedVideos = vList;
-        p.video = vList[0];
+        if (minVideoViews !== null || maxVideoViews !== null) {
+          const matchVideo = vList.find((v) => {
+            const vCount = v.views ?? 0;
+            const passMin = minVideoViews === null || vCount >= minVideoViews;
+            const passMax = maxVideoViews === null || vCount <= maxVideoViews;
+            return passMin && passMax;
+          });
+          p.video = matchVideo || vList[0];
+        } else {
+          p.video = vList[0];
+        }
       } else if (p.video && p.video.id) {
         p.associatedVideos = [p.video];
       } else {
@@ -2434,7 +2448,7 @@ export async function searchTikTokShopProducts(params: {
       }
 
       const productsWithTrends = await attachTrendMetrics(localProducts);
-      const products = await attachAssociatedVideos(productsWithTrends);
+      const products = await attachAssociatedVideos(productsWithTrends, minVideoViews, maxVideoViews);
       logMinerAcquisition({
         category,
         query,
@@ -3459,3 +3473,161 @@ export async function executeDailyRefresh(options?: { force?: boolean }): Promis
     isCurrentlyRunning: false,
   };
 }
+
+export type DailyPickResult = {
+  hasSpunToday: boolean;
+  pickDate?: string;
+  category?: string;
+  product?: MinedProduct | null;
+};
+
+export async function getCategoryChampion(category: string): Promise<MinedProduct | null> {
+  if (!isDatabaseConfigured()) return null;
+  await ensureProductMinerTables();
+
+  const aliases = getCategoryAliases(category);
+  const ors: string[] = [];
+  const params: any[] = [];
+
+  for (const alias of aliases) {
+    ors.push(`TRIM(p.query_source) = ?`);
+    params.push(alias);
+    ors.push(`LOWER(TRIM(p.query_source)) = LOWER(?)`);
+    params.push(alias);
+    ors.push(`p.category_path = ?`);
+    params.push(alias);
+    ors.push(`p.category_path LIKE ?`);
+    params.push(`${alias} >%`);
+    ors.push(`p.classified_category = ?`);
+    params.push(alias);
+  }
+
+  const whereClause = ors.length > 0 ? `(${ors.join(' OR ')})` : '1=1';
+
+  const [rows]: any = await db.query(
+    `SELECT p.*
+     FROM tiktok_shop_products p
+     WHERE ${whereClause}
+     ORDER BY COALESCE(p.sold_count, 0) DESC, COALESCE(p.rating, 0) DESC, p.last_seen_at DESC
+     LIMIT 1`,
+    params
+  );
+
+  let rawProduct = Array.isArray(rows) && rows[0] ? rowToProduct(rows[0]) : null;
+
+  // Se a categoria específica não tiver nenhum produto, pega o produto mais vendido global como fallback de segurança
+  if (!rawProduct) {
+    const [globalRows]: any = await db.query(
+      `SELECT p.*
+       FROM tiktok_shop_products p
+       ORDER BY COALESCE(p.sold_count, 0) DESC, COALESCE(p.rating, 0) DESC, p.last_seen_at DESC
+       LIMIT 1`
+    );
+    if (Array.isArray(globalRows) && globalRows[0]) {
+      rawProduct = rowToProduct(globalRows[0]);
+    }
+  }
+
+  if (!rawProduct) return null;
+
+  const [withTrends] = await attachTrendMetrics([rawProduct]);
+  const [enriched] = await attachAssociatedVideos([withTrends]);
+  return enriched || null;
+}
+
+export async function getDailyPickStatus(studentCode: string): Promise<DailyPickResult> {
+  const cleanCode = String(studentCode || '').trim();
+  if (!cleanCode || !isDatabaseConfigured()) {
+    return { hasSpunToday: false };
+  }
+  await ensureProductMinerTables();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [rows]: any = await db.query(
+    `SELECT category, product_id, DATE_FORMAT(pick_date, '%Y-%m-%d') as formatted_date
+     FROM tiktok_shop_daily_picks
+     WHERE student_code = ? AND pick_date = CURDATE()
+     LIMIT 1`,
+    [cleanCode]
+  );
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return { hasSpunToday: false };
+  }
+
+  const record = rows[0];
+  let product: MinedProduct | null = null;
+
+  if (record.product_id) {
+    const [pRows]: any = await db.query(
+      `SELECT p.* FROM tiktok_shop_products p WHERE p.product_id = ? LIMIT 1`,
+      [record.product_id]
+    );
+    if (Array.isArray(pRows) && pRows[0]) {
+      const baseProduct = rowToProduct(pRows[0]);
+      const [withTrends] = await attachTrendMetrics([baseProduct]);
+      const [enriched] = await attachAssociatedVideos([withTrends]);
+      product = enriched || null;
+    }
+  }
+
+  // Fallback if product was deleted or missing
+  if (!product && record.category) {
+    product = await getCategoryChampion(record.category);
+  }
+
+  return {
+    hasSpunToday: true,
+    pickDate: record.formatted_date || todayStr,
+    category: record.category,
+    product,
+  };
+}
+
+export async function spinDailyPick(studentCode: string, targetCategory?: string): Promise<DailyPickResult> {
+  const cleanCode = String(studentCode || '').trim();
+  if (!cleanCode) {
+    throw new Error('STUDENT_CODE_REQUIRED');
+  }
+  if (!isDatabaseConfigured()) {
+    throw new Error('DATABASE_NOT_CONFIGURED');
+  }
+  await ensureProductMinerTables();
+
+  // 1. Checa se já girou hoje
+  const existingStatus = await getDailyPickStatus(cleanCode);
+  if (existingStatus.hasSpunToday && existingStatus.product) {
+    return existingStatus;
+  }
+
+  // 2. Determina a categoria sorteada
+  let chosenCategory = String(targetCategory || '').trim();
+  if (!chosenCategory || !(COLLECTOR_CATEGORIES as readonly string[]).includes(chosenCategory)) {
+    const randomIndex = Math.floor(Math.random() * COLLECTOR_CATEGORIES.length);
+    chosenCategory = COLLECTOR_CATEGORIES[randomIndex];
+  }
+
+  // 3. Obtém o produto campeão da categoria
+  const championProduct = await getCategoryChampion(chosenCategory);
+  if (!championProduct || !championProduct.productId) {
+    throw new Error('NO_PRODUCT_AVAILABLE_FOR_CATEGORY');
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // 4. Salva no banco de dados com proteção contra duplicidade
+  await db.query(
+    `INSERT INTO tiktok_shop_daily_picks (student_code, pick_date, category, product_id)
+     VALUES (?, CURDATE(), ?, ?)
+     ON DUPLICATE KEY UPDATE category = VALUES(category), product_id = VALUES(product_id)`,
+    [cleanCode, chosenCategory, championProduct.productId]
+  );
+
+  return {
+    hasSpunToday: true,
+    pickDate: todayStr,
+    category: chosenCategory,
+    product: championProduct,
+  };
+}
+

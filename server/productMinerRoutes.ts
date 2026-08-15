@@ -1,7 +1,22 @@
 import express from 'express';
 import crypto from 'crypto';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
-import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, reclassifyExistingDatabaseProducts, backfillLegacyVideosToProductVideos, extractVideosFromSearchCachePayloads, ProductRankingSort, logProductInteractionEvent } from './productMinerService.js';
+import {
+  searchTikTokShopProducts,
+  refreshMultiPageTikTokShopProducts,
+  getProductMinerRanking,
+  getCollectorCategoriesStats,
+  prepareVideoDownload,
+  getDailyRefreshStatus,
+  executeDailyRefresh,
+  reclassifyExistingDatabaseProducts,
+  backfillLegacyVideosToProductVideos,
+  extractVideosFromSearchCachePayloads,
+  ProductRankingSort,
+  logProductInteractionEvent,
+  getDailyPickStatus,
+  spinDailyPick,
+} from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
 import { db, isDatabaseConfigured, ensureCodigosAcessoTable, ensureProductMinerTables } from './database.js';
 import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin } from './presenceService.js';
@@ -1443,6 +1458,55 @@ productMinerRouter.post('/admin/expansion-jobs/:executionId/cancel', async (req,
     return res.status(500).json({ success: false, error: error?.message || 'CANCEL_JOB_ERROR' });
   }
 });
+
+// ==========================================
+// ROLETA / ESCOLHA DO DIA (DAILY PICK) ROUTES
+// ==========================================
+
+// Obter status do giro do dia para o usuário autenticado
+productMinerRouter.get('/daily-pick/status', async (req, res) => {
+  const access = await requireProductMinerAccess(req, res);
+  if (!access) return;
+
+  const requesterCode = getRequesterCode(req) || 'DEFAULT_STUDENT';
+  try {
+    const status = await getDailyPickStatus(requesterCode);
+    return res.json({
+      success: true,
+      hasSpunToday: status.hasSpunToday,
+      pickDate: status.pickDate,
+      category: status.category,
+      product: status.product,
+    });
+  } catch (error: any) {
+    console.error('[Daily Pick Status Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'DAILY_PICK_STATUS_ERROR' });
+  }
+});
+
+// Realizar o giro da roleta
+productMinerRouter.post('/daily-pick/spin', async (req, res) => {
+  const access = await requireProductMinerAccess(req, res);
+  if (!access) return;
+
+  const requesterCode = getRequesterCode(req) || 'DEFAULT_STUDENT';
+  const { targetCategory } = req.body || {};
+
+  try {
+    const result = await spinDailyPick(requesterCode, targetCategory);
+    return res.json({
+      success: true,
+      hasSpunToday: result.hasSpunToday,
+      pickDate: result.pickDate,
+      category: result.category,
+      product: result.product,
+    });
+  } catch (error: any) {
+    console.error('[Daily Pick Spin Error]:', error);
+    return res.status(500).json({ success: false, error: error?.message || 'DAILY_PICK_SPIN_ERROR' });
+  }
+});
+
 
 
 

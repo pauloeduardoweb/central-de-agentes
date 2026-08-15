@@ -1221,6 +1221,19 @@ export function ensureProductMinerTables(): Promise<void> {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS tiktok_shop_daily_picks (
+          id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          student_code VARCHAR(100) NOT NULL,
+          pick_date DATE NOT NULL,
+          category VARCHAR(150) NOT NULL,
+          product_id VARCHAR(100) NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_tsdp_student_date (student_code, pick_date),
+          INDEX idx_tsdp_date (pick_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
       await ensureDailyCollectionsTable();
       await ensureCategoryExecutionHistoryTable();
       await ensureExpansionJobsTable();
