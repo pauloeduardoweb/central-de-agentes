@@ -1,4 +1,5 @@
 import { db, isDatabaseConfigured, ensureProductMinerTables } from './database.js';
+import { isMasterKey } from './authKeys.js';
 import {
   COLLECTOR_CATEGORIES,
   OFFICIAL_TIKTOK_TAXONOMY,
@@ -3470,6 +3471,11 @@ export type DailyPickResult = {
   pickDate?: string;
   category?: string;
   product?: MinedProduct | null;
+  role: 'mentor' | 'student';
+  dailyLimit: number | null;
+  spinsUsedToday: number;
+  remainingSpins: number | null;
+  canSpin: boolean;
 };
 
 export async function getCategoryChampion(category: string): Promise<MinedProduct | null> {
@@ -3528,31 +3534,54 @@ export async function getCategoryChampion(category: string): Promise<MinedProduc
 
 export async function getDailyPickStatus(studentCode: string): Promise<DailyPickResult> {
   const cleanCode = String(studentCode || '').trim();
+  const isMaster = isMasterKey(cleanCode);
+  const role: 'mentor' | 'student' = isMaster ? 'mentor' : 'student';
+  const dailyLimit = isMaster ? null : 3;
+
   if (!cleanCode || !isDatabaseConfigured()) {
-    return { hasSpunToday: false };
+    return {
+      hasSpunToday: false,
+      role,
+      dailyLimit,
+      spinsUsedToday: 0,
+      remainingSpins: isMaster ? null : 3,
+      canSpin: true,
+    };
   }
   await ensureProductMinerTables();
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const [rows]: any = await db.query(
-    `SELECT category, product_id, DATE_FORMAT(pick_date, '%Y-%m-%d') as formatted_date
+    `SELECT id, category, product_id, DATE_FORMAT(pick_date, '%Y-%m-%d') as formatted_date, created_at
      FROM tiktok_shop_daily_picks
      WHERE student_code = ? AND pick_date = CURDATE()
-     LIMIT 1`,
+     ORDER BY id DESC`,
     [cleanCode]
   );
 
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return { hasSpunToday: false };
+  const spinsUsedToday = Array.isArray(rows) ? rows.length : 0;
+  const remainingSpins = isMaster ? null : Math.max(0, 3 - spinsUsedToday);
+  const canSpin = isMaster ? true : spinsUsedToday < 3;
+  const hasSpunToday = spinsUsedToday > 0;
+
+  if (!hasSpunToday) {
+    return {
+      hasSpunToday: false,
+      role,
+      dailyLimit,
+      spinsUsedToday: 0,
+      remainingSpins,
+      canSpin,
+    };
   }
 
-  const record = rows[0];
+  const latestRecord = rows[0];
   let product: MinedProduct | null = null;
 
-  if (record.product_id) {
+  if (latestRecord.product_id) {
     const [pRows]: any = await db.query(
       `SELECT p.* FROM tiktok_shop_products p WHERE p.product_id = ? LIMIT 1`,
-      [record.product_id]
+      [latestRecord.product_id]
     );
     if (Array.isArray(pRows) && pRows[0]) {
       const baseProduct = rowToProduct(pRows[0]);
@@ -3563,15 +3592,20 @@ export async function getDailyPickStatus(studentCode: string): Promise<DailyPick
   }
 
   // Fallback if product was deleted or missing
-  if (!product && record.category) {
-    product = await getCategoryChampion(record.category);
+  if (!product && latestRecord.category) {
+    product = await getCategoryChampion(latestRecord.category);
   }
 
   return {
     hasSpunToday: true,
-    pickDate: record.formatted_date || todayStr,
-    category: record.category,
+    pickDate: latestRecord.formatted_date || todayStr,
+    category: latestRecord.category,
     product,
+    role,
+    dailyLimit,
+    spinsUsedToday,
+    remainingSpins,
+    canSpin,
   };
 }
 
@@ -3585,10 +3619,12 @@ export async function spinDailyPick(studentCode: string, targetCategory?: string
   }
   await ensureProductMinerTables();
 
-  // 1. Checa se já girou hoje
-  const existingStatus = await getDailyPickStatus(cleanCode);
-  if (existingStatus.hasSpunToday && existingStatus.product) {
-    return existingStatus;
+  const isMaster = isMasterKey(cleanCode);
+  const currentStatus = await getDailyPickStatus(cleanCode);
+
+  // 1. Checa se o aluno já atingiu o limite de 3 giros diários
+  if (!isMaster && currentStatus.spinsUsedToday >= 3) {
+    throw new Error('DAILY_SPIN_LIMIT_REACHED');
   }
 
   // 2. Determina a categoria sorteada
@@ -3606,19 +3642,27 @@ export async function spinDailyPick(studentCode: string, targetCategory?: string
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  // 4. Salva no banco de dados com proteção contra duplicidade
+  // 4. Salva a nova jogada no histórico diário (múltiplas jogadas permitidas por dia)
   await db.query(
     `INSERT INTO tiktok_shop_daily_picks (student_code, pick_date, category, product_id)
-     VALUES (?, CURDATE(), ?, ?)
-     ON DUPLICATE KEY UPDATE category = VALUES(category), product_id = VALUES(product_id)`,
+     VALUES (?, CURDATE(), ?, ?)`,
     [cleanCode, chosenCategory, championProduct.productId]
   );
+
+  const newSpinsUsed = currentStatus.spinsUsedToday + 1;
+  const remainingSpins = isMaster ? null : Math.max(0, 3 - newSpinsUsed);
+  const canSpin = isMaster ? true : newSpinsUsed < 3;
 
   return {
     hasSpunToday: true,
     pickDate: todayStr,
     category: chosenCategory,
     product: championProduct,
+    role: isMaster ? 'mentor' : 'student',
+    dailyLimit: isMaster ? null : 3,
+    spinsUsedToday: newSpinsUsed,
+    remainingSpins,
+    canSpin,
   };
 }
 

@@ -1229,10 +1229,22 @@ export function ensureProductMinerTables(): Promise<void> {
           category VARCHAR(150) NOT NULL,
           product_id VARCHAR(100) NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE KEY uk_tsdp_student_date (student_code, pick_date),
+          INDEX idx_tsdp_student_date (student_code, pick_date),
           INDEX idx_tsdp_date (pick_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_daily_picks DROP INDEX uk_tsdp_student_date`);
+      } catch (_e) {
+        // Unique index was not present or already removed
+      }
+
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_daily_picks ADD INDEX idx_tsdp_student_date (student_code, pick_date)`);
+      } catch (_e) {
+        // Index already present
+      }
 
       await ensureDailyCollectionsTable();
       await ensureCategoryExecutionHistoryTable();

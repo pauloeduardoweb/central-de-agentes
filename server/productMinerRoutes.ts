@@ -1467,6 +1467,11 @@ productMinerRouter.get('/daily-pick/status', async (req, res) => {
       pickDate: status.pickDate,
       category: status.category,
       product: status.product,
+      role: status.role,
+      dailyLimit: status.dailyLimit,
+      spinsUsedToday: status.spinsUsedToday,
+      remainingSpins: status.remainingSpins,
+      canSpin: status.canSpin,
     });
   } catch (error: any) {
     console.error('[Daily Pick Status Error]:', error);
@@ -1490,6 +1495,11 @@ productMinerRouter.post('/daily-pick/spin', async (req, res) => {
       pickDate: result.pickDate,
       category: result.category,
       product: result.product,
+      role: result.role,
+      dailyLimit: result.dailyLimit,
+      spinsUsedToday: result.spinsUsedToday,
+      remainingSpins: result.remainingSpins,
+      canSpin: result.canSpin,
     });
   } catch (error: any) {
     console.error('[Daily Pick Spin Error]:', error);
