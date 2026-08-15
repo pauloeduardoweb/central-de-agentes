@@ -879,3 +879,379 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     </div>
   );
 };
+
+// ==========================================
+// 4. TIKTOK EMBED VIDEO PLAYER MODAL
+// ==========================================
+export function extractCleanTikTokVideoId(video?: { id?: string | null; url?: string | null } | null): string | null {
+  if (!video) return null;
+  if (video.id) {
+    const rawId = String(video.id).trim();
+    if (/^\d{10,25}$/.test(rawId)) {
+      return rawId;
+    }
+  }
+  if (video.url) {
+    const rawUrl = String(video.url).trim();
+    const match = rawUrl.match(/\/video\/(\d{10,25})/i) || rawUrl.match(/\/v\/(\d{10,25})/i) || rawUrl.match(/(\d{15,25})/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+export function getTikTokDirectWatchUrl(video?: { id?: string | null; url?: string | null; author?: string | null } | null): string | null {
+  if (!video) return null;
+  if (video.url && (video.url.startsWith('http://') || video.url.startsWith('https://'))) {
+    return video.url;
+  }
+  const cleanId = extractCleanTikTokVideoId(video);
+  if (cleanId) {
+    const author = video.author ? encodeURIComponent(video.author.replace(/^@/, '')) : 'user';
+    return `https://www.tiktok.com/@${author}/video/${cleanId}`;
+  }
+  return null;
+}
+
+interface TikTokVideoPlayerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  product: ProductMinerProduct | null;
+  onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
+  onOpenDetailModal?: (p: ProductMinerProduct) => void;
+  onToggleFavorite?: (p: ProductMinerProduct) => void;
+  isFavorite?: boolean;
+  onTrackClick?: (p: ProductMinerProduct) => void;
+}
+
+export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
+  isOpen,
+  onClose,
+  product,
+  onOpenAnalysisModal,
+  onOpenDetailModal,
+  onToggleFavorite,
+  isFavorite = false,
+  onTrackClick,
+}) => {
+  const [iframeLoading, setIframeLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const video = product?.video || (product?.associatedVideos && product.associatedVideos[0]) || null;
+  const videoId = extractCleanTikTokVideoId(video);
+  const tiktokWatchUrl = getTikTokDirectWatchUrl(video);
+  const officialProductUrl = product ? getOfficialProductUrl(product) : null;
+
+  // Body scroll lock
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      setIframeLoading(true);
+      setLoadError(false);
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen, product?.productId, videoId]);
+
+  // ESC key listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !product) return null;
+
+  const embedUrl = videoId
+    ? `https://www.tiktok.com/player/v1/${encodeURIComponent(videoId)}?autoplay=1&controls=1`
+    : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-4xl rounded-3xl bg-slate-900 border border-slate-800 p-3 sm:p-5 md:p-6 shadow-2xl text-white my-auto flex flex-col max-h-[96dvh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top Floating Close Button */}
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+              <Play className="w-3.5 h-3.5 fill-current" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 block">
+                Player Oficial TikTok
+              </span>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-200 truncate max-w-[240px] sm:max-w-md">
+                {video?.author ? `@${video.author}` : 'Vídeo Viral'}
+              </h3>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {tiktokWatchUrl ? (
+              <a
+                href={tiktokWatchUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => onTrackClick?.(product)}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-all"
+                title="Abrir no TikTok em nova aba"
+              >
+                <span>Abrir no TikTok</span>
+                <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+              </a>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 sm:p-2.5 rounded-xl bg-slate-800/90 hover:bg-rose-950/80 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 transition-all cursor-pointer"
+              title="Fechar player (ESC)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Main Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 items-center">
+          {/* Column 1: Vertical 9:16 Video Player */}
+          <div className="md:col-span-6 lg:col-span-7 flex justify-center">
+            <div className="relative w-full max-w-[340px] sm:max-w-[360px] md:max-w-[380px] aspect-[9/16] max-h-[68dvh] sm:max-h-[72dvh] rounded-2xl bg-black overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center">
+              {embedUrl && !loadError ? (
+                <>
+                  {iframeLoading && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/90 text-amber-400">
+                      <Loader2 className="w-8 h-8 animate-spin" />
+                      <span className="text-xs font-bold text-slate-300">Carregando Player TikTok...</span>
+                    </div>
+                  )}
+                  <iframe
+                    key={videoId}
+                    src={embedUrl}
+                    title="TikTok Video Player"
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                    allowFullScreen
+                    onLoad={() => setIframeLoading(false)}
+                    onError={() => {
+                      setIframeLoading(false);
+                      setLoadError(true);
+                    }}
+                  />
+                </>
+              ) : (
+                /* Fallback State */
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center bg-slate-950 text-slate-200">
+                  <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <AlertCircle className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1 max-w-xs">
+                    <h4 className="text-sm font-black text-white">
+                      Este vídeo não está disponível para reprodução incorporada.
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Você pode assistir diretamente na plataforma oficial do TikTok.
+                    </p>
+                  </div>
+                  {tiktokWatchUrl ? (
+                    <a
+                      href={tiktokWatchUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => onTrackClick?.(product)}
+                      className="mt-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg transition-all"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Abrir no TikTok</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Column 2: Creator, Metrics, and Related Product */}
+          <div className="md:col-span-6 lg:col-span-5 flex flex-col justify-between space-y-4">
+            {/* Creator profile */}
+            {video ? (
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-black text-xs">
+                      @
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-black text-sm text-white truncate block">
+                        @{video.author || 'creator'}
+                      </span>
+                      {video.authorFollowers !== null && video.authorFollowers !== undefined ? (
+                        <span className="text-[11px] text-slate-400 block font-medium">
+                          {compactNumber(video.authorFollowers)} seguidores
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {onToggleFavorite && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleFavorite(product)}
+                      className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                        isFavorite
+                          ? 'border-rose-500/60 bg-rose-950/60 text-rose-400'
+                          : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-rose-400'
+                      }`}
+                      title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
+                    >
+                      <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+                    </button>
+                  )}
+                </div>
+
+                {/* 5 Video Metrics Grid */}
+                <div className="grid grid-cols-5 gap-1.5 text-center text-xs pt-2 border-t border-slate-800">
+                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <Eye className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
+                    <span className="font-bold text-white text-[11px] block">{compactNumber(video.views)}</span>
+                    <span className="text-[9px] text-slate-500 font-semibold">Views</span>
+                  </div>
+                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <Heart className="w-3.5 h-3.5 mx-auto mb-0.5 text-rose-400" />
+                    <span className="font-bold text-white text-[11px] block">{compactNumber(video.likes)}</span>
+                    <span className="text-[9px] text-slate-500 font-semibold">Likes</span>
+                  </div>
+                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <MessageCircle className="w-3.5 h-3.5 mx-auto mb-0.5 text-sky-400" />
+                    <span className="font-bold text-white text-[11px] block">{compactNumber(video.comments)}</span>
+                    <span className="text-[9px] text-slate-500 font-semibold">Com.</span>
+                  </div>
+                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <Share2 className="w-3.5 h-3.5 mx-auto mb-0.5 text-emerald-400" />
+                    <span className="font-bold text-white text-[11px] block">{compactNumber(video.shares)}</span>
+                    <span className="text-[9px] text-slate-500 font-semibold">Shares</span>
+                  </div>
+                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <Bookmark className="w-3.5 h-3.5 mx-auto mb-0.5 text-amber-400" />
+                    <span className="font-bold text-white text-[11px] block">{compactNumber(video.saves)}</span>
+                    <span className="text-[9px] text-slate-500 font-semibold">Salvos</span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Related Product Summary */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Produto Relacionado</span>
+                <span className="text-amber-400 font-black">{compactNumber(product.soldCount)} vendas</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.title}
+                    className="w-14 h-14 rounded-xl object-cover border border-slate-800 shrink-0 bg-slate-900"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 shrink-0">
+                    <ShoppingBag className="w-6 h-6" />
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1 space-y-1">
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-200 line-clamp-2 leading-tight">
+                    {product.title}
+                  </h4>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs sm:text-sm font-black text-emerald-400">
+                      {(() => {
+                        const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+                        return range ? range.formattedRange : formatMoney(product.priceCents, product.currencySymbol);
+                      })()}
+                    </div>
+                    <div className="text-[11px] text-slate-400 truncate max-w-[110px]">
+                      {product.sellerName || 'TikTok Shop'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-2 gap-2">
+                {onOpenAnalysisModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenAnalysisModal(product);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-all cursor-pointer"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Análise com IA</span>
+                  </button>
+                )}
+
+                {onOpenDetailModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenDetailModal(product);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-all cursor-pointer"
+                  >
+                    <span>Detalhes do Produto</span>
+                  </button>
+                )}
+              </div>
+
+              {officialProductUrl ? (
+                <a
+                  href={officialProductUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => onTrackClick?.(product)}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all"
+                >
+                  <span>Ver Produto no TikTok Shop</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              ) : null}
+
+              {tiktokWatchUrl ? (
+                <a
+                  href={tiktokWatchUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => onTrackClick?.(product)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700/80 transition-all sm:hidden"
+                >
+                  <span>Abrir vídeo no TikTok</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

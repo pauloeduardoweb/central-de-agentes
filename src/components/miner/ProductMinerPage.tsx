@@ -38,6 +38,7 @@ import {
   ScriptGeneratorModal,
   VideoAnalysisModal,
   ProductDetailModal,
+  TikTokVideoPlayerModal,
 } from './ProductMinerModals';
 import { DailyPickRoulette } from './DailyPickRoulette';
 import { getProductPriceRange } from '../../utils/priceHelper';
@@ -4770,202 +4771,69 @@ const ViralVideoCard: React.FC<{
   onToggleFavorite?: (p: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
   onOpenDetailModal?: (p: ProductMinerProduct) => void;
+  onPlayVideo?: (p: ProductMinerProduct) => void;
   onTrackClick?: (p: ProductMinerProduct) => void;
 }> = ({
   product,
-  studentCode,
   position,
   isFavorite = false,
   onToggleFavorite,
   onOpenAnalysisModal,
   onOpenDetailModal,
+  onPlayVideo,
   onTrackClick,
 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isPreparing, setIsPreparing] = useState(false);
-  const [playbackError, setPlaybackError] = useState(false);
-  const [streamFallbackAttempted, setStreamFallbackAttempted] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  // Initial direct playable media URL check
-  const initialPlayableUrl = useMemo(() => {
-    if (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl)) {
-      return product.videoDownload.directMediaUrl;
-    }
-    if (product.video?.url && isDirectPlayableVideoUrl(product.video.url)) {
-      return product.video.url;
-    }
-    return null;
-  }, [product.videoDownload?.directMediaUrl, product.video?.url]);
-
-  const [playableUrl, setPlayableUrl] = useState<string | null>(initialPlayableUrl);
-
   const targetProductUrl = getOfficialProductUrl(product);
   const views = product.video?.views ?? 0;
   const badge = getVideoViewBadge(views);
 
-  const handlePlayClick = async () => {
+  const handlePlayClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     onTrackClick?.(product);
-    setPlaybackError(false);
-
-    if (studentCode && product.productId) {
-      setIsPreparing(true);
-      try {
-        const tokenRes = await fetchVideoPlaybackToken(studentCode, product.productId, product.video?.id);
-        if (tokenRes?.success && tokenRes.streamUrl) {
-          setPlayableUrl(tokenRes.streamUrl);
-          setIsPlaying(true);
-          setIsPreparing(false);
-          return;
-        }
-      } catch (err) {
-        console.warn('[VideoPlay PlaybackToken Error]:', err);
-      } finally {
-        setIsPreparing(false);
-      }
-    }
-
-    // Direct playable media URL check fallback
-    const directUrl = (playableUrl && isDirectPlayableVideoUrl(playableUrl))
-      ? playableUrl
-      : (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl))
-        ? product.videoDownload.directMediaUrl
-        : (product.video?.url && isDirectPlayableVideoUrl(product.video.url))
-          ? product.video.url
-          : null;
-
-    if (directUrl) {
-      setPlayableUrl(directUrl);
-      setIsPlaying(true);
-      return;
-    }
-
-    // Fallback: Show inline error with explicit secondary button.
-    setIsPlaying(false);
-    setPlaybackError(true);
+    onPlayVideo?.(product);
   };
 
   return (
     <article className="group rounded-3xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/80 transition-all flex flex-col h-full text-slate-900 relative">
       {/* Video / Media Hero (aspect 9:16) */}
-      <div className="relative aspect-[9/16] max-h-[520px] w-full bg-slate-950 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center">
-        {isPlaying && playableUrl && !playbackError ? (
-          <video
-            ref={videoRef}
-            src={playableUrl}
-            controls
-            autoPlay
-            playsInline
-            preload="metadata"
-            poster={product.imageUrl || undefined}
-            onError={() => {
-              if (!streamFallbackAttempted && product.productId) {
-                setStreamFallbackAttempted(true);
-                const streamUrl = `/api/product-miner/videos/${encodeURIComponent(product.productId)}${
-                  product.video?.id ? `/${encodeURIComponent(product.video.id)}` : ''
-                }/stream`;
-                setPlayableUrl(streamUrl);
-                setIsPlaying(true);
-              } else {
-                setPlaybackError(true);
-                setIsPlaying(false);
-              }
-            }}
-            className="w-full h-full object-cover bg-black"
+      <div
+        className="relative aspect-[9/16] max-h-[520px] w-full bg-slate-950 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center cursor-pointer group/media"
+        onClick={handlePlayClick}
+      >
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.title}
+            className="w-full h-full object-cover group-hover/media:scale-105 transition-transform duration-500 bg-slate-900"
           />
         ) : (
-          <div className="relative w-full h-full overflow-hidden flex items-center justify-center group/media bg-slate-900">
-            {product.imageUrl ? (
-              <img
-                src={product.imageUrl}
-                alt={product.title}
-                className="w-full h-full object-cover group-hover/media:scale-105 transition-transform duration-500 bg-slate-900"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-900">
-                <ShoppingBag className="w-12 h-12" />
-              </div>
-            )}
-
-            {/* Dark overlay */}
-            <div className="absolute inset-0 bg-black/45 group-hover/media:bg-black/35 transition-all" />
-
-            {/* Play Button or Playback Error Overlay */}
-            {playbackError ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 z-10 text-center bg-black/75 backdrop-blur-xs">
-                <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
-                  <AlertCircle className="w-6 h-6" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-white text-xs font-bold leading-tight">
-                    Não foi possível reproduzir este vídeo aqui.
-                  </p>
-                  <p className="text-slate-300 text-[11px]">
-                    A mídia direta não pôde ser carregada no navegador.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handlePlayClick();
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
-                  >
-                    Tentar novamente
-                  </button>
-                  {product.video?.url ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.open(product.video!.url!, '_blank', 'noopener,noreferrer');
-                      }}
-                      className="px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-white/30"
-                    >
-                      Abrir no TikTok <ExternalLink className="w-3.5 h-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
-                <button
-                  type="button"
-                  disabled={isPreparing}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handlePlayClick();
-                  }}
-                  className="w-16 h-16 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-2xl border-2 border-white flex items-center justify-center transition-all duration-200 cursor-pointer group/btn"
-                  title="Reproduzir vídeo no app"
-                >
-                  {isPreparing ? (
-                    <Loader2 className="w-7 h-7 animate-spin text-white" />
-                  ) : (
-                    <Play className="w-8 h-8 fill-current ml-1 text-white group-hover/btn:scale-110 transition-transform" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  disabled={isPreparing}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handlePlayClick();
-                  }}
-                  className="px-4 py-1.5 rounded-full bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-md backdrop-blur-xs flex items-center gap-1.5 cursor-pointer transition-all"
-                >
-                  {isPreparing ? 'Preparando vídeo...' : 'Assistir vídeo'}
-                </button>
-              </div>
-            )}
+          <div className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-900">
+            <ShoppingBag className="w-12 h-12" />
           </div>
         )}
+
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/45 group-hover/media:bg-black/35 transition-all" />
+
+        {/* Play Button Overlay */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+          <button
+            type="button"
+            onClick={handlePlayClick}
+            className="w-16 h-16 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-2xl border-2 border-white flex items-center justify-center transition-all duration-200 cursor-pointer group/btn"
+            title="Assistir vídeo no player oficial do TikTok"
+          >
+            <Play className="w-8 h-8 fill-current ml-1 text-white group-hover/btn:scale-110 transition-transform" />
+          </button>
+          <button
+            type="button"
+            onClick={handlePlayClick}
+            className="px-4 py-1.5 rounded-full bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-md backdrop-blur-xs flex items-center gap-1.5 cursor-pointer transition-all"
+          >
+            Assistir vídeo
+          </button>
+        </div>
 
         {/* Position badge */}
         {position ? (
@@ -5131,194 +4999,69 @@ const MobileViralVideoCard: React.FC<{
   onToggleFavorite?: (p: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
   onOpenDetailModal?: (p: ProductMinerProduct) => void;
+  onPlayVideo?: (p: ProductMinerProduct) => void;
   onTrackClick?: (p: ProductMinerProduct) => void;
 }> = ({
   product,
-  studentCode,
   position,
   isFavorite = false,
   onToggleFavorite,
   onOpenAnalysisModal,
   onOpenDetailModal,
+  onPlayVideo,
   onTrackClick,
 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isPreparing, setIsPreparing] = useState(false);
-  const [playbackError, setPlaybackError] = useState(false);
-  const [streamFallbackAttempted, setStreamFallbackAttempted] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  const initialPlayableUrl = useMemo(() => {
-    if (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl)) {
-      return product.videoDownload.directMediaUrl;
-    }
-    if (product.video?.url && isDirectPlayableVideoUrl(product.video.url)) {
-      return product.video.url;
-    }
-    return null;
-  }, [product.videoDownload?.directMediaUrl, product.video?.url]);
-
-  const [playableUrl, setPlayableUrl] = useState<string | null>(initialPlayableUrl);
-
   const targetProductUrl = getOfficialProductUrl(product);
   const views = product.video?.views ?? 0;
   const badge = getVideoViewBadge(views);
 
-  const handlePlayClick = async () => {
+  const handlePlayClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     onTrackClick?.(product);
-    setPlaybackError(false);
-
-    if (studentCode && product.productId) {
-      setIsPreparing(true);
-      try {
-        const tokenRes = await fetchVideoPlaybackToken(studentCode, product.productId, product.video?.id);
-        if (tokenRes?.success && tokenRes.streamUrl) {
-          setPlayableUrl(tokenRes.streamUrl);
-          setIsPlaying(true);
-          setIsPreparing(false);
-          return;
-        }
-      } catch (err) {
-        console.warn('[MobileVideoPlay PlaybackToken Error]:', err);
-      } finally {
-        setIsPreparing(false);
-      }
-    }
-
-    // Direct playable media URL check fallback
-    const directUrl = (playableUrl && isDirectPlayableVideoUrl(playableUrl))
-      ? playableUrl
-      : (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl))
-        ? product.videoDownload.directMediaUrl
-        : (product.video?.url && isDirectPlayableVideoUrl(product.video.url))
-          ? product.video.url
-          : null;
-
-    if (directUrl) {
-      setPlayableUrl(directUrl);
-      setIsPlaying(true);
-      return;
-    }
-
-    // Fallback: Show inline error with explicit option.
-    setIsPlaying(false);
-    setPlaybackError(true);
+    onPlayVideo?.(product);
   };
 
   return (
     <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-xs flex flex-col h-full text-slate-900 relative p-2.5 sm:p-3 space-y-2.5">
       {/* Video Container (aspect 9:16) */}
-      <div className="relative aspect-[9/16] max-h-[380px] w-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
-        {isPlaying && playableUrl && !playbackError ? (
-          <video
-            ref={videoRef}
-            src={playableUrl}
-            controls
-            autoPlay
-            playsInline
-            preload="metadata"
-            poster={product.imageUrl || undefined}
-            onError={() => {
-              if (!streamFallbackAttempted && product.productId) {
-                setStreamFallbackAttempted(true);
-                const streamUrl = `/api/product-miner/videos/${encodeURIComponent(product.productId)}${
-                  product.video?.id ? `/${encodeURIComponent(product.video.id)}` : ''
-                }/stream`;
-                setPlayableUrl(streamUrl);
-                setIsPlaying(true);
-              } else {
-                setPlaybackError(true);
-                setIsPlaying(false);
-              }
-            }}
-            className="w-full h-full object-cover bg-black"
+      <div
+        className="relative aspect-[9/16] max-h-[380px] w-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center shrink-0 cursor-pointer"
+        onClick={handlePlayClick}
+      >
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.title}
+            className="w-full h-full object-cover bg-slate-900"
           />
         ) : (
-          <div className="relative w-full h-full overflow-hidden flex items-center justify-center bg-slate-900">
-            {product.imageUrl ? (
-              <img
-                src={product.imageUrl}
-                alt={product.title}
-                className="w-full h-full object-cover bg-slate-900"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-900">
-                <ShoppingBag className="w-8 h-8" />
-              </div>
-            )}
-
-            {/* Dark overlay */}
-            <div className="absolute inset-0 bg-black/45" />
-
-            {/* Play Button or Playback Error Overlay */}
-            {playbackError ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2.5 z-10 text-center bg-black/80 backdrop-blur-xs">
-                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-                <p className="text-white text-[10px] font-bold leading-tight">
-                  Não foi possível reproduzir este vídeo aqui.
-                </p>
-                <div className="flex flex-col gap-1.5 w-full max-w-[140px] pt-0.5">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handlePlayClick();
-                    }}
-                    className="w-full py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-[10px] font-bold transition-all cursor-pointer shadow-xs"
-                  >
-                    Tentar de novo
-                  </button>
-                  {product.video?.url ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.open(product.video!.url!, '_blank', 'noopener,noreferrer');
-                      }}
-                      className="w-full py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-white/30"
-                    >
-                      Abrir no TikTok <ExternalLink className="w-3 h-3" />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
-                <button
-                  type="button"
-                  disabled={isPreparing}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handlePlayClick();
-                  }}
-                  className="w-13 h-13 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-xl border-2 border-white flex items-center justify-center transition-all cursor-pointer"
-                  title="Reproduzir vídeo no app"
-                >
-                  {isPreparing ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-white" />
-                  ) : (
-                    <Play className="w-6 h-6 fill-current ml-0.5 text-white" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  disabled={isPreparing}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handlePlayClick();
-                  }}
-                  className="px-3 py-1 rounded-full bg-black/80 text-white text-[10px] sm:text-[11px] font-bold border border-white/20 shadow-xs backdrop-blur-xs flex items-center gap-1 cursor-pointer"
-                >
-                  {isPreparing ? 'Preparando...' : 'Assistir vídeo'}
-                </button>
-              </div>
-            )}
+          <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-900">
+            <ShoppingBag className="w-8 h-8" />
           </div>
         )}
+
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/45" />
+
+        {/* Play Button Overlay */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
+          <button
+            type="button"
+            onClick={handlePlayClick}
+            className="w-13 h-13 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-xl border-2 border-white flex items-center justify-center transition-all cursor-pointer"
+            title="Assistir vídeo no player oficial do TikTok"
+          >
+            <Play className="w-6 h-6 fill-current ml-0.5 text-white" />
+          </button>
+          <button
+            type="button"
+            onClick={handlePlayClick}
+            className="px-3 py-1 rounded-full bg-black/80 text-white text-[10px] sm:text-[11px] font-bold border border-white/20 shadow-xs backdrop-blur-xs flex items-center gap-1 cursor-pointer"
+          >
+            Assistir vídeo
+          </button>
+        </div>
 
         {/* Position badge */}
         {position ? (
@@ -5360,7 +5103,6 @@ const MobileViralVideoCard: React.FC<{
       {/* Video Creator & Non-Overlapping Stats */}
       {product.video ? (
         <div className="rounded-xl border border-amber-200/70 bg-amber-50/40 p-2.5 space-y-2">
-          {/* Stacked Author & Followers in 2 separate lines to prevent collision */}
           <div className="space-y-0.5">
             <span className="text-[13px] sm:text-[14px] font-black text-slate-900 truncate block leading-tight">
               @{product.video.author || 'creator'}
@@ -5372,9 +5114,7 @@ const MobileViralVideoCard: React.FC<{
             ) : null}
           </div>
 
-          {/* 5 Video Metrics in 2 structured rows */}
           <div className="space-y-1 pt-1.5 border-t border-amber-200/50">
-            {/* Row 1: Views, Likes, Comentários (3 columns) */}
             <div className="grid grid-cols-3 gap-1 text-center bg-white/80 rounded-lg p-1.5 border border-amber-200/30">
               <div title="Views" className="flex flex-col items-center">
                 <Eye className="w-3.5 h-3.5 mb-0.5 text-slate-600" />
@@ -5399,7 +5139,6 @@ const MobileViralVideoCard: React.FC<{
               </div>
             </div>
 
-            {/* Row 2: Compartilhamentos, Salvos (2 columns) */}
             <div className="grid grid-cols-2 gap-1 text-center bg-white/80 rounded-lg p-1.5 border border-amber-200/30">
               <div title="Compartilhamentos" className="flex flex-col items-center">
                 <Share2 className="w-3.5 h-3.5 mb-0.5 text-emerald-600" />
@@ -6436,6 +6175,24 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
   const [analysisModalProduct, setAnalysisModalProduct] = useState<ProductMinerProduct | null>(null);
   const [detailModalProduct, setDetailModalProduct] = useState<ProductMinerProduct | null>(null);
+  const [videoPlayerModalProduct, setVideoPlayerModalProduct] = useState<ProductMinerProduct | null>(null);
+
+  const handleOpenVideoPlayerModal = useCallback(
+    (p: ProductMinerProduct | null) => {
+      setVideoPlayerModalProduct(p);
+      if (p?.productId && studentCode) {
+        trackProductInteraction(studentCode, {
+          productId: p.productId,
+          eventType: 'video_play',
+          query,
+          category: selectedCategory,
+          subcategory: selectedSubcategory,
+          childCategory: selectedChildCategory,
+        });
+      }
+    },
+    [studentCode, query, selectedCategory, selectedSubcategory, selectedChildCategory]
+  );
 
   const handleOpenDetailModal = useCallback(
     (p: ProductMinerProduct | null) => {
@@ -7561,6 +7318,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           onToggleFavorite={toggleFavorite}
           onOpenAnalysisModal={handleOpenAnalysisModal}
           onOpenDetailModal={handleOpenDetailModal}
+          onPlayVideo={handleOpenVideoPlayerModal}
           onTrackClick={handleTrackProductClick}
         />
       ) : mode === 'search' || mode === 'favorites' ? (
@@ -7697,6 +7455,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         onToggleFavorite={toggleFavorite}
                         onOpenAnalysisModal={handleOpenAnalysisModal}
                         onOpenDetailModal={handleOpenDetailModal}
+                        onPlayVideo={handleOpenVideoPlayerModal}
                         onTrackClick={handleTrackProductClick}
                       />
                     );
@@ -7738,6 +7497,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         onToggleFavorite={toggleFavorite}
                         onOpenAnalysisModal={handleOpenAnalysisModal}
                         onOpenDetailModal={handleOpenDetailModal}
+                        onPlayVideo={handleOpenVideoPlayerModal}
                         onTrackClick={handleTrackProductClick}
                       />
                     );
@@ -9072,6 +8832,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       ) : null}
 
       {/* Video & AI Modals */}
+      <TikTokVideoPlayerModal
+        isOpen={Boolean(videoPlayerModalProduct)}
+        onClose={() => setVideoPlayerModalProduct(null)}
+        product={videoPlayerModalProduct}
+        isFavorite={videoPlayerModalProduct ? isFavorited(videoPlayerModalProduct.productId) : false}
+        onToggleFavorite={toggleFavorite}
+        onOpenAnalysisModal={handleOpenAnalysisModal}
+        onOpenDetailModal={handleOpenDetailModal}
+        onTrackClick={handleTrackProductClick}
+      />
+
       <ScriptGeneratorModal
         isOpen={Boolean(scriptModalProduct)}
         onClose={() => setScriptModalProduct(null)}

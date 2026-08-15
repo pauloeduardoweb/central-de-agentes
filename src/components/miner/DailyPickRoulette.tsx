@@ -36,6 +36,7 @@ interface DailyPickRouletteProps {
   onToggleFavorite?: (product: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (product: ProductMinerProduct) => void;
   onOpenDetailModal?: (product: ProductMinerProduct) => void;
+  onPlayVideo?: (product: ProductMinerProduct) => void;
   onTrackClick?: (product: ProductMinerProduct) => void;
 }
 
@@ -88,6 +89,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
   onToggleFavorite,
   onOpenAnalysisModal,
   onOpenDetailModal,
+  onPlayVideo,
   onTrackClick,
 }) => {
   const [loadingStatus, setLoadingStatus] = useState(true);
@@ -554,10 +556,25 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                     <span className="font-bold text-slate-800 text-[11px] truncate">
                       Vídeo: @{pickedProduct.video.author || 'creator'}
                     </span>
-                    <span className="text-[10px] text-amber-800 font-extrabold flex items-center gap-1">
-                      <Flame className="w-3 h-3 fill-current text-amber-600" />
-                      {compactNumber(pickedProduct.video.views)} views
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-amber-800 font-extrabold flex items-center gap-1">
+                        <Flame className="w-3 h-3 fill-current text-amber-600" />
+                        {compactNumber(pickedProduct.video.views)} views
+                      </span>
+                      {onPlayVideo && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onTrackClick?.(pickedProduct);
+                            onPlayVideo(pickedProduct);
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] flex items-center gap-1 shadow-xs cursor-pointer"
+                        >
+                          <Play className="w-2.5 h-2.5 fill-current" />
+                          Assistir
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-4 gap-1 text-center text-[10px] text-slate-600 font-semibold pt-1 border-t border-amber-200/50">
