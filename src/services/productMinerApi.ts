@@ -1239,4 +1239,36 @@ export async function executeSubcategoryExpansionApi(
   throw new Error('Expansão finalizada sem confirmação de resultado.');
 }
 
+export interface DailyPickResponse {
+  success: boolean;
+  hasSpunToday: boolean;
+  pickDate?: string;
+  category?: string;
+  product?: ProductMinerProduct | null;
+  error?: string;
+}
+
+export async function getDailyPickStatusApi(studentCode: string): Promise<DailyPickResponse> {
+  const response = await fetch('/api/product-miner/daily-pick/status', {
+    headers: authHeaders(studentCode),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data;
+}
+
+export async function spinDailyPickApi(studentCode: string, targetCategory?: string): Promise<DailyPickResponse> {
+  const response = await fetch('/api/product-miner/daily-pick/spin', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ targetCategory }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data;
+}
+
 
