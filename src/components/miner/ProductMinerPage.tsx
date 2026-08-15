@@ -4782,6 +4782,7 @@ const ViralVideoCard: React.FC<{
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
+  const [streamFallbackAttempted, setStreamFallbackAttempted] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Initial direct playable media URL check
@@ -4820,11 +4821,11 @@ const ViralVideoCard: React.FC<{
       return;
     }
 
-    // 2. Prepare media URL via backend service
+    // 2. Prepare media URL via backend service with videoId
     if (studentCode && product.productId) {
       setIsPreparing(true);
       try {
-        const res = await prepareProductVideoDownload(studentCode, product.productId);
+        const res = await prepareProductVideoDownload(studentCode, product.productId, product.video?.id);
         if (res?.success && res.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
           setPlayableUrl(res.directMediaUrl);
           setIsPlaying(true);
@@ -4843,7 +4844,17 @@ const ViralVideoCard: React.FC<{
       }
     }
 
-    // 3. Fallback: NEVER open TikTok automatically. Show inline error with explicit secondary button.
+    // 3. Fallback to same-origin stream proxy
+    if (product.productId) {
+      const streamUrl = `/api/product-miner/videos/${encodeURIComponent(product.productId)}${
+        product.video?.id ? `/${encodeURIComponent(product.video.id)}` : ''
+      }/stream`;
+      setPlayableUrl(streamUrl);
+      setIsPlaying(true);
+      return;
+    }
+
+    // 4. Fallback: Show inline error with explicit secondary button.
     setIsPlaying(false);
     setPlaybackError(true);
   };
@@ -4862,8 +4873,17 @@ const ViralVideoCard: React.FC<{
             preload="metadata"
             poster={product.imageUrl || undefined}
             onError={() => {
-              setPlaybackError(true);
-              setIsPlaying(false);
+              if (!streamFallbackAttempted && product.productId) {
+                setStreamFallbackAttempted(true);
+                const streamUrl = `/api/product-miner/videos/${encodeURIComponent(product.productId)}${
+                  product.video?.id ? `/${encodeURIComponent(product.video.id)}` : ''
+                }/stream`;
+                setPlayableUrl(streamUrl);
+                setIsPlaying(true);
+              } else {
+                setPlaybackError(true);
+                setIsPlaying(false);
+              }
             }}
             className="w-full h-full object-cover bg-black"
           />
@@ -5139,6 +5159,7 @@ const MobileViralVideoCard: React.FC<{
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
+  const [streamFallbackAttempted, setStreamFallbackAttempted] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const initialPlayableUrl = useMemo(() => {
@@ -5176,11 +5197,11 @@ const MobileViralVideoCard: React.FC<{
       return;
     }
 
-    // 2. Prepare media URL via backend
+    // 2. Prepare media URL via backend with videoId
     if (studentCode && product.productId) {
       setIsPreparing(true);
       try {
-        const res = await prepareProductVideoDownload(studentCode, product.productId);
+        const res = await prepareProductVideoDownload(studentCode, product.productId, product.video?.id);
         if (res?.success && res.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
           setPlayableUrl(res.directMediaUrl);
           setIsPlaying(true);
@@ -5199,7 +5220,17 @@ const MobileViralVideoCard: React.FC<{
       }
     }
 
-    // 3. Fallback: NEVER open TikTok automatically. Show inline error with explicit option.
+    // 3. Fallback to same-origin stream proxy
+    if (product.productId) {
+      const streamUrl = `/api/product-miner/videos/${encodeURIComponent(product.productId)}${
+        product.video?.id ? `/${encodeURIComponent(product.video.id)}` : ''
+      }/stream`;
+      setPlayableUrl(streamUrl);
+      setIsPlaying(true);
+      return;
+    }
+
+    // 4. Fallback: Show inline error with explicit option.
     setIsPlaying(false);
     setPlaybackError(true);
   };
@@ -5218,8 +5249,17 @@ const MobileViralVideoCard: React.FC<{
             preload="metadata"
             poster={product.imageUrl || undefined}
             onError={() => {
-              setPlaybackError(true);
-              setIsPlaying(false);
+              if (!streamFallbackAttempted && product.productId) {
+                setStreamFallbackAttempted(true);
+                const streamUrl = `/api/product-miner/videos/${encodeURIComponent(product.productId)}${
+                  product.video?.id ? `/${encodeURIComponent(product.video.id)}` : ''
+                }/stream`;
+                setPlayableUrl(streamUrl);
+                setIsPlaying(true);
+              } else {
+                setPlaybackError(true);
+                setIsPlaying(false);
+              }
             }}
             className="w-full h-full object-cover bg-black"
           />
@@ -6318,11 +6358,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [selectedChildCategory, setSelectedChildCategory] = useState<string>('Todas');
   const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
   const [minVideoViews, setMinVideoViews] = useState<number | null>(null);
-  const [selectedVideoRange, setSelectedVideoRange] = useState<VideoViewRangeId>('all_videos');
+  const [selectedVideoRange, setSelectedVideoRange] = useState<VideoViewRangeId | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+  const [isCategoriesCollapsed, setIsCategoriesCollapsed] = useState<boolean>(false);
 
   const activeVideoRange = useMemo(
-    () => VIDEO_FILTER_OPTIONS.find((opt) => opt.id === selectedVideoRange) || VIDEO_FILTER_OPTIONS[0],
+    () => (selectedVideoRange ? VIDEO_FILTER_OPTIONS.find((opt) => opt.id === selectedVideoRange) || null : null),
     [selectedVideoRange]
   );
 
@@ -6759,10 +6800,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     targetSubcategory = selectedSubcategory,
     targetChildCategory = selectedChildCategory,
     targetClassification = selectedClassification,
-    targetHasVideoOnly = (hasVideoOnly || selectedClassification === 'viral_video'),
-    targetMinVideoViews = selectedClassification === 'viral_video' ? activeVideoRange.min : minVideoViews,
-    targetMaxVideoViews = selectedClassification === 'viral_video' ? activeVideoRange.max : null,
-    targetVideoViewRange = selectedClassification === 'viral_video' ? selectedVideoRange : null
+    targetHasVideoOnly = (hasVideoOnly || selectedClassification === 'viral_video' || selectedVideoRange !== null),
+    targetMinVideoViews = activeVideoRange ? activeVideoRange.min : (selectedClassification === 'viral_video' ? null : minVideoViews),
+    targetMaxVideoViews = activeVideoRange ? activeVideoRange.max : null,
+    targetVideoViewRange = selectedVideoRange
   ) => {
     const clean = targetQuery.trim();
 
@@ -6813,6 +6854,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   useEffect(() => {
     if (mode === 'search') {
+      const computedHasVideoOnly = Boolean(hasVideoOnly || selectedClassification === 'viral_video' || selectedVideoRange !== null);
+      const computedMinVideoViews = activeVideoRange ? activeVideoRange.min : (selectedClassification === 'viral_video' ? null : minVideoViews);
+      const computedMaxVideoViews = activeVideoRange ? activeVideoRange.max : null;
+      const computedVideoRange = selectedVideoRange;
+
       runSearch(
         query,
         page,
@@ -6821,10 +6867,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         selectedSubcategory,
         selectedChildCategory,
         selectedClassification,
-        hasVideoOnly || selectedClassification === 'viral_video',
-        selectedClassification === 'viral_video' ? activeVideoRange.min : minVideoViews,
-        selectedClassification === 'viral_video' ? activeVideoRange.max : null,
-        selectedClassification === 'viral_video' ? selectedVideoRange : null
+        computedHasVideoOnly,
+        computedMinVideoViews,
+        computedMaxVideoViews,
+        computedVideoRange
       );
     }
   }, [
@@ -6843,7 +6889,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const activeFilterCount =
     (selectedCategory !== 'Todos' ? 1 : 0) +
     (selectedSubcategory !== 'Todas' ? 1 : 0) +
-    (selectedClassification === 'viral_video' ? 1 : (minVideoViews ? 1 : (hasVideoOnly ? 1 : 0)));
+    (selectedVideoRange !== null ? 1 : 0) +
+    (minVideoViews ? 1 : 0) +
+    (hasVideoOnly ? 1 : 0);
 
   return (
     <section className="space-y-2 sm:space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
@@ -6911,23 +6959,44 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-sm">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">Categorias:</span>
-          {selectedCategory && selectedCategory !== 'Todos' ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">Categorias:</span>
+            {selectedCategory !== 'Todos' ? (
+              <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-black">
+                {selectedCategory}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-3">
+            {selectedCategory && selectedCategory !== 'Todos' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory('Todos');
+                  setSelectedSubcategory('Todas');
+                  setSelectedChildCategory('Todas');
+                }}
+                className="text-[10px] sm:text-xs font-bold text-rose-600 hover:underline cursor-pointer"
+              >
+                Limpar filtro
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={() => {
-                setSelectedCategory('Todos');
-                setSelectedSubcategory('Todas');
-              }}
-              className="text-[10px] sm:text-xs font-bold text-rose-600 hover:underline"
+              onClick={() => setIsCategoriesCollapsed((prev) => !prev)}
+              className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
+              title={isCategoriesCollapsed ? 'Expandir categorias' : 'Recolher categorias'}
             >
-              Limpar filtro
+              <span>{isCategoriesCollapsed ? 'Expandir' : 'Recolher'}</span>
+              {isCategoriesCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
             </button>
-          ) : null}
+          </div>
         </div>
 
-        {/* Categories Icon Cards Bar */}
-        <div className="relative group/catnav pt-2.5 pb-1">
+        {/* Categories Icon Cards Bar & Subcategories */}
+        {!isCategoriesCollapsed && (
+          <>
+            <div className="relative group/catnav pt-2.5 pb-1">
           {/* Desktop Scroll Left Arrow */}
           <button
             type="button"
@@ -7297,6 +7366,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             </div>
           )
         ) : null}
+          </>
+        )}
       </div>
 
       {/* ================================================== */}
@@ -7409,27 +7480,35 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {(showAdvancedFilters || selectedClassification === 'viral_video') ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-sm animate-fade-in">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-            <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-amber-500" /> Faixas de Visualização (Vídeos)
-            </span>
-            <button
-              onClick={() => {
-                setSelectedVideoRange('all_videos');
-                setMinVideoViews(null);
-                setHasVideoOnly(false);
-                if (selectedClassification === 'viral_video') {
-                  setSelectedClassification(null);
-                }
-              }}
-              className="text-[11px] text-rose-600 hover:underline font-bold cursor-pointer"
-            >
-              Limpar Filtro
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-amber-500" /> Faixas de Visualização (Vídeos)
+              </span>
+              {selectedVideoRange ? (
+                <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-black">
+                  {VIDEO_FILTER_OPTIONS.find((o) => o.id === selectedVideoRange)?.label || selectedVideoRange}
+                </span>
+              ) : null}
+            </div>
+            {selectedVideoRange ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedVideoRange(null);
+                  setMinVideoViews(null);
+                  setHasVideoOnly(false);
+                }}
+                className="text-[11px] text-rose-600 hover:underline font-bold cursor-pointer"
+              >
+                Limpar Filtro
+              </button>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none sm:flex-wrap">
             {VIDEO_FILTER_OPTIONS.map((opt) => {
-              const isActive = selectedClassification === 'viral_video' && selectedVideoRange === opt.id;
+              const isActive = selectedVideoRange === opt.id;
+              const isAllVideos = opt.id === 'all_videos';
 
               return (
                 <button
@@ -7438,23 +7517,31 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   aria-label={opt.label}
                   title={opt.label}
                   onClick={() => {
-                    setSelectedClassification('viral_video');
-                    setHasVideoOnly(true);
-                    setSelectedVideoRange(opt.id);
+                    if (selectedVideoRange === opt.id) {
+                      setSelectedVideoRange(null);
+                      setMinVideoViews(null);
+                      setHasVideoOnly(false);
+                    } else {
+                      setSelectedVideoRange(opt.id);
+                      setMinVideoViews(opt.min);
+                      setHasVideoOnly(true);
+                    }
                     setPage(1);
                   }}
-                  className={`group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl border transition-all duration-200 cursor-pointer shrink-0 p-2 sm:p-2.5 ${
+                  className={`group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl transition-all duration-200 cursor-pointer shrink-0 p-2 sm:p-2.5 bg-white ${
                     isActive
-                      ? 'border-amber-400 bg-amber-500/15 ring-2 ring-amber-400/40 shadow-md scale-[1.02]'
-                      : 'border-slate-200/90 bg-white hover:border-amber-300 hover:bg-amber-50/50 shadow-2xs'
+                      ? 'border-2 border-amber-500 ring-2 ring-amber-400/40 shadow-sm scale-[1.02]'
+                      : 'border border-slate-200/90 hover:border-amber-300 shadow-2xs'
                   }`}
                 >
-                  <FilterIconImage
-                    src={opt.iconUrl}
-                    fallbackSrc={opt.fallbackIconUrl}
-                    alt={opt.label}
-                    className="w-full h-full object-contain pointer-events-none transition-transform duration-200 group-hover:scale-105"
-                  />
+                  <div className={`w-full h-full flex items-center justify-center ${isAllVideos ? 'scale-[1.35]' : ''}`}>
+                    <FilterIconImage
+                      src={opt.iconUrl}
+                      fallbackSrc={opt.fallbackIconUrl}
+                      alt={opt.label}
+                      className="w-full h-full object-contain pointer-events-none transition-transform duration-200 group-hover:scale-105"
+                    />
+                  </div>
                 </button>
               );
             })}
