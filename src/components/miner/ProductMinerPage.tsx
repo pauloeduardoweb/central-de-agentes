@@ -3962,12 +3962,21 @@ function getCategoryIcon(catName: string) {
 function matchesCategoryFilter(
   productCatRaw: string | null,
   selectedCat: string,
-  productTitleRaw?: string | null
+  productTitleRaw?: string | null,
+  classifiedCat?: string | null
 ): boolean {
   if (!selectedCat || selectedCat === 'Todos' || selectedCat === 'Todas') return true;
-  if (!productCatRaw && !productTitleRaw) return false;
 
   const target = selectedCat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // 0. PRIORITY: Exact match on classifiedCategory if available
+  if (classifiedCat) {
+    const classNorm = classifiedCat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return classNorm === target;
+  }
+
+  if (!productCatRaw && !productTitleRaw) return false;
+
   const cat = (productCatRaw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   if (cat && (cat === target || cat.includes(target) || target.includes(cat))) {
@@ -4012,14 +4021,23 @@ function matchesSubcategoryFilter(
   productCatRaw: string | null | undefined,
   productTitleRaw: string | null | undefined,
   selectedSubcat: string,
-  selectedCat: string
+  selectedCat: string,
+  classifiedCat?: string | null,
+  classifiedSubcat?: string | null
 ): boolean {
   if (!selectedSubcat || selectedSubcat === 'Todas' || selectedSubcat === 'Todos') {
     return true;
   }
 
+  // 0. PRIORITY 0: Exact match on classifiedSubcategory if available
+  if (classifiedSubcat) {
+    const subNorm = selectedSubcat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const classSubNorm = classifiedSubcat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return classSubNorm === subNorm;
+  }
+
   // 1. MAIN CATEGORY CHECK FIRST (Requirement 6: Never test subcategory on products outside main category)
-  if (!matchesCategoryFilter(productCatRaw || null, selectedCat)) {
+  if (!matchesCategoryFilter(productCatRaw || null, selectedCat, productTitleRaw, classifiedCat)) {
     return false;
   }
 
@@ -6218,17 +6236,24 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       }
 
       // 1. Filter by TikTok main category
-      list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory, p.title));
+      list = list.filter((p) => matchesCategoryFilter(p.category, selectedCategory, p.title, p.classifiedCategory));
     }
 
     // 1b. Filter by subcategory (applies to search and favorites)
     if (selectedSubcategory && selectedSubcategory !== 'Todas' && selectedSubcategory !== 'Todos') {
-      list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedSubcategory, selectedCategory));
+      list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedSubcategory, selectedCategory, p.classifiedCategory, p.classifiedSubcategory));
     }
 
     // 1c. Filter by third level child category
     if (selectedChildCategory && selectedChildCategory !== 'Todas' && selectedChildCategory !== 'Todos') {
-      list = list.filter((p) => matchesSubcategoryFilter(p.category, p.title, selectedChildCategory, selectedCategory));
+      list = list.filter((p) => {
+        if (p.classifiedChildCategory) {
+          const childNorm = selectedChildCategory.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const pChildNorm = p.classifiedChildCategory.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          return pChildNorm === childNorm;
+        }
+        return matchesSubcategoryFilter(p.category, p.title, selectedChildCategory, selectedCategory, p.classifiedCategory, p.classifiedSubcategory);
+      });
     }
 
     // 2. Filter by video options
