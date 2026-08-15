@@ -74,38 +74,37 @@ const ROULETTE_PALETTE = [
 function getShortCategoryLabel(fullLabel: string): string {
   const normalized = (fullLabel || '').trim();
   const map: Record<string, string> = {
-    'Acessórios de moda': 'Acessórios',
-    'Alimentos e bebidas': 'Alimentos',
-    'Automotivo': 'Automotivo',
-    'Bebês e maternidade': 'Bebês',
-    'Beleza e cuidados pessoais': 'Beleza',
-    'Bolsas e malas': 'Bolsas',
-    'Brinquedos e hobbies': 'Brinquedos',
-    'Calçados': 'Calçados',
-    'Câmeras e óptica': 'Câmeras',
-    'Casa e decoração': 'Casa',
-    'Construção e ferramentas': 'Ferramentas',
-    'Eletrodomésticos': 'Eletros',
-    'Eletrônicos e celulares': 'Celulares',
-    'Telefonia e celular': 'Celulares',
-    'Esportes e lazer': 'Esportes',
-    'Informática e escritório': 'Informática',
-    'Instrumentos musicais': 'Música',
-    'Joias e relógios': 'Joias',
-    'Livros e papelaria': 'Livros',
-    'Moda feminina': 'Moda Fem.',
-    'Moda íntima': 'Moda Ínt.',
-    'Moda masculina': 'Moda Masc.',
-    'Moda praia': 'Moda Praia',
-    'Pet shop': 'Pet Shop',
-    'Relógios': 'Relógios',
-    'Saúde e bem-estar': 'Saúde',
-    'Utensílios de cozinha': 'Cozinha',
+    'Acessórios de moda': 'ACESSÓRIOS',
+    'Alimentos e bebidas': 'ALIMENTOS',
+    'Automotivo': 'AUTOMOTIVO',
+    'Bebês e maternidade': 'BEBÊS',
+    'Beleza e cuidados pessoais': 'BELEZA',
+    'Bolsas e malas': 'BOLSAS',
+    'Brinquedos e hobbies': 'BRINQUEDOS',
+    'Calçados': 'CALÇADOS',
+    'Câmeras e óptica': 'CÂMERAS',
+    'Casa e decoração': 'CASA',
+    'Construção e ferramentas': 'FERRAMENTAS',
+    'Eletrodomésticos': 'ELETROS',
+    'Eletrônicos e celulares': 'CELULARES',
+    'Telefonia e celular': 'CELULARES',
+    'Esportes e lazer': 'ESPORTES',
+    'Informática e escritório': 'INFORMÁTICA',
+    'Instrumentos musicais': 'MÚSICA',
+    'Joias e relógios': 'JOIAS',
+    'Livros e papelaria': 'LIVROS',
+    'Moda feminina': 'MODA FEM',
+    'Moda íntima': 'MODA ÍNT',
+    'Moda masculina': 'MODA MASC',
+    'Moda praia': 'MODA PRAIA',
+    'Pet shop': 'PET SHOP',
+    'Relógios': 'RELÓGIOS',
+    'Saúde e bem-estar': 'SAÚDE',
+    'Utensílios de cozinha': 'COZINHA',
   };
 
   if (map[normalized]) return map[normalized];
-  if (normalized.length <= 11) return normalized;
-  return `${normalized.slice(0, 10)}…`;
+  return normalized.toUpperCase().slice(0, 11);
 }
 
 function compactNumber(val?: number | null): string {
@@ -137,11 +136,15 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
   const [pickedCategory, setPickedCategory] = useState<string | null>(null);
   const [pickedProduct, setPickedProduct] = useState<ProductMinerProduct | null>(null);
 
+  const [role, setRole] = useState<'mentor' | 'student'>('student');
+  const [spinsUsedToday, setSpinsUsedToday] = useState<number>(0);
+  const [remainingSpins, setRemainingSpins] = useState<number | null>(3);
+  const [canSpin, setCanSpin] = useState<boolean>(true);
+
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotationDegrees, setRotationDegrees] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [spinNotice, setSpinNotice] = useState<string | null>(null);
-  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+  const [_spinNotice, setSpinNotice] = useState<string | null>(null);
 
   // Wheel configuration based on 26 categories
   const numCategories = Math.max(1, categories.length);
@@ -156,10 +159,19 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
     getDailyPickStatusApi(studentCode)
       .then((res) => {
         if (!active) return;
+        const isMaster = res.role === 'mentor';
+        const used = res.spinsUsedToday || (res.hasSpunToday ? 1 : 0);
+        const rem = res.remainingSpins !== undefined ? res.remainingSpins : (isMaster ? null : Math.max(0, 3 - used));
+        const allowSpin = res.canSpin !== undefined ? res.canSpin : (isMaster ? true : used < 3);
+
         setHasSpunToday(Boolean(res.hasSpunToday));
         setPickedDate(res.pickDate || null);
         setPickedCategory(res.category || null);
         setPickedProduct(res.product || null);
+        setRole(res.role || 'student');
+        setSpinsUsedToday(used);
+        setRemainingSpins(rem);
+        setCanSpin(allowSpin);
 
         // If user already spun, position wheel smoothly on the category
         if (res.hasSpunToday && res.category) {
@@ -186,7 +198,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
   }, [studentCode, categories, sliceAngle]);
 
   const handleSpin = async () => {
-    if (isSpinning || hasSpunToday) return;
+    if (isSpinning || !canSpin) return;
 
     setIsSpinning(true);
     setError(null);
@@ -232,11 +244,23 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
         setPickedDate(result.pickDate || new Date().toISOString().split('T')[0]);
         setPickedCategory(winningCat);
         setPickedProduct(winningProd);
+
+        const newUsed = result.spinsUsedToday !== undefined ? result.spinsUsedToday : (spinsUsedToday + 1);
+        const isMaster = (result.role || role) === 'mentor';
+        const newRem = result.remainingSpins !== undefined ? result.remainingSpins : (isMaster ? null : Math.max(0, 3 - newUsed));
+        const allowSpin = result.canSpin !== undefined ? result.canSpin : (isMaster ? true : newUsed < 3);
+
+        setRole(result.role || role);
+        setSpinsUsedToday(newUsed);
+        setRemainingSpins(newRem);
+        setCanSpin(allowSpin);
         setSpinNotice(`Categoria sorteada: ${winningCat}! Produto campeão revelado ao lado.`);
       }, 6000);
     } catch (err: any) {
       setIsSpinning(false);
-      const msg = err?.message || 'Falha ao girar a roleta. Tente novamente.';
+      const msg = err?.message === 'DAILY_SPIN_LIMIT_REACHED'
+        ? 'Você já utilizou seus 3 giros diários. Novos giros estarão disponíveis amanhã.'
+        : (err?.message || 'Falha ao girar a roleta. Tente novamente.');
       setError(msg);
     }
   };
@@ -259,6 +283,8 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
     ? pickedProduct.productUrl || (pickedProduct.productId ? `https://shop.tiktok.com/view/product/${pickedProduct.productId}` : '')
     : '';
 
+  const isMentor = role === 'mentor';
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* ================================================== */}
@@ -272,7 +298,11 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
           <div className="space-y-2.5 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black tracking-wider uppercase">
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>INTELIGÊNCIA DIÁRIA • 1 GIRO POR DIA</span>
+              {isMentor ? (
+                <span>ACESSO MENTOR • GIROS ILIMITADOS</span>
+              ) : (
+                <span>INTELIGÊNCIA DIÁRIA • 3 GIROS POR DIA ({Math.min(3, spinsUsedToday)}/3)</span>
+              )}
             </div>
 
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tight text-slate-900 flex items-center gap-3">
@@ -286,15 +316,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
-            {hasSpunToday ? (
-              <div className="px-5 py-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-black flex items-center gap-2.5 shadow-xs">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                <div>
-                  <div className="font-extrabold">Giro de hoje já realizado!</div>
-                  <div className="text-[10px] text-emerald-700/80 font-normal">Renovação diária às 00:00</div>
-                </div>
-              </div>
-            ) : (
+            {canSpin ? (
               <button
                 type="button"
                 onClick={handleSpin}
@@ -309,10 +331,24 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5 text-white" />
-                    <span>Girar Roleta da Escolha do Dia</span>
+                    <span>
+                      {spinsUsedToday === 0
+                        ? 'Girar Roleta da Escolha do Dia'
+                        : isMentor
+                        ? 'Girar Novamente (Ilimitado)'
+                        : `Girar Novamente (Restam ${remainingSpins ?? 0})`}
+                    </span>
                   </>
                 )}
               </button>
+            ) : (
+              <div className="px-5 py-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-black flex items-center gap-2.5 shadow-xs">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div>
+                  <div className="font-extrabold">3 giros de hoje já realizados!</div>
+                  <div className="text-[10px] text-emerald-700/80 font-normal">Renovação diária às 00:00</div>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -387,8 +423,8 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                   const pathData = `M 200 200 L ${x1} ${y1} A 200 200 0 0 1 ${x2} ${y2} Z`;
                   const color = ROULETTE_PALETTE[i % ROULETTE_PALETTE.length];
 
-                  // Text angle and placement
-                  const textRotation = (i * sliceAngle + sliceAngle / 2);
+                  // Bisector angle of this slice in degrees
+                  const textRotation = i * sliceAngle + sliceAngle / 2 - 90;
                   const shortLabel = getShortCategoryLabel(cat.label);
 
                   return (
@@ -400,18 +436,19 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                         strokeWidth="0.75"
                         strokeOpacity="0.4"
                       />
-                      {/* Radial label with clean contrast */}
+                      {/* Radial label with crisp contrast located inside each sector */}
                       <g transform={`rotate(${textRotation}, 200, 200)`}>
                         <text
-                          x="315"
+                          x="320"
                           y="203"
-                          fill="#f8fafc"
-                          fontSize="7"
+                          fill="#ffffff"
+                          fontSize="8.5"
                           fontWeight="800"
                           textAnchor="middle"
-                          transform="rotate(90, 315, 203)"
-                          letterSpacing="0.2"
-                          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}
+                          letterSpacing="0.4"
+                          style={{
+                            textShadow: '0 1px 2px rgba(0,0,0,0.95), 0 0 3px rgba(0,0,0,0.85)',
+                          }}
                         >
                           {shortLabel}
                         </text>
@@ -427,26 +464,31 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
               <button
                 type="button"
                 onClick={handleSpin}
-                disabled={isSpinning || hasSpunToday || loadingStatus}
+                disabled={isSpinning || !canSpin || loadingStatus}
                 className={`w-full h-full rounded-full bg-slate-950 flex flex-col items-center justify-center text-center p-1 transition-all ${
-                  !hasSpunToday && !isSpinning ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'
+                  canSpin && !isSpinning ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'
                 }`}
-                title={hasSpunToday ? 'Giro de hoje já realizado' : 'Girar Roleta'}
+                title={canSpin ? 'Girar Roleta' : 'Limite de giros diários atingido'}
               >
                 {isSpinning ? (
                   <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
-                ) : hasSpunToday ? (
-                  <>
-                    <Trophy className="w-5 h-5 text-amber-400" />
-                    <span className="text-[9px] font-black text-amber-200 mt-0.5 leading-tight">
-                      SORTEADO
-                    </span>
-                  </>
-                ) : (
+                ) : canSpin ? (
                   <>
                     <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
                     <span className="text-[10px] font-black text-white mt-0.5 leading-tight">
-                      GIRAR
+                      {spinsUsedToday > 0 ? 'GIRAR' : 'GIRAR'}
+                    </span>
+                    {!isMentor && (
+                      <span className="text-[8px] font-bold text-amber-300">
+                        {3 - spinsUsedToday} rest.
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Trophy className="w-5 h-5 text-amber-400" />
+                    <span className="text-[9px] font-black text-amber-200 mt-0.5 leading-tight">
+                      3/3 FEITO
                     </span>
                   </>
                 )}
@@ -456,7 +498,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
 
           {/* Action Trigger */}
           <div className="mt-3 text-center space-y-2">
-            {!hasSpunToday ? (
+            {canSpin ? (
               <button
                 type="button"
                 onClick={handleSpin}
@@ -464,56 +506,30 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all disabled:opacity-50 flex items-center gap-2 mx-auto cursor-pointer"
               >
                 <RotateCcw className={`w-4 h-4 ${isSpinning ? 'animate-spin' : ''}`} />
-                <span>{isSpinning ? 'Sorteando em 6s...' : 'Girar Roleta'}</span>
+                <span>
+                  {isSpinning
+                    ? 'Sorteando em 6s...'
+                    : spinsUsedToday > 0
+                    ? isMentor
+                      ? 'Girar Novamente (Ilimitado)'
+                      : `Girar Novamente (Restam ${remainingSpins ?? 0})`
+                    : 'Girar Roleta'}
+                </span>
               </button>
             ) : (
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
                 <Lock className="w-3.5 h-3.5 text-slate-500" />
-                <span>1 giro disponível a cada 24 horas</span>
+                <span>3 giros diários concluídos • Renovação às 00:00</span>
               </div>
             )}
           </div>
 
           {/* ================================================== */}
-          {/* LEGENDA DAS 26 CATEGORIAS (COMPACTA E DINÂMICA)     */}
+          {/* INDICADOR DISCRETO DAS 26 CATEGORIAS               */}
           {/* ================================================== */}
-          <div className="w-full mt-5 pt-4 border-t border-slate-100">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                <Layers className="w-3.5 h-3.5 text-amber-600" />
-                <span>26 categorias analisadas</span>
-              </div>
-
-              {/* Mobile collapse toggle */}
-              <button
-                type="button"
-                onClick={() => setIsLegendExpanded(!isLegendExpanded)}
-                className="sm:hidden text-[11px] text-amber-800 font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <span>{isLegendExpanded ? 'Ocultar' : 'Ver todas'}</span>
-                {isLegendExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-            </div>
-
-            {/* Chips Grid */}
-            <div className={`gap-1.5 sm:grid sm:grid-cols-3 md:grid-cols-4 ${isLegendExpanded ? 'grid grid-cols-2' : 'hidden sm:grid'}`}>
-              {categories.map((cat) => {
-                const isSelected = pickedCategory && (cat.filterKey === pickedCategory || cat.label === pickedCategory);
-                return (
-                  <div
-                    key={cat.filterKey}
-                    title={cat.label}
-                    className={`px-2 py-1 rounded-lg text-[10px] truncate transition-all ${
-                      isSelected
-                        ? 'bg-amber-100 border border-amber-300 text-amber-950 font-black shadow-2xs'
-                        : 'bg-slate-50 border border-slate-200/80 text-slate-600 font-semibold'
-                    }`}
-                  >
-                    <span className="truncate">{cat.label}</span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="w-full mt-4 pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-xs font-bold text-slate-500">
+            <Layers className="w-3.5 h-3.5 text-amber-500" />
+            <span>26 categorias analisadas</span>
           </div>
         </div>
 
@@ -614,7 +630,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                   <div className="flex items-center justify-between gap-2 text-xs text-slate-600 pt-1 border-t border-slate-100">
                     <div className="flex items-center gap-1.5 truncate">
                       <Store className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span className="truncate font-semibold">{pickedProduct.sellerName || 'TikTok Shop'}</span>
+                      <span className="truncate font-semibold">Loja: {pickedProduct.sellerName || 'TikTok Shop'}</span>
                     </div>
                     <div className="font-black text-amber-800 shrink-0">
                       {compactNumber(pickedProduct.soldCount)} vendas

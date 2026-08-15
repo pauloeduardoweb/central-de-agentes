@@ -29,6 +29,17 @@ export interface EffectiveCommissionInfo {
   hasDirectAmount: boolean;
 }
 
+export function formatStoreName(sellerName?: string | null): string {
+  if (!sellerName || !sellerName.trim()) {
+    return 'Loja: TikTok Shop';
+  }
+  const clean = sellerName.trim();
+  if (clean.toLowerCase().startsWith('loja:')) {
+    return clean;
+  }
+  return `Loja: ${clean}`;
+}
+
 export function getEffectiveCommissionInfo(product: ProductMinerProduct): EffectiveCommissionInfo | null {
   const directCents = product.estimatedCommissionCents && product.estimatedCommissionCents > 0
     ? product.estimatedCommissionCents
@@ -690,8 +701,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
               <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-between gap-2 min-w-0">
                 <span className="text-slate-500 font-medium shrink-0">Loja</span>
-                <span className="font-bold text-slate-900 truncate" title={product.sellerName || 'TikTok Shop'}>
-                  {product.sellerName || 'TikTok Shop'}
+                <span className="font-bold text-slate-900 truncate" title={formatStoreName(product.sellerName)}>
+                  {formatStoreName(product.sellerName)}
                 </span>
               </div>
 
@@ -983,48 +994,30 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
         className="relative w-full max-w-4xl rounded-3xl bg-white border border-slate-200 p-4 sm:p-6 shadow-2xl text-slate-900 my-auto flex flex-col max-h-[96dvh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ================================================== */}
-        {/* 1. CABEÇALHO PREMIUM DO PLAYER                     */}
-        {/* ================================================== */}
-        <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs shrink-0">
-              <Play className="w-4 h-4 fill-current ml-0.5" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 block">
-                PLAYER OFICIAL TIKTOK
-              </span>
-              <h3 className="text-sm sm:text-base font-extrabold text-slate-900 truncate max-w-[200px] sm:max-w-md">
-                {video?.author ? `@${video.author}` : 'Vídeo Viral'}
-              </h3>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {tiktokWatchUrl ? (
-              <a
-                href={tiktokWatchUrl}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => onTrackClick?.(product)}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-amber-50/60 text-slate-700 hover:text-amber-900 text-xs font-bold border border-slate-200 hover:border-amber-300 transition-all shadow-2xs"
-                title="Abrir no TikTok em nova aba"
-              >
-                <span>Abrir no TikTok</span>
-                <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
-              </a>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 sm:p-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer"
-              title="Fechar player (ESC)"
+        {/* Top Control Bar with clean Assistir no TikTok & Close Button (No redundant header/title) */}
+        <div className="flex items-center justify-end gap-2 pb-3 mb-2 border-b border-slate-100">
+          {tiktokWatchUrl ? (
+            <a
+              href={tiktokWatchUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => onTrackClick?.(product)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-amber-50/60 text-slate-700 hover:text-amber-900 text-xs font-bold border border-slate-200 hover:border-amber-300 transition-all shadow-2xs"
+              title="Assistir vídeo no TikTok em nova aba"
             >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+              <span>Assistir no TikTok</span>
+              <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
+            </a>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer"
+            title="Fechar player (ESC)"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* ================================================== */}
@@ -1079,7 +1072,7 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
                       className="mt-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center gap-2 shadow-md transition-all"
                     >
                       <Play className="w-4 h-4 fill-current" />
-                      <span>Abrir no TikTok</span>
+                      <span>Assistir no TikTok</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   ) : null}
@@ -1228,9 +1221,9 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
                         return range ? range.formattedRange : formatMoney(product.priceCents, product.currencySymbol);
                       })()}
                     </div>
-                    <div className="text-[11px] text-slate-500 truncate max-w-[130px] flex items-center gap-1 font-medium">
-                      <Store className="w-3 h-3 text-amber-600 shrink-0" />
-                      <span className="truncate">{product.sellerName || 'TikTok Shop'}</span>
+                    <div className="text-[11px] text-slate-600 truncate max-w-[150px] flex items-center gap-1 font-medium" title={formatStoreName(product.sellerName)}>
+                      <Store className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="truncate">{formatStoreName(product.sellerName)}</span>
                     </div>
                   </div>
                 </div>
@@ -1289,7 +1282,7 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
                   onClick={() => onTrackClick?.(product)}
                   className="w-full py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-200 transition-all sm:hidden cursor-pointer"
                 >
-                  <span>Abrir vídeo no TikTok</span>
+                  <span>Assistir no TikTok</span>
                   <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
                 </a>
               ) : null}

@@ -39,6 +39,7 @@ import {
   VideoAnalysisModal,
   ProductDetailModal,
   TikTokVideoPlayerModal,
+  formatStoreName,
 } from './ProductMinerModals';
 import { DailyPickRoulette } from './DailyPickRoulette';
 import { getProductPriceRange } from '../../utils/priceHelper';
@@ -4369,17 +4370,17 @@ const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive
   if (hasValidImage) {
     return (
       <div
-        className={`relative w-14 h-14 sm:w-16 sm:h-16 lg:w-16 lg:h-16 xl:w-20 xl:h-20 rounded-full overflow-hidden transition-all flex items-center justify-center shrink-0 border-2 ${
+        className={`relative w-14 h-14 sm:w-16 sm:h-16 lg:w-16 lg:h-16 xl:w-20 xl:h-20 rounded-full overflow-hidden transition-all duration-200 flex items-center justify-center shrink-0 border-2 ${
           isActive
-            ? 'border-amber-500 bg-gradient-to-br from-amber-400/30 to-orange-400/30 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
-            : 'border-slate-200 bg-slate-100 hover:border-slate-300 hover:bg-slate-200/80'
+            ? 'border-amber-500 bg-gradient-to-br from-amber-400/25 to-orange-400/25 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/70 scale-105'
+            : 'border-slate-200/90 bg-slate-50 group-hover:border-amber-400/60 group-hover:bg-amber-50/40 group-hover:scale-105 shadow-2xs'
         }`}
       >
         <img
           src={item.imgUrl}
           alt={item.label}
           onError={() => setImgError(true)}
-          className={`w-full h-full object-cover transition-transform ${isNewIcon ? 'scale-[1.32]' : ''}`}
+          className={`w-full h-full object-cover transition-transform duration-200 group-hover:scale-105 ${isNewIcon ? 'scale-[1.32]' : ''}`}
         />
       </div>
     );
@@ -4387,13 +4388,13 @@ const ClassificationIconComponent: React.FC<{ item: ClassificationItem; isActive
 
   return (
     <div
-      className={`relative w-14 h-14 sm:w-16 sm:h-16 lg:w-16 lg:h-16 xl:w-20 xl:h-20 rounded-full transition-all flex items-center justify-center shrink-0 border-2 ${
+      className={`relative w-14 h-14 sm:w-16 sm:h-16 lg:w-16 lg:h-16 xl:w-20 xl:h-20 rounded-full transition-all duration-200 flex items-center justify-center shrink-0 border-2 ${
         isActive
-          ? 'border-amber-500 bg-slate-900 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/60 scale-105'
-          : 'border-slate-800 bg-slate-900/95 hover:border-amber-500/50 hover:bg-slate-900'
+          ? 'border-amber-500 bg-slate-900 shadow-md shadow-amber-500/20 ring-2 ring-amber-400/70 scale-105'
+          : 'border-slate-800 bg-slate-900/95 group-hover:border-amber-400/60 group-hover:bg-slate-900 group-hover:scale-105 shadow-2xs'
       }`}
     >
-      <div className="text-amber-400 flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6 lg:[&>svg]:w-7 lg:[&>svg]:h-7 xl:[&>svg]:w-8 xl:[&>svg]:h-8">
+      <div className="text-amber-400 flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6 lg:[&>svg]:w-7 lg:[&>svg]:h-7 xl:[&>svg]:w-8 xl:[&>svg]:h-8 transition-transform duration-200 group-hover:scale-105">
         {item.fallbackIcon}
       </div>
     </div>
@@ -4423,23 +4424,17 @@ const MobileProductCard: React.FC<{
   onTrackClick,
 }) => {
   const targetProductUrl = getOfficialProductUrl(product);
-  const isHighestCommission = selectedClassification === 'highest_commission';
-  const commInfo = getEffectiveCommissionInfo(product);
 
   return (
     <article
       onClick={() => onOpenDetailModal?.(product)}
-      className={`group rounded-xl border ${
-        isHighestCommission ? 'border-emerald-300 bg-white ring-1 ring-emerald-200/60' : 'border-slate-200/90 bg-white'
-      } shadow-xs hover:shadow-md hover:border-amber-400/60 transition-all flex flex-col h-full relative overflow-hidden text-slate-900 cursor-pointer p-2`}
+      className="group rounded-xl border border-slate-200/90 bg-white shadow-xs hover:shadow-md hover:border-amber-400/60 transition-all flex flex-col h-full relative overflow-hidden text-slate-900 cursor-pointer p-2"
     >
       {/* Product Image Container - 1:1 Aspect ratio with object-contain to prevent cropping */}
       <div className="relative aspect-square w-full rounded-lg bg-slate-50 border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center p-1">
         {/* Ranking position tag */}
         {position ? (
-          <div className={`absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded bg-white/95 border ${
-            isHighestCommission ? 'border-emerald-500 text-emerald-800' : 'border-amber-400/80 text-amber-800'
-          } text-[9px] font-black shadow-xs`}>
+          <div className="absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded bg-white/95 border border-amber-400/80 text-amber-800 text-[9px] font-black shadow-xs">
             #{position}
           </div>
         ) : null}
@@ -4487,80 +4482,49 @@ const MobileProductCard: React.FC<{
             ) : null}
           </div>
 
-          {/* Quando for classificação MAIOR COMISSÃO: Bloco forte de ganho por venda separado do preço */}
-          {isHighestCommission ? (
-            <div className="space-y-1 pt-0.5">
-              <div className="rounded-lg border-2 border-emerald-500/80 bg-emerald-50/90 p-2 space-y-0.5 shadow-2xs">
-                <div className="text-[9px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1">
-                  <span>💰</span> COMISSÃO POR VENDA
-                </div>
-                <div className="text-base font-black text-emerald-800 leading-tight">
-                  {commInfo ? commInfo.formattedCommission : '—'}
-                </div>
-                {commInfo?.ratePercent ? (
-                  <div className="text-[9px] font-extrabold text-emerald-700">
-                    {commInfo.ratePercent}% de comissão
-                  </div>
-                ) : null}
+          {/* Real Commission Badge Padrão */}
+          {(() => {
+            const commText = getCommissionText(product);
+            if (!commText) return null;
+            return (
+              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[9px] font-black max-w-full truncate">
+                {commText}
               </div>
-              <div className="text-[10px] text-slate-600 flex items-center justify-between px-0.5">
-                <span className="text-slate-500">Preço:</span>
-                <span className="font-bold text-slate-800 truncate">
-                  {(() => {
-                    const range = getProductPriceRange(product.priceCents, product.currencySymbol);
-                    return range ? range.formattedRange : formatMoney(product.priceCents, product.currencySymbol);
-                  })()}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Real Commission Badge Padrão */}
-              {(() => {
-                const commText = getCommissionText(product);
-                if (!commText) return null;
-                return (
-                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[9px] font-black max-w-full truncate">
-                    {commText}
-                  </div>
-                );
-              })()}
+            );
+          })()}
 
-              {/* Price Padrão */}
-              {(() => {
-                const range = getProductPriceRange(product.priceCents, product.currencySymbol);
-                if (!range) {
-                  return (
-                    <div className="pt-0.5">
-                      <span className="text-xs font-black text-emerald-700">
-                        {formatMoney(product.priceCents, product.currencySymbol)}
-                      </span>
-                    </div>
-                  );
-                }
-                return (
-                  <div className="pt-0.5 space-y-0.5 min-w-0">
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60 inline-block leading-tight whitespace-nowrap">
-                        Faixa estimada
-                      </span>
-                    </div>
-                    <div className="text-xs font-black text-emerald-700 leading-tight whitespace-nowrap truncate">
-                      {range.formattedRange}
-                    </div>
-                  </div>
-                );
-              })()}
-            </>
-          )}
+          {/* Price */}
+          {(() => {
+            const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+            if (!range) {
+              return (
+                <div className="pt-0.5">
+                  <span className="text-xs font-black text-emerald-700">
+                    {formatMoney(product.priceCents, product.currencySymbol)}
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <div className="pt-0.5 space-y-0.5 min-w-0">
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60 inline-block leading-tight whitespace-nowrap">
+                    Faixa estimada
+                  </span>
+                </div>
+                <div className="text-xs font-black text-emerald-700 leading-tight whitespace-nowrap truncate">
+                  {range.formattedRange}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Bottom Bar: Seller Name + Heart Favorite & Action Buttons */}
         <div className="pt-1.5 border-t border-slate-100 space-y-1.5 mt-auto">
           <div className="flex items-center justify-between gap-1 text-[10px]">
-            <span className="text-[10px] text-slate-500 font-medium flex-1 min-w-0 flex items-center">
-              <span className="shrink-0 mr-0.5">Loja:</span>
-              <span className="truncate">{product.sellerName || 'TikTok Shop'}</span>
+            <span className="text-[10px] text-slate-600 font-medium flex-1 min-w-0 flex items-center" title={formatStoreName(product.sellerName)}>
+              <span className="truncate">{formatStoreName(product.sellerName)}</span>
             </span>
             <button
               type="button"
@@ -4947,8 +4911,8 @@ const ViralVideoCard: React.FC<{
                 );
               })()}
 
-              <span className="text-xs text-slate-500 truncate max-w-[130px]" title={product.sellerName || 'TikTok Shop'}>
-                {product.sellerName || 'TikTok Shop'}
+              <span className="text-xs text-slate-500 truncate max-w-[130px]" title={formatStoreName(product.sellerName)}>
+                {formatStoreName(product.sellerName)}
               </span>
             </div>
           </div>
@@ -5264,9 +5228,7 @@ const ProductCard: React.FC<{
   const commInfo = getEffectiveCommissionInfo(product);
 
   return (
-    <article className={`group rounded-2xl border ${
-      isHighestCommission ? 'border-emerald-300 ring-1 ring-emerald-200/60 bg-white' : 'border-slate-200/90 bg-white'
-    } overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative`}>
+    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative">
       <div className="relative aspect-[4/3] bg-slate-50 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center p-2">
         <button
           type="button"
@@ -5296,9 +5258,7 @@ const ProductCard: React.FC<{
         )}
 
         {position ? (
-          <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg bg-white/95 border ${
-            isHighestCommission ? 'border-emerald-500 text-emerald-800' : 'border-amber-400 text-amber-700'
-          } text-xs font-black shadow-sm`}>
+          <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-white/95 border border-amber-400 text-amber-700 text-xs font-black shadow-sm">
             #{position}
           </div>
         ) : null}
@@ -5326,76 +5286,42 @@ const ProductCard: React.FC<{
           {product.title}
         </h3>
 
-        {/* Quando for classificação MAIOR COMISSÃO: Bloco de alto impacto visual para o ganho do afiliado */}
-        {isHighestCommission ? (
-          <div className="space-y-2">
-            <div className="rounded-xl border-2 border-emerald-500/80 bg-emerald-50/80 p-3 shadow-xs space-y-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1">
-                  <span>💰</span> COMISSÃO POR VENDA
+        {/* Ganho Afiliado / Comissão Padrão (se disponível) */}
+        {(() => {
+          const commText = getCommissionText(product);
+          if (!commText) return null;
+          return (
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
+              {commText}
+            </div>
+          );
+        })()}
+
+        {/* Bloco 1: Faixa Estimada em linha única */}
+        {(() => {
+          const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+          if (!range) {
+            return (
+              <div className="min-w-0">
+                <span className="text-lg font-black text-emerald-700 whitespace-nowrap">
+                  {formatMoney(product.priceCents, product.currencySymbol)}
                 </span>
-                {commInfo?.ratePercent ? (
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-200/90 border border-emerald-300 text-emerald-900 leading-none">
-                    {commInfo.ratePercent}% de comissão
-                  </span>
-                ) : null}
               </div>
-              <div className="text-2xl font-black text-emerald-800 tracking-tight leading-none pt-0.5">
-                {commInfo ? commInfo.formattedCommission : '—'}
+            );
+          }
+          return (
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block leading-none whitespace-nowrap">
+                  Faixa estimada
+                </span>
+              </div>
+              <div className="text-base sm:text-lg font-black text-emerald-700 leading-tight whitespace-nowrap">
+                {range.formattedRange}
               </div>
             </div>
-
-            {/* Preço do Produto claramente separado da comissão */}
-            <div className="rounded-lg bg-slate-100/90 border border-slate-200 px-2.5 py-1.5 flex items-center justify-between text-xs text-slate-700">
-              <span className="font-semibold text-slate-500 text-[11px]">Preço do produto:</span>
-              <span className="font-bold text-slate-900">
-                {(() => {
-                  const range = getProductPriceRange(product.priceCents, product.currencySymbol);
-                  return range ? range.formattedRange : formatMoney(product.priceCents, product.currencySymbol);
-                })()}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Ganho Afiliado / Comissão Padrão (se disponível) */}
-            {(() => {
-              const commText = getCommissionText(product);
-              if (!commText) return null;
-              return (
-                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
-                  {commText}
-                </div>
-              );
-            })()}
-
-            {/* Bloco 1: Faixa Estimada em linha única */}
-            {(() => {
-              const range = getProductPriceRange(product.priceCents, product.currencySymbol);
-              if (!range) {
-                return (
-                  <div className="min-w-0">
-                    <span className="text-lg font-black text-emerald-700 whitespace-nowrap">
-                      {formatMoney(product.priceCents, product.currencySymbol)}
-                    </span>
-                  </div>
-                );
-              }
-              return (
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block leading-none whitespace-nowrap">
-                      Faixa estimada
-                    </span>
-                  </div>
-                  <div className="text-base sm:text-lg font-black text-emerald-700 leading-tight whitespace-nowrap">
-                    {range.formattedRange}
-                  </div>
-                </div>
-              );
-            })()}
-          </>
-        )}
+          );
+        })()}
 
         {/* Bloco 2: Vendas Totais + Avaliação lado a lado abaixo da faixa */}
         <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -5454,9 +5380,8 @@ const ProductCard: React.FC<{
 
         <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2 text-slate-700 flex items-center gap-2 min-w-0 font-medium">
           <Store className="w-4 h-4 text-amber-600 shrink-0" />
-          <span className="text-xs text-slate-700 font-medium truncate flex-1 min-w-0" title={product.sellerName || 'TikTok Shop'}>
-            <span className="text-slate-500 mr-1">Loja:</span>
-            <span className="font-bold text-slate-800">{product.sellerName || 'TikTok Shop'}</span>
+          <span className="text-xs text-slate-700 font-medium truncate flex-1 min-w-0" title={formatStoreName(product.sellerName)}>
+            <span className="font-bold text-slate-800">{formatStoreName(product.sellerName)}</span>
           </span>
         </div>
 
@@ -7286,10 +7211,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     }
                     setPage(1);
                   }}
-                  className={`group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl transition-all duration-200 cursor-pointer shrink-0 p-2 sm:p-2.5 bg-white ${
+                  className={`group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl transition-all duration-200 cursor-pointer shrink-0 p-2 sm:p-2.5 ${
                     isActive
-                      ? 'border-2 border-amber-500 shadow-sm'
-                      : 'border border-slate-200 hover:border-slate-300 shadow-2xs'
+                      ? 'border-2 border-amber-500 bg-amber-50/25 ring-2 ring-amber-400/40 shadow-sm scale-102'
+                      : 'border border-slate-200/90 bg-white hover:border-amber-300 hover:bg-slate-50/60 shadow-2xs hover:scale-102'
                   }`}
                 >
                   <div className={`w-full h-full flex items-center justify-center ${opt.id === 'all_videos' ? 'p-0 overflow-visible' : 'p-0.5 sm:p-1'}`}>
