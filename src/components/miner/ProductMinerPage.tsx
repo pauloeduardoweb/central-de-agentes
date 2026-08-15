@@ -8551,7 +8551,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                           <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
                             <span>Base: <strong>{catSum.initialValidCount}</strong> ➔ <strong>{catSum.finalValidCount}</strong> (Meta: {catSum.categoryTargetLimit})</span>
                             <span>•</span>
-                            <span>{catSum.subcategoriesConsulted}{catSum.totalSelectedSubcategories ? ` de ${catSum.totalSelectedSubcategories}` : ''} subcats</span>
+                            <span>{catSum.subcategoriesConsulted}{catSum.totalSelectedSubcategories ? ` de ${catSum.totalSelectedSubcategories}` : ''} subcats consultadas</span>
                             {catSum.pagesProcessed !== undefined && catSum.pagesProcessed > 0 && (
                               <>
                                 <span>•</span>
@@ -8561,7 +8561,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                             {catSum.coverageBefore !== undefined && catSum.coverageAfter !== undefined && (
                               <>
                                 <span>•</span>
-                                <span>Cobertura: {catSum.coverageBefore} ➔ {catSum.coverageAfter} subcats</span>
+                                <span>Cobertura (prods &gt; 0): {catSum.coverageBefore} ➔ {catSum.coverageAfter} subcats</span>
                               </>
                             )}
                           </div>
