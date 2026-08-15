@@ -16,7 +16,7 @@ export function formatMoney(cents: number | null | undefined, symbol = 'R$'): st
  * Retorna a faixa de preço temporária do produto.
  * Regra:
  * - minCents = priceCents
- * - maxCents = priceCents + 3000 (+ R$ 30,00) para produtos válidos (>0)
+ * - maxCents = priceCents + 1000 (+ R$ 10,00) para produtos válidos (>0)
  * - originalPriceCents NÃO participa do cálculo nem é exibido
  * - Nenhum valor estimado é salvo no banco
  */
@@ -26,7 +26,7 @@ export function getProductPriceRange(priceCents: number | null | undefined, symb
   }
 
   const minCents = priceCents;
-  const maxCents = priceCents + 3000;
+  const maxCents = priceCents + 1000;
 
   const minFormatted = formatMoney(minCents, symbol);
   const maxFormatted = formatMoney(maxCents, symbol);
