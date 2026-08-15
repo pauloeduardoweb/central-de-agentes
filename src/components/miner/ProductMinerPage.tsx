@@ -50,7 +50,6 @@ const RANKING_FILTERS: Array<{ id: ProductRankingSort; label: string }> = [
   { id: 'opportunities', label: '🔥 Melhores Oportunidades' },
   { id: 'total', label: 'Mais vendidos' },
   { id: '24h', label: 'Vendas 24h' },
-  { id: '7d', label: 'Vendas 7 dias' },
   { id: 'spiking', label: '🔥 Disparando' },
 ];
 
@@ -6255,8 +6254,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const activeFilterCount =
     (selectedCategory !== 'Todos' ? 1 : 0) +
     (selectedSubcategory !== 'Todas' ? 1 : 0) +
-    (hasVideoOnly ? 1 : 0) +
-    (minVideoViews ? 1 : 0);
+    (minVideoViews ? 1 : (hasVideoOnly ? 1 : 0));
 
   return (
     <section className="space-y-2 sm:space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
