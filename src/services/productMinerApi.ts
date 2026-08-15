@@ -33,6 +33,10 @@ export interface ProductMinerProduct {
   sellerName: string | null;
   productUrl: string | null;
   category: string | null;
+  classifiedCategory?: string | null;
+  classifiedSubcategory?: string | null;
+  classifiedChildCategory?: string | null;
+  classificationSource?: string | null;
   description?: string | null;
   productDescription?: string | null;
   variants?: any;
