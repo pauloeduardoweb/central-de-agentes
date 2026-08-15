@@ -703,7 +703,9 @@ export function verifyPlaybackToken(token: string, productId: string, videoId?: 
     const exp = parseInt(expStr, 10);
     if (isNaN(exp) || Date.now() > exp) return false;
     if (pId !== productId) return false;
-    if (videoId && vId && vId !== videoId) return false;
+    const expectedVideoId = String(videoId || '').trim();
+    const tokenVideoId = String(vId || '').trim();
+    if (expectedVideoId && tokenVideoId && tokenVideoId !== expectedVideoId) return false;
     const expectedSig = crypto.createHmac('sha256', PLAYBACK_SECRET).update(`${pId}:${vId}:${expStr}`).digest('hex');
     return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig));
   } catch {
@@ -796,28 +798,14 @@ async function streamVideoProxy(req: express.Request, res: express.Response, pro
 
     // 1. Check existing completed record strictly by product_id and video_id
     let cdnUrl: string | null = null;
-    let query = `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND video_id = ? LIMIT 1`;
-    let params = [cleanProductId, cleanVideoId];
-
-    const [rows]: any = await db.query(query, params);
+    const [rows]: any = await db.query(
+      `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND video_id = ? LIMIT 1`,
+      [cleanProductId, cleanVideoId]
+    );
     const record = Array.isArray(rows) && rows[0];
 
     if (record && record.status === 'COMPLETED' && record.direct_media_url) {
       cdnUrl = String(record.direct_media_url);
-    } else if (cleanVideoId) {
-      // Check legacy record with video_id = '' or NULL and migrate if applicable
-      const [legacyRows]: any = await db.query(
-        `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND (video_id = '' OR video_id IS NULL) LIMIT 1`,
-        [cleanProductId]
-      );
-      if (Array.isArray(legacyRows) && legacyRows[0]?.status === 'COMPLETED' && legacyRows[0]?.direct_media_url) {
-        cdnUrl = String(legacyRows[0].direct_media_url);
-        // Opportunistic migration to associate with cleanVideoId
-        db.query(
-          `UPDATE tiktok_shop_video_downloads SET video_id = ? WHERE product_id = ? AND (video_id = '' OR video_id IS NULL) LIMIT 1`,
-          [cleanVideoId, cleanProductId]
-        ).catch(() => {});
-      }
     }
 
     // 2. If not prepared yet, prepare on demand
@@ -835,7 +823,7 @@ async function streamVideoProxy(req: express.Request, res: express.Response, pro
       });
     }
 
-    // 3. Fetch from CDN forwarding Range header - NEVER REDIRECT 302
+    // 3. Fetch from CDN forwarding Range header - NEVER REDIRECT 302 TO BROWSER
     const forwardHeaders: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': '*/*',
@@ -846,6 +834,7 @@ async function streamVideoProxy(req: express.Request, res: express.Response, pro
 
     let mediaResponse = await fetch(cdnUrl, {
       headers: forwardHeaders,
+      redirect: 'follow',
     });
 
     if (!mediaResponse.ok && mediaResponse.status !== 206) {
@@ -855,6 +844,7 @@ async function streamVideoProxy(req: express.Request, res: express.Response, pro
           'User-Agent': forwardHeaders['User-Agent'],
           'Accept': '*/*',
         },
+        redirect: 'follow',
       });
     }
 
@@ -868,7 +858,7 @@ async function streamVideoProxy(req: express.Request, res: express.Response, pro
     res.status(mediaResponse.status);
     res.setHeader('Content-Type', mediaResponse.headers.get('content-type') || 'video/mp4');
     res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'private, max-age=300, no-transform');
 
     const contentRange = mediaResponse.headers.get('content-range');
     if (contentRange) res.setHeader('Content-Range', contentRange);

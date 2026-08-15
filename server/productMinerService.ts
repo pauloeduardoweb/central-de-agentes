@@ -867,7 +867,21 @@ export async function attachAssociatedVideos(
   minVideoViews: number | null = null,
   maxVideoViews: number | null = null
 ): Promise<MinedProduct[]> {
-  if (!isDatabaseConfigured() || !products || products.length === 0) return products;
+  if (!products || products.length === 0) return products;
+  
+  const hasRangeFilter = (minVideoViews !== null && minVideoViews !== undefined) || (maxVideoViews !== null && maxVideoViews !== undefined);
+
+  if (!isDatabaseConfigured()) {
+    if (!hasRangeFilter) return products;
+    return products.filter((p) => {
+      if (!p.video) return false;
+      const vViews = p.video.views ?? 0;
+      const passMin = minVideoViews === null || minVideoViews === undefined || vViews >= minVideoViews;
+      const passMax = maxVideoViews === null || maxVideoViews === undefined || vViews <= maxVideoViews;
+      return passMin && passMax;
+    });
+  }
+
   await ensureProductMinerTables();
 
   const productIds = Array.from(new Set(products.map((p) => p.productId).filter(Boolean)));
@@ -913,37 +927,60 @@ export async function attachAssociatedVideos(
       }
     }
 
+    const filteredProducts: MinedProduct[] = [];
+
     for (const p of products) {
       const vList = videoMap.get(p.productId) || [];
-      if (vList.length > 0) {
-        p.associatedVideos = vList;
-        if (minVideoViews !== null || maxVideoViews !== null) {
-          const matchVideo = vList.find((v) => {
-            const vCount = v.views ?? 0;
-            const passMin = minVideoViews === null || vCount >= minVideoViews;
-            const passMax = maxVideoViews === null || vCount <= maxVideoViews;
-            return passMin && passMax;
-          });
-          p.video = matchVideo || vList[0];
+      
+      // Combine with existing p.video if present
+      const allCandidates: MinedVideo[] = [...vList];
+      if (p.video && p.video.id && !allCandidates.some((c) => c.id === p.video!.id)) {
+        allCandidates.push(p.video);
+      }
+
+      if (hasRangeFilter) {
+        const validVideos = allCandidates.filter((v) => {
+          const vCount = v.views ?? 0;
+          const passMin = minVideoViews === null || minVideoViews === undefined || vCount >= minVideoViews;
+          const passMax = maxVideoViews === null || maxVideoViews === undefined || vCount <= maxVideoViews;
+          return passMin && passMax;
+        });
+
+        // Ordenar candidatos válidos
+        validVideos.sort(compareMinedVideosDesc);
+
+        if (validVideos.length > 0) {
+          p.video = validVideos[0];
+          p.associatedVideos = validVideos;
+          filteredProducts.push(p);
         } else {
-          p.video = vList[0];
+          // PROIBIDO fallback fora da faixa quando o filtro de faixa está ativo
+          // Produto é descartado dos resultados
         }
-      } else if (p.video && p.video.id) {
-        p.associatedVideos = [p.video];
       } else {
-        p.associatedVideos = [];
+        if (allCandidates.length > 0) {
+          allCandidates.sort(compareMinedVideosDesc);
+          p.video = allCandidates[0];
+          p.associatedVideos = allCandidates;
+        } else {
+          p.associatedVideos = p.video ? [p.video] : [];
+        }
+        filteredProducts.push(p);
       }
     }
+
+    return filteredProducts;
   } catch (err) {
     console.warn('[attachAssociatedVideos Error]:', err);
-    for (const p of products) {
-      if (!p.associatedVideos) {
-        p.associatedVideos = p.video && p.video.id ? [p.video] : [];
-      }
-    }
+    if (!hasRangeFilter) return products;
+    return products.filter((p) => {
+      if (!p.video) return false;
+      const vViews = p.video.views ?? 0;
+      const passMin = minVideoViews === null || minVideoViews === undefined || vViews >= minVideoViews;
+      const passMax = maxVideoViews === null || maxVideoViews === undefined || vViews <= maxVideoViews;
+      return passMin && passMax;
+    });
   }
-
-  return products;
 }
 
 export async function backfillLegacyVideosToProductVideos(): Promise<{ processedCount: number; insertedCount: number }> {
@@ -2218,59 +2255,13 @@ export async function searchTikTokShopProducts(params: {
           requestId: null,
         };
       } else if (classification === 'highest_commission') {
-        // MAIOR COMISSÃO:
-        // Nível A: Se existirem produtos com comissão real no escopo atual:
-        // - Usa exatamente a regra real: estimated_commission_cents > 0 OU (price_cents > 0 AND commission_rate_percent > 0)
-        // - Ordena pelo ganho efetivo em R$ por venda (effective_commission_cents) DESC
-        // Nível B (Fallback transparente): Se existirem ZERO produtos com comissão real no escopo:
-        // - Não deixa a classificação vazia. Ordena por potencial de valor: price_cents DESC, sold_count DESC, rating DESC.
-        const commissionCond = `(COALESCE(p.estimated_commission_cents, 0) > 0 OR (COALESCE(p.price_cents, 0) > 0 AND COALESCE(p.commission_rate_percent, 0) > 0))`;
-        let realCommissionCount = 0;
-
-        try {
-          const countWhere = finalWhereSql && finalWhereSql !== '1=1' ? `(${finalWhereSql}) AND ${commissionCond}` : commissionCond;
-          const [cntRows]: any = await db.query(
-            `SELECT COUNT(*) as real_cnt FROM tiktok_shop_products p WHERE ${countWhere}`,
-            sqlParams
-          );
-          if (Array.isArray(cntRows) && cntRows[0]?.real_cnt) {
-            realCommissionCount = Number(cntRows[0].real_cnt) || 0;
-          }
-        } catch (cntErr) {
-          console.warn('[highest_commission count check warning]:', cntErr);
-        }
-
-        const fallbackByPrice = realCommissionCount === 0;
-        console.log(`[HIGHEST COMMISSION] realCommissionProducts: ${realCommissionCount} fallbackByPrice: ${fallbackByPrice} filters:`, {
-          query,
-          category,
-          subcategory,
-          childCategory,
-          hasVideoOnly,
-          minVideoViews,
-          maxVideoViews,
-        });
-
-        if (!fallbackByPrice) {
-          finalWhereSql = finalWhereSql && finalWhereSql !== '1=1' ? `(${finalWhereSql}) AND ${commissionCond}` : commissionCond;
-          orderClause = `ORDER BY 
-            (CASE 
-              WHEN COALESCE(p.estimated_commission_cents, 0) > 0 THEN p.estimated_commission_cents 
-              WHEN COALESCE(p.price_cents, 0) > 0 AND COALESCE(p.commission_rate_percent, 0) > 0 THEN ROUND((p.price_cents * p.commission_rate_percent) / 100.0) 
-              ELSE 0 
-            END) DESC,
-            COALESCE(p.commission_rate_percent, 0) DESC,
-            COALESCE(p.price_cents, 0) DESC,
-            COALESCE(p.sold_count, 0) DESC,
-            COALESCE(p.rating, 0) DESC,
-            p.last_seen_at DESC`;
-        } else {
-          orderClause = `ORDER BY 
-            COALESCE(p.price_cents, 0) DESC,
-            COALESCE(p.sold_count, 0) DESC,
-            COALESCE(p.rating, 0) DESC,
-            p.last_seen_at DESC`;
-        }
+        // MAIOR COMISSÃO / MAIOR VALOR:
+        // Ordena por potencial de valor: price_cents DESC, sold_count DESC, rating DESC
+        orderClause = `ORDER BY 
+          COALESCE(p.price_cents, 0) DESC,
+          COALESCE(p.sold_count, 0) DESC,
+          COALESCE(p.rating, 0) DESC,
+          p.last_seen_at DESC`;
       } else if (classification === 'best_sellers') {
         orderClause = `ORDER BY p.sold_count DESC, p.last_seen_at DESC, p.product_id DESC`;
       } else if (classification === 'top_rated') {
