@@ -6329,7 +6329,58 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [minVideoViews, setMinVideoViews] = useState<number | null>(null);
   const [selectedVideoRange, setSelectedVideoRange] = useState<VideoViewRangeId | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
-  const [isExpansionCategoriesCollapsed, setIsExpansionCategoriesCollapsed] = useState<boolean>(false);
+
+  // Adquirir Produtos - Painéis Recolhíveis com persistência no localStorage
+  const [isExpansionTargetCollapsed, setIsExpansionTargetCollapsed] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('geracaozpro:miner:expansion-target-collapsed') === 'true';
+    }
+    return false;
+  });
+
+  const [isExpansionCategoriesCollapsed, setIsExpansionCategoriesCollapsed] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('geracaozpro:miner:expansion-categories-collapsed') === 'true';
+    }
+    return false;
+  });
+
+  const [isAcquisitionSummaryCollapsed, setIsAcquisitionSummaryCollapsed] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('geracaozpro:miner:acquisition-summary-collapsed') === 'true';
+    }
+    return false;
+  });
+
+  const toggleExpansionTargetCollapsed = () => {
+    setIsExpansionTargetCollapsed((prev) => {
+      const next = !prev;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('geracaozpro:miner:expansion-target-collapsed', String(next));
+      }
+      return next;
+    });
+  };
+
+  const toggleExpansionCategoriesCollapsed = () => {
+    setIsExpansionCategoriesCollapsed((prev) => {
+      const next = !prev;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('geracaozpro:miner:expansion-categories-collapsed', String(next));
+      }
+      return next;
+    });
+  };
+
+  const toggleAcquisitionSummaryCollapsed = () => {
+    setIsAcquisitionSummaryCollapsed((prev) => {
+      const next = !prev;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('geracaozpro:miner:acquisition-summary-collapsed', String(next));
+      }
+      return next;
+    });
+  };
 
   const activeVideoRange = useMemo(
     () => (selectedVideoRange ? VIDEO_FILTER_OPTIONS.find((opt) => opt.id === selectedVideoRange) || null : null),
@@ -7463,7 +7514,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           <div className="flex items-center gap-2.5 sm:gap-3.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none sm:flex-wrap">
             {VIDEO_FILTER_OPTIONS.map((opt) => {
               const isActive = selectedVideoRange === opt.id;
-              const isAllVideos = opt.id === 'all_videos';
 
               return (
                 <button
@@ -7489,7 +7539,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       : 'border border-slate-200 hover:border-slate-300 shadow-2xs'
                   }`}
                 >
-                  <div className={`w-full h-full flex items-center justify-center ${isAllVideos ? 'scale-[1.35]' : ''}`}>
+                  <div className="w-full h-full flex items-center justify-center p-0.5 sm:p-1">
                     <FilterIconImage
                       src={opt.iconUrl}
                       fallbackSrc={opt.fallbackIconUrl}
@@ -7876,7 +7926,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
               {/* Card 1: Volume Target Selection */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div>
                     <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
                       <Target className="w-4 h-4 text-amber-600" /> 1. Meta de Expansão por Categoria
@@ -7885,36 +7935,46 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       Escolha a profundidade de busca (múltiplas páginas por categoria)
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={toggleExpansionTargetCollapsed}
+                    className="p-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-all cursor-pointer shrink-0"
+                    title={isExpansionTargetCollapsed ? 'Mostrar meta de expansão' : 'Ocultar meta de expansão'}
+                  >
+                    {isExpansionTargetCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { count: 100, label: '100 produtos', desc: 'Meta final por categoria', tag: 'Rápido' },
-                    { count: 300, label: '300 produtos', desc: 'Meta final por categoria', tag: '✨ Recomendado' },
-                    { count: 500, label: '500 produtos', desc: 'Meta final por categoria', tag: 'Aprofundado' },
-                    { count: 1000, label: '1.000 produtos', desc: 'Meta final por categoria', tag: 'Avançado' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.count}
-                      type="button"
-                      onClick={() => setExpansionTargetCount(opt.count)}
-                      disabled={isBatchExecuting || isDailyRefreshing}
-                      className={`p-3.5 rounded-2xl border text-left transition-all ${
-                        expansionTargetCount === opt.count
-                          ? 'border-amber-500 bg-amber-50/80 ring-2 ring-amber-400/30 text-amber-950 shadow-sm'
-                          : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-black text-sm">{opt.label}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                          {opt.tag}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-1">{opt.desc}</div>
-                    </button>
-                  ))}
-                </div>
+                {!isExpansionTargetCollapsed && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { count: 100, label: '100 produtos', desc: 'Meta final por categoria', tag: 'Rápido' },
+                      { count: 300, label: '300 produtos', desc: 'Meta final por categoria', tag: '✨ Recomendado' },
+                      { count: 500, label: '500 produtos', desc: 'Meta final por categoria', tag: 'Aprofundado' },
+                      { count: 1000, label: '1.000 produtos', desc: 'Meta final por categoria', tag: 'Avançado' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.count}
+                        type="button"
+                        onClick={() => setExpansionTargetCount(opt.count)}
+                        disabled={isBatchExecuting || isDailyRefreshing}
+                        className={`p-3.5 rounded-2xl border text-left transition-all ${
+                          expansionTargetCount === opt.count
+                            ? 'border-amber-500 bg-amber-50/80 ring-2 ring-amber-400/30 text-amber-950 shadow-sm'
+                            : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-sm">{opt.label}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                            {opt.tag}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">{opt.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Card 2: Select Categories & Subcategories (Single Source of Truth) */}
@@ -7941,7 +8001,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setIsExpansionCategoriesCollapsed((prev) => !prev)}
+                      onClick={toggleExpansionCategoriesCollapsed}
                       className="p-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-all cursor-pointer shrink-0"
                       title={isExpansionCategoriesCollapsed ? 'Mostrar categorias' : 'Ocultar categorias'}
                     >
@@ -8163,120 +8223,144 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               {/* Card 3: Execution Estimation & Trigger Panel */}
               <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-amber-50/80 p-5 md:p-6 shadow-md space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-amber-800 text-xs font-black uppercase tracking-wider">
-                      <Gauge className="w-4 h-4 text-amber-600" />
-                      {expansionSummary.hasHistoricalDataCount > 0
-                        ? 'Estimativa Real de Créditos • Baseada no Histórico'
-                        : 'Estimativa de Créditos • Gestão da Base'}
-                    </div>
-                    <h3 className="mt-1 text-lg font-black text-slate-900">
-                      Resumo da Operação de Aquisição
-                    </h3>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowBatchConfirmModal(true)}
-                    disabled={isBatchExecuting || expansionSummary.totalCats === 0}
-                    className="px-6 py-3.5 rounded-xl font-black text-xs md:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] flex items-center justify-center gap-2.5 disabled:opacity-50"
-                  >
-                    <Rocket className="w-4.5 h-4.5" />
-                    <span>
-                      🚀 Iniciar Expansão da Base
-                      {expansionSummary.hasHistoricalDataCount > 0
-                        ? ` (~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} crs estimados)`
-                        : ''}
-                    </span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-200/60 text-xs">
-                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
-                    <div className="text-[11px] text-slate-500 font-medium">Categorias Ativas</div>
-                    <div className="font-black text-amber-900 text-sm mt-0.5">
-                      {expansionSummary.totalCats} de {CATEGORY_CONFIG.length} selecionadas
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
-                    <div className="text-[11px] text-slate-500 font-medium">Meta Final</div>
-                    <div className="font-black text-amber-900 text-sm mt-0.5">
-                      {expansionTargetCount} produtos por categoria
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
-                    <div className="text-[11px] text-slate-500 font-medium">Produtos Atuais nas Selecionadas</div>
-                    <div className="font-black text-amber-900 text-sm mt-0.5">
-                      {expansionSummary.totalCurrentProducts.toLocaleString('pt-BR')} produtos
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
-                    <div className="text-[11px] text-slate-500 font-medium">Déficit Planejado</div>
-                    <div className="font-black text-amber-900 text-sm mt-0.5">
-                      até {expansionSummary.totalAllocatedProducts.toLocaleString('pt-BR')} novos prods
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex flex-col justify-between gap-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-[11px] text-slate-500 font-medium">
-                          {expansionSummary.hasHistoricalDataCount > 0
-                            ? 'Estimativa Real de Créditos'
-                            : 'Estimativa de Créditos'}
-                        </div>
-                        <div className="font-black text-amber-900 text-base mt-0.5">
-                          {expansionSummary.hasHistoricalDataCount > 0
-                            ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} créditos`
-                            : 'Sem histórico suficiente'}
-                        </div>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded border shrink-0 ${
-                        expansionSummary.hasHistoricalDataCount > 0
-                          ? 'bg-amber-100/90 text-amber-800 border-amber-300'
-                          : 'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}>
-                        {expansionSummary.hasHistoricalDataCount > 0
-                          ? `📊 Baseada no histórico (${expansionSummary.hasHistoricalDataCount} de ${expansionSummary.totalCats} cats)`
-                          : 'Aguardando 1ª execução'}
-                      </span>
-                    </div>
-
-                    {expansionSummary.hasHistoricalDataCount === 0 && (
-                      <p className="text-[11px] text-slate-500 leading-snug">
-                        A primeira execução desta categoria será utilizada para calcular a estimativa real de consumo.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex items-center justify-between">
+                  <div className="flex items-start justify-between gap-2 w-full md:w-auto">
                     <div>
-                      <div className="text-[11px] text-slate-500 font-medium">Saldo Disponível na Conta</div>
-                      <div className="font-black text-emerald-700 text-base mt-0.5">
-                        {credits?.remaining !== null && credits?.remaining !== undefined
-                          ? `${credits.remaining} créditos`
-                          : 'Ativo via SocialCrawl'}
+                      <div className="flex items-center gap-2 text-amber-800 text-xs font-black uppercase tracking-wider">
+                        <Gauge className="w-4 h-4 text-amber-600" />
+                        {expansionSummary.hasHistoricalDataCount > 0
+                          ? 'Estimativa Real de Créditos • Baseada no Histórico'
+                          : 'Estimativa de Créditos • Gestão da Base'}
                       </div>
+                      <h3 className="mt-1 text-lg font-black text-slate-900">
+                        Resumo da Operação de Aquisição
+                      </h3>
                     </div>
+                    <button
+                      type="button"
+                      onClick={toggleAcquisitionSummaryCollapsed}
+                      className="p-1.5 rounded-xl border border-amber-200 bg-white/80 hover:bg-white text-slate-700 hover:text-slate-900 transition-all cursor-pointer shrink-0 md:hidden"
+                      title={isAcquisitionSummaryCollapsed ? 'Mostrar resumo da operação' : 'Ocultar resumo da operação'}
+                    >
+                      {isAcquisitionSummaryCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowBatchConfirmModal(true)}
+                      disabled={isBatchExecuting || expansionSummary.totalCats === 0}
+                      className="px-6 py-3.5 rounded-xl font-black text-xs md:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] flex items-center justify-center gap-2.5 disabled:opacity-50"
+                    >
+                      <Rocket className="w-4.5 h-4.5" />
+                      <span>
+                        🚀 Iniciar Expansão da Base
+                        {expansionSummary.hasHistoricalDataCount > 0
+                          ? ` (~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} crs estimados)`
+                          : ''}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleAcquisitionSummaryCollapsed}
+                      className="p-2 rounded-xl border border-amber-200 bg-white/80 hover:bg-white text-slate-700 hover:text-slate-900 transition-all cursor-pointer shrink-0 hidden md:flex items-center justify-center"
+                      title={isAcquisitionSummaryCollapsed ? 'Mostrar resumo da operação' : 'Ocultar resumo da operação'}
+                    >
+                      {isAcquisitionSummaryCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-600 leading-relaxed pt-1">
-                  ℹ️ <strong>Mineração Contínua:</strong> O consumo de créditos continuará enquanto houver resultados válidos disponíveis na SocialCrawl e a meta da categoria ainda não tiver sido alcançada.
-                </p>
+                {!isAcquisitionSummaryCollapsed && (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-200/60 text-xs">
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                        <div className="text-[11px] text-slate-500 font-medium">Categorias Ativas</div>
+                        <div className="font-black text-amber-900 text-sm mt-0.5">
+                          {expansionSummary.totalCats} de {CATEGORY_CONFIG.length} selecionadas
+                        </div>
+                      </div>
 
-                {expansionSummary.totalUnallocatedGap > 0 && (
-                  <div className="p-3 rounded-xl bg-amber-100/80 border border-amber-300 text-amber-950 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
-                    <span>
-                      Gap de capacidade: <strong>{expansionSummary.totalUnallocatedGap} produtos</strong> não possuem subcategorias adicionais disponíveis para atingir a meta integral nesta rodada.
-                    </span>
-                  </div>
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                        <div className="text-[11px] text-slate-500 font-medium">Meta Final</div>
+                        <div className="font-black text-amber-900 text-sm mt-0.5">
+                          {expansionTargetCount} produtos por categoria
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                        <div className="text-[11px] text-slate-500 font-medium">Produtos Atuais nas Selecionadas</div>
+                        <div className="font-black text-amber-900 text-sm mt-0.5">
+                          {expansionSummary.totalCurrentProducts.toLocaleString('pt-BR')} produtos
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3">
+                        <div className="text-[11px] text-slate-500 font-medium">Déficit Planejado</div>
+                        <div className="font-black text-amber-900 text-sm mt-0.5">
+                          até {expansionSummary.totalAllocatedProducts.toLocaleString('pt-BR')} novos prods
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex flex-col justify-between gap-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-[11px] text-slate-500 font-medium">
+                              {expansionSummary.hasHistoricalDataCount > 0
+                                ? 'Estimativa Real de Créditos'
+                                : 'Estimativa de Créditos'}
+                            </div>
+                            <div className="font-black text-amber-900 text-base mt-0.5">
+                              {expansionSummary.hasHistoricalDataCount > 0
+                                ? `~${expansionSummary.totalMinEstimatedCredits}–${expansionSummary.totalMaxEstimatedCredits} créditos`
+                                : 'Sem histórico suficiente'}
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded border shrink-0 ${
+                            expansionSummary.hasHistoricalDataCount > 0
+                              ? 'bg-amber-100/90 text-amber-800 border-amber-300'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                            {expansionSummary.hasHistoricalDataCount > 0
+                              ? `📊 Baseada no histórico (${expansionSummary.hasHistoricalDataCount} de ${expansionSummary.totalCats} cats)`
+                              : 'Aguardando 1ª execução'}
+                          </span>
+                        </div>
+
+                        {expansionSummary.hasHistoricalDataCount === 0 && (
+                          <p className="text-[11px] text-slate-500 leading-snug">
+                            A primeira execução desta categoria será utilizada para calcular a estimativa real de consumo.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl bg-white/80 border border-amber-200 p-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-[11px] text-slate-500 font-medium">Saldo Disponível na Conta</div>
+                          <div className="font-black text-emerald-700 text-base mt-0.5">
+                            {credits?.remaining !== null && credits?.remaining !== undefined
+                              ? `${credits.remaining} créditos`
+                              : 'Ativo via SocialCrawl'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 leading-relaxed pt-1">
+                      ℹ️ <strong>Mineração Contínua:</strong> O consumo de créditos continuará enquanto houver resultados válidos disponíveis na SocialCrawl e a meta da categoria ainda não tiver sido alcançada.
+                    </p>
+
+                    {expansionSummary.totalUnallocatedGap > 0 && (
+                      <div className="p-3 rounded-xl bg-amber-100/80 border border-amber-300 text-amber-950 text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                        <span>
+                          Gap de capacidade: <strong>{expansionSummary.totalUnallocatedGap} produtos</strong> não possuem subcategorias adicionais disponíveis para atingir a meta integral nesta rodada.
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
