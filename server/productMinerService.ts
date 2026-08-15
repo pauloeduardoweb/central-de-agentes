@@ -134,6 +134,10 @@ export type MinedProduct = {
   sellerName: string | null;
   productUrl: string | null;
   category: string | null;
+  classifiedCategory?: string | null;
+  classifiedSubcategory?: string | null;
+  classifiedChildCategory?: string | null;
+  classificationSource?: string | null;
   collectionCategory?: string | null;
   collectionSubcategory?: string | null;
   querySource?: string | null;
@@ -1644,71 +1648,96 @@ export function buildProductSearchWhereClause(params: {
     childCategoryToUse = '';
   }
 
-  // 1. Category Filter
+  // 1. Category Filter (Priority: classified_category with safe legacy fallback for unclassified items)
   if (categoryToUse) {
     const catAliases = getCategoryAliases(categoryToUse);
-    const catOrs: string[] = [];
+    const legacyCatOrs: string[] = [];
+    const legacyParams: any[] = [];
     for (const alias of catAliases) {
-      catOrs.push(`TRIM(p.query_source) = ?`);
-      sqlParams.push(alias);
-      catOrs.push(`LOWER(TRIM(p.query_source)) = LOWER(?)`);
-      sqlParams.push(alias);
-      catOrs.push(`p.category_path = ?`);
-      sqlParams.push(alias);
-      catOrs.push(`p.category_path LIKE ?`);
-      sqlParams.push(`${alias} >%`);
+      legacyCatOrs.push(`TRIM(p.query_source) = ?`);
+      legacyParams.push(alias);
+      legacyCatOrs.push(`LOWER(TRIM(p.query_source)) = LOWER(?)`);
+      legacyParams.push(alias);
+      legacyCatOrs.push(`p.category_path = ?`);
+      legacyParams.push(alias);
+      legacyCatOrs.push(`p.category_path LIKE ?`);
+      legacyParams.push(`${alias} >%`);
     }
-    whereConditions.push(`(${catOrs.join(' OR ')})`);
+
+    whereConditions.push(`(
+      p.classified_category = ?
+      OR (
+        (p.classified_category IS NULL OR p.classified_category = '')
+        AND (${legacyCatOrs.join(' OR ')})
+      )
+    )`);
+    sqlParams.push(categoryToUse, ...legacyParams);
   }
 
-  // 2. Subcategory Filter
+  // 2. Subcategory Filter (Priority: classified_subcategory with safe legacy fallback for unclassified items)
   if (subcategoryToUse) {
-    const subOrs: string[] = [];
     const subAliases = getSubcategoryAliases(subcategoryToUse);
+    const legacySubOrs: string[] = [];
+    const legacyParams: any[] = [];
     for (const alias of subAliases) {
-      subOrs.push(`p.category_path LIKE ?`);
-      sqlParams.push(`%> ${alias}`);
-      subOrs.push(`p.category_path LIKE ?`);
-      sqlParams.push(`%> ${alias} >%`);
-      subOrs.push(`p.category_path = ?`);
-      sqlParams.push(alias);
+      legacySubOrs.push(`p.category_path LIKE ?`);
+      legacyParams.push(`%> ${alias}`);
+      legacySubOrs.push(`p.category_path LIKE ?`);
+      legacyParams.push(`%> ${alias} >%`);
+      legacySubOrs.push(`p.category_path = ?`);
+      legacyParams.push(alias);
     }
 
     const subKeywords = getSubcategoryKeywords(subcategoryToUse);
     if (subKeywords.length > 0) {
       const kwOrs = subKeywords.map(() => `p.title LIKE ?`);
       for (const kw of subKeywords) {
-        sqlParams.push(`%${kw}%`);
+        legacyParams.push(`%${kw}%`);
       }
-      subOrs.push(`(${kwOrs.join(' OR ')})`);
+      legacySubOrs.push(`(${kwOrs.join(' OR ')})`);
     }
 
-    whereConditions.push(`(${subOrs.join(' OR ')})`);
+    whereConditions.push(`(
+      p.classified_subcategory = ?
+      OR (
+        (p.classified_subcategory IS NULL OR p.classified_subcategory = '')
+        AND (${legacySubOrs.join(' OR ')})
+      )
+    )`);
+    sqlParams.push(subcategoryToUse, ...legacyParams);
   }
 
-  // 3. Child Category Filter
+  // 3. Child Category Filter (Priority: classified_child_category with safe legacy fallback for unclassified items)
   if (childCategoryToUse) {
-    const childOrs: string[] = [];
     const childAliases = getChildCategoryAliases(childCategoryToUse);
+    const legacyChildOrs: string[] = [];
+    const legacyParams: any[] = [];
     for (const alias of childAliases) {
-      childOrs.push(`p.category_path LIKE ?`);
-      sqlParams.push(`%> ${alias}`);
-      childOrs.push(`p.category_path LIKE ?`);
-      sqlParams.push(`%> ${alias} >%`);
-      childOrs.push(`p.category_path = ?`);
-      sqlParams.push(alias);
+      legacyChildOrs.push(`p.category_path LIKE ?`);
+      legacyParams.push(`%> ${alias}`);
+      legacyChildOrs.push(`p.category_path LIKE ?`);
+      legacyParams.push(`%> ${alias} >%`);
+      legacyChildOrs.push(`p.category_path = ?`);
+      legacyParams.push(alias);
     }
 
     const childKeywords = getChildCategoryKeywords(childCategoryToUse);
     if (childKeywords.length > 0) {
       const kwOrs = childKeywords.map(() => `p.title LIKE ?`);
       for (const kw of childKeywords) {
-        sqlParams.push(`%${kw}%`);
+        legacyParams.push(`%${kw}%`);
       }
-      childOrs.push(`(${kwOrs.join(' OR ')})`);
+      legacyChildOrs.push(`(${kwOrs.join(' OR ')})`);
     }
 
-    whereConditions.push(`(${childOrs.join(' OR ')})`);
+    whereConditions.push(`(
+      p.classified_child_category = ?
+      OR (
+        (p.classified_child_category IS NULL OR p.classified_child_category = '')
+        AND (${legacyChildOrs.join(' OR ')})
+      )
+    )`);
+    sqlParams.push(childCategoryToUse, ...legacyParams);
   }
 
   // 4. Video and Views Filter (Ranges supported)
@@ -1775,7 +1804,8 @@ export function buildProductSearchWhereClause(params: {
     const isMainCatName = COLLECTOR_CATEGORIES.some((c) => c.toLowerCase() === rawQuery.toLowerCase());
     if (isMainCatName && !categoryToUse) {
       whereConditions.push(`(
-        TRIM(p.query_source) = ?
+        p.classified_category = ?
+        OR TRIM(p.query_source) = ?
         OR LOWER(TRIM(p.query_source)) = LOWER(?)
         OR p.category_path = ?
         OR p.category_path LIKE ?
@@ -1783,7 +1813,7 @@ export function buildProductSearchWhereClause(params: {
         OR p.seller_name LIKE ?
       )`);
       const likeQ = `%${rawQuery}%`;
-      sqlParams.push(rawQuery, rawQuery, rawQuery, `${rawQuery} >%`, likeQ, likeQ);
+      sqlParams.push(rawQuery, rawQuery, rawQuery, rawQuery, `${rawQuery} >%`, likeQ, likeQ);
       querySourceForOrder = rawQuery;
     } else {
       whereConditions.push(`(
@@ -1791,9 +1821,11 @@ export function buildProductSearchWhereClause(params: {
         OR p.seller_name LIKE ?
         OR p.category_path LIKE ?
         OR p.query_source LIKE ?
+        OR p.classified_category LIKE ?
+        OR p.classified_subcategory LIKE ?
       )`);
       const likeQ = `%${rawQuery}%`;
-      sqlParams.push(likeQ, likeQ, likeQ, likeQ);
+      sqlParams.push(likeQ, likeQ, likeQ, likeQ, likeQ, likeQ);
     }
   } else if (categoryToUse) {
     querySourceForOrder = categoryToUse;
@@ -2218,6 +2250,10 @@ export async function searchTikTokShopProducts(params: {
             sellerName: row.seller_name ? String(row.seller_name) : null,
             productUrl: row.product_url ? String(row.product_url) : null,
             category: row.classified_category || row.category_path || null,
+            classifiedCategory: row.classified_category || null,
+            classifiedSubcategory: row.classified_subcategory || null,
+            classifiedChildCategory: row.classified_child_category || null,
+            classificationSource: row.classification_source || null,
             collectionCategory: row.collection_category || null,
             collectionSubcategory: row.collection_subcategory || null,
             querySource: row.query_source || null,
@@ -2857,7 +2893,11 @@ export function rowToProduct(row: any): MinedProduct {
     sellerId: row.seller_id,
     sellerName: row.seller_name,
     productUrl: row.product_url ? String(row.product_url).trim() : null,
-    category: row.category_path,
+    category: row.classified_category || row.category_path || null,
+    classifiedCategory: row.classified_category || null,
+    classifiedSubcategory: row.classified_subcategory || null,
+    classifiedChildCategory: row.classified_child_category || null,
+    classificationSource: row.classification_source || null,
     lastSeenAt: row.last_seen_at,
     estimatedCommissionCents: row.estimated_commission_cents === null || row.estimated_commission_cents === undefined ? null : Number(row.estimated_commission_cents),
     commissionRatePercent: row.commission_rate_percent === null || row.commission_rate_percent === undefined ? null : Number(row.commission_rate_percent),
@@ -3483,23 +3523,27 @@ export async function getCategoryChampion(category: string): Promise<MinedProduc
   await ensureProductMinerTables();
 
   const aliases = getCategoryAliases(category);
-  const ors: string[] = [];
-  const params: any[] = [];
+  const legacyOrs: string[] = [];
+  const legacyParams: any[] = [];
 
   for (const alias of aliases) {
-    ors.push(`TRIM(p.query_source) = ?`);
-    params.push(alias);
-    ors.push(`LOWER(TRIM(p.query_source)) = LOWER(?)`);
-    params.push(alias);
-    ors.push(`p.category_path = ?`);
-    params.push(alias);
-    ors.push(`p.category_path LIKE ?`);
-    params.push(`${alias} >%`);
-    ors.push(`p.classified_category = ?`);
-    params.push(alias);
+    legacyOrs.push(`TRIM(p.query_source) = ?`);
+    legacyParams.push(alias);
+    legacyOrs.push(`LOWER(TRIM(p.query_source)) = LOWER(?)`);
+    legacyParams.push(alias);
+    legacyOrs.push(`p.category_path = ?`);
+    legacyParams.push(alias);
+    legacyOrs.push(`p.category_path LIKE ?`);
+    legacyParams.push(`${alias} >%`);
   }
 
-  const whereClause = ors.length > 0 ? `(${ors.join(' OR ')})` : '1=1';
+  const whereClause = `(
+    p.classified_category = ?
+    OR (
+      (p.classified_category IS NULL OR p.classified_category = '')
+      AND (${legacyOrs.length > 0 ? legacyOrs.join(' OR ') : '1=1'})
+    )
+  )`;
 
   const [rows]: any = await db.query(
     `SELECT p.*
@@ -3507,7 +3551,7 @@ export async function getCategoryChampion(category: string): Promise<MinedProduc
      WHERE ${whereClause}
      ORDER BY COALESCE(p.sold_count, 0) DESC, COALESCE(p.rating, 0) DESC, p.last_seen_at DESC
      LIMIT 1`,
-    params
+    [category, ...legacyParams]
   );
 
   let rawProduct = Array.isArray(rows) && rows[0] ? rowToProduct(rows[0]) : null;
