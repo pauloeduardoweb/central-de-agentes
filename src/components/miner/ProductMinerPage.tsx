@@ -7079,7 +7079,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             type="button"
             onClick={() => setShowAdvancedFilters((prev) => !prev)}
             className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0 whitespace-nowrap ${
-              showAdvancedFilters || activeFilterCount > 0
+              showAdvancedFilters
                 ? 'border-amber-400 bg-amber-50 text-amber-800 font-black'
                 : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900 hover:border-slate-300'
             }`}
@@ -7150,11 +7150,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                 <Filter className="w-3.5 h-3.5 text-amber-500" /> Faixas de Visualização (Vídeos)
               </span>
-              {selectedVideoRange ? (
-                <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-black">
-                  {VIDEO_FILTER_OPTIONS.find((o) => o.id === selectedVideoRange)?.label || selectedVideoRange}
-                </span>
-              ) : null}
             </div>
             {selectedVideoRange ? (
               <button
@@ -7171,7 +7166,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-2.5 sm:gap-3.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none sm:flex-wrap">
+          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-4 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none sm:flex-wrap">
             {VIDEO_FILTER_OPTIONS.map((opt) => {
               const isActive = selectedVideoRange === opt.id;
 
@@ -7193,18 +7188,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     }
                     setPage(1);
                   }}
-                  className={`group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl transition-all duration-200 cursor-pointer shrink-0 p-2 sm:p-2.5 ${
-                    isActive
-                      ? 'border-2 border-amber-500 bg-amber-50/25 ring-2 ring-amber-400/40 shadow-sm scale-102'
-                      : 'border border-slate-200/90 bg-white hover:border-amber-300 hover:bg-slate-50/60 shadow-2xs hover:scale-102'
-                  }`}
+                  className="group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl bg-transparent border-0 ring-0 shadow-none outline-none focus:outline-none cursor-pointer shrink-0 p-1"
                 >
-                  <div className={`w-full h-full flex items-center justify-center ${opt.id === 'all_videos' ? 'p-0 overflow-visible' : 'p-0.5 sm:p-1'}`}>
+                  <div
+                    className={`w-full h-full flex items-center justify-center transition-all duration-200 ${
+                      isActive
+                        ? 'scale-105 sm:scale-110 brightness-110 saturate-125 drop-shadow-md -translate-y-0.5'
+                        : 'scale-100 opacity-90 hover:opacity-100 hover:scale-105'
+                    }`}
+                  >
                     <FilterIconImage
                       src={opt.iconUrl}
                       fallbackSrc={opt.fallbackIconUrl}
                       alt={opt.label}
-                      className={`w-full h-full object-contain pointer-events-none transition-transform duration-200 group-hover:scale-105 ${
+                      className={`w-full h-full object-contain pointer-events-none transition-transform duration-200 ${
                         opt.id === 'all_videos'
                           ? 'scale-[1.32] sm:scale-[1.38] md:scale-[1.4] origin-center'
                           : ''

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Sparkles, Copy, Check, Play, Eye, Heart, MessageCircle, Share2,
   Bookmark, Zap, Loader2, AlertCircle, FileText, Wand2, RefreshCw, ExternalLink, ShieldCheck, BarChart3,
-  Store, Star, Flame, ShoppingBag, Info, Tag, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Film, VideoOff, Layers
+  Store, Star, Flame, ShoppingBag, Info, Tag, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Film, VideoOff, Layers, Users
 } from 'lucide-react';
 import {
   ProductMinerProduct,
@@ -1083,26 +1083,25 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
 
           {/* Column 2: Creator, Metrics, and Related Product */}
           <div className="md:col-span-6 lg:col-span-6 flex flex-col space-y-4">
-            {/* 2.1 CARD DO CRIADOR */}
+            {/* 2.1 CARD DO CRIADOR — ALTO IMPACTO */}
             {video ? (
-              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3.5 flex items-center justify-between gap-3 shadow-2xs">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
+              <div className="rounded-2xl border border-slate-200/90 bg-white p-4 flex items-center justify-between gap-3.5 shadow-sm ring-1 ring-amber-500/10">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-white font-black text-base sm:text-lg flex items-center justify-center shrink-0 shadow-sm ring-2 ring-amber-200/80">
                     @
                   </div>
-                  <div className="min-w-0">
-                    <span className="font-extrabold text-sm sm:text-base text-slate-900 truncate block leading-tight">
+                  <div className="min-w-0 space-y-0.5">
+                    <span className="font-black text-base sm:text-lg text-slate-900 truncate block leading-tight tracking-tight">
                       @{video.author || 'creator'}
                     </span>
-                    {video.authorFollowers !== null && video.authorFollowers !== undefined ? (
-                      <span className="text-xs text-slate-500 block font-medium mt-0.5">
-                        {compactNumber(video.authorFollowers)} seguidores
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100/90 border border-slate-200 text-xs sm:text-sm font-bold text-slate-700">
+                        <Users className="w-3.5 h-3.5 text-slate-500" />
+                        {video.authorFollowers !== null && video.authorFollowers !== undefined
+                          ? `${compactNumber(video.authorFollowers)} seguidores`
+                          : 'Criador TikTok Shop'}
                       </span>
-                    ) : (
-                      <span className="text-xs text-slate-400 block font-medium mt-0.5">
-                        Criador TikTok Shop
-                      </span>
-                    )}
+                    </div>
                   </div>
                 </div>
 
@@ -1110,77 +1109,79 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => onToggleFavorite(product)}
-                    className={`p-2.5 rounded-xl border transition-all cursor-pointer shadow-2xs shrink-0 ${
+                    className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shadow-2xs shrink-0 ${
                       isFavorite
                         ? 'border-rose-300 bg-rose-50 text-rose-600'
-                        : 'border-slate-200 bg-white text-slate-400 hover:text-rose-500 hover:border-rose-200'
+                        : 'border-slate-200 bg-white text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50/40'
                     }`}
                     title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
                   >
-                    <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+                    <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isFavorite ? 'fill-current' : ''}`} />
                   </button>
                 )}
               </div>
             ) : null}
 
-            {/* 2.2 MÉTRICAS DO VÍDEO — 5 MINI CARDS PREMIUM */}
+            {/* 2.2 MÉTRICAS DO VÍDEO — 5 CARDS COM IDENTIDADE VISUAL E IMPACTO */}
             {video ? (
-              <div className="space-y-1.5">
-                <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 px-0.5">
-                  Métricas de Engajamento
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-600">
+                    Desempenho do Vídeo
+                  </span>
                 </div>
                 <div className="grid grid-cols-5 gap-1.5 sm:gap-2 text-center">
-                  {/* Views */}
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center">
-                    <Eye className="w-4 h-4 text-slate-600 mb-1" />
-                    <span className="font-black text-slate-900 text-xs sm:text-sm block leading-tight">
+                  {/* 1. Views - Ciano/Azul */}
+                  <div className="group p-2 sm:p-2.5 rounded-2xl bg-cyan-50/60 border border-cyan-200/80 flex flex-col items-center justify-center min-w-0 transition-all duration-200 md:hover:-translate-y-0.5 md:hover:shadow-md md:hover:scale-[1.02] md:hover:border-cyan-300">
+                    <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 mb-1 transition-transform duration-200 md:group-hover:scale-110" />
+                    <span className="font-black text-cyan-950 text-xs sm:text-sm md:text-base lg:text-lg block leading-tight truncate w-full">
                       {compactNumber(video.views)}
                     </span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">
+                    <span className="text-[9px] sm:text-[10px] text-cyan-700 font-bold uppercase tracking-tight mt-0.5 truncate w-full">
                       Views
                     </span>
                   </div>
 
-                  {/* Likes */}
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center">
-                    <Heart className="w-4 h-4 text-rose-500 mb-1" />
-                    <span className="font-black text-slate-900 text-xs sm:text-sm block leading-tight">
+                  {/* 2. Likes - Rose */}
+                  <div className="group p-2 sm:p-2.5 rounded-2xl bg-rose-50/60 border border-rose-200/80 flex flex-col items-center justify-center min-w-0 transition-all duration-200 md:hover:-translate-y-0.5 md:hover:shadow-md md:hover:scale-[1.02] md:hover:border-rose-300">
+                    <Heart className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500 fill-rose-500/20 mb-1 transition-transform duration-200 md:group-hover:scale-110" />
+                    <span className="font-black text-rose-950 text-xs sm:text-sm md:text-base lg:text-lg block leading-tight truncate w-full">
                       {compactNumber(video.likes)}
                     </span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">
+                    <span className="text-[9px] sm:text-[10px] text-rose-700 font-bold uppercase tracking-tight mt-0.5 truncate w-full">
                       Likes
                     </span>
                   </div>
 
-                  {/* Comments */}
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center">
-                    <MessageCircle className="w-4 h-4 text-sky-500 mb-1" />
-                    <span className="font-black text-slate-900 text-xs sm:text-sm block leading-tight">
+                  {/* 3. Comments - Sky */}
+                  <div className="group p-2 sm:p-2.5 rounded-2xl bg-sky-50/60 border border-sky-200/80 flex flex-col items-center justify-center min-w-0 transition-all duration-200 md:hover:-translate-y-0.5 md:hover:shadow-md md:hover:scale-[1.02] md:hover:border-sky-300">
+                    <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600 fill-sky-600/15 mb-1 transition-transform duration-200 md:group-hover:scale-110" />
+                    <span className="font-black text-sky-950 text-xs sm:text-sm md:text-base lg:text-lg block leading-tight truncate w-full">
                       {compactNumber(video.comments)}
                     </span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">
+                    <span className="text-[9px] sm:text-[10px] text-sky-700 font-bold uppercase tracking-tight mt-0.5 truncate w-full">
                       Coment.
                     </span>
                   </div>
 
-                  {/* Shares */}
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center">
-                    <Share2 className="w-4 h-4 text-emerald-600 mb-1" />
-                    <span className="font-black text-slate-900 text-xs sm:text-sm block leading-tight">
+                  {/* 4. Shares - Emerald */}
+                  <div className="group p-2 sm:p-2.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 flex flex-col items-center justify-center min-w-0 transition-all duration-200 md:hover:-translate-y-0.5 md:hover:shadow-md md:hover:scale-[1.02] md:hover:border-emerald-300">
+                    <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 mb-1 transition-transform duration-200 md:group-hover:scale-110" />
+                    <span className="font-black text-emerald-950 text-xs sm:text-sm md:text-base lg:text-lg block leading-tight truncate w-full">
                       {compactNumber(video.shares)}
                     </span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">
+                    <span className="text-[9px] sm:text-[10px] text-emerald-700 font-bold uppercase tracking-tight mt-0.5 truncate w-full">
                       Shares
                     </span>
                   </div>
 
-                  {/* Saves */}
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center">
-                    <Bookmark className="w-4 h-4 text-amber-600 mb-1" />
-                    <span className="font-black text-slate-900 text-xs sm:text-sm block leading-tight">
+                  {/* 5. Saves - Amber */}
+                  <div className="group p-2 sm:p-2.5 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col items-center justify-center min-w-0 transition-all duration-200 md:hover:-translate-y-0.5 md:hover:shadow-md md:hover:scale-[1.02] md:hover:border-amber-300">
+                    <Bookmark className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 fill-amber-600/20 mb-1 transition-transform duration-200 md:group-hover:scale-110" />
+                    <span className="font-black text-amber-950 text-xs sm:text-sm md:text-base lg:text-lg block leading-tight truncate w-full">
                       {compactNumber(video.saves)}
                     </span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-0.5">
+                    <span className="text-[9px] sm:text-[10px] text-amber-700 font-bold uppercase tracking-tight mt-0.5 truncate w-full">
                       Salvos
                     </span>
                   </div>
