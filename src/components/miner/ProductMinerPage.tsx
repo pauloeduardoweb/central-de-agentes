@@ -109,24 +109,12 @@ const CLASSIFICATIONS: ClassificationItem[] = [
     imgUrl: 'https://i.postimg.cc/767qSPKN/coração.jpg',
     fallbackIcon: <Heart className="w-6 h-6 text-rose-500" />,
   },
-  // 6-9: Geração Z Pro Exclusive Intelligence
+  // 6-7: Geração Z Pro Exclusive Intelligence
   {
     id: 'highest_commission',
     label: 'Maior Comissão',
     imgUrl: 'https://i.postimg.cc/m1gxft2d/maiorcomissao.png',
     fallbackIcon: <BadgeDollarSign className="w-6 h-6 text-amber-500" />,
-  },
-  {
-    id: 'sales_24h',
-    label: 'Vendas 24h',
-    imgUrl: 'https://i.postimg.cc/YLCcKhCp/vendas24h.png',
-    fallbackIcon: <Clock3 className="w-6 h-6 text-amber-500" />,
-  },
-  {
-    id: 'spiking',
-    label: 'Disparando',
-    imgUrl: 'https://i.postimg.cc/Zv5ktC5S/disparando.png',
-    fallbackIcon: <Rocket className="w-6 h-6 text-amber-500" />,
   },
   {
     id: 'viral_video',
@@ -6300,16 +6288,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         });
       } else if (selectedClassification === 'highest_commission') {
         copy.sort((a, b) => {
-          const commB = getEffectiveCommissionCents(b);
-          const commA = getEffectiveCommissionCents(a);
-          const rateB = b.commissionRatePercent ?? 0;
-          const rateA = a.commissionRatePercent ?? 0;
-          const priceB = b.priceCents ?? 0;
-          const priceA = a.priceCents ?? 0;
-          if (commB !== commA) return commB - commA;
-          if (rateB !== rateA) return rateB - rateA;
-          if (priceB !== priceA) return priceB - priceA;
-          if ((b.soldCount || 0) !== (a.soldCount || 0)) return (b.soldCount || 0) - (a.soldCount || 0);
+          const priceDiff = (b.priceCents ?? 0) - (a.priceCents ?? 0);
+          if (priceDiff !== 0) return priceDiff;
+          const soldDiff = (b.soldCount || 0) - (a.soldCount || 0);
+          if (soldDiff !== 0) return soldDiff;
           return (b.rating || 0) - (a.rating || 0);
         });
       } else if (selectedClassification === 'sales_24h') {
@@ -6612,7 +6594,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             }
           }}
         >
-          <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 pr-6 lg:pr-0 lg:w-full lg:min-w-0 lg:grid lg:grid-cols-9 lg:gap-2 lg:justify-items-center">
+          <div className="flex w-max min-w-max items-start gap-3 sm:gap-4 pr-6 lg:pr-0 lg:w-full lg:min-w-0 lg:grid lg:grid-cols-7 lg:gap-2 lg:justify-items-center">
             {CLASSIFICATIONS.map((c) => {
               const isActive = selectedClassification === c.id;
               return (
