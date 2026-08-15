@@ -1853,42 +1853,209 @@ export async function searchTikTokShopProducts(params: {
       let orderClause = `ORDER BY p.last_seen_at DESC, p.sold_count DESC, p.product_id DESC`;
       let joinClause = ``;
 
-      if (classification === 'best_sellers') {
-        orderClause = `ORDER BY p.sold_count DESC, COALESCE(p.rating, 0) DESC, p.last_seen_at DESC`;
-      } else if (classification === 'top_rated') {
-        orderClause = `ORDER BY COALESCE(p.rating, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
-      } else if (classification === 'highest_commission') {
-        orderClause = `ORDER BY (CASE WHEN (COALESCE(p.estimated_commission_cents, 0) > 0 OR COALESCE(p.commission_rate_percent, 0) > 0) THEN 0 ELSE 1 END), COALESCE(p.estimated_commission_cents, (COALESCE(p.price_cents, 0) * COALESCE(p.commission_rate_percent, 0) / 100), 0) DESC, COALESCE(p.commission_rate_percent, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
-      } else if (classification === 'viral_video') {
-        // VÍDEO VIRAL: Usa a tabela relacional tiktok_shop_product_videos
-        // Agrupado por product_id para selecionar o MELHOR vídeo (1 produto = 1 linha)
-        // Score viral = views * 1.0 + shares * 10.0 + saves * 5.0 + comments * 3.0 + likes * 0.5
-        joinClause = `
-          LEFT JOIN (
-            SELECT 
-              product_id,
-              MAX(
-                COALESCE(video_views, 0) * 1.0 + 
-                COALESCE(video_shares, 0) * 10.0 + 
-                COALESCE(video_saves, 0) * 5.0 + 
-                COALESCE(video_comments, 0) * 3.0 + 
-                COALESCE(video_likes, 0) * 0.5
-              ) AS best_video_viral_score,
-              MAX(COALESCE(video_views, 0)) AS max_v_views
-            FROM tiktok_shop_product_videos
-            GROUP BY product_id
-          ) pv ON pv.product_id = p.product_id
-        `;
-        orderClause = `ORDER BY GREATEST(
-          COALESCE(pv.best_video_viral_score, 0),
-          (
-            COALESCE(p.video_views, 0) * 1.0 + 
-            COALESCE(p.video_shares, 0) * 10.0 + 
-            COALESCE(video_saves, 0) * 5.0 + 
-            COALESCE(video_comments, 0) * 3.0 + 
-            COALESCE(video_likes, 0) * 0.5
-          )
-        ) DESC, p.sold_count DESC, p.last_seen_at DESC`;
+      if (classification === 'viral_video') {
+        const viralViewsThreshold = Math.max(100000, Number(minVideoViews) || 100000);
+        const { whereSql: baseWhereSql, sqlParams: baseSqlParams } = buildProductSearchWhereClause({
+          query,
+          category,
+          subcategory,
+          childCategory,
+        });
+
+        const viralWhereConditions = [
+          `pv.video_id IS NOT NULL AND pv.video_id != ''`,
+          `pv.video_url IS NOT NULL AND pv.video_url != ''`,
+          `COALESCE(pv.video_views, 0) >= ?`,
+          `p.product_id IS NOT NULL AND p.product_id != ''`,
+          `p.title IS NOT NULL AND p.title != ''`,
+          `p.image_url IS NOT NULL AND p.image_url != ''`,
+        ];
+        const viralSqlParams: any[] = [viralViewsThreshold];
+
+        if (baseWhereSql && baseWhereSql !== '1=1') {
+          viralWhereConditions.push(`(${baseWhereSql})`);
+          viralSqlParams.push(...baseSqlParams);
+        }
+
+        const viralWhereSql = viralWhereConditions.join(' AND ');
+
+        const [viralRows]: any = await db.query(
+          `SELECT 
+            pv.id AS pv_row_id,
+            pv.video_id,
+            pv.video_url,
+            pv.video_author,
+            pv.video_author_followers,
+            pv.video_views,
+            pv.video_likes,
+            pv.video_comments,
+            pv.video_shares,
+            pv.video_saves,
+            pv.video_description,
+            p.product_id,
+            p.title,
+            p.image_url,
+            p.price_cents,
+            p.original_price_cents,
+            p.discount_percent,
+            p.currency_symbol,
+            p.rating,
+            p.sold_count,
+            p.seller_id,
+            p.seller_name,
+            p.product_url,
+            p.category_path,
+            p.classified_category,
+            p.classified_subcategory,
+            p.classified_child_category,
+            p.classification_source,
+            p.estimated_commission_cents,
+            p.commission_rate_percent,
+            p.last_seen_at
+          FROM tiktok_shop_product_videos pv
+          INNER JOIN tiktok_shop_products p ON pv.product_id = p.product_id
+          WHERE ${viralWhereSql}
+          ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC
+          LIMIT ? OFFSET ?`,
+          [...viralSqlParams, safePageSize * 2, offset]
+        );
+
+        const rawList = Array.isArray(viralRows) ? viralRows : [];
+        const seenVideoIds = new Set<string>();
+        const uniqueViralRows: any[] = [];
+        for (const r of rawList) {
+          const vid = String(r.video_id);
+          if (!seenVideoIds.has(vid)) {
+            seenVideoIds.add(vid);
+            uniqueViralRows.push(r);
+          }
+          if (uniqueViralRows.length >= safePageSize + 1) break;
+        }
+
+        let hasMoreViral = uniqueViralRows.length > safePageSize;
+        let pageRows = uniqueViralRows.slice(0, safePageSize);
+
+        // Fallback: If page > 1 has no rows, load page 1
+        if (pageRows.length === 0 && page > 1) {
+          const [fbRows]: any = await db.query(
+            `SELECT 
+              pv.id AS pv_row_id,
+              pv.video_id,
+              pv.video_url,
+              pv.video_author,
+              pv.video_author_followers,
+              pv.video_views,
+              pv.video_likes,
+              pv.video_comments,
+              pv.video_shares,
+              pv.video_saves,
+              pv.video_description,
+              p.product_id,
+              p.title,
+              p.image_url,
+              p.price_cents,
+              p.original_price_cents,
+              p.discount_percent,
+              p.currency_symbol,
+              p.rating,
+              p.sold_count,
+              p.seller_id,
+              p.seller_name,
+              p.product_url,
+              p.category_path,
+              p.classified_category,
+              p.classified_subcategory,
+              p.classified_child_category,
+              p.classification_source,
+              p.estimated_commission_cents,
+              p.commission_rate_percent,
+              p.last_seen_at
+            FROM tiktok_shop_product_videos pv
+            INNER JOIN tiktok_shop_products p ON pv.product_id = p.product_id
+            WHERE ${viralWhereSql}
+            ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC
+            LIMIT ? OFFSET 0`,
+            [...viralSqlParams, safePageSize * 2]
+          );
+          const fbRaw = Array.isArray(fbRows) ? fbRows : [];
+          const fbSeen = new Set<string>();
+          const fbUnique: any[] = [];
+          for (const r of fbRaw) {
+            const vid = String(r.video_id);
+            if (!fbSeen.has(vid)) {
+              fbSeen.add(vid);
+              fbUnique.push(r);
+            }
+            if (fbUnique.length >= safePageSize + 1) break;
+          }
+          hasMoreViral = fbUnique.length > safePageSize;
+          pageRows = fbUnique.slice(0, safePageSize);
+        }
+
+        const viralProducts: MinedProduct[] = pageRows.map((row: any) => {
+          const video: MinedVideo = {
+            id: String(row.video_id),
+            url: row.video_url,
+            description: row.video_description,
+            author: row.video_author,
+            authorFollowers: row.video_author_followers === null ? null : Number(row.video_author_followers),
+            views: row.video_views === null ? null : Number(row.video_views),
+            likes: row.video_likes === null ? null : Number(row.video_likes),
+            comments: row.video_comments === null ? null : Number(row.video_comments),
+            shares: row.video_shares === null ? null : Number(row.video_shares),
+            saves: row.video_saves === null ? null : Number(row.video_saves),
+          };
+
+          return {
+            productId: String(row.product_id),
+            title: String(row.title || 'Produto sem título'),
+            imageUrl: row.image_url || null,
+            priceCents: row.price_cents === null ? null : Number(row.price_cents),
+            originalPriceCents: row.original_price_cents === null ? null : Number(row.original_price_cents),
+            discountPercent: row.discount_percent === null ? null : Number(row.discount_percent),
+            currencySymbol: row.currency_symbol || 'R$',
+            rating: row.rating === null ? null : Number(row.rating),
+            soldCount: Number(row.sold_count || 0),
+            sellerId: row.seller_id ? String(row.seller_id) : null,
+            sellerName: row.seller_name ? String(row.seller_name) : null,
+            productUrl: row.product_url ? String(row.product_url) : null,
+            category: row.classified_category || row.category_path || null,
+            collectionCategory: row.collection_category || null,
+            collectionSubcategory: row.collection_subcategory || null,
+            querySource: row.query_source || null,
+            lastSeenAt: row.last_seen_at || null,
+            estimatedCommissionCents: row.estimated_commission_cents === null ? null : Number(row.estimated_commission_cents),
+            commissionRatePercent: row.commission_rate_percent === null ? null : Number(row.commission_rate_percent),
+            video,
+            associatedVideos: [video],
+          };
+        });
+
+        const productsWithTrends = await attachTrendMetrics(viralProducts);
+        logMinerAcquisition({
+          category,
+          query,
+          page,
+          region,
+          endpoint: '/v1/tiktokshop/search',
+          requestExecuted: false,
+          skipReason: 'classification=viral_video local DB hit',
+          itemsReceived: productsWithTrends.length,
+          creditsUsed: 0,
+        });
+
+        return {
+          products: productsWithTrends,
+          creditsUsed: 0,
+          creditsRemaining: null,
+          hasMore: hasMoreViral,
+          pageSize: safePageSize,
+          fromCache: true,
+          source: productsWithTrends.length > 0 ? 'database' : 'empty',
+          needsRefresh: false,
+          cacheExpired: false,
+          requestId: null,
+        };
       } else if (classification === 'sales_24h') {
         // VENDAS 24H: Variação real de sold_count em janela coerente (~24h: 18h a 42h)
         joinClause = `
