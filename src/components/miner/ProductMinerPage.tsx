@@ -4507,6 +4507,480 @@ const MobileProductCard: React.FC<{
   );
 };
 
+/* Viral Video Mode Card (Desktop) */
+const ViralVideoCard: React.FC<{
+  product: ProductMinerProduct;
+  position?: number;
+  isFavorite?: boolean;
+  onToggleFavorite?: (p: ProductMinerProduct) => void;
+  onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
+  onOpenDetailModal?: (p: ProductMinerProduct) => void;
+  onTrackClick?: (p: ProductMinerProduct) => void;
+}> = ({
+  product,
+  position,
+  isFavorite = false,
+  onToggleFavorite,
+  onOpenAnalysisModal,
+  onOpenDetailModal,
+  onTrackClick,
+}) => {
+  const [videoError, setVideoError] = useState(false);
+  const targetProductUrl = getOfficialProductUrl(product);
+  const views = product.video?.views ?? 0;
+
+  let badgeLabel = '🔥 100K+';
+  if (views >= 10000000) badgeLabel = '🔥 10M+';
+  else if (views >= 5000000) badgeLabel = '🔥 5M+';
+  else if (views >= 1000000) badgeLabel = '🔥 1M+';
+  else if (views >= 500000) badgeLabel = '🔥 500K+';
+  else if (views >= 100000) badgeLabel = '🔥 100K+';
+
+  return (
+    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative">
+      {/* Media: Real Video with Fallback to Image */}
+      <div className="relative aspect-[9/14] sm:aspect-[9/13] max-h-[420px] bg-slate-950 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center">
+        {product.video?.url && !videoError ? (
+          <video
+            src={product.video.url}
+            controls
+            playsInline
+            preload="metadata"
+            poster={product.imageUrl || undefined}
+            onError={() => setVideoError(true)}
+            className="w-full h-full object-contain bg-slate-950"
+          />
+        ) : product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.title}
+            className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-300 bg-slate-50"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-50">
+            <ShoppingBag className="w-10 h-10" />
+          </div>
+        )}
+
+        {/* Position badge */}
+        {position ? (
+          <div className="absolute top-2 left-2 z-10 px-2 py-1 rounded-lg bg-white/95 border border-amber-400 text-amber-700 text-xs font-black shadow-sm pointer-events-none">
+            #{position}
+          </div>
+        ) : null}
+
+        {/* View Level Badge */}
+        <div className="absolute top-2 left-12 z-10 px-2.5 py-1 rounded-lg bg-amber-500 text-white text-[11px] font-black shadow-md flex items-center gap-1 pointer-events-none">
+          {badgeLabel}
+        </div>
+
+        {/* Favorite Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleFavorite?.(product);
+          }}
+          className={`absolute top-2 right-2 z-20 p-2 rounded-full bg-white/90 shadow-md transition-all hover:scale-110 ${
+            isFavorite ? 'text-rose-500 bg-white' : 'text-slate-400 hover:text-rose-500'
+          }`}
+          title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
+        >
+          <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current text-rose-500' : ''}`} />
+        </button>
+      </div>
+
+      <div className="p-4 space-y-3 flex-1 flex flex-col">
+        {/* Video Author & 5 Metrics */}
+        {product.video ? (
+          <div className="rounded-xl border border-amber-200/60 bg-amber-50/20 p-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[12px] font-black text-slate-900 truncate">
+                @{product.video.author || 'creator'}
+              </span>
+
+              {product.video.authorFollowers !== null && product.video.authorFollowers !== undefined ? (
+                <span className="text-[10px] text-slate-500 font-semibold">
+                  {compactNumber(product.video.authorFollowers)} seguidores
+                </span>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-5 gap-1 text-center text-[10px] text-slate-600 font-semibold">
+              <span title="Views">
+                <Eye className="w-3.5 h-3.5 mx-auto mb-1 text-slate-600" />
+                {compactNumber(product.video.views)}
+              </span>
+
+              <span title="Likes">
+                <Heart className="w-3.5 h-3.5 mx-auto mb-1 text-rose-500" />
+                {compactNumber(product.video.likes)}
+              </span>
+
+              <span title="Comentários">
+                <MessageCircle className="w-3.5 h-3.5 mx-auto mb-1 text-sky-600" />
+                {compactNumber(product.video.comments)}
+              </span>
+
+              <span title="Compartilhamentos">
+                <Share2 className="w-3.5 h-3.5 mx-auto mb-1 text-emerald-600" />
+                {compactNumber(product.video.shares)}
+              </span>
+
+              <span title="Salvos">
+                <Bookmark className="w-3.5 h-3.5 mx-auto mb-1 text-amber-600" />
+                {compactNumber(product.video.saves)}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Product Title */}
+        <h3 className="font-extrabold text-sm text-slate-900 leading-snug line-clamp-2 min-h-[40px]">
+          {product.title}
+        </h3>
+
+        {/* Commission Badge (if available) */}
+        {(() => {
+          const commText = getCommissionText(product);
+          if (!commText) return null;
+          return (
+            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
+              {commText}
+            </div>
+          );
+        })()}
+
+        {/* Price / Estimated Range */}
+        {(() => {
+          const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+          if (!range) {
+            return (
+              <div className="min-w-0">
+                <span className="text-lg font-black text-emerald-700 whitespace-nowrap">
+                  {formatMoney(product.priceCents, product.currencySymbol)}
+                </span>
+              </div>
+            );
+          }
+          return (
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block leading-none whitespace-nowrap">
+                  Faixa estimada
+                </span>
+              </div>
+              <div className="text-base sm:text-lg font-black text-emerald-700 leading-tight whitespace-nowrap">
+                {range.formattedRange}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Total Sold & Rating */}
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <span>Vendas totais:</span>
+            <span className="font-black text-amber-700">{compactNumber(product.soldCount)}</span>
+          </div>
+
+          {product.rating ? (
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50/80 border border-amber-200/60 text-amber-800 text-xs font-extrabold shrink-0 shadow-2xs">
+              <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
+              <span>{product.rating}</span>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Store Name */}
+        <div className="rounded-lg bg-slate-50 border border-slate-200/80 px-2.5 py-2 text-slate-700 flex items-center gap-2 min-w-0 font-medium">
+          <Store className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="text-xs text-slate-700 font-medium truncate flex-1 min-w-0" title={product.sellerName || 'TikTok Shop'}>
+            <span className="text-slate-500 mr-1">Loja:</span>
+            <span className="font-bold text-slate-800">{product.sellerName || 'TikTok Shop'}</span>
+          </span>
+        </div>
+
+        {/* Action Buttons: Analisar + Assistir Vídeo */}
+        <div className="grid grid-cols-2 gap-1.5 text-[11px] pt-1">
+          <button
+            type="button"
+            onClick={() => onOpenAnalysisModal?.(product)}
+            className="w-full py-1.5 px-2 rounded-lg bg-white border border-amber-200 text-slate-800 hover:bg-amber-50 font-bold flex items-center justify-center gap-1 transition-all shadow-xs"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-amber-600" />
+            🔍 Analisar
+          </button>
+
+          {product.video?.url ? (
+            <a
+              href={product.video.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => onTrackClick?.(product)}
+              className="w-full py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-amber-900 hover:border-amber-300 font-bold flex items-center justify-center gap-1 transition-all shadow-xs"
+            >
+              <Play className="w-3.5 h-3.5 text-amber-600 fill-amber-500/20" />
+              Assistir Vídeo
+            </a>
+          ) : (
+            <div className="w-full py-1.5 px-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 font-semibold flex items-center justify-center text-[10px]">
+              Sem link
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Actions: Detalhes + Produto */}
+        <div className="flex gap-2 mt-auto pt-2">
+          <button
+            type="button"
+            onClick={() => onOpenDetailModal?.(product)}
+            className="flex-1 inline-flex items-center justify-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-2.5 py-2 text-xs font-bold transition-all"
+          >
+            Detalhes
+          </button>
+
+          {targetProductUrl ? (
+            <a
+              href={targetProductUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => onTrackClick?.(product)}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3 py-2 text-xs font-bold shadow-sm"
+            >
+              Produto <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+};
+
+/* Viral Video Mode Card (Mobile) */
+const MobileViralVideoCard: React.FC<{
+  product: ProductMinerProduct;
+  position?: number;
+  isFavorite?: boolean;
+  onToggleFavorite?: (p: ProductMinerProduct) => void;
+  onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
+  onOpenDetailModal?: (p: ProductMinerProduct) => void;
+  onTrackClick?: (p: ProductMinerProduct) => void;
+}> = ({
+  product,
+  position,
+  isFavorite = false,
+  onToggleFavorite,
+  onOpenAnalysisModal,
+  onOpenDetailModal,
+  onTrackClick,
+}) => {
+  const [videoError, setVideoError] = useState(false);
+  const targetProductUrl = getOfficialProductUrl(product);
+  const views = product.video?.views ?? 0;
+
+  let badgeLabel = '🔥 100K+';
+  if (views >= 10000000) badgeLabel = '🔥 10M+';
+  else if (views >= 5000000) badgeLabel = '🔥 5M+';
+  else if (views >= 1000000) badgeLabel = '🔥 1M+';
+  else if (views >= 500000) badgeLabel = '🔥 500K+';
+  else if (views >= 100000) badgeLabel = '🔥 100K+';
+
+  return (
+    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm flex flex-col h-full text-slate-900 relative p-3 space-y-3">
+      {/* Video Container */}
+      <div className="relative aspect-[9/14] max-h-[380px] w-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center">
+        {product.video?.url && !videoError ? (
+          <video
+            src={product.video.url}
+            controls
+            playsInline
+            preload="metadata"
+            poster={product.imageUrl || undefined}
+            onError={() => setVideoError(true)}
+            className="w-full h-full object-contain bg-slate-950"
+          />
+        ) : product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.title}
+            className="w-full h-full object-contain bg-slate-50"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-50">
+            <ShoppingBag className="w-8 h-8" />
+          </div>
+        )}
+
+        {position ? (
+          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-white/95 border border-amber-400 text-amber-700 text-[11px] font-black shadow-sm pointer-events-none">
+            #{position}
+          </div>
+        ) : null}
+
+        <div className="absolute top-2 left-11 z-10 px-2 py-0.5 rounded-lg bg-amber-500 text-white text-[10px] font-black shadow-md flex items-center gap-1 pointer-events-none">
+          {badgeLabel}
+        </div>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleFavorite?.(product);
+          }}
+          className={`absolute top-2 right-2 z-20 p-1.5 rounded-full bg-white/90 shadow-md transition-all ${
+            isFavorite ? 'text-rose-500 bg-white' : 'text-slate-400 hover:text-rose-500'
+          }`}
+          title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
+        >
+          <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current text-rose-500' : ''}`} />
+        </button>
+      </div>
+
+      {/* Video Creator & Stats */}
+      {product.video ? (
+        <div className="rounded-xl border border-amber-200/60 bg-amber-50/20 p-2.5 space-y-2">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[11px] font-black text-slate-900 truncate">
+              @{product.video.author || 'creator'}
+            </span>
+            {product.video.authorFollowers !== null && product.video.authorFollowers !== undefined ? (
+              <span className="text-[10px] text-slate-500 font-semibold">
+                {compactNumber(product.video.authorFollowers)} seg.
+              </span>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-5 gap-1 text-center text-[9px] text-slate-600 font-semibold">
+            <span title="Views">
+              <Eye className="w-3 h-3 mx-auto mb-0.5 text-slate-600" />
+              {compactNumber(product.video.views)}
+            </span>
+            <span title="Likes">
+              <Heart className="w-3 h-3 mx-auto mb-0.5 text-rose-500" />
+              {compactNumber(product.video.likes)}
+            </span>
+            <span title="Comentários">
+              <MessageCircle className="w-3 h-3 mx-auto mb-0.5 text-sky-600" />
+              {compactNumber(product.video.comments)}
+            </span>
+            <span title="Compartilhamentos">
+              <Share2 className="w-3 h-3 mx-auto mb-0.5 text-emerald-600" />
+              {compactNumber(product.video.shares)}
+            </span>
+            <span title="Salvos">
+              <Bookmark className="w-3 h-3 mx-auto mb-0.5 text-amber-600" />
+              {compactNumber(product.video.saves)}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Product info */}
+      <div className="space-y-1.5 flex-1 flex flex-col justify-between">
+        <div className="space-y-1">
+          <h3 className="font-bold text-xs text-slate-900 leading-tight line-clamp-2 min-h-[32px]">
+            {product.title}
+          </h3>
+
+          <div className="flex items-center justify-between gap-1 text-[10px] text-slate-600">
+            <span className="font-extrabold text-amber-700 truncate">
+              {compactNumber(product.soldCount)} vendidos
+            </span>
+            {product.rating ? (
+              <span className="font-bold text-amber-600 flex items-center gap-0.5 shrink-0">
+                <Star className="w-2.5 h-2.5 fill-current text-amber-400" />
+                {product.rating}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Price / Estimated Range */}
+          {(() => {
+            const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+            if (!range) {
+              return (
+                <div className="pt-0.5">
+                  <span className="text-xs font-black text-emerald-700">
+                    {formatMoney(product.priceCents, product.currencySymbol)}
+                  </span>
+                </div>
+              );
+            }
+            return (
+              <div className="pt-0.5 space-y-0.5 min-w-0">
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60 inline-block leading-tight whitespace-nowrap">
+                    Faixa estimada
+                  </span>
+                </div>
+                <div className="text-xs font-black text-emerald-700 leading-tight whitespace-nowrap truncate">
+                  {range.formattedRange}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Store Name */}
+        <div className="text-[10px] text-slate-500 font-medium truncate flex items-center pt-1 border-t border-slate-100">
+          <span className="shrink-0 mr-0.5">Loja:</span>
+          <span className="truncate font-bold text-slate-700">{product.sellerName || 'TikTok Shop'}</span>
+        </div>
+
+        {/* Actions */}
+        <div className="grid grid-cols-2 gap-1.5 pt-1">
+          <button
+            type="button"
+            onClick={() => onOpenAnalysisModal?.(product)}
+            className="w-full py-1.5 px-2 rounded-lg bg-white border border-amber-200 text-slate-800 hover:bg-amber-50 font-bold flex items-center justify-center gap-1 transition-all text-[10px]"
+          >
+            <BarChart3 className="w-3 h-3 text-amber-600" />
+            🔍 Analisar
+          </button>
+
+          {product.video?.url ? (
+            <a
+              href={product.video.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => onTrackClick?.(product)}
+              className="w-full py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold flex items-center justify-center gap-1 transition-all text-[10px]"
+            >
+              <Play className="w-3 h-3 text-amber-600" />
+              Assistir
+            </a>
+          ) : null}
+        </div>
+
+        <div className="flex gap-1.5 pt-1">
+          <button
+            type="button"
+            onClick={() => onOpenDetailModal?.(product)}
+            className="flex-1 py-1.5 px-2 rounded-lg bg-slate-100 text-slate-800 border border-slate-200 font-bold text-[11px] text-center"
+          >
+            Detalhes
+          </button>
+
+          {targetProductUrl ? (
+            <a
+              href={targetProductUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => onTrackClick?.(product)}
+              className="flex-1 py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-[11px] text-center flex items-center justify-center gap-1"
+            >
+              Produto <ExternalLink className="w-3 h-3" />
+            </a>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+};
+
 /* Desktop Full Card */
 const ProductCard: React.FC<{
   product: ProductMinerProduct;
@@ -6539,9 +7013,24 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:hidden items-stretch">
                 {currentRenderProducts.map((product, index) => {
                   const globalPos = index + 1;
+                  const cardKey = product.video?.id ? `${product.productId}_${product.video.id}` : product.productId;
+                  if (selectedClassification === 'viral_video') {
+                    return (
+                      <MobileViralVideoCard
+                        key={cardKey}
+                        product={product}
+                        position={globalPos}
+                        isFavorite={isFavorited(product.productId)}
+                        onToggleFavorite={toggleFavorite}
+                        onOpenAnalysisModal={handleOpenAnalysisModal}
+                        onOpenDetailModal={handleOpenDetailModal}
+                        onTrackClick={handleTrackProductClick}
+                      />
+                    );
+                  }
                   return (
                     <MobileProductCard
-                      key={product.productId}
+                      key={cardKey}
                       product={product}
                       position={globalPos}
                       rankingSort={rankingSort}
@@ -6559,9 +7048,24 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                 {currentRenderProducts.map((product, index) => {
                   const globalPos = index + 1;
+                  const cardKey = product.video?.id ? `${product.productId}_${product.video.id}` : product.productId;
+                  if (selectedClassification === 'viral_video') {
+                    return (
+                      <ViralVideoCard
+                        key={cardKey}
+                        product={product}
+                        position={globalPos}
+                        isFavorite={isFavorited(product.productId)}
+                        onToggleFavorite={toggleFavorite}
+                        onOpenAnalysisModal={handleOpenAnalysisModal}
+                        onOpenDetailModal={handleOpenDetailModal}
+                        onTrackClick={handleTrackProductClick}
+                      />
+                    );
+                  }
                   return (
                     <ProductCard
-                      key={product.productId}
+                      key={cardKey}
                       product={product}
                       position={globalPos}
                       rankingSort={rankingSort}
