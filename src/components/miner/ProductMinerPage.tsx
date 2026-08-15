@@ -3835,21 +3835,69 @@ function formatMoney(cents: number | null | undefined, symbol = 'R$') {
   return `${symbol} ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+export interface EffectiveCommissionInfo {
+  cents: number;
+  ratePercent: number | null;
+  formattedCommission: string;
+  isDirectAmount: boolean;
+}
+
+export function getEffectiveCommissionInfo(product: {
+  estimatedCommissionCents?: number | null;
+  commissionRatePercent?: number | null;
+  priceCents?: number | null;
+  currencySymbol?: string;
+} | null | undefined): EffectiveCommissionInfo | null {
+  if (!product) return null;
+  const directCents = Number(product.estimatedCommissionCents || 0);
+  const rate = product.commissionRatePercent && product.commissionRatePercent > 0 ? Number(product.commissionRatePercent) : null;
+  const price = Number(product.priceCents || 0);
+
+  if (directCents > 0) {
+    return {
+      cents: directCents,
+      ratePercent: rate,
+      formattedCommission: formatMoney(directCents, product.currencySymbol || 'R$'),
+      isDirectAmount: true,
+    };
+  }
+
+  if (price > 0 && rate !== null && rate > 0) {
+    const calculatedCents = Math.round((price * rate) / 100);
+    return {
+      cents: calculatedCents,
+      ratePercent: rate,
+      formattedCommission: formatMoney(calculatedCents, product.currencySymbol || 'R$'),
+      isDirectAmount: false,
+    };
+  }
+
+  return null;
+}
+
+export function getEffectiveCommissionCents(product: {
+  estimatedCommissionCents?: number | null;
+  commissionRatePercent?: number | null;
+  priceCents?: number | null;
+} | null | undefined): number {
+  if (!product) return 0;
+  if (product.estimatedCommissionCents && product.estimatedCommissionCents > 0) {
+    return Number(product.estimatedCommissionCents);
+  }
+  if (product.priceCents && product.priceCents > 0 && product.commissionRatePercent && product.commissionRatePercent > 0) {
+    return Math.round((Number(product.priceCents) * Number(product.commissionRatePercent)) / 100);
+  }
+  return 0;
+}
+
 function getCommissionText(product: ProductMinerProduct): string | null {
-  const hasAmount = Boolean(product.estimatedCommissionCents && product.estimatedCommissionCents > 0);
-  const hasPercent = Boolean(product.commissionRatePercent && product.commissionRatePercent > 0);
+  const commInfo = getEffectiveCommissionInfo(product);
+  if (!commInfo) return null;
 
-  if (!hasAmount && !hasPercent) return null;
-
-  if (hasAmount && hasPercent) {
-    const moneyStr = formatMoney(product.estimatedCommissionCents!, product.currencySymbol);
-    return `Comissão ${moneyStr} · ${product.commissionRatePercent}%`;
+  if (commInfo.ratePercent) {
+    return `Comissão ${commInfo.formattedCommission} · ${commInfo.ratePercent}%`;
   }
-  if (hasAmount) {
-    const moneyStr = formatMoney(product.estimatedCommissionCents!, product.currencySymbol);
-    return `Comissão ${moneyStr}`;
-  }
-  return `Comissão ${product.commissionRatePercent}%`;
+  return `Comissão ${commInfo.formattedCommission}`;
 }
 
 function getOfficialProductUrl(product: { productUrl?: string | null; productId?: string | null }): string | null {
@@ -4354,6 +4402,7 @@ const MobileProductCard: React.FC<{
   product: ProductMinerProduct;
   position?: number;
   rankingSort?: ProductRankingSort;
+  selectedClassification?: ClassificationType | null;
   isMentor?: boolean;
   isFavorite?: boolean;
   onToggleFavorite?: (p: ProductMinerProduct) => void;
@@ -4363,6 +4412,7 @@ const MobileProductCard: React.FC<{
   product,
   position,
   rankingSort,
+  selectedClassification,
   isMentor,
   isFavorite = false,
   onToggleFavorite,
@@ -4370,17 +4420,23 @@ const MobileProductCard: React.FC<{
   onTrackClick,
 }) => {
   const targetProductUrl = getOfficialProductUrl(product);
+  const isHighestCommission = selectedClassification === 'highest_commission';
+  const commInfo = getEffectiveCommissionInfo(product);
 
   return (
     <article
       onClick={() => onOpenDetailModal?.(product)}
-      className="group rounded-xl border border-slate-200/90 bg-white shadow-xs hover:shadow-md hover:border-amber-400/60 transition-all flex flex-col h-full relative overflow-hidden text-slate-900 cursor-pointer p-2"
+      className={`group rounded-xl border ${
+        isHighestCommission ? 'border-emerald-300 bg-white ring-1 ring-emerald-200/60' : 'border-slate-200/90 bg-white'
+      } shadow-xs hover:shadow-md hover:border-amber-400/60 transition-all flex flex-col h-full relative overflow-hidden text-slate-900 cursor-pointer p-2`}
     >
       {/* Product Image Container - 1:1 Aspect ratio with object-contain to prevent cropping */}
       <div className="relative aspect-square w-full rounded-lg bg-slate-50 border border-slate-100 overflow-hidden shrink-0 flex items-center justify-center p-1">
         {/* Ranking position tag */}
         {position ? (
-          <div className="absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded bg-white/95 border border-amber-400/80 text-amber-800 text-[9px] font-black shadow-xs">
+          <div className={`absolute top-1 left-1 z-10 px-1.5 py-0.5 rounded bg-white/95 border ${
+            isHighestCommission ? 'border-emerald-500 text-emerald-800' : 'border-amber-400/80 text-amber-800'
+          } text-[9px] font-black shadow-xs`}>
             #{position}
           </div>
         ) : null}
@@ -4428,42 +4484,72 @@ const MobileProductCard: React.FC<{
             ) : null}
           </div>
 
-          {/* Real Commission Badge */}
-          {(() => {
-            const commText = getCommissionText(product);
-            if (!commText) return null;
-            return (
-              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[9px] font-black max-w-full truncate">
-                {commText}
+          {/* Quando for classificação MAIOR COMISSÃO: Bloco forte de ganho por venda separado do preço */}
+          {isHighestCommission ? (
+            <div className="space-y-1 pt-0.5">
+              <div className="rounded-lg border-2 border-emerald-500/80 bg-emerald-50/90 p-2 space-y-0.5 shadow-2xs">
+                <div className="text-[9px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1">
+                  <span>💰</span> COMISSÃO POR VENDA
+                </div>
+                <div className="text-base font-black text-emerald-800 leading-tight">
+                  {commInfo ? commInfo.formattedCommission : '—'}
+                </div>
+                {commInfo?.ratePercent ? (
+                  <div className="text-[9px] font-extrabold text-emerald-700">
+                    {commInfo.ratePercent}% de comissão
+                  </div>
+                ) : null}
               </div>
-            );
-          })()}
+              <div className="text-[10px] text-slate-600 flex items-center justify-between px-0.5">
+                <span className="text-slate-500">Preço:</span>
+                <span className="font-bold text-slate-800 truncate">
+                  {(() => {
+                    const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+                    return range ? range.formattedRange : formatMoney(product.priceCents, product.currencySymbol);
+                  })()}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Real Commission Badge Padrão */}
+              {(() => {
+                const commText = getCommissionText(product);
+                if (!commText) return null;
+                return (
+                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[9px] font-black max-w-full truncate">
+                    {commText}
+                  </div>
+                );
+              })()}
 
-          {/* Price */}
-          {(() => {
-            const range = getProductPriceRange(product.priceCents, product.currencySymbol);
-            if (!range) {
-              return (
-                <div className="pt-0.5">
-                  <span className="text-xs font-black text-emerald-700">
-                    {formatMoney(product.priceCents, product.currencySymbol)}
-                  </span>
-                </div>
-              );
-            }
-            return (
-              <div className="pt-0.5 space-y-0.5 min-w-0">
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60 inline-block leading-tight whitespace-nowrap">
-                    Faixa estimada
-                  </span>
-                </div>
-                <div className="text-xs font-black text-emerald-700 leading-tight whitespace-nowrap truncate">
-                  {range.formattedRange}
-                </div>
-              </div>
-            );
-          })()}
+              {/* Price Padrão */}
+              {(() => {
+                const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+                if (!range) {
+                  return (
+                    <div className="pt-0.5">
+                      <span className="text-xs font-black text-emerald-700">
+                        {formatMoney(product.priceCents, product.currencySymbol)}
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="pt-0.5 space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60 inline-block leading-tight whitespace-nowrap">
+                        Faixa estimada
+                      </span>
+                    </div>
+                    <div className="text-xs font-black text-emerald-700 leading-tight whitespace-nowrap truncate">
+                      {range.formattedRange}
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
+          )}
         </div>
 
         {/* Bottom Bar: Seller Name + Heart Favorite & Action Buttons */}
@@ -5398,6 +5484,7 @@ const ProductCard: React.FC<{
   product: ProductMinerProduct;
   position?: number;
   rankingSort?: ProductRankingSort;
+  selectedClassification?: ClassificationType | null;
   isMentor?: boolean;
   isFavorite?: boolean;
   onToggleFavorite?: (p: ProductMinerProduct) => void;
@@ -5410,6 +5497,7 @@ const ProductCard: React.FC<{
   product,
   position,
   rankingSort,
+  selectedClassification,
   isMentor,
   isFavorite = false,
   onToggleFavorite,
@@ -5423,9 +5511,13 @@ const ProductCard: React.FC<{
   const show24h = product.sales24h !== undefined && product.sales24h !== null;
   const show7d = product.sales7d !== undefined && product.sales7d !== null;
   const isSpikingRanking = rankingSort === 'spiking';
+  const isHighestCommission = selectedClassification === 'highest_commission';
+  const commInfo = getEffectiveCommissionInfo(product);
 
   return (
-    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative">
+    <article className={`group rounded-2xl border ${
+      isHighestCommission ? 'border-emerald-300 ring-1 ring-emerald-200/60 bg-white' : 'border-slate-200/90 bg-white'
+    } overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative`}>
       <div className="relative aspect-[4/3] bg-slate-50 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center p-2">
         <button
           type="button"
@@ -5455,7 +5547,9 @@ const ProductCard: React.FC<{
         )}
 
         {position ? (
-          <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-white/95 border border-amber-400 text-amber-700 text-xs font-black shadow-sm">
+          <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg bg-white/95 border ${
+            isHighestCommission ? 'border-emerald-500 text-emerald-800' : 'border-amber-400 text-amber-700'
+          } text-xs font-black shadow-sm`}>
             #{position}
           </div>
         ) : null}
@@ -5483,42 +5577,76 @@ const ProductCard: React.FC<{
           {product.title}
         </h3>
 
-        {/* Ganho Afiliado / Comissão (se disponível) */}
-        {(() => {
-          const commText = getCommissionText(product);
-          if (!commText) return null;
-          return (
-            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
-              {commText}
+        {/* Quando for classificação MAIOR COMISSÃO: Bloco de alto impacto visual para o ganho do afiliado */}
+        {isHighestCommission ? (
+          <div className="space-y-2">
+            <div className="rounded-xl border-2 border-emerald-500/80 bg-emerald-50/80 p-3 shadow-xs space-y-1">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900 flex items-center gap-1">
+                  <span>💰</span> COMISSÃO POR VENDA
+                </span>
+                {commInfo?.ratePercent ? (
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-200/90 border border-emerald-300 text-emerald-900 leading-none">
+                    {commInfo.ratePercent}% de comissão
+                  </span>
+                ) : null}
+              </div>
+              <div className="text-2xl font-black text-emerald-800 tracking-tight leading-none pt-0.5">
+                {commInfo ? commInfo.formattedCommission : '—'}
+              </div>
             </div>
-          );
-        })()}
 
-        {/* Bloco 1: Faixa Estimada em linha única */}
-        {(() => {
-          const range = getProductPriceRange(product.priceCents, product.currencySymbol);
-          if (!range) {
-            return (
-              <div className="min-w-0">
-                <span className="text-lg font-black text-emerald-700 whitespace-nowrap">
-                  {formatMoney(product.priceCents, product.currencySymbol)}
-                </span>
-              </div>
-            );
-          }
-          return (
-            <div className="min-w-0">
-              <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block leading-none whitespace-nowrap">
-                  Faixa estimada
-                </span>
-              </div>
-              <div className="text-base sm:text-lg font-black text-emerald-700 leading-tight whitespace-nowrap">
-                {range.formattedRange}
-              </div>
+            {/* Preço do Produto claramente separado da comissão */}
+            <div className="rounded-lg bg-slate-100/90 border border-slate-200 px-2.5 py-1.5 flex items-center justify-between text-xs text-slate-700">
+              <span className="font-semibold text-slate-500 text-[11px]">Preço do produto:</span>
+              <span className="font-bold text-slate-900">
+                {(() => {
+                  const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+                  return range ? range.formattedRange : formatMoney(product.priceCents, product.currencySymbol);
+                })()}
+              </span>
             </div>
-          );
-        })()}
+          </div>
+        ) : (
+          <>
+            {/* Ganho Afiliado / Comissão Padrão (se disponível) */}
+            {(() => {
+              const commText = getCommissionText(product);
+              if (!commText) return null;
+              return (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black self-start">
+                  {commText}
+                </div>
+              );
+            })()}
+
+            {/* Bloco 1: Faixa Estimada em linha única */}
+            {(() => {
+              const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+              if (!range) {
+                return (
+                  <div className="min-w-0">
+                    <span className="text-lg font-black text-emerald-700 whitespace-nowrap">
+                      {formatMoney(product.priceCents, product.currencySymbol)}
+                    </span>
+                  </div>
+                );
+              }
+              return (
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block leading-none whitespace-nowrap">
+                      Faixa estimada
+                    </span>
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-emerald-700 leading-tight whitespace-nowrap">
+                    {range.formattedRange}
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
 
         {/* Bloco 2: Vendas Totais + Avaliação lado a lado abaixo da faixa */}
         <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -6375,6 +6503,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     if (hasVideoOnly || selectedClassification === 'viral_video') {
       list = list.filter((p) => Boolean(p.video?.url || p.video?.id || (p.associatedVideos && p.associatedVideos.length > 0)));
     }
+
+    // 2b. Filter for highest_commission (only show products that have effective commission > 0)
+    if (selectedClassification === 'highest_commission') {
+      list = list.filter((p) => getEffectiveCommissionCents(p) > 0);
+    }
     if (selectedClassification === 'viral_video' && activeVideoRange) {
       if (activeVideoRange.min !== null && activeVideoRange.min !== undefined) {
         list = list.filter((p) => {
@@ -6428,16 +6561,17 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         });
       } else if (selectedClassification === 'highest_commission') {
         copy.sort((a, b) => {
-          const commB = b.estimatedCommissionCents ?? (b.commissionRatePercent && b.priceCents ? Math.round((b.priceCents * b.commissionRatePercent) / 100) : 0);
-          const commA = a.estimatedCommissionCents ?? (a.commissionRatePercent && a.priceCents ? Math.round((a.priceCents * a.commissionRatePercent) / 100) : 0);
+          const commB = getEffectiveCommissionCents(b);
+          const commA = getEffectiveCommissionCents(a);
           const rateB = b.commissionRatePercent ?? 0;
           const rateA = a.commissionRatePercent ?? 0;
-          const hasB = (commB > 0 || rateB > 0) ? 1 : 0;
-          const hasA = (commA > 0 || rateA > 0) ? 1 : 0;
-          if (hasB !== hasA) return hasB - hasA;
+          const priceB = b.priceCents ?? 0;
+          const priceA = a.priceCents ?? 0;
           if (commB !== commA) return commB - commA;
           if (rateB !== rateA) return rateB - rateA;
-          return (b.soldCount || 0) - (a.soldCount || 0);
+          if (priceB !== priceA) return priceB - priceA;
+          if ((b.soldCount || 0) !== (a.soldCount || 0)) return (b.soldCount || 0) - (a.soldCount || 0);
+          return (b.rating || 0) - (a.rating || 0);
         });
       } else if (selectedClassification === 'sales_24h') {
         copy.sort((a, b) => (b.sales24h ?? 0) - (a.sales24h ?? 0) || (b.soldCount || 0) - (a.soldCount || 0));
@@ -7475,6 +7609,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       product={product}
                       position={globalPos}
                       rankingSort={rankingSort}
+                      selectedClassification={selectedClassification}
                       isMentor={canRefresh}
                       isFavorite={isFavorited(product.productId)}
                       onToggleFavorite={toggleFavorite}
@@ -7515,6 +7650,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       product={product}
                       position={globalPos}
                       rankingSort={rankingSort}
+                      selectedClassification={selectedClassification}
                       isMentor={canRefresh}
                       isFavorite={isFavorited(product.productId)}
                       onToggleFavorite={toggleFavorite}

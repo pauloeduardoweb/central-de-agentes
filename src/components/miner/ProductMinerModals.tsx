@@ -22,21 +22,55 @@ function formatMoney(cents: number | null, symbol = 'R$') {
   return `${symbol} ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+export interface EffectiveCommissionInfo {
+  effectiveCommissionCents: number;
+  formattedCommission: string;
+  ratePercent: number | null;
+  hasDirectAmount: boolean;
+}
+
+export function getEffectiveCommissionInfo(product: ProductMinerProduct): EffectiveCommissionInfo | null {
+  const directCents = product.estimatedCommissionCents && product.estimatedCommissionCents > 0
+    ? product.estimatedCommissionCents
+    : 0;
+
+  const rate = product.commissionRatePercent && product.commissionRatePercent > 0
+    ? product.commissionRatePercent
+    : null;
+
+  let calculatedCents = 0;
+  if (directCents > 0) {
+    calculatedCents = directCents;
+  } else if (rate !== null && product.priceCents && product.priceCents > 0) {
+    calculatedCents = Math.round((product.priceCents * rate) / 100);
+  }
+
+  if (calculatedCents <= 0 && rate === null) {
+    return null;
+  }
+
+  return {
+    effectiveCommissionCents: calculatedCents,
+    formattedCommission: formatMoney(calculatedCents, product.currencySymbol || 'R$'),
+    ratePercent: rate,
+    hasDirectAmount: directCents > 0,
+  };
+}
+
 function getCommissionText(product: ProductMinerProduct): string | null {
-  const hasAmount = Boolean(product.estimatedCommissionCents && product.estimatedCommissionCents > 0);
-  const hasPercent = Boolean(product.commissionRatePercent && product.commissionRatePercent > 0);
+  const info = getEffectiveCommissionInfo(product);
+  if (!info) return null;
 
-  if (!hasAmount && !hasPercent) return null;
-
-  if (hasAmount && hasPercent) {
-    const moneyStr = formatMoney(product.estimatedCommissionCents!, product.currencySymbol);
-    return `Comissão ${moneyStr} · ${product.commissionRatePercent}%`;
+  if (info.effectiveCommissionCents > 0 && info.ratePercent !== null) {
+    return `Comissão ${info.formattedCommission} · ${info.ratePercent}%`;
   }
-  if (hasAmount) {
-    const moneyStr = formatMoney(product.estimatedCommissionCents!, product.currencySymbol);
-    return `Comissão ${moneyStr}`;
+  if (info.effectiveCommissionCents > 0) {
+    return `Comissão ${info.formattedCommission}`;
   }
-  return `Comissão ${product.commissionRatePercent}%`;
+  if (info.ratePercent !== null) {
+    return `Comissão ${info.ratePercent}%`;
+  }
+  return null;
 }
 
 function getOfficialProductUrl(product: { productUrl?: string | null; productId?: string | null }): string | null {
