@@ -1154,43 +1154,65 @@ async function attachTrendMetrics(products: MinedProduct[]): Promise<MinedProduc
 }
 
 export async function attachVideoDownloads(products: MinedProduct[]): Promise<MinedProduct[]> {
-  if (!isDatabaseConfigured() || products.length === 0) return products;
-  const productIds = products.map((p) => p.productId).filter(Boolean);
+  if (!isDatabaseConfigured() || !Array.isArray(products) || products.length === 0) {
+    return products;
+  }
+
+  const productIds = Array.from(new Set(products.map((p) => String(p.productId)).filter(Boolean)));
   if (productIds.length === 0) return products;
 
   try {
     await ensureProductMinerTables();
     const placeholders = productIds.map(() => '?').join(',');
     const [rows]: any = await db.query(
-      `SELECT product_id, direct_media_url, status, prepared_at
+      `SELECT product_id, video_id, direct_media_url, status, prepared_at
        FROM tiktok_shop_video_downloads
        WHERE product_id IN (${placeholders})`,
       productIds
     );
 
-    const map = new Map<string, { isPrepared: boolean; directMediaUrl: string | null; preparedAt: string | null; status: string }>();
+    const mapByComposite = new Map<string, { isPrepared: boolean; directMediaUrl: string | null; preparedAt: string | null; status: string }>();
+    const mapByProduct = new Map<string, { isPrepared: boolean; directMediaUrl: string | null; preparedAt: string | null; status: string }>();
+
     if (Array.isArray(rows)) {
       for (const r of rows) {
-        map.set(String(r.product_id), {
+        const item = {
           isPrepared: r.status === 'COMPLETED' && Boolean(r.direct_media_url),
           directMediaUrl: r.direct_media_url || null,
           preparedAt: r.prepared_at ? new Date(r.prepared_at).toISOString() : null,
           status: String(r.status),
-        });
+        };
+        const pId = String(r.product_id);
+        const vId = String(r.video_id || '');
+        if (vId) {
+          mapByComposite.set(`${pId}:${vId}`, item);
+        }
+        if (!mapByProduct.has(pId) || item.isPrepared) {
+          mapByProduct.set(pId, item);
+        }
       }
     }
 
-    return products.map((p) => ({
-      ...p,
-      videoDownload: map.get(p.productId) || null,
-    }));
+    return products.map((p) => {
+      let downloadInfo: any = null;
+      if (p.video?.id) {
+        downloadInfo = mapByComposite.get(`${p.productId}:${p.video.id}`);
+      }
+      if (!downloadInfo) {
+        downloadInfo = mapByProduct.get(p.productId);
+      }
+      return {
+        ...p,
+        videoDownload: downloadInfo || null,
+      };
+    });
   } catch (err: any) {
     console.warn('[attachVideoDownloads Warning]:', err?.message || err);
     return products;
   }
 }
 
-export async function prepareVideoDownload(productId: string): Promise<{
+export async function prepareVideoDownload(productId: string, videoId?: string): Promise<{
   success: boolean;
   prepared?: boolean;
   directMediaUrl?: string;
@@ -1205,17 +1227,33 @@ export async function prepareVideoDownload(productId: string): Promise<{
   }
 
   await ensureProductMinerTables();
+  const cleanVideoId = String(videoId || '').trim();
 
   // 1. Check if already prepared or preparing
   const [existingRows]: any = await db.query(
     `SELECT direct_media_url, status, updated_at
      FROM tiktok_shop_video_downloads
-     WHERE product_id = ?
+     WHERE product_id = ? AND video_id = ?
      LIMIT 1`,
-    [productId]
+    [productId, cleanVideoId]
   );
 
-  const existing = Array.isArray(existingRows) && existingRows[0];
+  let existing = Array.isArray(existingRows) && existingRows[0];
+
+  // Fallback to legacy record with video_id = '' if cleanVideoId not found
+  if (!existing && cleanVideoId) {
+    const [legacyRows]: any = await db.query(
+      `SELECT direct_media_url, status, updated_at
+       FROM tiktok_shop_video_downloads
+       WHERE product_id = ? AND (video_id = '' OR video_id IS NULL)
+       LIMIT 1`,
+      [productId]
+    );
+    if (Array.isArray(legacyRows) && legacyRows[0]) {
+      existing = legacyRows[0];
+    }
+  }
+
   if (existing) {
     if (existing.status === 'COMPLETED' && existing.direct_media_url) {
       return {
@@ -1238,15 +1276,28 @@ export async function prepareVideoDownload(productId: string): Promise<{
     }
   }
 
-  // 2. Locate video_url for product
+  // 2. Locate video_url for product and specific videoId
   let videoUrl: string | null = null;
-  const [prodRows]: any = await db.query(
-    `SELECT video_url FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
-    [productId]
-  );
 
-  if (Array.isArray(prodRows) && prodRows[0]?.video_url) {
-    videoUrl = String(prodRows[0].video_url);
+  if (cleanVideoId) {
+    const [videoRows]: any = await db.query(
+      `SELECT video_url FROM tiktok_shop_product_videos WHERE product_id = ? AND video_id = ? LIMIT 1`,
+      [productId, cleanVideoId]
+    );
+    if (Array.isArray(videoRows) && videoRows[0]?.video_url) {
+      videoUrl = String(videoRows[0].video_url);
+    }
+  }
+
+  if (!videoUrl) {
+    const [prodRows]: any = await db.query(
+      `SELECT video_url FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
+      [productId]
+    );
+
+    if (Array.isArray(prodRows) && prodRows[0]?.video_url) {
+      videoUrl = String(prodRows[0].video_url);
+    }
   }
 
   if (!videoUrl) {
@@ -1258,6 +1309,13 @@ export async function prepareVideoDownload(productId: string): Promise<{
         try {
           const payload = JSON.parse(row.payload_json);
           const item = payload.data?.items?.find((i: any) => String(i.product_id || i.productId) === productId);
+          if (cleanVideoId) {
+            const vMatch = item?.associated_videos?.find((v: any) => String(v.id || v.video_id) === cleanVideoId);
+            if (vMatch?.url || vMatch?.video_url) {
+              videoUrl = vMatch.url || vMatch.video_url;
+              break;
+            }
+          }
           if (item?.video?.url || item?.video_url) {
             videoUrl = item?.video?.url || item?.video_url;
             break;
@@ -1277,10 +1335,10 @@ export async function prepareVideoDownload(productId: string): Promise<{
 
   // 3. Set lock 'PREPARING'
   await db.query(
-    `INSERT INTO tiktok_shop_video_downloads (product_id, video_page_url, status, updated_at)
-     VALUES (?, ?, 'PREPARING', NOW())
-     ON DUPLICATE KEY UPDATE status = 'PREPARING', updated_at = NOW()`,
-    [productId, videoUrl]
+    `INSERT INTO tiktok_shop_video_downloads (product_id, video_id, video_page_url, status, updated_at)
+     VALUES (?, ?, ?, 'PREPARING', NOW())
+     ON DUPLICATE KEY UPDATE video_page_url = VALUES(video_page_url), status = 'PREPARING', updated_at = NOW()`,
+    [productId, cleanVideoId, videoUrl]
   );
 
   // 4. Request SocialCrawl endpoint GET /v1/tiktok/post?url=...&download_media=true
@@ -1325,8 +1383,8 @@ export async function prepareVideoDownload(productId: string): Promise<{
       await db.query(
         `UPDATE tiktok_shop_video_downloads
          SET status = 'FAILED', error_message = 'A SocialCrawl não retornou uma mídia utilizável.'
-         WHERE product_id = ?`,
-        [productId]
+         WHERE product_id = ? AND video_id = ?`,
+        [productId, cleanVideoId]
       );
       return {
         success: false,
@@ -1350,8 +1408,8 @@ export async function prepareVideoDownload(productId: string): Promise<{
            prepared_at = NOW(),
            status = 'COMPLETED',
            error_message = NULL
-       WHERE product_id = ?`,
-      [cdnUrl, postId, mediaType, isCached ? 1 : 0, productId]
+       WHERE product_id = ? AND video_id = ?`,
+      [cdnUrl, postId, mediaType, isCached ? 1 : 0, productId, cleanVideoId]
     );
 
     return {
@@ -1364,8 +1422,8 @@ export async function prepareVideoDownload(productId: string): Promise<{
     await db.query(
       `UPDATE tiktok_shop_video_downloads
        SET status = 'FAILED', error_message = ?
-       WHERE product_id = ?`,
-      [String(err?.message || 'Erro de conexão com a SocialCrawl'), productId]
+       WHERE product_id = ? AND video_id = ?`,
+      [String(err?.message || 'Erro de conexão com a SocialCrawl'), productId, cleanVideoId]
     ).catch(() => {});
 
     return {
@@ -1587,34 +1645,56 @@ export function buildProductSearchWhereClause(params: {
   }
 
   // 4. Video and Views Filter (Ranges supported)
-  if (hasMinViews || hasMaxViews) {
-    const vConds: string[] = [];
-    if (hasMinViews) {
-      vConds.push(`(
-        COALESCE(p.video_views, 0) >= ?
-        OR EXISTS (
-          SELECT 1 FROM tiktok_shop_product_videos pv_flt
-          WHERE pv_flt.product_id = p.product_id AND COALESCE(pv_flt.video_views, 0) >= ?
-        )
-      )`);
-      sqlParams.push(minVideoViews, minVideoViews);
-    }
-    if (hasMaxViews) {
-      vConds.push(`(
-        COALESCE(p.video_views, 0) <= ?
-        OR EXISTS (
-          SELECT 1 FROM tiktok_shop_product_videos pv_flt
-          WHERE pv_flt.product_id = p.product_id AND COALESCE(pv_flt.video_views, 0) <= ?
-        )
-      )`);
-      sqlParams.push(maxVideoViews, maxVideoViews);
-    }
-    whereConditions.push(`(${vConds.join(' AND ')})`);
+  if (hasMinViews && hasMaxViews) {
+    whereConditions.push(`(
+      (
+        ((p.video_url IS NOT NULL AND p.video_url != '') OR (p.video_id IS NOT NULL AND p.video_id != ''))
+        AND p.video_views IS NOT NULL
+        AND p.video_views >= ?
+        AND p.video_views <= ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM tiktok_shop_product_videos pv_flt
+        WHERE pv_flt.product_id = p.product_id
+          AND pv_flt.video_views IS NOT NULL
+          AND pv_flt.video_views >= ?
+          AND pv_flt.video_views <= ?
+      )
+    )`);
+    sqlParams.push(minVideoViews, maxVideoViews, minVideoViews, maxVideoViews);
+  } else if (hasMinViews) {
+    whereConditions.push(`(
+      (
+        ((p.video_url IS NOT NULL AND p.video_url != '') OR (p.video_id IS NOT NULL AND p.video_id != ''))
+        AND p.video_views IS NOT NULL
+        AND p.video_views >= ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM tiktok_shop_product_videos pv_flt
+        WHERE pv_flt.product_id = p.product_id
+          AND pv_flt.video_views IS NOT NULL
+          AND pv_flt.video_views >= ?
+      )
+    )`);
+    sqlParams.push(minVideoViews, minVideoViews);
+  } else if (hasMaxViews) {
+    whereConditions.push(`(
+      (
+        ((p.video_url IS NOT NULL AND p.video_url != '') OR (p.video_id IS NOT NULL AND p.video_id != ''))
+        AND p.video_views IS NOT NULL
+        AND p.video_views <= ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM tiktok_shop_product_videos pv_flt
+        WHERE pv_flt.product_id = p.product_id
+          AND pv_flt.video_views IS NOT NULL
+          AND pv_flt.video_views <= ?
+      )
+    )`);
+    sqlParams.push(maxVideoViews, maxVideoViews);
   } else if (hasVideoOnly) {
     whereConditions.push(`(
-      (p.video_url IS NOT NULL AND p.video_url != '')
-      OR (p.video_id IS NOT NULL AND p.video_id != '')
-      OR COALESCE(p.video_views, 0) > 0
+      ((p.video_url IS NOT NULL AND p.video_url != '') OR (p.video_id IS NOT NULL AND p.video_id != ''))
       OR EXISTS (
         SELECT 1 FROM tiktok_shop_product_videos pv_flt
         WHERE pv_flt.product_id = p.product_id
@@ -1820,8 +1900,9 @@ export async function searchTikTokShopProducts(params: {
   const subcategory = String(params.subcategory || '').trim();
   const childCategory = String(params.childCategory || '').trim();
   const classification = params.classification;
-  const hasVideoOnly = Boolean(params.hasVideoOnly || (params.minVideoViews && params.minVideoViews > 0));
-  const minVideoViews = params.minVideoViews && Number.isFinite(params.minVideoViews) && params.minVideoViews > 0 ? params.minVideoViews : undefined;
+  const hasVideoOnly = Boolean(params.hasVideoOnly || (params.minVideoViews && params.minVideoViews > 0) || (params.videoViewsMin && params.videoViewsMin > 0));
+  const minVideoViews = params.minVideoViews && Number.isFinite(params.minVideoViews) && params.minVideoViews > 0 ? params.minVideoViews : (params.videoViewsMin !== undefined ? params.videoViewsMin : undefined);
+  const maxVideoViews = params.maxVideoViews && Number.isFinite(params.maxVideoViews) && params.maxVideoViews > 0 ? params.maxVideoViews : (params.videoViewsMax !== undefined ? params.videoViewsMax : undefined);
 
   // Telemetry: record search event for query/category
   if (query || category) {
@@ -1872,6 +1953,9 @@ export async function searchTikTokShopProducts(params: {
         childCategory,
         hasVideoOnly,
         minVideoViews,
+        maxVideoViews,
+        videoViewsMin: params.videoViewsMin,
+        videoViewsMax: params.videoViewsMax,
       });
 
       let finalWhereSql = whereSql;
@@ -2105,24 +2189,59 @@ export async function searchTikTokShopProducts(params: {
           requestId: null,
         };
       } else if (classification === 'highest_commission') {
-        // MAIOR COMISSÃO: Ordenação real pelo ganho efetivo em R$ por venda (effective_commission_cents)
-        // 1. estimated_commission_cents > 0
-        // 2. (price_cents * commission_rate_percent) / 100
-        // Produtos sem dado de comissão são estritamente excluídos da listagem.
+        // MAIOR COMISSÃO:
+        // Nível A: Se existirem produtos com comissão real no escopo atual:
+        // - Usa exatamente a regra real: estimated_commission_cents > 0 OU (price_cents > 0 AND commission_rate_percent > 0)
+        // - Ordena pelo ganho efetivo em R$ por venda (effective_commission_cents) DESC
+        // Nível B (Fallback transparente): Se existirem ZERO produtos com comissão real no escopo:
+        // - Não deixa a classificação vazia. Ordena por potencial de valor: price_cents DESC, sold_count DESC, rating DESC.
         const commissionCond = `(COALESCE(p.estimated_commission_cents, 0) > 0 OR (COALESCE(p.price_cents, 0) > 0 AND COALESCE(p.commission_rate_percent, 0) > 0))`;
-        finalWhereSql = finalWhereSql && finalWhereSql !== '1=1' ? `(${finalWhereSql}) AND ${commissionCond}` : commissionCond;
+        let realCommissionCount = 0;
 
-        orderClause = `ORDER BY 
-          (CASE 
-            WHEN COALESCE(p.estimated_commission_cents, 0) > 0 THEN p.estimated_commission_cents 
-            WHEN COALESCE(p.price_cents, 0) > 0 AND COALESCE(p.commission_rate_percent, 0) > 0 THEN ROUND((p.price_cents * p.commission_rate_percent) / 100.0) 
-            ELSE 0 
-          END) DESC,
-          COALESCE(p.commission_rate_percent, 0) DESC,
-          COALESCE(p.price_cents, 0) DESC,
-          COALESCE(p.sold_count, 0) DESC,
-          COALESCE(p.rating, 0) DESC,
-          p.last_seen_at DESC`;
+        try {
+          const countWhere = finalWhereSql && finalWhereSql !== '1=1' ? `(${finalWhereSql}) AND ${commissionCond}` : commissionCond;
+          const [cntRows]: any = await db.query(
+            `SELECT COUNT(*) as real_cnt FROM tiktok_shop_products p WHERE ${countWhere}`,
+            sqlParams
+          );
+          if (Array.isArray(cntRows) && cntRows[0]?.real_cnt) {
+            realCommissionCount = Number(cntRows[0].real_cnt) || 0;
+          }
+        } catch (cntErr) {
+          console.warn('[highest_commission count check warning]:', cntErr);
+        }
+
+        const fallbackByPrice = realCommissionCount === 0;
+        console.log(`[HIGHEST COMMISSION] realCommissionProducts: ${realCommissionCount} fallbackByPrice: ${fallbackByPrice} filters:`, {
+          query,
+          category,
+          subcategory,
+          childCategory,
+          hasVideoOnly,
+          minVideoViews,
+          maxVideoViews,
+        });
+
+        if (!fallbackByPrice) {
+          finalWhereSql = finalWhereSql && finalWhereSql !== '1=1' ? `(${finalWhereSql}) AND ${commissionCond}` : commissionCond;
+          orderClause = `ORDER BY 
+            (CASE 
+              WHEN COALESCE(p.estimated_commission_cents, 0) > 0 THEN p.estimated_commission_cents 
+              WHEN COALESCE(p.price_cents, 0) > 0 AND COALESCE(p.commission_rate_percent, 0) > 0 THEN ROUND((p.price_cents * p.commission_rate_percent) / 100.0) 
+              ELSE 0 
+            END) DESC,
+            COALESCE(p.commission_rate_percent, 0) DESC,
+            COALESCE(p.price_cents, 0) DESC,
+            COALESCE(p.sold_count, 0) DESC,
+            COALESCE(p.rating, 0) DESC,
+            p.last_seen_at DESC`;
+        } else {
+          orderClause = `ORDER BY 
+            COALESCE(p.price_cents, 0) DESC,
+            COALESCE(p.sold_count, 0) DESC,
+            COALESCE(p.rating, 0) DESC,
+            p.last_seen_at DESC`;
+        }
       } else if (classification === 'best_sellers') {
         orderClause = `ORDER BY p.sold_count DESC, p.last_seen_at DESC, p.product_id DESC`;
       } else if (classification === 'top_rated') {

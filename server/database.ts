@@ -1107,7 +1107,8 @@ export function ensureProductMinerTables(): Promise<void> {
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS tiktok_shop_video_downloads (
-          product_id VARCHAR(128) PRIMARY KEY,
+          product_id VARCHAR(128) NOT NULL,
+          video_id VARCHAR(128) NOT NULL DEFAULT '',
           video_page_url VARCHAR(500),
           video_post_id VARCHAR(128),
           direct_media_url TEXT,
@@ -1118,9 +1119,22 @@ export function ensureProductMinerTables(): Promise<void> {
           status VARCHAR(50) NOT NULL,
           error_message TEXT DEFAULT NULL,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX idx_tsv_downloads_status (status)
+          PRIMARY KEY (product_id, video_id),
+          INDEX idx_tsv_downloads_status (status),
+          INDEX idx_tsv_downloads_prod_vid (product_id, video_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      // Safe migration for existing installations that had product_id as single primary key
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_video_downloads ADD COLUMN video_id VARCHAR(128) NOT NULL DEFAULT '' AFTER product_id`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_video_downloads DROP PRIMARY KEY, ADD PRIMARY KEY (product_id, video_id)`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_video_downloads ADD INDEX idx_tsv_downloads_prod_vid (product_id, video_id)`);
+      } catch {}
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS product_miner_script_logs (

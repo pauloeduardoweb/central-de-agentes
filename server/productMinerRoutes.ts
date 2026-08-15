@@ -670,12 +670,12 @@ Mostre o produto em uso close-up. Destaque a alta avaliação de ${product.ratin
 productMinerRouter.post('/videos/prepare-download', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
   try {
-    const { productId } = req.body || {};
+    const { productId, videoId } = req.body || {};
     if (!productId) {
       return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto é obrigatório.' });
     }
 
-    const result = await prepareVideoDownload(String(productId));
+    const result = await prepareVideoDownload(String(productId), videoId ? String(videoId) : undefined);
     if (!result.success) {
       return res.status(400).json(result);
     }
@@ -691,11 +691,129 @@ productMinerRouter.post('/videos/prepare-download', async (req, res) => {
   }
 });
 
+// Helper for same-origin video streaming proxy
+async function streamVideoProxy(req: express.Request, res: express.Response, productId: string, videoId?: string) {
+  if (!requireProductMinerAccess(req, res)) return;
+
+  try {
+    const cleanProductId = String(productId || '').trim();
+    const cleanVideoId = String(videoId || '').trim();
+
+    if (!cleanProductId) {
+      return res.status(400).json({ error: 'MISSING_PRODUCT_ID' });
+    }
+
+    if (!isDatabaseConfigured()) {
+      return res.status(503).json({ error: 'DATABASE_NOT_CONFIGURED' });
+    }
+
+    // 1. Check existing completed record
+    let cdnUrl: string | null = null;
+    let query = `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND video_id = ? LIMIT 1`;
+    let params = [cleanProductId, cleanVideoId];
+
+    const [rows]: any = await db.query(query, params);
+    const record = Array.isArray(rows) && rows[0];
+
+    if (record && record.status === 'COMPLETED' && record.direct_media_url) {
+      cdnUrl = String(record.direct_media_url);
+    } else if (cleanVideoId) {
+      // Fallback to legacy record with video_id = ''
+      const [legacyRows]: any = await db.query(
+        `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND (video_id = '' OR video_id IS NULL) LIMIT 1`,
+        [cleanProductId]
+      );
+      if (Array.isArray(legacyRows) && legacyRows[0]?.status === 'COMPLETED' && legacyRows[0]?.direct_media_url) {
+        cdnUrl = String(legacyRows[0].direct_media_url);
+      }
+    }
+
+    // 2. If not prepared yet, prepare on demand
+    if (!cdnUrl) {
+      const prepRes = await prepareVideoDownload(cleanProductId, cleanVideoId || undefined);
+      if (prepRes.success && prepRes.directMediaUrl) {
+        cdnUrl = String(prepRes.directMediaUrl);
+      }
+    }
+
+    if (!cdnUrl) {
+      return res.status(404).json({
+        error: 'VIDEO_NOT_FOUND',
+        message: 'Vídeo não disponível para reprodução.',
+      });
+    }
+
+    // 3. Fetch from CDN forwarding Range header
+    const forwardHeaders: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    };
+    if (req.headers.range) {
+      forwardHeaders['Range'] = String(req.headers.range);
+    }
+
+    const mediaResponse = await fetch(cdnUrl, {
+      headers: forwardHeaders,
+    });
+
+    if (!mediaResponse.ok && mediaResponse.status !== 206) {
+      return res.redirect(302, cdnUrl);
+    }
+
+    res.status(mediaResponse.status);
+    res.setHeader('Content-Type', mediaResponse.headers.get('content-type') || 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    const contentRange = mediaResponse.headers.get('content-range');
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+
+    const contentLength = mediaResponse.headers.get('content-length');
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    if (mediaResponse.body) {
+      const reader = (mediaResponse.body as any).getReader();
+      let isClientConnected = true;
+
+      req.on('close', () => {
+        isClientConnected = false;
+        reader.cancel().catch(() => {});
+      });
+
+      while (isClientConnected) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+      return res.end();
+    } else {
+      return res.redirect(302, cdnUrl);
+    }
+  } catch (err: any) {
+    console.error('[Video Proxy Stream Error]:', err?.message || err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'STREAM_FAILED' });
+    }
+    return res.end();
+  }
+}
+
+// Same-Origin Video Stream Proxy
+productMinerRouter.get('/videos/:productId/:videoId/stream', async (req, res) => {
+  const { productId, videoId } = req.params;
+  return streamVideoProxy(req, res, productId, videoId);
+});
+
+productMinerRouter.get('/videos/:productId/stream', async (req, res) => {
+  const { productId } = req.params;
+  return streamVideoProxy(req, res, productId);
+});
+
 // Video Download Delivery/Proxy (Mentor Only)
 productMinerRouter.get('/videos/:productId/download', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
   try {
     const { productId } = req.params;
+    const videoId = String(req.query.videoId || '').trim();
     if (!productId) {
       return res.status(400).json({ error: 'MISSING_PRODUCT_ID' });
     }
@@ -704,10 +822,17 @@ productMinerRouter.get('/videos/:productId/download', async (req, res) => {
       return res.status(503).json({ error: 'DATABASE_NOT_CONFIGURED' });
     }
 
-    const [rows]: any = await db.query(
-      `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? LIMIT 1`,
-      [productId]
+    let [rows]: any = await db.query(
+      `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND video_id = ? LIMIT 1`,
+      [productId, videoId]
     );
+
+    if ((!Array.isArray(rows) || rows.length === 0) && videoId) {
+      [rows] = await db.query(
+        `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND (video_id = '' OR video_id IS NULL) LIMIT 1`,
+        [productId]
+      );
+    }
 
     const record = Array.isArray(rows) && rows[0];
     if (!record || record.status !== 'COMPLETED' || !record.direct_media_url) {
@@ -728,7 +853,7 @@ productMinerRouter.get('/videos/:productId/download', async (req, res) => {
 
       if (mediaResponse.ok && mediaResponse.body) {
         res.setHeader('Content-Type', mediaResponse.headers.get('content-type') || 'video/mp4');
-        res.setHeader('Content-Disposition', `attachment; filename="tiktok_video_${productId}.mp4"`);
+        res.setHeader('Content-Disposition', `attachment; filename="tiktok_video_${productId}${videoId ? `_${videoId}` : ''}.mp4"`);
         const length = mediaResponse.headers.get('content-length');
         if (length) res.setHeader('Content-Length', length);
 
