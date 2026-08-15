@@ -4541,25 +4541,80 @@ const isDirectPlayableVideoUrl = (url?: string | null): boolean => {
   return false;
 };
 
-/* Official View Icons Mapping */
-const getVideoViewBadge = (views?: number | null): { iconUrl: string; label: string } => {
+/* Filter Icon with safe fallback (no broken image icon ever) */
+const FilterIconImage: React.FC<{
+  src: string;
+  fallbackSrc?: string;
+  alt: string;
+  className?: string;
+}> = ({ src, fallbackSrc, alt, className = 'w-full h-full object-contain' }) => {
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const [hasError, setHasError] = useState(false);
+
+  return hasError ? (
+    <div className="w-full h-full flex items-center justify-center rounded-lg bg-amber-100/70 text-amber-700 font-black text-xs">
+      <Flame className="w-4 h-4 text-amber-600 fill-current" />
+    </div>
+  ) : (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className={className}
+      referrerPolicy="no-referrer"
+      onError={() => {
+        if (fallbackSrc && currentSrc !== fallbackSrc) {
+          setCurrentSrc(fallbackSrc);
+        } else {
+          setHasError(true);
+        }
+      }}
+    />
+  );
+};
+
+/* Official View Icons Mapping with local assets and CDN fallback */
+const getVideoViewBadge = (views?: number | null): { iconUrl: string; fallbackIconUrl: string; label: string } => {
   const v = Number(views || 0);
   if (v >= 10000000) {
-    return { iconUrl: 'https://i.postimg.cc/LnvggLW7/10M.png', label: '10M+' };
+    return {
+      iconUrl: '/miner/video-filters/10m.png',
+      fallbackIconUrl: 'https://i.postimg.cc/LnvggLW7/10M.png',
+      label: '10M+',
+    };
   }
   if (v >= 5000000) {
-    return { iconUrl: 'https://i.postimg.cc/XpxBBdPD/5M.png', label: '5M+' };
+    return {
+      iconUrl: '/miner/video-filters/5m.png',
+      fallbackIconUrl: 'https://i.postimg.cc/XpxBBdPD/5M.png',
+      label: '5M+',
+    };
   }
   if (v >= 1000000) {
-    return { iconUrl: 'https://i.postimg.cc/jLvnnP1F/1M.png', label: '1M+' };
+    return {
+      iconUrl: '/miner/video-filters/1m.png',
+      fallbackIconUrl: 'https://i.postimg.cc/jLvnnP1F/1M.png',
+      label: '1M+',
+    };
   }
   if (v >= 500000) {
-    return { iconUrl: 'https://i.postimg.cc/JGKHHZFF/500k.png', label: '500K+' };
+    return {
+      iconUrl: '/miner/video-filters/500k.png',
+      fallbackIconUrl: 'https://i.postimg.cc/JGKHHZFF/500k.png',
+      label: '500K+',
+    };
   }
   if (v >= 100000) {
-    return { iconUrl: 'https://i.postimg.cc/8jwffMYX/100k.png', label: '100K+' };
+    return {
+      iconUrl: '/miner/video-filters/100k.png',
+      fallbackIconUrl: 'https://i.postimg.cc/8jwffMYX/100k.png',
+      label: '100K+',
+    };
   }
-  return { iconUrl: 'https://i.postimg.cc/k69ttsn9/todos-os-videos.png', label: compactNumber(v) };
+  return {
+    iconUrl: '/miner/video-filters/todos-os-videos.png',
+    fallbackIconUrl: 'https://i.postimg.cc/k69ttsn9/todos-os-videos.png',
+    label: compactNumber(v),
+  };
 };
 
 const VIDEO_FILTER_OPTIONS = [
@@ -4567,37 +4622,43 @@ const VIDEO_FILTER_OPTIONS = [
     id: 'all_videos',
     label: 'Todos os vídeos',
     value: null,
-    iconUrl: 'https://i.postimg.cc/k69ttsn9/todos-os-videos.png',
+    iconUrl: '/miner/video-filters/todos-os-videos.png',
+    fallbackIconUrl: 'https://i.postimg.cc/k69ttsn9/todos-os-videos.png',
   },
   {
     id: '100k',
     label: '100K+',
     value: 100000,
-    iconUrl: 'https://i.postimg.cc/8jwffMYX/100k.png',
+    iconUrl: '/miner/video-filters/100k.png',
+    fallbackIconUrl: 'https://i.postimg.cc/8jwffMYX/100k.png',
   },
   {
     id: '500k',
     label: '500K+',
     value: 500000,
-    iconUrl: 'https://i.postimg.cc/JGKHHZFF/500k.png',
+    iconUrl: '/miner/video-filters/500k.png',
+    fallbackIconUrl: 'https://i.postimg.cc/JGKHHZFF/500k.png',
   },
   {
     id: '1m',
     label: '1M+',
     value: 1000000,
-    iconUrl: 'https://i.postimg.cc/jLvnnP1F/1M.png',
+    iconUrl: '/miner/video-filters/1m.png',
+    fallbackIconUrl: 'https://i.postimg.cc/jLvnnP1F/1M.png',
   },
   {
     id: '5m',
     label: '5M+',
     value: 5000000,
-    iconUrl: 'https://i.postimg.cc/XpxBBdPD/5M.png',
+    iconUrl: '/miner/video-filters/5m.png',
+    fallbackIconUrl: 'https://i.postimg.cc/XpxBBdPD/5M.png',
   },
   {
     id: '10m',
     label: '10M+',
     value: 10000000,
-    iconUrl: 'https://i.postimg.cc/LnvggLW7/10M.png',
+    iconUrl: '/miner/video-filters/10m.png',
+    fallbackIconUrl: 'https://i.postimg.cc/LnvggLW7/10M.png',
   },
 ];
 
@@ -4623,9 +4684,10 @@ const ViralVideoCard: React.FC<{
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
-  const [videoError, setVideoError] = useState(false);
+  const [playbackError, setPlaybackError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Check if we have an immediate playable direct media URL
+  // Initial direct playable media URL check
   const initialPlayableUrl = useMemo(() => {
     if (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl)) {
       return product.videoDownload.directMediaUrl;
@@ -4644,30 +4706,34 @@ const ViralVideoCard: React.FC<{
 
   const handlePlayClick = async () => {
     onTrackClick?.(product);
+    setPlaybackError(false);
 
-    if (playableUrl && isDirectPlayableVideoUrl(playableUrl) && !videoError) {
+    // 1. If we already have a direct playable media URL, play inside the card
+    const directUrl = (playableUrl && isDirectPlayableVideoUrl(playableUrl))
+      ? playableUrl
+      : (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl))
+        ? product.videoDownload.directMediaUrl
+        : (product.video?.url && isDirectPlayableVideoUrl(product.video.url))
+          ? product.video.url
+          : null;
+
+    if (directUrl) {
+      setPlayableUrl(directUrl);
       setIsPlaying(true);
       return;
     }
 
-    if (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl)) {
-      setPlayableUrl(product.videoDownload.directMediaUrl);
-      setIsPlaying(true);
-      return;
-    }
-
-    if (product.video?.url && isDirectPlayableVideoUrl(product.video.url)) {
-      setPlayableUrl(product.video.url);
-      setIsPlaying(true);
-      return;
-    }
-
-    // Need to prepare direct media URL
+    // 2. Prepare media URL via backend service
     if (studentCode && product.productId) {
       setIsPreparing(true);
       try {
         const res = await prepareProductVideoDownload(studentCode, product.productId);
-        if (res.success && res.directMediaUrl) {
+        if (res?.success && res.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
+          setPlayableUrl(res.directMediaUrl);
+          setIsPlaying(true);
+          setIsPreparing(false);
+          return;
+        } else if (res?.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
           setPlayableUrl(res.directMediaUrl);
           setIsPlaying(true);
           setIsPreparing(false);
@@ -4680,18 +4746,18 @@ const ViralVideoCard: React.FC<{
       }
     }
 
-    // Fallback: If it is a TikTok URL, open in TikTok
-    if (product.video?.url) {
-      window.open(product.video.url, '_blank', 'noopener,noreferrer');
-    }
+    // 3. Fallback: NEVER open TikTok automatically. Show inline error with explicit secondary button.
+    setIsPlaying(false);
+    setPlaybackError(true);
   };
 
   return (
-    <article className="group rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/80 transition-all flex flex-col h-full text-slate-900 relative">
+    <article className="group rounded-3xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/80 transition-all flex flex-col h-full text-slate-900 relative">
       {/* Video / Media Hero (aspect 9:16) */}
-      <div className="relative aspect-[9/16] max-h-[500px] w-full bg-slate-950 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center">
-        {isPlaying && playableUrl && !videoError ? (
+      <div className="relative aspect-[9/16] max-h-[520px] w-full bg-slate-950 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center">
+        {isPlaying && playableUrl && !playbackError ? (
           <video
+            ref={videoRef}
             src={playableUrl}
             controls
             autoPlay
@@ -4699,7 +4765,7 @@ const ViralVideoCard: React.FC<{
             preload="metadata"
             poster={product.imageUrl || undefined}
             onError={() => {
-              setVideoError(true);
+              setPlaybackError(true);
               setIsPlaying(false);
             }}
             className="w-full h-full object-cover bg-black"
@@ -4719,59 +4785,103 @@ const ViralVideoCard: React.FC<{
             )}
 
             {/* Dark overlay */}
-            <div className="absolute inset-0 bg-black/40 group-hover/media:bg-black/30 transition-all" />
+            <div className="absolute inset-0 bg-black/45 group-hover/media:bg-black/35 transition-all" />
 
-            {/* Large Prominent Centered PLAY Button */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 z-10">
-              <button
-                type="button"
-                disabled={isPreparing}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handlePlayClick();
-                }}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-2xl border-2 border-white flex items-center justify-center transition-all duration-200 cursor-pointer group/btn"
-                title="Reproduzir vídeo"
-              >
-                {isPreparing ? (
-                  <Loader2 className="w-6 h-6 sm:w-7 sm:h-7 animate-spin text-white" />
-                ) : (
-                  <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-current ml-1 text-white group-hover/btn:scale-110 transition-transform" />
-                )}
-              </button>
-              <button
-                type="button"
-                disabled={isPreparing}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handlePlayClick();
-                }}
-                className="px-3.5 py-1 rounded-full bg-black/80 hover:bg-black text-white text-[11px] font-bold border border-white/20 shadow-md backdrop-blur-xs flex items-center gap-1.5 cursor-pointer transition-all"
-              >
-                {isPreparing ? 'Preparando vídeo...' : 'Assistir vídeo'}
-              </button>
-            </div>
+            {/* Play Button or Playback Error Overlay */}
+            {playbackError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 z-10 text-center bg-black/75 backdrop-blur-xs">
+                <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-white text-xs font-bold leading-tight">
+                    Não foi possível reproduzir este vídeo aqui.
+                  </p>
+                  <p className="text-slate-300 text-[11px]">
+                    A mídia direta não pôde ser carregada no navegador.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handlePlayClick();
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    Tentar novamente
+                  </button>
+                  {product.video?.url ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.open(product.video!.url!, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-white/30"
+                    >
+                      Abrir no TikTok <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+                <button
+                  type="button"
+                  disabled={isPreparing}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handlePlayClick();
+                  }}
+                  className="w-16 h-16 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-2xl border-2 border-white flex items-center justify-center transition-all duration-200 cursor-pointer group/btn"
+                  title="Reproduzir vídeo no app"
+                >
+                  {isPreparing ? (
+                    <Loader2 className="w-7 h-7 animate-spin text-white" />
+                  ) : (
+                    <Play className="w-8 h-8 fill-current ml-1 text-white group-hover/btn:scale-110 transition-transform" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={isPreparing}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handlePlayClick();
+                  }}
+                  className="px-4 py-1.5 rounded-full bg-black/80 hover:bg-black text-white text-xs font-bold border border-white/20 shadow-md backdrop-blur-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                >
+                  {isPreparing ? 'Preparando vídeo...' : 'Assistir vídeo'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Position badge */}
         {position ? (
-          <div className="absolute top-2.5 left-2.5 z-20 px-2 py-0.5 rounded-lg bg-white/95 border border-amber-400 text-amber-700 text-xs font-black shadow-sm pointer-events-none">
+          <div className="absolute top-3 left-3 z-20 px-2.5 py-1 rounded-xl bg-white/95 border border-amber-400 text-amber-800 text-xs font-black shadow-sm pointer-events-none">
             #{position}
           </div>
         ) : null}
 
         {/* Official View Badge */}
-        <div className="absolute top-2.5 left-13 z-20 px-2.5 py-1 rounded-lg bg-white/95 border border-amber-300 shadow-md flex items-center gap-1.5 pointer-events-none">
-          <img
-            src={badge.iconUrl}
-            alt={badge.label}
-            className="w-4 h-4 object-contain"
-            referrerPolicy="no-referrer"
-          />
-          <span className="text-[11px] font-black text-amber-950">{badge.label}</span>
+        <div className="absolute top-3 left-14 z-20 h-7 px-2.5 rounded-xl bg-white/95 border border-amber-300 shadow-sm flex items-center gap-1.5 pointer-events-none">
+          <div className="w-4.5 h-4.5 flex items-center justify-center">
+            <FilterIconImage
+              src={badge.iconUrl}
+              fallbackSrc={badge.fallbackIconUrl}
+              alt={badge.label}
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="text-xs font-black text-amber-950">{badge.label}</span>
         </div>
 
         {/* Favorite Button */}
@@ -4782,7 +4892,7 @@ const ViralVideoCard: React.FC<{
             e.stopPropagation();
             onToggleFavorite?.(product);
           }}
-          className={`absolute top-2.5 right-2.5 z-20 p-2 rounded-full bg-white/90 shadow-md transition-all hover:scale-110 ${
+          className={`absolute top-3 right-3 z-20 p-2 rounded-full bg-white/90 shadow-sm transition-all hover:scale-110 cursor-pointer ${
             isFavorite ? 'text-rose-500 bg-white' : 'text-slate-400 hover:text-rose-500'
           }`}
           title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
@@ -4792,76 +4902,81 @@ const ViralVideoCard: React.FC<{
       </div>
 
       {/* Video & Product Metadata */}
-      <div className="p-3.5 sm:p-4 space-y-3 flex-1 flex flex-col justify-between">
-        <div className="space-y-2.5">
+      <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+        <div className="space-y-3">
           {/* Creator Profile & Stats */}
           {product.video ? (
-            <div className="rounded-xl sm:rounded-2xl border border-amber-200/70 bg-amber-50/30 p-2.5 sm:p-3 space-y-2">
+            <div className="rounded-2xl border border-amber-200/70 bg-amber-50/40 p-3 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                <span className="text-sm font-black text-slate-900 truncate">
                   @{product.video.author || 'creator'}
                 </span>
                 {product.video.authorFollowers !== null && product.video.authorFollowers !== undefined ? (
-                  <span className="text-[10px] sm:text-xs text-slate-500 font-semibold shrink-0">
+                  <span className="text-xs text-slate-500 font-semibold shrink-0">
                     {compactNumber(product.video.authorFollowers)} seguidores
                   </span>
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-5 gap-1 text-center text-[10px] text-slate-600 font-semibold pt-1 border-t border-amber-200/40">
+              <div className="grid grid-cols-5 gap-1.5 text-center text-xs text-slate-600 font-semibold pt-2 border-t border-amber-200/50">
                 <span title="Views" className="flex flex-col items-center">
-                  <Eye className="w-3.5 h-3.5 mb-0.5 text-slate-600" />
-                  <span className="font-bold text-slate-900">{compactNumber(product.video.views)}</span>
+                  <Eye className="w-4 h-4 mb-0.5 text-slate-600" />
+                  <span className="font-black text-slate-900">{compactNumber(product.video.views)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold">Views</span>
                 </span>
                 <span title="Likes" className="flex flex-col items-center">
-                  <Heart className="w-3.5 h-3.5 mb-0.5 text-rose-500" />
-                  <span className="font-bold text-slate-900">{compactNumber(product.video.likes)}</span>
+                  <Heart className="w-4 h-4 mb-0.5 text-rose-500" />
+                  <span className="font-black text-slate-900">{compactNumber(product.video.likes)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold">Likes</span>
                 </span>
                 <span title="Comentários" className="flex flex-col items-center">
-                  <MessageCircle className="w-3.5 h-3.5 mb-0.5 text-sky-600" />
-                  <span className="font-bold text-slate-900">{compactNumber(product.video.comments)}</span>
+                  <MessageCircle className="w-4 h-4 mb-0.5 text-sky-600" />
+                  <span className="font-black text-slate-900">{compactNumber(product.video.comments)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold">Com.</span>
                 </span>
                 <span title="Compartilhamentos" className="flex flex-col items-center">
-                  <Share2 className="w-3.5 h-3.5 mb-0.5 text-emerald-600" />
-                  <span className="font-bold text-slate-900">{compactNumber(product.video.shares)}</span>
+                  <Share2 className="w-4 h-4 mb-0.5 text-emerald-600" />
+                  <span className="font-black text-slate-900">{compactNumber(product.video.shares)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold">Shares</span>
                 </span>
                 <span title="Salvos" className="flex flex-col items-center">
-                  <Bookmark className="w-3.5 h-3.5 mb-0.5 text-amber-600" />
-                  <span className="font-bold text-slate-900">{compactNumber(product.video.saves)}</span>
+                  <Bookmark className="w-4 h-4 mb-0.5 text-amber-600" />
+                  <span className="font-black text-slate-900">{compactNumber(product.video.saves)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold">Salvos</span>
                 </span>
               </div>
             </div>
           ) : null}
 
           {/* Secondary Product Section */}
-          <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-2.5 space-y-1.5 text-slate-800">
-            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 space-y-2 text-slate-800">
+            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <span>Produto Relacionado</span>
               <span className="text-amber-700 font-black">{compactNumber(product.soldCount)} vendas</span>
             </div>
 
-            <h4 className="font-bold text-xs text-slate-900 leading-snug line-clamp-2" title={product.title}>
+            <h4 className="font-bold text-sm text-slate-900 leading-snug line-clamp-2" title={product.title}>
               {product.title}
             </h4>
 
-            <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
+            <div className="flex items-center justify-between gap-2 pt-0.5">
               {(() => {
                 const range = getProductPriceRange(product.priceCents, product.currencySymbol);
                 if (!range) {
                   return (
-                    <span className="font-black text-emerald-700">
+                    <span className="font-black text-emerald-700 text-sm">
                       {formatMoney(product.priceCents, product.currencySymbol)}
                     </span>
                   );
                 }
                 return (
-                  <span className="font-black text-emerald-700">
+                  <span className="font-black text-emerald-700 text-sm">
                     {range.formattedRange}
                   </span>
                 );
               })()}
 
-              <span className="text-[11px] text-slate-500 truncate max-w-[120px]" title={product.sellerName || 'TikTok Shop'}>
+              <span className="text-xs text-slate-500 truncate max-w-[130px]" title={product.sellerName || 'TikTok Shop'}>
                 {product.sellerName || 'TikTok Shop'}
               </span>
             </div>
@@ -4869,13 +4984,13 @@ const ViralVideoCard: React.FC<{
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-2 pt-1.5">
           <button
             type="button"
             onClick={() => onOpenAnalysisModal?.(product)}
-            className="flex-1 py-2 px-2.5 rounded-xl bg-white border border-amber-300 hover:bg-amber-50 text-slate-800 font-bold flex items-center justify-center gap-1.5 transition-all text-xs shadow-2xs"
+            className="flex-1 py-2.5 px-3 rounded-xl bg-white border border-amber-300 hover:bg-amber-50 text-slate-800 font-bold flex items-center justify-center gap-1.5 transition-all text-xs sm:text-sm shadow-2xs cursor-pointer"
           >
-            <BarChart3 className="w-3.5 h-3.5 text-amber-600" />
+            <BarChart3 className="w-4 h-4 text-amber-600" />
             🔍 Analisar
           </button>
 
@@ -4885,7 +5000,7 @@ const ViralVideoCard: React.FC<{
               target="_blank"
               rel="noreferrer"
               onClick={() => onTrackClick?.(product)}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3 py-2 text-xs font-bold shadow-sm transition-all"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3 py-2.5 text-xs sm:text-sm font-bold shadow-2xs transition-all"
             >
               Produto <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -4893,7 +5008,7 @@ const ViralVideoCard: React.FC<{
             <button
               type="button"
               onClick={() => onOpenDetailModal?.(product)}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-2.5 py-2 text-xs font-bold transition-all"
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-3 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer"
             >
               Detalhes
             </button>
@@ -4926,7 +5041,8 @@ const MobileViralVideoCard: React.FC<{
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
-  const [videoError, setVideoError] = useState(false);
+  const [playbackError, setPlaybackError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const initialPlayableUrl = useMemo(() => {
     if (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl)) {
@@ -4946,29 +5062,34 @@ const MobileViralVideoCard: React.FC<{
 
   const handlePlayClick = async () => {
     onTrackClick?.(product);
+    setPlaybackError(false);
 
-    if (playableUrl && isDirectPlayableVideoUrl(playableUrl) && !videoError) {
+    // 1. Direct playable media URL check
+    const directUrl = (playableUrl && isDirectPlayableVideoUrl(playableUrl))
+      ? playableUrl
+      : (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl))
+        ? product.videoDownload.directMediaUrl
+        : (product.video?.url && isDirectPlayableVideoUrl(product.video.url))
+          ? product.video.url
+          : null;
+
+    if (directUrl) {
+      setPlayableUrl(directUrl);
       setIsPlaying(true);
       return;
     }
 
-    if (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl)) {
-      setPlayableUrl(product.videoDownload.directMediaUrl);
-      setIsPlaying(true);
-      return;
-    }
-
-    if (product.video?.url && isDirectPlayableVideoUrl(product.video.url)) {
-      setPlayableUrl(product.video.url);
-      setIsPlaying(true);
-      return;
-    }
-
+    // 2. Prepare media URL via backend
     if (studentCode && product.productId) {
       setIsPreparing(true);
       try {
         const res = await prepareProductVideoDownload(studentCode, product.productId);
-        if (res.success && res.directMediaUrl) {
+        if (res?.success && res.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
+          setPlayableUrl(res.directMediaUrl);
+          setIsPlaying(true);
+          setIsPreparing(false);
+          return;
+        } else if (res?.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
           setPlayableUrl(res.directMediaUrl);
           setIsPlaying(true);
           setIsPreparing(false);
@@ -4981,17 +5102,18 @@ const MobileViralVideoCard: React.FC<{
       }
     }
 
-    if (product.video?.url) {
-      window.open(product.video.url, '_blank', 'noopener,noreferrer');
-    }
+    // 3. Fallback: NEVER open TikTok automatically. Show inline error with explicit option.
+    setIsPlaying(false);
+    setPlaybackError(true);
   };
 
   return (
-    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm flex flex-col h-full text-slate-900 relative p-2.5 sm:p-3 space-y-2.5">
+    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-xs flex flex-col h-full text-slate-900 relative p-2.5 sm:p-3 space-y-2.5">
       {/* Video Container (aspect 9:16) */}
-      <div className="relative aspect-[9/16] max-h-[380px] w-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center">
-        {isPlaying && playableUrl && !videoError ? (
+      <div className="relative aspect-[9/16] max-h-[380px] w-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
+        {isPlaying && playableUrl && !playbackError ? (
           <video
+            ref={videoRef}
             src={playableUrl}
             controls
             autoPlay
@@ -4999,7 +5121,7 @@ const MobileViralVideoCard: React.FC<{
             preload="metadata"
             poster={product.imageUrl || undefined}
             onError={() => {
-              setVideoError(true);
+              setPlaybackError(true);
               setIsPlaying(false);
             }}
             className="w-full h-full object-cover bg-black"
@@ -5019,59 +5141,96 @@ const MobileViralVideoCard: React.FC<{
             )}
 
             {/* Dark overlay */}
-            <div className="absolute inset-0 bg-black/40" />
+            <div className="absolute inset-0 bg-black/45" />
 
-            {/* Centered Play button */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 z-10">
-              <button
-                type="button"
-                disabled={isPreparing}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handlePlayClick();
-                }}
-                className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-xl border-2 border-white flex items-center justify-center transition-all cursor-pointer"
-                title="Reproduzir vídeo"
-              >
-                {isPreparing ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-white" />
-                ) : (
-                  <Play className="w-5 h-5 fill-current ml-0.5 text-white" />
-                )}
-              </button>
-              <button
-                type="button"
-                disabled={isPreparing}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handlePlayClick();
-                }}
-                className="px-2.5 py-0.5 rounded-full bg-black/75 text-white text-[10px] font-bold border border-white/20 shadow-xs backdrop-blur-xs flex items-center gap-1 cursor-pointer"
-              >
-                {isPreparing ? 'Preparando...' : 'Assistir'}
-              </button>
-            </div>
+            {/* Play Button or Playback Error Overlay */}
+            {playbackError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2.5 z-10 text-center bg-black/80 backdrop-blur-xs">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                <p className="text-white text-[10px] font-bold leading-tight">
+                  Não foi possível reproduzir este vídeo aqui.
+                </p>
+                <div className="flex flex-col gap-1.5 w-full max-w-[140px] pt-0.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handlePlayClick();
+                    }}
+                    className="w-full py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-[10px] font-bold transition-all cursor-pointer shadow-xs"
+                  >
+                    Tentar de novo
+                  </button>
+                  {product.video?.url ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.open(product.video!.url!, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="w-full py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 border border-white/30"
+                    >
+                      Abrir no TikTok <ExternalLink className="w-3 h-3" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
+                <button
+                  type="button"
+                  disabled={isPreparing}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handlePlayClick();
+                  }}
+                  className="w-13 h-13 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-xl border-2 border-white flex items-center justify-center transition-all cursor-pointer"
+                  title="Reproduzir vídeo no app"
+                >
+                  {isPreparing ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-white" />
+                  ) : (
+                    <Play className="w-6 h-6 fill-current ml-0.5 text-white" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={isPreparing}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handlePlayClick();
+                  }}
+                  className="px-3 py-1 rounded-full bg-black/80 text-white text-[10px] sm:text-[11px] font-bold border border-white/20 shadow-xs backdrop-blur-xs flex items-center gap-1 cursor-pointer"
+                >
+                  {isPreparing ? 'Preparando...' : 'Assistir vídeo'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Position badge */}
         {position ? (
-          <div className="absolute top-2 left-2 z-20 px-1.5 py-0.5 rounded-md bg-white/95 border border-amber-400 text-amber-700 text-[10px] font-black shadow-xs pointer-events-none">
+          <div className="absolute top-2 left-2 z-20 px-2 py-0.5 rounded-lg bg-white/95 border border-amber-400 text-amber-800 text-[11px] font-black shadow-xs pointer-events-none">
             #{position}
           </div>
         ) : null}
 
         {/* Official View Badge */}
-        <div className="absolute top-2 left-9 z-20 px-1.5 py-0.5 rounded-md bg-white/95 border border-amber-300 shadow-xs flex items-center gap-1 pointer-events-none">
-          <img
-            src={badge.iconUrl}
-            alt={badge.label}
-            className="w-3.5 h-3.5 object-contain"
-            referrerPolicy="no-referrer"
-          />
-          <span className="text-[10px] font-black text-amber-950">{badge.label}</span>
+        <div className="absolute top-2 left-10 z-20 h-[26px] px-2 rounded-lg bg-white/95 border border-amber-300 shadow-xs flex items-center gap-1 pointer-events-none">
+          <div className="w-4 h-4 flex items-center justify-center">
+            <FilterIconImage
+              src={badge.iconUrl}
+              fallbackSrc={badge.fallbackIconUrl}
+              alt={badge.label}
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="text-[10px] sm:text-[11px] font-black text-amber-950">{badge.label}</span>
         </div>
 
         {/* Favorite Button */}
@@ -5082,7 +5241,7 @@ const MobileViralVideoCard: React.FC<{
             e.stopPropagation();
             onToggleFavorite?.(product);
           }}
-          className={`absolute top-2 right-2 z-20 p-1.5 rounded-full bg-white/90 shadow-xs transition-all ${
+          className={`absolute top-2 right-2 z-20 p-1.5 rounded-full bg-white/90 shadow-xs transition-all cursor-pointer ${
             isFavorite ? 'text-rose-500 bg-white' : 'text-slate-400 hover:text-rose-500'
           }`}
           title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
@@ -5091,86 +5250,110 @@ const MobileViralVideoCard: React.FC<{
         </button>
       </div>
 
-      {/* Video Creator & Stats */}
+      {/* Video Creator & Non-Overlapping Stats */}
       {product.video ? (
-        <div className="rounded-xl border border-amber-200/70 bg-amber-50/30 p-2 space-y-1.5">
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[11px] font-black text-slate-900 truncate">
+        <div className="rounded-xl border border-amber-200/70 bg-amber-50/40 p-2.5 space-y-2">
+          {/* Stacked Author & Followers in 2 separate lines to prevent collision */}
+          <div className="space-y-0.5">
+            <span className="text-[13px] sm:text-[14px] font-black text-slate-900 truncate block leading-tight">
               @{product.video.author || 'creator'}
             </span>
             {product.video.authorFollowers !== null && product.video.authorFollowers !== undefined ? (
-              <span className="text-[9px] text-slate-500 font-semibold shrink-0">
-                {compactNumber(product.video.authorFollowers)} seg.
+              <span className="text-[11px] sm:text-[12px] text-slate-500 font-semibold block leading-tight">
+                {compactNumber(product.video.authorFollowers)} seguidores
               </span>
             ) : null}
           </div>
 
-          <div className="grid grid-cols-5 gap-0.5 text-center text-[9px] text-slate-600 font-semibold pt-1 border-t border-amber-200/40">
-            <span title="Views" className="flex flex-col items-center">
-              <Eye className="w-3 h-3 mb-0.5 text-slate-600" />
-              <span className="font-bold text-slate-900">{compactNumber(product.video.views)}</span>
-            </span>
-            <span title="Likes" className="flex flex-col items-center">
-              <Heart className="w-3 h-3 mb-0.5 text-rose-500" />
-              <span className="font-bold text-slate-900">{compactNumber(product.video.likes)}</span>
-            </span>
-            <span title="Comentários" className="flex flex-col items-center">
-              <MessageCircle className="w-3 h-3 mb-0.5 text-sky-600" />
-              <span className="font-bold text-slate-900">{compactNumber(product.video.comments)}</span>
-            </span>
-            <span title="Compartilhamentos" className="flex flex-col items-center">
-              <Share2 className="w-3 h-3 mb-0.5 text-emerald-600" />
-              <span className="font-bold text-slate-900">{compactNumber(product.video.shares)}</span>
-            </span>
-            <span title="Salvos" className="flex flex-col items-center">
-              <Bookmark className="w-3 h-3 mb-0.5 text-amber-600" />
-              <span className="font-bold text-slate-900">{compactNumber(product.video.saves)}</span>
-            </span>
+          {/* 5 Video Metrics in 2 structured rows */}
+          <div className="space-y-1 pt-1.5 border-t border-amber-200/50">
+            {/* Row 1: Views, Likes, Comentários (3 columns) */}
+            <div className="grid grid-cols-3 gap-1 text-center bg-white/80 rounded-lg p-1.5 border border-amber-200/30">
+              <div title="Views" className="flex flex-col items-center">
+                <Eye className="w-3.5 h-3.5 mb-0.5 text-slate-600" />
+                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                  {compactNumber(product.video.views)}
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Views</span>
+              </div>
+              <div title="Likes" className="flex flex-col items-center">
+                <Heart className="w-3.5 h-3.5 mb-0.5 text-rose-500" />
+                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                  {compactNumber(product.video.likes)}
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Likes</span>
+              </div>
+              <div title="Comentários" className="flex flex-col items-center">
+                <MessageCircle className="w-3.5 h-3.5 mb-0.5 text-sky-600" />
+                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                  {compactNumber(product.video.comments)}
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Com.</span>
+              </div>
+            </div>
+
+            {/* Row 2: Compartilhamentos, Salvos (2 columns) */}
+            <div className="grid grid-cols-2 gap-1 text-center bg-white/80 rounded-lg p-1.5 border border-amber-200/30">
+              <div title="Compartilhamentos" className="flex flex-col items-center">
+                <Share2 className="w-3.5 h-3.5 mb-0.5 text-emerald-600" />
+                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                  {compactNumber(product.video.shares)}
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Shares</span>
+              </div>
+              <div title="Salvos" className="flex flex-col items-center">
+                <Bookmark className="w-3.5 h-3.5 mb-0.5 text-amber-600" />
+                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                  {compactNumber(product.video.saves)}
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Salvos</span>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}
 
       {/* Secondary Product info */}
-      <div className="space-y-1.5 flex-1 flex flex-col justify-between">
-        <div className="space-y-1 rounded-lg bg-slate-50/80 p-2 border border-slate-100">
-          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
+      <div className="space-y-2 flex-1 flex flex-col justify-between">
+        <div className="space-y-1.5 rounded-xl bg-slate-50/90 p-2.5 border border-slate-200/70">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             Produto Relacionado
           </span>
-          <h3 className="font-bold text-[11px] text-slate-900 leading-tight line-clamp-2 min-h-[28px]" title={product.title}>
+          <h3 className="font-bold text-[12px] text-slate-900 leading-snug line-clamp-2 min-h-[32px]" title={product.title}>
             {product.title}
           </h3>
 
-          <div className="flex items-center justify-between gap-1 text-[10px] pt-0.5">
+          <div className="space-y-0.5 pt-0.5">
             {(() => {
               const range = getProductPriceRange(product.priceCents, product.currencySymbol);
               if (!range) {
                 return (
-                  <span className="font-black text-emerald-700">
+                  <span className="font-black text-emerald-700 text-[12px] sm:text-[13px] block">
                     {formatMoney(product.priceCents, product.currencySymbol)}
                   </span>
                 );
               }
               return (
-                <span className="font-black text-emerald-700">
+                <span className="font-black text-emerald-700 text-[12px] sm:text-[13px] block">
                   {range.formattedRange}
                 </span>
               );
             })()}
 
-            <span className="text-slate-500 font-medium truncate max-w-[80px]">
-              {compactNumber(product.soldCount)} vend.
+            <span className="text-[10px] sm:text-[11px] text-amber-700 font-bold block">
+              {compactNumber(product.soldCount)} vendas
             </span>
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-1 pt-1">
+        {/* Action buttons (height 36-38px, font 11-12px) */}
+        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
           <button
             type="button"
             onClick={() => onOpenAnalysisModal?.(product)}
-            className="w-full py-1.5 px-1.5 rounded-lg bg-white border border-amber-200 text-slate-800 hover:bg-amber-50 font-bold flex items-center justify-center gap-1 transition-all text-[10px]"
+            className="w-full h-[36px] sm:h-[38px] px-2 rounded-xl bg-white border border-amber-300 text-slate-800 hover:bg-amber-50 font-bold flex items-center justify-center gap-1 transition-all text-[11px] sm:text-[12px] shadow-2xs cursor-pointer"
           >
-            <BarChart3 className="w-3 h-3 text-amber-600" />
+            <BarChart3 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
             🔍 Analisar
           </button>
 
@@ -5180,15 +5363,15 @@ const MobileViralVideoCard: React.FC<{
               target="_blank"
               rel="noreferrer"
               onClick={() => onTrackClick?.(product)}
-              className="w-full py-1.5 px-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-[10px] text-center flex items-center justify-center gap-1 shadow-2xs"
+              className="w-full h-[36px] sm:h-[38px] px-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-[11px] sm:text-[12px] text-center flex items-center justify-center gap-1 shadow-2xs transition-all"
             >
-              Produto <ExternalLink className="w-3 h-3" />
+              Produto <ExternalLink className="w-3 h-3 shrink-0" />
             </a>
           ) : (
             <button
               type="button"
               onClick={() => onOpenDetailModal?.(product)}
-              className="w-full py-1.5 px-1.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200 font-bold text-[10px] text-center"
+              className="w-full h-[36px] sm:h-[38px] px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-bold text-[11px] sm:text-[12px] text-center transition-all cursor-pointer"
             >
               Detalhes
             </button>
@@ -7049,7 +7232,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto pb-1.5 pt-1 scrollbar-none sm:flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1.5 pt-1 scrollbar-none sm:flex-wrap">
             {VIDEO_FILTER_OPTIONS.map((opt) => {
               const isActive = opt.value === null
                 ? (hasVideoOnly && minVideoViews === null)
@@ -7080,21 +7263,21 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       }
                     }
                   }}
-                  className={`group relative flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-2 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer shrink-0 shadow-2xs ${
+                  className={`group relative flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 min-h-[56px] sm:min-h-[62px] rounded-2xl border transition-all duration-200 cursor-pointer shrink-0 shadow-2xs ${
                     isActive
-                      ? 'border-amber-400 bg-amber-50/90 text-amber-950 font-black ring-2 ring-amber-400/40 shadow-xs'
+                      ? 'border-amber-400 bg-amber-500/15 text-amber-950 font-black ring-2 ring-amber-400/40 shadow-xs'
                       : 'border-slate-200/90 bg-white text-slate-700 hover:border-amber-300 hover:bg-amber-50/40 hover:text-slate-900'
                   }`}
                 >
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center rounded-lg bg-slate-50 group-hover:bg-white p-1 transition-colors">
-                    <img
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 flex items-center justify-center rounded-xl bg-slate-50 group-hover:bg-white p-1 transition-colors">
+                    <FilterIconImage
                       src={opt.iconUrl}
+                      fallbackSrc={opt.fallbackIconUrl}
                       alt={opt.label}
                       className="w-full h-full object-contain"
-                      referrerPolicy="no-referrer"
                     />
                   </div>
-                  <span className="text-xs sm:text-xs md:text-sm font-bold whitespace-nowrap">
+                  <span className="text-xs sm:text-sm md:text-sm font-black whitespace-nowrap">
                     {opt.label}
                   </span>
                 </button>
@@ -7261,8 +7444,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 })}
               </div>
 
-              {/* Desktop View: Full Rich Grid */}
-              <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+              {/* Desktop View: Full Rich Grid (3 columns for Viral Video Mode, 4 columns for regular product mode) */}
+              <div className={`hidden sm:grid gap-4 sm:grid-cols-2 ${
+                selectedClassification === 'viral_video'
+                  ? 'xl:grid-cols-3 2xl:grid-cols-3'
+                  : 'xl:grid-cols-3 2xl:grid-cols-4'
+              }`}>
                 {currentRenderProducts.map((product, index) => {
                   const globalPos = index + 1;
                   const cardKey = product.video?.id ? `${product.productId}_${product.video.id}` : product.productId;
