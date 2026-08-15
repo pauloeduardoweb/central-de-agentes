@@ -1503,7 +1503,8 @@ productMinerRouter.post('/daily-pick/spin', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[Daily Pick Spin Error]:', error);
-    return res.status(500).json({ success: false, error: error?.message || 'DAILY_PICK_SPIN_ERROR' });
+    const statusCode = error?.message === 'DAILY_SPIN_LIMIT_REACHED' ? 429 : 500;
+    return res.status(statusCode).json({ success: false, error: error?.message || 'DAILY_PICK_SPIN_ERROR' });
   }
 });
 

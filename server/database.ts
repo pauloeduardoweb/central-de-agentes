@@ -1246,6 +1246,17 @@ export function ensureProductMinerTables(): Promise<void> {
         // Index already present
       }
 
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS tiktok_shop_daily_spin_counters (
+          student_code VARCHAR(100) NOT NULL,
+          pick_date DATE NOT NULL,
+          spins_count INT UNSIGNED NOT NULL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (student_code, pick_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
       await ensureDailyCollectionsTable();
       await ensureCategoryExecutionHistoryTable();
       await ensureExpansionJobsTable();

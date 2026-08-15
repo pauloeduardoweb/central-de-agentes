@@ -3620,36 +3620,106 @@ export async function spinDailyPick(studentCode: string, targetCategory?: string
   await ensureProductMinerTables();
 
   const isMaster = isMasterKey(cleanCode);
-  const currentStatus = await getDailyPickStatus(cleanCode);
 
-  // 1. Checa se o aluno já atingiu o limite de 3 giros diários
-  if (!isMaster && currentStatus.spinsUsedToday >= 3) {
-    throw new Error('DAILY_SPIN_LIMIT_REACHED');
-  }
-
-  // 2. Determina a categoria sorteada
+  // 1. Determina a categoria sorteada
   let chosenCategory = String(targetCategory || '').trim();
   if (!chosenCategory || !(COLLECTOR_CATEGORIES as readonly string[]).includes(chosenCategory)) {
     const randomIndex = Math.floor(Math.random() * COLLECTOR_CATEGORIES.length);
     chosenCategory = COLLECTOR_CATEGORIES[randomIndex];
   }
 
-  // 3. Obtém o produto campeão da categoria
+  // 2. Obtém o produto campeão da categoria
   const championProduct = await getCategoryChampion(chosenCategory);
   if (!championProduct || !championProduct.productId) {
     throw new Error('NO_PRODUCT_AVAILABLE_FOR_CATEGORY');
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);
+  let newSpinsUsed = 1;
 
-  // 4. Salva a nova jogada no histórico diário (múltiplas jogadas permitidas por dia)
-  await db.query(
-    `INSERT INTO tiktok_shop_daily_picks (student_code, pick_date, category, product_id)
-     VALUES (?, CURDATE(), ?, ?)`,
-    [cleanCode, chosenCategory, championProduct.productId]
-  );
+  // 3. Executa a validação e inserção atômica via transação com row lock no MySQL
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  const newSpinsUsed = currentStatus.spinsUsedToday + 1;
+    if (isMaster) {
+      // Mentor/Master: giros ilimitados, sem restrição de cota diária
+      await conn.query(
+        `INSERT INTO tiktok_shop_daily_picks (student_code, pick_date, category, product_id)
+         VALUES (?, CURDATE(), ?, ?)`,
+        [cleanCode, chosenCategory, championProduct.productId]
+      );
+
+      const [countRows]: any = await conn.query(
+        `SELECT COUNT(*) AS total FROM tiktok_shop_daily_picks
+         WHERE student_code = ? AND pick_date = CURDATE()`,
+        [cleanCode]
+      );
+      newSpinsUsed = Number(countRows?.[0]?.total || 1);
+
+      await conn.commit();
+    } else {
+      // Aluno: controle atômico rigoroso de no máximo 3 giros diários
+      // a) Garante a existência da linha de contador do dia para lock exclusivo de linha (X Lock)
+      await conn.query(
+        `INSERT INTO tiktok_shop_daily_spin_counters (student_code, pick_date, spins_count)
+         VALUES (?, CURDATE(), 0)
+         ON DUPLICATE KEY UPDATE student_code = student_code`,
+        [cleanCode]
+      );
+
+      // b) Adquire lock transacional exclusivo para o aluno e a data atual
+      const [counterRows]: any = await conn.query(
+        `SELECT spins_count FROM tiktok_shop_daily_spin_counters
+         WHERE student_code = ? AND pick_date = CURDATE()
+         FOR UPDATE`,
+        [cleanCode]
+      );
+
+      // c) Verifica a contagem consolidada em tiktok_shop_daily_picks dentro da mesma transação protegida
+      const [pickCountRows]: any = await conn.query(
+        `SELECT COUNT(*) AS total FROM tiktok_shop_daily_picks
+         WHERE student_code = ? AND pick_date = CURDATE()`,
+        [cleanCode]
+      );
+
+      const recordedSpins = Number(counterRows?.[0]?.spins_count || 0);
+      const actualPicks = Number(pickCountRows?.[0]?.total || 0);
+      const currentSpins = Math.max(recordedSpins, actualPicks);
+
+      // d) Se já atingiu 3 giros hoje, aborta com rollback e rejeita a tentativa concorrente
+      if (currentSpins >= 3) {
+        await conn.rollback();
+        throw new Error('DAILY_SPIN_LIMIT_REACHED');
+      }
+
+      // e) Atualiza contador e registra exatamente 1 novo giro atômico
+      newSpinsUsed = currentSpins + 1;
+
+      await conn.query(
+        `UPDATE tiktok_shop_daily_spin_counters
+         SET spins_count = ?
+         WHERE student_code = ? AND pick_date = CURDATE()`,
+        [newSpinsUsed, cleanCode]
+      );
+
+      await conn.query(
+        `INSERT INTO tiktok_shop_daily_picks (student_code, pick_date, category, product_id)
+         VALUES (?, CURDATE(), ?, ?)`,
+        [cleanCode, chosenCategory, championProduct.productId]
+      );
+
+      await conn.commit();
+    }
+  } catch (err) {
+    try {
+      await conn.rollback();
+    } catch (_rb) {}
+    throw err;
+  } finally {
+    conn.release();
+  }
+
   const remainingSpins = isMaster ? null : Math.max(0, 3 - newSpinsUsed);
   const canSpin = isMaster ? true : newSpinsUsed < 3;
 
