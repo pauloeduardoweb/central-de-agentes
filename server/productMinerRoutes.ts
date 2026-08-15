@@ -311,8 +311,13 @@ productMinerRouter.get('/search', async (req, res) => {
     const childCategory = String(req.query.childCategory || req.query.child_category || '').trim();
     const classification = String(req.query.classification || '').trim() as any;
     const hasVideoOnly = req.query.hasVideoOnly === 'true' || req.query.has_video_only === 'true' || req.query.hasVideo === 'true';
-    const parsedMinViews = req.query.minVideoViews ? Number(req.query.minVideoViews) : (req.query.min_video_views ? Number(req.query.min_video_views) : undefined);
-    const minVideoViews = Number.isFinite(parsedMinViews) && (parsedMinViews as number) > 0 ? (parsedMinViews as number) : undefined;
+    const rawMinViews = req.query.videoViewsMin ?? req.query.minVideoViews ?? req.query.min_video_views;
+    const rawMaxViews = req.query.videoViewsMax ?? req.query.maxVideoViews ?? req.query.max_video_views;
+    const parsedMinViews = rawMinViews !== undefined && rawMinViews !== '' ? Number(rawMinViews) : undefined;
+    const parsedMaxViews = rawMaxViews !== undefined && rawMaxViews !== '' ? Number(rawMaxViews) : undefined;
+    const minVideoViews = Number.isFinite(parsedMinViews) && (parsedMinViews as number) >= 0 ? (parsedMinViews as number) : undefined;
+    const maxVideoViews = Number.isFinite(parsedMaxViews) && (parsedMaxViews as number) >= 0 ? (parsedMaxViews as number) : undefined;
+    const videoViewRange = req.query.videoViewRange ? String(req.query.videoViewRange) : undefined;
     const page = Number(req.query.page || 1);
     const result = await searchTikTokShopProducts({
       query,
@@ -322,11 +327,31 @@ productMinerRouter.get('/search', async (req, res) => {
       classification,
       hasVideoOnly,
       minVideoViews,
+      maxVideoViews,
+      videoViewsMin: minVideoViews,
+      videoViewsMax: maxVideoViews,
+      videoViewRange,
       page,
       region: 'BR',
       forceRefresh: false
     });
-    return res.json({ success: true, region: 'BR', query, category, subcategory, childCategory, classification, hasVideoOnly, minVideoViews, page, ...result });
+    return res.json({
+      success: true,
+      region: 'BR',
+      query,
+      category,
+      subcategory,
+      childCategory,
+      classification,
+      hasVideoOnly,
+      minVideoViews,
+      maxVideoViews,
+      videoViewsMin: minVideoViews,
+      videoViewsMax: maxVideoViews,
+      videoViewRange,
+      page,
+      ...result
+    });
   } catch (error: any) {
     console.error('[Product Miner Search Error]:', error?.message || error);
     const message = String(error?.message || 'PRODUCT_MINER_ERROR');

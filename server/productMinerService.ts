@@ -1487,6 +1487,9 @@ export function buildProductSearchWhereClause(params: {
   childCategory?: string;
   hasVideoOnly?: boolean;
   minVideoViews?: number;
+  maxVideoViews?: number;
+  videoViewsMin?: number;
+  videoViewsMax?: number;
 }): { whereSql: string; sqlParams: any[]; querySourceForOrder: string | null } {
   const whereConditions: string[] = [];
   const sqlParams: any[] = [];
@@ -1496,7 +1499,10 @@ export function buildProductSearchWhereClause(params: {
   const rawSubcategory = String(params.subcategory || '').trim();
   const rawChildCategory = String(params.childCategory || '').trim();
   const hasVideoOnly = Boolean(params.hasVideoOnly);
-  const minVideoViews = params.minVideoViews && Number.isFinite(params.minVideoViews) && params.minVideoViews > 0 ? params.minVideoViews : undefined;
+  const minVideoViews = params.videoViewsMin !== undefined ? params.videoViewsMin : params.minVideoViews;
+  const maxVideoViews = params.videoViewsMax !== undefined ? params.videoViewsMax : params.maxVideoViews;
+  const hasMinViews = minVideoViews !== undefined && Number.isFinite(minVideoViews);
+  const hasMaxViews = maxVideoViews !== undefined && Number.isFinite(maxVideoViews);
 
   let categoryToUse = rawCategory;
   if (categoryToUse.toLowerCase() === 'todos' || categoryToUse.toLowerCase() === 'todas') {
@@ -1580,16 +1586,30 @@ export function buildProductSearchWhereClause(params: {
     whereConditions.push(`(${childOrs.join(' OR ')})`);
   }
 
-  // 4. Video and Views Filter
-  if (minVideoViews) {
-    whereConditions.push(`(
-      COALESCE(p.video_views, 0) >= ?
-      OR EXISTS (
-        SELECT 1 FROM tiktok_shop_product_videos pv_flt
-        WHERE pv_flt.product_id = p.product_id AND COALESCE(pv_flt.video_views, 0) >= ?
-      )
-    )`);
-    sqlParams.push(minVideoViews, minVideoViews);
+  // 4. Video and Views Filter (Ranges supported)
+  if (hasMinViews || hasMaxViews) {
+    const vConds: string[] = [];
+    if (hasMinViews) {
+      vConds.push(`(
+        COALESCE(p.video_views, 0) >= ?
+        OR EXISTS (
+          SELECT 1 FROM tiktok_shop_product_videos pv_flt
+          WHERE pv_flt.product_id = p.product_id AND COALESCE(pv_flt.video_views, 0) >= ?
+        )
+      )`);
+      sqlParams.push(minVideoViews, minVideoViews);
+    }
+    if (hasMaxViews) {
+      vConds.push(`(
+        COALESCE(p.video_views, 0) <= ?
+        OR EXISTS (
+          SELECT 1 FROM tiktok_shop_product_videos pv_flt
+          WHERE pv_flt.product_id = p.product_id AND COALESCE(pv_flt.video_views, 0) <= ?
+        )
+      )`);
+      sqlParams.push(maxVideoViews, maxVideoViews);
+    }
+    whereConditions.push(`(${vConds.join(' AND ')})`);
   } else if (hasVideoOnly) {
     whereConditions.push(`(
       (p.video_url IS NOT NULL AND p.video_url != '')
@@ -1769,6 +1789,10 @@ export async function searchTikTokShopProducts(params: {
   classification?: ClassificationType | null;
   hasVideoOnly?: boolean;
   minVideoViews?: number;
+  maxVideoViews?: number;
+  videoViewsMin?: number;
+  videoViewsMax?: number;
+  videoViewRange?: string;
   page?: number;
   region?: string;
   forceRefresh?: boolean;
@@ -1854,7 +1878,10 @@ export async function searchTikTokShopProducts(params: {
       let joinClause = ``;
 
       if (classification === 'viral_video') {
-        const viralViewsThreshold = minVideoViews ? Number(minVideoViews) : null;
+        const vMin = params.videoViewsMin !== undefined ? params.videoViewsMin : (params.minVideoViews !== undefined ? params.minVideoViews : null);
+        const vMax = params.videoViewsMax !== undefined ? params.videoViewsMax : (params.maxVideoViews !== undefined ? params.maxVideoViews : null);
+        const isAllRange = (vMin === null || vMin === undefined) && (vMax === null || vMax === undefined);
+
         const { whereSql: baseWhereSql, sqlParams: baseSqlParams } = buildProductSearchWhereClause({
           query,
           category,
@@ -1871,9 +1898,14 @@ export async function searchTikTokShopProducts(params: {
         ];
         const viralSqlParams: any[] = [];
 
-        if (viralViewsThreshold !== null && viralViewsThreshold > 0) {
+        if (vMin !== null && vMin !== undefined && Number.isFinite(vMin)) {
           viralWhereConditions.push(`COALESCE(pv.video_views, 0) >= ?`);
-          viralSqlParams.push(viralViewsThreshold);
+          viralSqlParams.push(vMin);
+        }
+
+        if (vMax !== null && vMax !== undefined && Number.isFinite(vMax)) {
+          viralWhereConditions.push(`COALESCE(pv.video_views, 0) <= ?`);
+          viralSqlParams.push(vMax);
         }
 
         if (baseWhereSql && baseWhereSql !== '1=1') {
@@ -1882,6 +1914,9 @@ export async function searchTikTokShopProducts(params: {
         }
 
         const viralWhereSql = viralWhereConditions.join(' AND ');
+        const viralOrderClause = isAllRange
+          ? `ORDER BY CRC32(CONCAT(pv.video_id, 'viral_mix_all_v1')) ASC, pv.id DESC`
+          : `ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC, pv.id DESC`;
 
         const [viralRows]: any = await db.query(
           `SELECT 
@@ -1933,7 +1968,7 @@ export async function searchTikTokShopProducts(params: {
           ) pv
           INNER JOIN tiktok_shop_products p ON pv.product_id = p.product_id
           WHERE pv.row_num = 1
-          ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC, pv.id DESC
+          ${viralOrderClause}
           LIMIT ? OFFSET ?`,
           [...viralSqlParams, safePageSize + 1, offset]
         );
@@ -1994,7 +2029,7 @@ export async function searchTikTokShopProducts(params: {
             ) pv
             INNER JOIN tiktok_shop_products p ON pv.product_id = p.product_id
             WHERE pv.row_num = 1
-            ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC, pv.id DESC
+            ${viralOrderClause}
             LIMIT ? OFFSET 0`,
             [...viralSqlParams, safePageSize + 1]
           );
