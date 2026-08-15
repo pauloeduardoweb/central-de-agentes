@@ -1854,7 +1854,7 @@ export async function searchTikTokShopProducts(params: {
       let joinClause = ``;
 
       if (classification === 'viral_video') {
-        const viralViewsThreshold = Math.max(100000, Number(minVideoViews) || 100000);
+        const viralViewsThreshold = minVideoViews ? Number(minVideoViews) : null;
         const { whereSql: baseWhereSql, sqlParams: baseSqlParams } = buildProductSearchWhereClause({
           query,
           category,
@@ -1865,12 +1865,16 @@ export async function searchTikTokShopProducts(params: {
         const viralWhereConditions = [
           `pv.video_id IS NOT NULL AND pv.video_id != ''`,
           `pv.video_url IS NOT NULL AND pv.video_url != ''`,
-          `COALESCE(pv.video_views, 0) >= ?`,
           `p.product_id IS NOT NULL AND p.product_id != ''`,
           `p.title IS NOT NULL AND p.title != ''`,
           `p.image_url IS NOT NULL AND p.image_url != ''`,
         ];
-        const viralSqlParams: any[] = [viralViewsThreshold];
+        const viralSqlParams: any[] = [];
+
+        if (viralViewsThreshold !== null && viralViewsThreshold > 0) {
+          viralWhereConditions.push(`COALESCE(pv.video_views, 0) >= ?`);
+          viralSqlParams.push(viralViewsThreshold);
+        }
 
         if (baseWhereSql && baseWhereSql !== '1=1') {
           viralWhereConditions.push(`(${baseWhereSql})`);
@@ -2039,6 +2043,7 @@ export async function searchTikTokShopProducts(params: {
         });
 
         const productsWithTrends = await attachTrendMetrics(viralProducts);
+        const productsWithDownloads = await attachVideoDownloads(productsWithTrends);
         logMinerAcquisition({
           category,
           query,
@@ -2047,18 +2052,18 @@ export async function searchTikTokShopProducts(params: {
           endpoint: '/v1/tiktokshop/search',
           requestExecuted: false,
           skipReason: 'classification=viral_video local DB hit',
-          itemsReceived: productsWithTrends.length,
+          itemsReceived: productsWithDownloads.length,
           creditsUsed: 0,
         });
 
         return {
-          products: productsWithTrends,
+          products: productsWithDownloads,
           creditsUsed: 0,
           creditsRemaining: null,
           hasMore: hasMoreViral,
           pageSize: safePageSize,
           fromCache: true,
-          source: productsWithTrends.length > 0 ? 'database' : 'empty',
+          source: productsWithDownloads.length > 0 ? 'database' : 'empty',
           needsRefresh: false,
           cacheExpired: false,
           requestId: null,
