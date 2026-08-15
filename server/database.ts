@@ -1136,6 +1136,16 @@ export function ensureProductMinerTables(): Promise<void> {
         await db.query(`ALTER TABLE tiktok_shop_video_downloads ADD INDEX idx_tsv_downloads_prod_vid (product_id, video_id)`);
       } catch {}
 
+      // Safe migration: associate legacy records (video_id = '') with video_id from tiktok_shop_products when primary video_id is present
+      await db.query(`
+        UPDATE tiktok_shop_video_downloads d
+        JOIN tiktok_shop_products p ON p.product_id = d.product_id
+        SET d.video_id = p.video_id
+        WHERE (d.video_id = '' OR d.video_id IS NULL)
+          AND p.video_id IS NOT NULL
+          AND TRIM(p.video_id) <> ''
+      `).catch(() => {});
+
       await db.query(`
         CREATE TABLE IF NOT EXISTS product_miner_script_logs (
           id BIGINT AUTO_INCREMENT PRIMARY KEY,

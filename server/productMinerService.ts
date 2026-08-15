@@ -1196,10 +1196,9 @@ export async function attachVideoDownloads(products: MinedProduct[]): Promise<Mi
     return products.map((p) => {
       let downloadInfo: any = null;
       if (p.video?.id) {
-        downloadInfo = mapByComposite.get(`${p.productId}:${p.video.id}`);
-      }
-      if (!downloadInfo) {
-        downloadInfo = mapByProduct.get(p.productId);
+        downloadInfo = mapByComposite.get(`${p.productId}:${p.video.id}`) || null;
+      } else {
+        downloadInfo = mapByProduct.get(p.productId) || null;
       }
       return {
         ...p,
@@ -1229,19 +1228,18 @@ export async function prepareVideoDownload(productId: string, videoId?: string):
   await ensureProductMinerTables();
   const cleanVideoId = String(videoId || '').trim();
 
-  // 1. Check if already prepared or preparing
-  const [existingRows]: any = await db.query(
-    `SELECT direct_media_url, status, updated_at
-     FROM tiktok_shop_video_downloads
-     WHERE product_id = ? AND video_id = ?
-     LIMIT 1`,
-    [productId, cleanVideoId]
-  );
-
-  let existing = Array.isArray(existingRows) && existingRows[0];
-
-  // Fallback to legacy record with video_id = '' if cleanVideoId not found
-  if (!existing && cleanVideoId) {
+  // 1. Check if already prepared or preparing (strictly matching cleanVideoId)
+  let existing: any = null;
+  if (cleanVideoId) {
+    const [existingRows]: any = await db.query(
+      `SELECT direct_media_url, status, updated_at
+       FROM tiktok_shop_video_downloads
+       WHERE product_id = ? AND video_id = ?
+       LIMIT 1`,
+      [productId, cleanVideoId]
+    );
+    existing = Array.isArray(existingRows) && existingRows[0];
+  } else {
     const [legacyRows]: any = await db.query(
       `SELECT direct_media_url, status, updated_at
        FROM tiktok_shop_video_downloads
@@ -1249,9 +1247,7 @@ export async function prepareVideoDownload(productId: string, videoId?: string):
        LIMIT 1`,
       [productId]
     );
-    if (Array.isArray(legacyRows) && legacyRows[0]) {
-      existing = legacyRows[0];
-    }
+    existing = Array.isArray(legacyRows) && legacyRows[0];
   }
 
   if (existing) {
@@ -1287,9 +1283,35 @@ export async function prepareVideoDownload(productId: string, videoId?: string):
     if (Array.isArray(videoRows) && videoRows[0]?.video_url) {
       videoUrl = String(videoRows[0].video_url);
     }
-  }
 
-  if (!videoUrl) {
+    if (!videoUrl) {
+      const [cacheRows]: any = await db.query(
+        `SELECT payload_json FROM tiktok_shop_search_cache LIMIT 50`
+      );
+      if (Array.isArray(cacheRows)) {
+        for (const row of cacheRows) {
+          try {
+            const payload = JSON.parse(row.payload_json);
+            const item = payload.data?.items?.find((i: any) => String(i.product_id || i.productId) === productId);
+            const vMatch = item?.associated_videos?.find((v: any) => String(v.id || v.video_id) === cleanVideoId);
+            if (vMatch?.url || vMatch?.video_url) {
+              videoUrl = vMatch.url || vMatch.video_url;
+              break;
+            }
+          } catch {}
+        }
+      }
+    }
+
+    if (!videoUrl) {
+      return {
+        success: false,
+        error: 'VIDEO_ID_NOT_FOUND',
+        message: 'Vídeo solicitado não foi encontrado para este produto.',
+      };
+    }
+  } else {
+    // When no videoId specified, look for primary product video
     const [prodRows]: any = await db.query(
       `SELECT video_url FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
       [productId]
@@ -1298,39 +1320,32 @@ export async function prepareVideoDownload(productId: string, videoId?: string):
     if (Array.isArray(prodRows) && prodRows[0]?.video_url) {
       videoUrl = String(prodRows[0].video_url);
     }
-  }
 
-  if (!videoUrl) {
-    const [cacheRows]: any = await db.query(
-      `SELECT payload_json FROM tiktok_shop_search_cache LIMIT 50`
-    );
-    if (Array.isArray(cacheRows)) {
-      for (const row of cacheRows) {
-        try {
-          const payload = JSON.parse(row.payload_json);
-          const item = payload.data?.items?.find((i: any) => String(i.product_id || i.productId) === productId);
-          if (cleanVideoId) {
-            const vMatch = item?.associated_videos?.find((v: any) => String(v.id || v.video_id) === cleanVideoId);
-            if (vMatch?.url || vMatch?.video_url) {
-              videoUrl = vMatch.url || vMatch.video_url;
+    if (!videoUrl) {
+      const [cacheRows]: any = await db.query(
+        `SELECT payload_json FROM tiktok_shop_search_cache LIMIT 50`
+      );
+      if (Array.isArray(cacheRows)) {
+        for (const row of cacheRows) {
+          try {
+            const payload = JSON.parse(row.payload_json);
+            const item = payload.data?.items?.find((i: any) => String(i.product_id || i.productId) === productId);
+            if (item?.video?.url || item?.video_url) {
+              videoUrl = item?.video?.url || item?.video_url;
               break;
             }
-          }
-          if (item?.video?.url || item?.video_url) {
-            videoUrl = item?.video?.url || item?.video_url;
-            break;
-          }
-        } catch {}
+          } catch {}
+        }
       }
     }
-  }
 
-  if (!videoUrl) {
-    return {
-      success: false,
-      error: 'NO_VIDEO_URL',
-      message: 'Nenhum vídeo do TikTok associado a este produto.',
-    };
+    if (!videoUrl) {
+      return {
+        success: false,
+        error: 'NO_VIDEO_URL',
+        message: 'Nenhum vídeo do TikTok associado a este produto.',
+      };
+    }
   }
 
   // 3. Set lock 'PREPARING'

@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
 import { searchTikTokShopProducts, refreshMultiPageTikTokShopProducts, getProductMinerRanking, getCollectorCategoriesStats, prepareVideoDownload, getDailyRefreshStatus, executeDailyRefresh, reclassifyExistingDatabaseProducts, backfillLegacyVideosToProductVideos, extractVideosFromSearchCachePayloads, ProductRankingSort, logProductInteractionEvent } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
@@ -666,6 +667,70 @@ Mostre o produto em uso close-up. Destaque a alta avaliação de ${product.ratin
   }
 });
 
+// Playback Token Helpers (5 minutes validity HMAC token)
+const PLAYBACK_SECRET = process.env.PLAYBACK_TOKEN_SECRET || 'geracao-z-pro-miner-video-stream-token-2026';
+
+export function generatePlaybackToken(productId: string, videoId?: string): { token: string; expiresAt: number } {
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes TTL
+  const payload = `${productId}:${videoId || ''}:${expiresAt}`;
+  const sig = crypto.createHmac('sha256', PLAYBACK_SECRET).update(payload).digest('hex');
+  const token = Buffer.from(`${payload}:${sig}`).toString('base64url');
+  return { token, expiresAt };
+}
+
+export function verifyPlaybackToken(token: string, productId: string, videoId?: string): boolean {
+  if (!token) return false;
+  try {
+    const raw = Buffer.from(token, 'base64url').toString('utf8');
+    const parts = raw.split(':');
+    if (parts.length !== 4) return false;
+    const [pId, vId, expStr, sig] = parts;
+    const exp = parseInt(expStr, 10);
+    if (isNaN(exp) || Date.now() > exp) return false;
+    if (pId !== productId) return false;
+    if (videoId && vId && vId !== videoId) return false;
+    const expectedSig = crypto.createHmac('sha256', PLAYBACK_SECRET).update(`${pId}:${vId}:${expStr}`).digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig));
+  } catch {
+    return false;
+  }
+}
+
+// Generate Playback Token (for standard HTML5 <video> tags without custom headers)
+productMinerRouter.post('/videos/playback-token', async (req, res) => {
+  const access = await requireProductMinerAccess(req, res);
+  if (!access) return;
+
+  try {
+    const { productId, videoId } = req.body || {};
+    const cleanProductId = String(productId || '').trim();
+    const cleanVideoId = String(videoId || '').trim();
+
+    if (!cleanProductId) {
+      return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto é obrigatório.' });
+    }
+
+    const { token, expiresAt } = generatePlaybackToken(cleanProductId, cleanVideoId || undefined);
+    const streamUrl = cleanVideoId
+      ? `/api/product-miner/videos/${encodeURIComponent(cleanProductId)}/${encodeURIComponent(cleanVideoId)}/stream?token=${encodeURIComponent(token)}`
+      : `/api/product-miner/videos/${encodeURIComponent(cleanProductId)}/stream?token=${encodeURIComponent(token)}`;
+
+    return res.json({
+      success: true,
+      token,
+      streamUrl,
+      expiresAt,
+    });
+  } catch (error: any) {
+    console.error('[Playback Token Route Error]:', error?.message || error);
+    return res.status(500).json({
+      success: false,
+      error: 'PLAYBACK_TOKEN_ERROR',
+      message: 'Ocorreu um erro ao gerar o token de reprodução.',
+    });
+  }
+});
+
 // Video Download Preparation (Mentor Only)
 productMinerRouter.post('/videos/prepare-download', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
@@ -693,21 +758,28 @@ productMinerRouter.post('/videos/prepare-download', async (req, res) => {
 
 // Helper for same-origin video streaming proxy
 async function streamVideoProxy(req: express.Request, res: express.Response, productId: string, videoId?: string) {
-  if (!requireProductMinerAccess(req, res)) return;
+  const cleanProductId = String(productId || '').trim();
+  const cleanVideoId = String(videoId || '').trim();
+
+  if (!cleanProductId) {
+    return res.status(400).json({ error: 'MISSING_PRODUCT_ID' });
+  }
+
+  // Authentication: Check token in query param OR standard auth header
+  const token = String(req.query.token || '').trim();
+  const isTokenValid = token ? verifyPlaybackToken(token, cleanProductId, cleanVideoId || undefined) : false;
+
+  if (!isTokenValid) {
+    const access = await requireProductMinerAccess(req, res);
+    if (!access) return;
+  }
 
   try {
-    const cleanProductId = String(productId || '').trim();
-    const cleanVideoId = String(videoId || '').trim();
-
-    if (!cleanProductId) {
-      return res.status(400).json({ error: 'MISSING_PRODUCT_ID' });
-    }
-
     if (!isDatabaseConfigured()) {
       return res.status(503).json({ error: 'DATABASE_NOT_CONFIGURED' });
     }
 
-    // 1. Check existing completed record
+    // 1. Check existing completed record strictly by product_id and video_id
     let cdnUrl: string | null = null;
     let query = `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND video_id = ? LIMIT 1`;
     let params = [cleanProductId, cleanVideoId];
@@ -718,13 +790,18 @@ async function streamVideoProxy(req: express.Request, res: express.Response, pro
     if (record && record.status === 'COMPLETED' && record.direct_media_url) {
       cdnUrl = String(record.direct_media_url);
     } else if (cleanVideoId) {
-      // Fallback to legacy record with video_id = ''
+      // Check legacy record with video_id = '' or NULL and migrate if applicable
       const [legacyRows]: any = await db.query(
         `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND (video_id = '' OR video_id IS NULL) LIMIT 1`,
         [cleanProductId]
       );
       if (Array.isArray(legacyRows) && legacyRows[0]?.status === 'COMPLETED' && legacyRows[0]?.direct_media_url) {
         cdnUrl = String(legacyRows[0].direct_media_url);
+        // Opportunistic migration to associate with cleanVideoId
+        db.query(
+          `UPDATE tiktok_shop_video_downloads SET video_id = ? WHERE product_id = ? AND (video_id = '' OR video_id IS NULL) LIMIT 1`,
+          [cleanVideoId, cleanProductId]
+        ).catch(() => {});
       }
     }
 
@@ -738,25 +815,39 @@ async function streamVideoProxy(req: express.Request, res: express.Response, pro
 
     if (!cdnUrl) {
       return res.status(404).json({
-        error: 'VIDEO_NOT_FOUND',
-        message: 'Vídeo não disponível para reprodução.',
+        error: 'VIDEO_ID_NOT_FOUND',
+        message: 'Vídeo não encontrado para este produto.',
       });
     }
 
-    // 3. Fetch from CDN forwarding Range header
+    // 3. Fetch from CDN forwarding Range header - NEVER REDIRECT 302
     const forwardHeaders: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': '*/*',
     };
     if (req.headers.range) {
       forwardHeaders['Range'] = String(req.headers.range);
     }
 
-    const mediaResponse = await fetch(cdnUrl, {
+    let mediaResponse = await fetch(cdnUrl, {
       headers: forwardHeaders,
     });
 
     if (!mediaResponse.ok && mediaResponse.status !== 206) {
-      return res.redirect(302, cdnUrl);
+      // Retry without Range header if CDN returned error with Range
+      mediaResponse = await fetch(cdnUrl, {
+        headers: {
+          'User-Agent': forwardHeaders['User-Agent'],
+          'Accept': '*/*',
+        },
+      });
+    }
+
+    if (!mediaResponse.ok && mediaResponse.status !== 206) {
+      return res.status(mediaResponse.status || 502).json({
+        error: 'CDN_FETCH_FAILED',
+        message: 'Não foi possível carregar o vídeo da fonte de mídia.',
+      });
     }
 
     res.status(mediaResponse.status);
@@ -786,12 +877,12 @@ async function streamVideoProxy(req: express.Request, res: express.Response, pro
       }
       return res.end();
     } else {
-      return res.redirect(302, cdnUrl);
+      return res.status(502).json({ error: 'EMPTY_CDN_BODY' });
     }
   } catch (err: any) {
     console.error('[Video Proxy Stream Error]:', err?.message || err);
     if (!res.headersSent) {
-      return res.status(500).json({ error: 'STREAM_FAILED' });
+      return res.status(500).json({ error: 'STREAM_FAILED', message: 'Falha durante o streaming do vídeo.' });
     }
     return res.end();
   }
