@@ -310,9 +310,23 @@ productMinerRouter.get('/search', async (req, res) => {
     const subcategory = String(req.query.subcategory || '').trim();
     const childCategory = String(req.query.childCategory || req.query.child_category || '').trim();
     const classification = String(req.query.classification || '').trim() as any;
+    const hasVideoOnly = req.query.hasVideoOnly === 'true' || req.query.has_video_only === 'true' || req.query.hasVideo === 'true';
+    const parsedMinViews = req.query.minVideoViews ? Number(req.query.minVideoViews) : (req.query.min_video_views ? Number(req.query.min_video_views) : undefined);
+    const minVideoViews = Number.isFinite(parsedMinViews) && (parsedMinViews as number) > 0 ? (parsedMinViews as number) : undefined;
     const page = Number(req.query.page || 1);
-    const result = await searchTikTokShopProducts({ query, category, subcategory, childCategory, classification, page, region: 'BR', forceRefresh: false });
-    return res.json({ success: true, region: 'BR', query, category, subcategory, childCategory, classification, page, ...result });
+    const result = await searchTikTokShopProducts({
+      query,
+      category,
+      subcategory,
+      childCategory,
+      classification,
+      hasVideoOnly,
+      minVideoViews,
+      page,
+      region: 'BR',
+      forceRefresh: false
+    });
+    return res.json({ success: true, region: 'BR', query, category, subcategory, childCategory, classification, hasVideoOnly, minVideoViews, page, ...result });
   } catch (error: any) {
     console.error('[Product Miner Search Error]:', error?.message || error);
     const message = String(error?.message || 'PRODUCT_MINER_ERROR');

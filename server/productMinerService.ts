@@ -1485,6 +1485,8 @@ export function buildProductSearchWhereClause(params: {
   category?: string;
   subcategory?: string;
   childCategory?: string;
+  hasVideoOnly?: boolean;
+  minVideoViews?: number;
 }): { whereSql: string; sqlParams: any[]; querySourceForOrder: string | null } {
   const whereConditions: string[] = [];
   const sqlParams: any[] = [];
@@ -1493,6 +1495,8 @@ export function buildProductSearchWhereClause(params: {
   const rawCategory = String(params.category || '').trim();
   const rawSubcategory = String(params.subcategory || '').trim();
   const rawChildCategory = String(params.childCategory || '').trim();
+  const hasVideoOnly = Boolean(params.hasVideoOnly);
+  const minVideoViews = params.minVideoViews && Number.isFinite(params.minVideoViews) && params.minVideoViews > 0 ? params.minVideoViews : undefined;
 
   let categoryToUse = rawCategory;
   if (categoryToUse.toLowerCase() === 'todos' || categoryToUse.toLowerCase() === 'todas') {
@@ -1576,7 +1580,29 @@ export function buildProductSearchWhereClause(params: {
     whereConditions.push(`(${childOrs.join(' OR ')})`);
   }
 
-  // 4. Search Query Filter
+  // 4. Video and Views Filter
+  if (minVideoViews) {
+    whereConditions.push(`(
+      COALESCE(p.video_views, 0) >= ?
+      OR EXISTS (
+        SELECT 1 FROM tiktok_shop_product_videos pv_flt
+        WHERE pv_flt.product_id = p.product_id AND COALESCE(pv_flt.video_views, 0) >= ?
+      )
+    )`);
+    sqlParams.push(minVideoViews, minVideoViews);
+  } else if (hasVideoOnly) {
+    whereConditions.push(`(
+      (p.video_url IS NOT NULL AND p.video_url != '')
+      OR (p.video_id IS NOT NULL AND p.video_id != '')
+      OR COALESCE(p.video_views, 0) > 0
+      OR EXISTS (
+        SELECT 1 FROM tiktok_shop_product_videos pv_flt
+        WHERE pv_flt.product_id = p.product_id
+      )
+    )`);
+  }
+
+  // 5. Search Query Filter
   let querySourceForOrder: string | null = null;
   if (rawQuery) {
     const isMainCatName = COLLECTOR_CATEGORIES.some((c) => c.toLowerCase() === rawQuery.toLowerCase());
@@ -1741,6 +1767,8 @@ export async function searchTikTokShopProducts(params: {
   subcategory?: string;
   childCategory?: string;
   classification?: ClassificationType | null;
+  hasVideoOnly?: boolean;
+  minVideoViews?: number;
   page?: number;
   region?: string;
   forceRefresh?: boolean;
@@ -1768,6 +1796,8 @@ export async function searchTikTokShopProducts(params: {
   const subcategory = String(params.subcategory || '').trim();
   const childCategory = String(params.childCategory || '').trim();
   const classification = params.classification;
+  const hasVideoOnly = Boolean(params.hasVideoOnly || (params.minVideoViews && params.minVideoViews > 0));
+  const minVideoViews = params.minVideoViews && Number.isFinite(params.minVideoViews) && params.minVideoViews > 0 ? params.minVideoViews : undefined;
 
   // Telemetry: record search event for query/category
   if (query || category) {
@@ -1816,6 +1846,8 @@ export async function searchTikTokShopProducts(params: {
         category,
         subcategory,
         childCategory,
+        hasVideoOnly,
+        minVideoViews,
       });
 
       let orderClause = `ORDER BY p.last_seen_at DESC, p.sold_count DESC, p.product_id DESC`;
@@ -1852,9 +1884,9 @@ export async function searchTikTokShopProducts(params: {
           (
             COALESCE(p.video_views, 0) * 1.0 + 
             COALESCE(p.video_shares, 0) * 10.0 + 
-            COALESCE(p.video_saves, 0) * 5.0 + 
-            COALESCE(p.video_comments, 0) * 3.0 + 
-            COALESCE(p.video_likes, 0) * 0.5
+            COALESCE(video_saves, 0) * 5.0 + 
+            COALESCE(video_comments, 0) * 3.0 + 
+            COALESCE(video_likes, 0) * 0.5
           )
         ) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (classification === 'sales_24h') {
@@ -1983,7 +2015,21 @@ export async function searchTikTokShopProducts(params: {
         orderClause = `ORDER BY CASE WHEN LOWER(TRIM(p.query_source)) = LOWER(?) THEN 0 ELSE 1 END, p.sold_count DESC, p.last_seen_at DESC`;
       }
 
-      const orderParams = (!classification && querySourceForOrder) ? [querySourceForOrder] : [];
+      // When a minVideoViews filter is active, force ordering by video_views DESC
+      if (minVideoViews) {
+        if (!joinClause.includes('pv ON pv.product_id')) {
+          joinClause += `
+            LEFT JOIN (
+              SELECT product_id, MAX(COALESCE(video_views, 0)) AS max_v_views
+              FROM tiktok_shop_product_videos
+              GROUP BY product_id
+            ) pv ON pv.product_id = p.product_id
+          `;
+        }
+        orderClause = `ORDER BY GREATEST(COALESCE(pv.max_v_views, 0), COALESCE(p.video_views, 0)) DESC, p.sold_count DESC, p.last_seen_at DESC`;
+      }
+
+      const orderParams = (!classification && !minVideoViews && querySourceForOrder) ? [querySourceForOrder] : [];
 
       const [rows]: any = await db.query(
         `SELECT p.*
