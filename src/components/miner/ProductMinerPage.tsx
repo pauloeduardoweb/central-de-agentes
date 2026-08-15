@@ -39,6 +39,7 @@ import {
   VideoAnalysisModal,
   ProductDetailModal,
 } from './ProductMinerModals';
+import { DailyPickRoulette } from './DailyPickRoulette';
 import { getProductPriceRange } from '../../utils/priceHelper';
 
 interface ProductMinerPageProps {
@@ -6564,11 +6565,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     if (hasVideoOnly || selectedClassification === 'viral_video') {
       list = list.filter((p) => Boolean(p.video?.url || p.video?.id || (p.associatedVideos && p.associatedVideos.length > 0)));
     }
-
-    // 2b. Filter for highest_commission (only show products that have effective commission > 0)
-    if (selectedClassification === 'highest_commission') {
-      list = list.filter((p) => getEffectiveCommissionCents(p) > 0);
-    }
     if (selectedClassification === 'viral_video' && activeVideoRange) {
       if (activeVideoRange.min !== null && activeVideoRange.min !== undefined) {
         list = list.filter((p) => {
@@ -7555,9 +7551,19 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       ) : null}
 
       {/* ================================================== */}
-      {/* 4 — LISTA / FEED DE PRODUTOS                       */}
+      {/* 4 — LISTA / FEED DE PRODUTOS / ESCOLHA DO DIA      */}
       {/* ================================================== */}
-      {mode === 'search' || mode === 'favorites' ? (
+      {mode !== 'collector' && selectedClassification === 'editors_choice' ? (
+        <DailyPickRoulette
+          studentCode={studentCode}
+          categories={CATEGORY_CONFIG}
+          isFavorite={isFavorited}
+          onToggleFavorite={toggleFavorite}
+          onOpenAnalysisModal={handleOpenAnalysisModal}
+          onOpenDetailModal={handleOpenDetailModal}
+          onTrackClick={handleTrackProductClick}
+        />
+      ) : mode === 'search' || mode === 'favorites' ? (
         <>
           {(loading || rankingLoading) ? (
             <div className="py-16 flex justify-center">
