@@ -1912,28 +1912,31 @@ export async function searchTikTokShopProducts(params: {
             p.estimated_commission_cents,
             p.commission_rate_percent,
             p.last_seen_at
-          FROM tiktok_shop_product_videos pv
+          FROM (
+            SELECT 
+              pv.*,
+              ROW_NUMBER() OVER (
+                PARTITION BY pv.video_id 
+                ORDER BY 
+                  COALESCE(pv.video_views, 0) DESC, 
+                  COALESCE(pv.video_likes, 0) DESC, 
+                  COALESCE(pv.video_shares, 0) DESC, 
+                  pv.id DESC
+              ) AS row_num
+            FROM tiktok_shop_product_videos pv
+            INNER JOIN tiktok_shop_products p ON pv.product_id = p.product_id
+            WHERE ${viralWhereSql}
+          ) pv
           INNER JOIN tiktok_shop_products p ON pv.product_id = p.product_id
-          WHERE ${viralWhereSql}
-          ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC
+          WHERE pv.row_num = 1
+          ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC, pv.id DESC
           LIMIT ? OFFSET ?`,
-          [...viralSqlParams, safePageSize * 2, offset]
+          [...viralSqlParams, safePageSize + 1, offset]
         );
 
         const rawList = Array.isArray(viralRows) ? viralRows : [];
-        const seenVideoIds = new Set<string>();
-        const uniqueViralRows: any[] = [];
-        for (const r of rawList) {
-          const vid = String(r.video_id);
-          if (!seenVideoIds.has(vid)) {
-            seenVideoIds.add(vid);
-            uniqueViralRows.push(r);
-          }
-          if (uniqueViralRows.length >= safePageSize + 1) break;
-        }
-
-        let hasMoreViral = uniqueViralRows.length > safePageSize;
-        let pageRows = uniqueViralRows.slice(0, safePageSize);
+        let hasMoreViral = rawList.length > safePageSize;
+        let pageRows = rawList.slice(0, safePageSize);
 
         // Fallback: If page > 1 has no rows, load page 1
         if (pageRows.length === 0 && page > 1) {
@@ -1970,26 +1973,30 @@ export async function searchTikTokShopProducts(params: {
               p.estimated_commission_cents,
               p.commission_rate_percent,
               p.last_seen_at
-            FROM tiktok_shop_product_videos pv
+            FROM (
+              SELECT 
+                pv.*,
+                ROW_NUMBER() OVER (
+                  PARTITION BY pv.video_id 
+                  ORDER BY 
+                    COALESCE(pv.video_views, 0) DESC, 
+                    COALESCE(pv.video_likes, 0) DESC, 
+                    COALESCE(pv.video_shares, 0) DESC, 
+                    pv.id DESC
+                ) AS row_num
+              FROM tiktok_shop_product_videos pv
+              INNER JOIN tiktok_shop_products p ON pv.product_id = p.product_id
+              WHERE ${viralWhereSql}
+            ) pv
             INNER JOIN tiktok_shop_products p ON pv.product_id = p.product_id
-            WHERE ${viralWhereSql}
-            ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC
+            WHERE pv.row_num = 1
+            ORDER BY COALESCE(pv.video_views, 0) DESC, p.sold_count DESC, COALESCE(pv.video_likes, 0) DESC, pv.id DESC
             LIMIT ? OFFSET 0`,
-            [...viralSqlParams, safePageSize * 2]
+            [...viralSqlParams, safePageSize + 1]
           );
           const fbRaw = Array.isArray(fbRows) ? fbRows : [];
-          const fbSeen = new Set<string>();
-          const fbUnique: any[] = [];
-          for (const r of fbRaw) {
-            const vid = String(r.video_id);
-            if (!fbSeen.has(vid)) {
-              fbSeen.add(vid);
-              fbUnique.push(r);
-            }
-            if (fbUnique.length >= safePageSize + 1) break;
-          }
-          hasMoreViral = fbUnique.length > safePageSize;
-          pageRows = fbUnique.slice(0, safePageSize);
+          hasMoreViral = fbRaw.length > safePageSize;
+          pageRows = fbRaw.slice(0, safePageSize);
         }
 
         const viralProducts: MinedProduct[] = pageRows.map((row: any) => {
