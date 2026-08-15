@@ -350,6 +350,25 @@ export async function generateProductScript(
   return data as { success: true; script: string };
 }
 
+export async function fetchVideoPlaybackToken(
+  studentCode: string,
+  productId: string,
+  videoId?: string
+): Promise<{ success: boolean; token?: string; streamUrl?: string; expiresAt?: number; error?: string; message?: string }> {
+  const response = await fetch('/api/product-miner/videos/playback-token', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ productId, videoId }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data;
+}
+
 export async function prepareProductVideoDownload(
   studentCode: string,
   productId: string,
