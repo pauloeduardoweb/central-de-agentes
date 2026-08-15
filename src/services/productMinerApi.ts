@@ -1241,7 +1241,12 @@ export async function executeSubcategoryExpansionApi(
 
 export interface DailyPickResponse {
   success: boolean;
-  hasSpunToday: boolean;
+  role?: 'mentor' | 'student';
+  dailyLimit?: number | null;
+  spinsUsedToday?: number;
+  remainingSpins?: number | null;
+  canSpin?: boolean;
+  hasSpunToday?: boolean;
   pickDate?: string;
   category?: string;
   product?: ProductMinerProduct | null;
