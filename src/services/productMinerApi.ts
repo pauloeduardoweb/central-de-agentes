@@ -132,13 +132,17 @@ export async function searchProducts(
   category?: string,
   subcategory?: string,
   childCategory?: string,
-  classification?: string | null
+  classification?: string | null,
+  hasVideoOnly?: boolean,
+  minVideoViews?: number | null
 ): Promise<ProductSearchResponse> {
   const params = new URLSearchParams({ query, page: String(page) });
   if (category && category !== 'Todos' && category !== 'Todas') params.set('category', category);
   if (subcategory && subcategory !== 'Todas' && subcategory !== 'Todos') params.set('subcategory', subcategory);
   if (childCategory && childCategory !== 'Todas' && childCategory !== 'Todos') params.set('childCategory', childCategory);
   if (classification) params.set('classification', classification);
+  if (hasVideoOnly) params.set('hasVideoOnly', 'true');
+  if (minVideoViews && minVideoViews > 0) params.set('minVideoViews', String(minVideoViews));
 
   const response = await fetch(`/api/product-miner/search?${params.toString()}`, {
     headers: authHeaders(studentCode),
