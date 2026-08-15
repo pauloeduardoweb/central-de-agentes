@@ -352,7 +352,8 @@ export async function generateProductScript(
 
 export async function prepareProductVideoDownload(
   studentCode: string,
-  productId: string
+  productId: string,
+  videoId?: string
 ): Promise<{ success: boolean; prepared?: boolean; directMediaUrl?: string; error?: string; message?: string }> {
   const response = await fetch('/api/product-miner/videos/prepare-download', {
     method: 'POST',
@@ -360,7 +361,7 @@ export async function prepareProductVideoDownload(
       ...authHeaders(studentCode),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ productId }),
+    body: JSON.stringify({ productId, videoId }),
   });
 
   const data = await response.json().catch(() => ({}));
