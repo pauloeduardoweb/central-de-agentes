@@ -5303,7 +5303,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('Todas');
   const [selectedChildCategory, setSelectedChildCategory] = useState<string>('Todas');
   const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
-  const [viralVideoOnly, setViralVideoOnly] = useState<boolean>(false);
+  const [minVideoViews, setMinVideoViews] = useState<number | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
   const catDrag = useDragToScroll<HTMLDivElement>();
@@ -5348,7 +5348,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   useEffect(() => {
     setRankingPage(1);
     setPage(1);
-  }, [selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, viralVideoOnly, selectedClassification, rankingSort, mode]);
+  }, [selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, minVideoViews, selectedClassification, rankingSort, mode]);
 
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
@@ -5481,13 +5481,30 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
     // 2. Filter by video options
     if (hasVideoOnly) {
-      list = list.filter((p) => Boolean(p.video?.url));
+      list = list.filter((p) => Boolean(p.video?.url || p.video?.id || (p.associatedVideos && p.associatedVideos.length > 0)));
     }
-    if (viralVideoOnly) {
-      list = list.filter((p) => Boolean(p.video && (p.video.views ?? 0) >= 1000000));
+    if (minVideoViews && minVideoViews > 0) {
+      list = list.filter((p) => {
+        const topView = Math.max(
+          p.video?.views ?? 0,
+          ...(p.associatedVideos || []).map((v) => v.views ?? 0)
+        );
+        return topView >= minVideoViews;
+      });
     }
 
-    // 3. Sort by classification choice (ONLY when in 'favorites' mode, since in 'search' mode the database query has already returned products in the exact classification order)
+    // 3. Sort by video views DESC when minVideoViews is active
+    if (minVideoViews && minVideoViews > 0) {
+      const copy = [...list];
+      copy.sort((a, b) => {
+        const viewsB = Math.max(b.video?.views ?? 0, ...(b.associatedVideos || []).map((v) => v.views ?? 0));
+        const viewsA = Math.max(a.video?.views ?? 0, ...(a.associatedVideos || []).map((v) => v.views ?? 0));
+        return viewsB - viewsA || (b.soldCount || 0) - (a.soldCount || 0);
+      });
+      return copy;
+    }
+
+    // 3b. Sort by classification choice (ONLY when in 'favorites' mode, since in 'search' mode the database query has already returned products in the exact classification order)
     if (mode === 'favorites' && selectedClassification) {
       const copy = [...list];
       if (selectedClassification === 'best_sellers') {
@@ -5532,7 +5549,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
 
     return list;
-  }, [products, ranking, favorites, mode, selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, viralVideoOnly, selectedClassification, query]);
+  }, [products, ranking, favorites, mode, selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, minVideoViews, selectedClassification, query]);
 
   const totalRankingPages = useMemo(() => {
     if (mode !== 'ranking') return 1;
@@ -5696,7 +5713,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     targetCategory = selectedCategory,
     targetSubcategory = selectedSubcategory,
     targetChildCategory = selectedChildCategory,
-    targetClassification = selectedClassification
+    targetClassification = selectedClassification,
+    targetHasVideoOnly = hasVideoOnly,
+    targetMinVideoViews = minVideoViews
   ) => {
     const clean = targetQuery.trim();
 
@@ -5716,7 +5735,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             targetCategory,
             targetSubcategory,
             targetChildCategory,
-            targetClassification
+            targetClassification,
+            targetHasVideoOnly,
+            targetMinVideoViews
           );
 
       setQuery(clean);
@@ -5750,16 +5771,18 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         selectedCategory,
         selectedSubcategory,
         selectedChildCategory,
-        selectedClassification
+        selectedClassification,
+        hasVideoOnly,
+        minVideoViews
       );
     }
-  }, [mode, selectedCategory, selectedSubcategory, selectedChildCategory, selectedClassification, page]);
+  }, [mode, selectedCategory, selectedSubcategory, selectedChildCategory, selectedClassification, hasVideoOnly, minVideoViews, page]);
 
   const activeFilterCount =
     (selectedCategory !== 'Todos' ? 1 : 0) +
     (selectedSubcategory !== 'Todas' ? 1 : 0) +
     (hasVideoOnly ? 1 : 0) +
-    (viralVideoOnly ? 1 : 0);
+    (minVideoViews ? 1 : 0);
 
   return (
     <section className="space-y-2 sm:space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
@@ -6327,60 +6350,66 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 setSelectedCategory('Todos');
                 setSelectedSubcategory('Todas');
                 setHasVideoOnly(false);
-                setViralVideoOnly(false);
-                if (rankingSort === '7d') setRankingSort('opportunities');
+                setMinVideoViews(null);
               }}
-              className="text-[11px] text-rose-600 hover:underline font-bold"
+              className="text-[11px] text-rose-600 hover:underline font-bold cursor-pointer"
             >
               Limpar Filtros
             </button>
           </div>
 
-          <div className="flex gap-2 flex-wrap pt-1">
+          <div className="flex gap-2 flex-wrap pt-1 items-center">
+            {/* Apenas com vídeo */}
             <button
               type="button"
-              onClick={() => setHasVideoOnly((p) => !p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+              onClick={() => {
+                setHasVideoOnly((p) => {
+                  const next = !p;
+                  if (!next) setMinVideoViews(null);
+                  return next;
+                });
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
                 hasVideoOnly
-                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs ring-1 ring-amber-400/40 font-black'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
               <Play className="w-3 h-3 text-amber-600 fill-current" />
               Apenas com vídeo
             </button>
 
-            <button
-              type="button"
-              onClick={() => setViralVideoOnly((p) => !p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                viralVideoOnly
-                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <Flame className="w-3 h-3 text-amber-500 fill-current" />
-              Vídeo viral (1M+ views)
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (rankingSort === '7d') {
-                  setRankingSort('opportunities');
-                } else {
-                  setRankingSort('7d');
-                }
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                rankingSort === '7d'
-                  ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <TrendingUp className="w-3 h-3 text-amber-600" />
-              Vendas 7 dias
-            </button>
+            {/* 5 View filters */}
+            {[
+              { label: '🔥 100K+', value: 100000 },
+              { label: '🔥 500K+', value: 500000 },
+              { label: '🔥 1M+', value: 1000000 },
+              { label: '🔥 5M+', value: 5000000 },
+              { label: '🔥 10M+', value: 10000000 },
+            ].map((vf) => {
+              const isActive = minVideoViews === vf.value;
+              return (
+                <button
+                  key={vf.value}
+                  type="button"
+                  onClick={() => {
+                    if (isActive) {
+                      setMinVideoViews(null);
+                    } else {
+                      setMinVideoViews(vf.value);
+                      setHasVideoOnly(true);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    isActive
+                      ? 'border-amber-400 bg-amber-50 text-amber-900 shadow-xs ring-1 ring-amber-400/40 font-black'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                >
+                  {vf.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -6487,16 +6516,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 Tente selecionar outra categoria ou classificação, ou realize uma pesquisa diferente no campo acima.
               </p>
-              {(selectedCategory !== 'Todos' || selectedSubcategory !== 'Todas' || hasVideoOnly || viralVideoOnly) ? (
+              {(selectedCategory !== 'Todos' || selectedSubcategory !== 'Todas' || hasVideoOnly || minVideoViews) ? (
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedCategory('Todos');
                     setSelectedSubcategory('Todas');
                     setHasVideoOnly(false);
-                    setViralVideoOnly(false);
+                    setMinVideoViews(null);
                   }}
-                  className="mt-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold"
+                  className="mt-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold cursor-pointer"
                 >
                   Remover Filtros
                 </button>
