@@ -14,6 +14,7 @@ import {
   ProductRankingSort,
   searchProducts,
   refreshProducts,
+  fetchVideoPlaybackToken,
   prepareProductVideoDownload,
   fetchCollectorCategories,
   fetchDailyRefreshStatus,
@@ -4806,7 +4807,24 @@ const ViralVideoCard: React.FC<{
     onTrackClick?.(product);
     setPlaybackError(false);
 
-    // 1. If we already have a direct playable media URL, play inside the card
+    if (studentCode && product.productId) {
+      setIsPreparing(true);
+      try {
+        const tokenRes = await fetchVideoPlaybackToken(studentCode, product.productId, product.video?.id);
+        if (tokenRes?.success && tokenRes.streamUrl) {
+          setPlayableUrl(tokenRes.streamUrl);
+          setIsPlaying(true);
+          setIsPreparing(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('[VideoPlay PlaybackToken Error]:', err);
+      } finally {
+        setIsPreparing(false);
+      }
+    }
+
+    // Direct playable media URL check fallback
     const directUrl = (playableUrl && isDirectPlayableVideoUrl(playableUrl))
       ? playableUrl
       : (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl))
@@ -4821,40 +4839,7 @@ const ViralVideoCard: React.FC<{
       return;
     }
 
-    // 2. Prepare media URL via backend service with videoId
-    if (studentCode && product.productId) {
-      setIsPreparing(true);
-      try {
-        const res = await prepareProductVideoDownload(studentCode, product.productId, product.video?.id);
-        if (res?.success && res.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
-          setPlayableUrl(res.directMediaUrl);
-          setIsPlaying(true);
-          setIsPreparing(false);
-          return;
-        } else if (res?.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
-          setPlayableUrl(res.directMediaUrl);
-          setIsPlaying(true);
-          setIsPreparing(false);
-          return;
-        }
-      } catch (err) {
-        console.warn('[VideoPlay Error]:', err);
-      } finally {
-        setIsPreparing(false);
-      }
-    }
-
-    // 3. Fallback to same-origin stream proxy
-    if (product.productId) {
-      const streamUrl = `/api/product-miner/videos/${encodeURIComponent(product.productId)}${
-        product.video?.id ? `/${encodeURIComponent(product.video.id)}` : ''
-      }/stream`;
-      setPlayableUrl(streamUrl);
-      setIsPlaying(true);
-      return;
-    }
-
-    // 4. Fallback: Show inline error with explicit secondary button.
+    // Fallback: Show inline error with explicit secondary button.
     setIsPlaying(false);
     setPlaybackError(true);
   };
@@ -5182,7 +5167,24 @@ const MobileViralVideoCard: React.FC<{
     onTrackClick?.(product);
     setPlaybackError(false);
 
-    // 1. Direct playable media URL check
+    if (studentCode && product.productId) {
+      setIsPreparing(true);
+      try {
+        const tokenRes = await fetchVideoPlaybackToken(studentCode, product.productId, product.video?.id);
+        if (tokenRes?.success && tokenRes.streamUrl) {
+          setPlayableUrl(tokenRes.streamUrl);
+          setIsPlaying(true);
+          setIsPreparing(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('[MobileVideoPlay PlaybackToken Error]:', err);
+      } finally {
+        setIsPreparing(false);
+      }
+    }
+
+    // Direct playable media URL check fallback
     const directUrl = (playableUrl && isDirectPlayableVideoUrl(playableUrl))
       ? playableUrl
       : (product.videoDownload?.directMediaUrl && isDirectPlayableVideoUrl(product.videoDownload.directMediaUrl))
@@ -5197,40 +5199,7 @@ const MobileViralVideoCard: React.FC<{
       return;
     }
 
-    // 2. Prepare media URL via backend with videoId
-    if (studentCode && product.productId) {
-      setIsPreparing(true);
-      try {
-        const res = await prepareProductVideoDownload(studentCode, product.productId, product.video?.id);
-        if (res?.success && res.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
-          setPlayableUrl(res.directMediaUrl);
-          setIsPlaying(true);
-          setIsPreparing(false);
-          return;
-        } else if (res?.directMediaUrl && isDirectPlayableVideoUrl(res.directMediaUrl)) {
-          setPlayableUrl(res.directMediaUrl);
-          setIsPlaying(true);
-          setIsPreparing(false);
-          return;
-        }
-      } catch (err) {
-        console.warn('[MobileVideoPlay Error]:', err);
-      } finally {
-        setIsPreparing(false);
-      }
-    }
-
-    // 3. Fallback to same-origin stream proxy
-    if (product.productId) {
-      const streamUrl = `/api/product-miner/videos/${encodeURIComponent(product.productId)}${
-        product.video?.id ? `/${encodeURIComponent(product.video.id)}` : ''
-      }/stream`;
-      setPlayableUrl(streamUrl);
-      setIsPlaying(true);
-      return;
-    }
-
-    // 4. Fallback: Show inline error with explicit option.
+    // Fallback: Show inline error with explicit option.
     setIsPlaying(false);
     setPlaybackError(true);
   };
@@ -6360,7 +6329,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [minVideoViews, setMinVideoViews] = useState<number | null>(null);
   const [selectedVideoRange, setSelectedVideoRange] = useState<VideoViewRangeId | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
-  const [isCategoriesCollapsed, setIsCategoriesCollapsed] = useState<boolean>(false);
+  const [isExpansionCategoriesCollapsed, setIsExpansionCategoriesCollapsed] = useState<boolean>(false);
 
   const activeVideoRange = useMemo(
     () => (selectedVideoRange ? VIDEO_FILTER_OPTIONS.find((opt) => opt.id === selectedVideoRange) || null : null),
@@ -6889,9 +6858,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const activeFilterCount =
     (selectedCategory !== 'Todos' ? 1 : 0) +
     (selectedSubcategory !== 'Todas' ? 1 : 0) +
-    (selectedVideoRange !== null ? 1 : 0) +
-    (minVideoViews ? 1 : 0) +
-    (hasVideoOnly ? 1 : 0);
+    (selectedChildCategory !== 'Todas' ? 1 : 0) +
+    (selectedVideoRange !== null ? 1 : (hasVideoOnly || minVideoViews ? 1 : 0));
 
   return (
     <section className="space-y-2 sm:space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
@@ -6981,22 +6949,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 Limpar filtro
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setIsCategoriesCollapsed((prev) => !prev)}
-              className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
-              title={isCategoriesCollapsed ? 'Expandir categorias' : 'Recolher categorias'}
-            >
-              <span>{isCategoriesCollapsed ? 'Expandir' : 'Recolher'}</span>
-              {isCategoriesCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-            </button>
           </div>
         </div>
 
         {/* Categories Icon Cards Bar & Subcategories */}
-        {!isCategoriesCollapsed && (
-          <>
-            <div className="relative group/catnav pt-2.5 pb-1">
+        <div className="relative group/catnav pt-2.5 pb-1">
           {/* Desktop Scroll Left Arrow */}
           <button
             type="button"
@@ -7366,8 +7323,6 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             </div>
           )
         ) : null}
-          </>
-        )}
       </div>
 
       {/* ================================================== */}
@@ -7530,8 +7485,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   }}
                   className={`group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl transition-all duration-200 cursor-pointer shrink-0 p-2 sm:p-2.5 bg-white ${
                     isActive
-                      ? 'border-2 border-amber-500 ring-2 ring-amber-400/40 shadow-sm scale-[1.02]'
-                      : 'border border-slate-200/90 hover:border-amber-300 shadow-2xs'
+                      ? 'border-2 border-amber-500 shadow-sm'
+                      : 'border border-slate-200 hover:border-slate-300 shadow-2xs'
                   }`}
                 >
                   <div className={`w-full h-full flex items-center justify-center ${isAllVideos ? 'scale-[1.35]' : ''}`}>
@@ -7974,18 +7929,29 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={toggleSelectAllCategories}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold shrink-0"
-                  >
-                    {selectedExpansionCategories.length === CATEGORY_CONFIG.length
-                      ? 'Desmarcar Todas'
-                      : `Selecionar Todas (${CATEGORY_CONFIG.length})`}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllCategories}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold shrink-0"
+                    >
+                      {selectedExpansionCategories.length === CATEGORY_CONFIG.length
+                        ? 'Desmarcar Todas'
+                        : `Selecionar Todas (${CATEGORY_CONFIG.length})`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsExpansionCategoriesCollapsed((prev) => !prev)}
+                      className="p-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-all cursor-pointer shrink-0"
+                      title={isExpansionCategoriesCollapsed ? 'Mostrar categorias' : 'Ocultar categorias'}
+                    >
+                      {isExpansionCategoriesCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {!isExpansionCategoriesCollapsed && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {CATEGORY_CONFIG.map((catConfig) => {
                     const isCatSelected = selectedExpansionCategories.includes(catConfig.filterKey);
                     const isDrawerOpen = Boolean(openCategoryDrawers[catConfig.filterKey]);
@@ -8191,6 +8157,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     );
                   })}
                 </div>
+                )}
               </div>
 
               {/* Card 3: Execution Estimation & Trigger Panel */}
