@@ -7292,12 +7292,16 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       : 'border border-slate-200 hover:border-slate-300 shadow-2xs'
                   }`}
                 >
-                  <div className="w-full h-full flex items-center justify-center p-0.5 sm:p-1">
+                  <div className={`w-full h-full flex items-center justify-center ${opt.id === 'all_videos' ? 'p-0 overflow-visible' : 'p-0.5 sm:p-1'}`}>
                     <FilterIconImage
                       src={opt.iconUrl}
                       fallbackSrc={opt.fallbackIconUrl}
                       alt={opt.label}
-                      className="w-full h-full object-contain pointer-events-none transition-transform duration-200 group-hover:scale-105"
+                      className={`w-full h-full object-contain pointer-events-none transition-transform duration-200 group-hover:scale-105 ${
+                        opt.id === 'all_videos'
+                          ? 'scale-[1.32] sm:scale-[1.38] md:scale-[1.4] origin-center'
+                          : ''
+                      }`}
                     />
                   </div>
                 </button>

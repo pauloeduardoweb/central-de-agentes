@@ -18,13 +18,14 @@ import {
   Loader2,
   AlertCircle,
   Flame,
-  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Layers,
 } from 'lucide-react';
 import {
   ProductMinerProduct,
   getDailyPickStatusApi,
   spinDailyPickApi,
-  DailyPickResponse,
 } from '../../services/productMinerApi';
 import { CategoryConfigItem } from './ProductMinerPage';
 import { getProductPriceRange } from '../../utils/priceHelper';
@@ -40,34 +41,72 @@ interface DailyPickRouletteProps {
   onTrackClick?: (product: ProductMinerProduct) => void;
 }
 
+// Sophisticated Slate / Amber / Warm Charcoal Palette without harsh blues
 const ROULETTE_PALETTE = [
-  '#0f172a', // Slate 900
-  '#b45309', // Amber 700
   '#1e293b', // Slate 800
+  '#b45309', // Amber 700
+  '#334155', // Slate 700
   '#d97706', // Amber 600
-  '#111827', // Gray 900
+  '#1e293b', // Slate 800
   '#92400e', // Amber 800
-  '#1e1b4b', // Indigo 950
+  '#27272a', // Zinc 800
   '#c2410c', // Orange 700
-  '#18181b', // Zinc 900
+  '#3f3f46', // Zinc 700
   '#b45309', // Amber 700
-  '#064e3b', // Emerald 900
-  '#d97706', // Amber 600
   '#1e293b', // Slate 800
+  '#d97706', // Amber 600
+  '#292524', // Stone 800
   '#78350f', // Amber 900
-  '#0f172a', // Slate 900
-  '#ea580c', // Orange 600
   '#1e293b', // Slate 800
+  '#ea580c', // Orange 600
+  '#334155', // Slate 700
   '#b45309', // Amber 700
-  '#111827', // Gray 900
+  '#27272a', // Zinc 800
   '#ca8a04', // Yellow 600
-  '#1e1b4b', // Indigo 950
+  '#1c1917', // Stone 900
   '#d97706', // Amber 600
-  '#18181b', // Zinc 900
+  '#3f3f46', // Zinc 700
   '#92400e', // Amber 800
-  '#064e3b', // Emerald 900
+  '#1e293b', // Slate 800
   '#b45309', // Amber 700
 ];
+
+function getShortCategoryLabel(fullLabel: string): string {
+  const normalized = (fullLabel || '').trim();
+  const map: Record<string, string> = {
+    'Acessórios de moda': 'Acessórios',
+    'Alimentos e bebidas': 'Alimentos',
+    'Automotivo': 'Automotivo',
+    'Bebês e maternidade': 'Bebês',
+    'Beleza e cuidados pessoais': 'Beleza',
+    'Bolsas e malas': 'Bolsas',
+    'Brinquedos e hobbies': 'Brinquedos',
+    'Calçados': 'Calçados',
+    'Câmeras e óptica': 'Câmeras',
+    'Casa e decoração': 'Casa',
+    'Construção e ferramentas': 'Ferramentas',
+    'Eletrodomésticos': 'Eletros',
+    'Eletrônicos e celulares': 'Celulares',
+    'Telefonia e celular': 'Celulares',
+    'Esportes e lazer': 'Esportes',
+    'Informática e escritório': 'Informática',
+    'Instrumentos musicais': 'Música',
+    'Joias e relógios': 'Joias',
+    'Livros e papelaria': 'Livros',
+    'Moda feminina': 'Moda Fem.',
+    'Moda íntima': 'Moda Ínt.',
+    'Moda masculina': 'Moda Masc.',
+    'Moda praia': 'Moda Praia',
+    'Pet shop': 'Pet Shop',
+    'Relógios': 'Relógios',
+    'Saúde e bem-estar': 'Saúde',
+    'Utensílios de cozinha': 'Cozinha',
+  };
+
+  if (map[normalized]) return map[normalized];
+  if (normalized.length <= 11) return normalized;
+  return `${normalized.slice(0, 10)}…`;
+}
 
 function compactNumber(val?: number | null): string {
   if (val === undefined || val === null) return '0';
@@ -102,8 +141,9 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
   const [rotationDegrees, setRotationDegrees] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [spinNotice, setSpinNotice] = useState<string | null>(null);
+  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
 
-  // Wheel configuration
+  // Wheel configuration based on 26 categories
   const numCategories = Math.max(1, categories.length);
   const sliceAngle = 360 / numCategories;
 
@@ -121,7 +161,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
         setPickedCategory(res.category || null);
         setPickedProduct(res.product || null);
 
-        // If user already spun, position wheel on the category
+        // If user already spun, position wheel smoothly on the category
         if (res.hasSpunToday && res.category) {
           const catIdx = categories.findIndex((c) => c.filterKey === res.category || c.label === res.category);
           if (catIdx >= 0) {
@@ -177,23 +217,23 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
       const sliceCenter = targetIndex * sliceAngle + sliceAngle / 2;
       const targetBaseAngle = (360 - sliceCenter + 360) % 360;
 
-      // 6 full 360-degree rotations for dramatic deceleration
-      const extraSpins = 6 * 360;
+      // 8 full 360-degree rotations for sustained momentum across 6 seconds
+      const extraSpins = 8 * 360;
       const currentMod = rotationDegrees % 360;
       const neededDelta = (targetBaseAngle - currentMod + 360) % 360;
       const finalRotation = rotationDegrees + extraSpins + neededDelta;
 
       setRotationDegrees(finalRotation);
 
-      // Wait 4.5 seconds for CSS transition to complete
+      // Exactly 6 seconds (6000ms) transition and state revelation
       setTimeout(() => {
         setIsSpinning(false);
         setHasSpunToday(true);
         setPickedDate(result.pickDate || new Date().toISOString().split('T')[0]);
         setPickedCategory(winningCat);
         setPickedProduct(winningProd);
-        setSpinNotice(`Categoria sorteada: ${winningCat}! Produto campeão revelado abaixo.`);
-      }, 4500);
+        setSpinNotice(`Categoria sorteada: ${winningCat}! Produto campeão revelado ao lado.`);
+      }, 6000);
     } catch (err: any) {
       setIsSpinning(false);
       const msg = err?.message || 'Falha ao girar a roleta. Tente novamente.';
@@ -222,36 +262,36 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* ================================================== */}
-      {/* HEADER: APRESENTAÇÃO ESCOLHA DO DIA                */}
+      {/* HEADER: APRESENTAÇÃO ESCOLHA DO DIA (LIGHT PREMIUM)*/}
       {/* ================================================== */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950/70 border-2 border-amber-500/40 p-6 md:p-8 text-white shadow-2xl">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl bg-white border border-amber-200/90 p-6 md:p-8 text-slate-900 shadow-sm">
+        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-amber-100/50 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-64 h-64 bg-orange-100/40 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-300 text-xs font-black tracking-wider uppercase">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Inteligência Diária • 1 Giro por Dia</span>
+          <div className="space-y-2.5 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black tracking-wider uppercase">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>INTELIGÊNCIA DIÁRIA • 1 GIRO POR DIA</span>
             </div>
 
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-              <Trophy className="w-8 h-8 text-amber-400 shrink-0" />
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+              <Trophy className="w-8 h-8 text-amber-500 shrink-0" />
               <span>ESCOLHA DO DIA</span>
             </h2>
 
-            <p className="text-sm md:text-base text-amber-100/90 font-medium leading-relaxed">
-              Descubra o seu produto campeão de hoje. A roleta de inteligência artificial do Geração Z Pro analisa as 26 categorias da TikTok Shop e sorteia um produto de alta tração com dados validados.
+            <p className="text-sm md:text-base text-slate-600 font-normal leading-relaxed">
+              Descubra o seu produto campeão de hoje. A inteligência de mercado do Geração Z Pro analisa as 26 categorias da TikTok Shop e sorteia um produto de alta tração com métricas de vendas validadas.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
             {hasSpunToday ? (
-              <div className="px-5 py-3 rounded-2xl bg-emerald-950/80 border border-emerald-400/60 text-emerald-200 text-xs font-black flex items-center gap-2.5 shadow-lg">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <div className="px-5 py-3 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-black flex items-center gap-2.5 shadow-xs">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                 <div>
-                  <div>Giro de hoje já realizado!</div>
-                  <div className="text-[10px] text-emerald-300/80 font-normal">Renovação diária às 00:00</div>
+                  <div className="font-extrabold">Giro de hoje já realizado!</div>
+                  <div className="text-[10px] text-emerald-700/80 font-normal">Renovação diária às 00:00</div>
                 </div>
               </div>
             ) : (
@@ -259,16 +299,16 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                 type="button"
                 onClick={handleSpin}
                 disabled={isSpinning || loadingStatus}
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black text-sm md:text-base shadow-xl shadow-amber-500/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer ring-2 ring-amber-300/60"
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black text-sm md:text-base shadow-lg shadow-amber-500/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSpinning ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin text-slate-950" />
+                    <Loader2 className="w-5 h-5 animate-spin text-white" />
                     <span>Sorteando Categoria...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5 text-slate-950" />
+                    <Sparkles className="w-5 h-5 text-white" />
                     <span>Girar Roleta da Escolha do Dia</span>
                   </>
                 )}
@@ -287,7 +327,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
           <button
             type="button"
             onClick={() => setError(null)}
-            className="text-rose-700 hover:underline"
+            className="text-rose-700 hover:underline cursor-pointer"
           >
             Fechar
           </button>
@@ -299,8 +339,8 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
       {/* ================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* COLUNA ESQUERDA: ROLETA CIRCULAR PREMIUM */}
-        <div className="lg:col-span-6 rounded-3xl border border-slate-200 bg-white p-5 md:p-8 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
-          <div className="text-center space-y-1 mb-4">
+        <div className="lg:col-span-6 rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 md:p-7 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="text-center space-y-1 mb-3">
             <div className="text-xs font-black uppercase tracking-wider text-amber-700">
               Roleta de Inteligência Artificial
             </div>
@@ -312,40 +352,32 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
           </div>
 
           {/* ROULETTE CONTAINER */}
-          <div className="relative w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] md:w-[420px] md:h-[420px] flex items-center justify-center my-2">
+          <div className="relative w-[290px] h-[290px] sm:w-[370px] sm:h-[370px] md:w-[410px] md:h-[410px] flex items-center justify-center my-2">
             {/* Top Fixed Indicator Pin (12 o'clock position) */}
-            <div className="absolute -top-3 z-30 flex flex-col items-center pointer-events-none drop-shadow-md">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-b from-amber-400 to-amber-600 border-2 border-white shadow-lg flex items-center justify-center">
+            <div className="absolute -top-3.5 z-30 flex flex-col items-center pointer-events-none drop-shadow-md">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-b from-amber-400 to-amber-600 border-2 border-white shadow-md flex items-center justify-center">
                 <div className="w-2.5 h-2.5 rounded-full bg-slate-950" />
               </div>
               <div className="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[14px] border-t-amber-500 -mt-1" />
             </div>
 
-            {/* Outer Glow Ring */}
-            <div className="absolute inset-0 rounded-full border-4 border-amber-400/40 shadow-2xl shadow-amber-500/10 pointer-events-none" />
+            {/* Outer Golden Glow Ring */}
+            <div className="absolute inset-0 rounded-full border-4 border-amber-300/60 shadow-lg pointer-events-none" />
 
-            {/* Animated Rotating Wheel */}
+            {/* Animated Rotating Wheel with 6 seconds timing */}
             <div
-              className="w-full h-full rounded-full relative overflow-hidden shadow-inner border-4 border-slate-900 bg-slate-950"
+              className="w-full h-full rounded-full relative overflow-hidden shadow-inner border-4 border-slate-800 bg-slate-950"
               style={{
                 transform: `rotate(${rotationDegrees}deg)`,
                 transition: isSpinning
-                  ? 'transform 4.5s cubic-bezier(0.12, 0.8, 0.2, 1)'
+                  ? 'transform 6s cubic-bezier(0.12, 0.85, 0.15, 1)'
                   : 'transform 0.5s ease-out',
               }}
             >
               <svg viewBox="0 0 400 400" className="w-full h-full">
-                <defs>
-                  <radialGradient id="wheelGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stopColor="#1e293b" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#020617" stopOpacity="1" />
-                  </radialGradient>
-                </defs>
-
                 {categories.map((cat, i) => {
                   const startAngle = (i * sliceAngle - 90) * (Math.PI / 180);
                   const endAngle = ((i + 1) * sliceAngle - 90) * (Math.PI / 180);
-                  const midAngle = (i * sliceAngle + sliceAngle / 2 - 90) * (Math.PI / 180);
 
                   const x1 = 200 + 200 * Math.cos(startAngle);
                   const y1 = 200 + 200 * Math.sin(startAngle);
@@ -357,7 +389,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
 
                   // Text angle and placement
                   const textRotation = (i * sliceAngle + sliceAngle / 2);
-                  const shortLabel = cat.label.length > 14 ? `${cat.label.slice(0, 13)}…` : cat.label;
+                  const shortLabel = getShortCategoryLabel(cat.label);
 
                   return (
                     <g key={cat.filterKey}>
@@ -368,18 +400,18 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                         strokeWidth="0.75"
                         strokeOpacity="0.4"
                       />
-                      {/* Category Label inside slice */}
+                      {/* Radial label with clean contrast */}
                       <g transform={`rotate(${textRotation}, 200, 200)`}>
                         <text
-                          x="320"
-                          y="204"
+                          x="315"
+                          y="203"
                           fill="#f8fafc"
-                          fontSize="7.5"
+                          fontSize="7"
                           fontWeight="800"
                           textAnchor="middle"
-                          transform="rotate(90, 320, 204)"
-                          letterSpacing="0.3"
-                          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
+                          transform="rotate(90, 315, 203)"
+                          letterSpacing="0.2"
+                          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}
                         >
                           {shortLabel}
                         </text>
@@ -391,7 +423,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
             </div>
 
             {/* Central Golden Hub Button */}
-            <div className="absolute z-20 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-orange-600 p-1.5 shadow-2xl border-2 border-white/80 flex items-center justify-center">
+            <div className="absolute z-20 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-amber-400 via-amber-500 to-orange-600 p-1.5 shadow-xl border-2 border-white/90 flex items-center justify-center">
               <button
                 type="button"
                 onClick={handleSpin}
@@ -422,17 +454,17 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
             </div>
           </div>
 
-          {/* Action Trigger / Footer Notice */}
-          <div className="mt-4 text-center space-y-2">
+          {/* Action Trigger */}
+          <div className="mt-3 text-center space-y-2">
             {!hasSpunToday ? (
               <button
                 type="button"
                 onClick={handleSpin}
                 disabled={isSpinning || loadingStatus}
-                className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs shadow-md transition-all disabled:opacity-50 flex items-center gap-2 mx-auto cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all disabled:opacity-50 flex items-center gap-2 mx-auto cursor-pointer"
               >
                 <RotateCcw className={`w-4 h-4 ${isSpinning ? 'animate-spin' : ''}`} />
-                <span>{isSpinning ? 'Sorteando...' : 'Girar Roleta'}</span>
+                <span>{isSpinning ? 'Sorteando em 6s...' : 'Girar Roleta'}</span>
               </button>
             ) : (
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
@@ -441,29 +473,71 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
               </div>
             )}
           </div>
+
+          {/* ================================================== */}
+          {/* LEGENDA DAS 26 CATEGORIAS (COMPACTA E DINÂMICA)     */}
+          {/* ================================================== */}
+          <div className="w-full mt-5 pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <Layers className="w-3.5 h-3.5 text-amber-600" />
+                <span>26 categorias analisadas</span>
+              </div>
+
+              {/* Mobile collapse toggle */}
+              <button
+                type="button"
+                onClick={() => setIsLegendExpanded(!isLegendExpanded)}
+                className="sm:hidden text-[11px] text-amber-800 font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <span>{isLegendExpanded ? 'Ocultar' : 'Ver todas'}</span>
+                {isLegendExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            </div>
+
+            {/* Chips Grid */}
+            <div className={`gap-1.5 sm:grid sm:grid-cols-3 md:grid-cols-4 ${isLegendExpanded ? 'grid grid-cols-2' : 'hidden sm:grid'}`}>
+              {categories.map((cat) => {
+                const isSelected = pickedCategory && (cat.filterKey === pickedCategory || cat.label === pickedCategory);
+                return (
+                  <div
+                    key={cat.filterKey}
+                    title={cat.label}
+                    className={`px-2 py-1 rounded-lg text-[10px] truncate transition-all ${
+                      isSelected
+                        ? 'bg-amber-100 border border-amber-300 text-amber-950 font-black shadow-2xs'
+                        : 'bg-slate-50 border border-slate-200/80 text-slate-600 font-semibold'
+                    }`}
+                  >
+                    <span className="truncate">{cat.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* COLUNA DIREITA: CARD DO PRODUTO CAMPEÃO */}
         <div className="lg:col-span-6 space-y-4">
           {loadingStatus ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center space-y-3">
+            <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center space-y-3 shadow-sm">
               <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto" />
               <div className="text-xs font-bold text-slate-600">Verificando Escolha do Dia...</div>
             </div>
           ) : pickedProduct ? (
-            /* CARD DO PRODUTO CAMPEÃO */
-            <article className="rounded-3xl border-2 border-amber-400 bg-white p-5 md:p-6 shadow-xl space-y-4 relative overflow-hidden">
-              {/* Top Golden Ribbon Banner */}
+            /* CARD DO PRODUTO CAMPEÃO (LIGHT PREMIUM COM BORDA ÂMBAR) */
+            <article className="rounded-3xl border-2 border-amber-300 bg-white p-5 md:p-6 shadow-lg space-y-4 relative overflow-hidden">
+              {/* Top Banner */}
               <div className="flex items-center justify-between gap-2 pb-3 border-b border-amber-100">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-amber-500 text-slate-950 font-black shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500 text-white font-black shadow-xs">
                     <Trophy className="w-5 h-5" />
                   </div>
                   <div>
                     <span className="text-[10px] font-black uppercase tracking-wider text-amber-800">
-                      🏆 Produto Escolha do Dia
+                      🏆 PRODUTO ESCOLHA DO DIA
                     </span>
-                    <h4 className="font-extrabold text-sm text-slate-900">
+                    <h4 className="font-extrabold text-sm sm:text-base text-slate-900">
                       {pickedCategory || 'Produto Campeão'}
                     </h4>
                   </div>
@@ -473,7 +547,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                   <button
                     type="button"
                     onClick={() => onToggleFavorite(pickedProduct)}
-                    className={`p-2.5 rounded-full bg-slate-50 border border-slate-200 shadow-sm transition-all hover:scale-110 ${
+                    className={`p-2.5 rounded-full bg-slate-50 border border-slate-200 shadow-2xs transition-all hover:scale-105 cursor-pointer ${
                       isFavorite?.(pickedProduct.productId)
                         ? 'text-rose-500 bg-rose-50 border-rose-200'
                         : 'text-slate-400 hover:text-rose-500'
@@ -499,7 +573,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                   )}
 
                   {pickedProduct.score !== undefined && pickedProduct.score !== null ? (
-                    <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-amber-500 text-slate-950 text-[11px] font-black shadow-md flex items-center gap-1">
+                    <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-amber-500 text-white text-[11px] font-black shadow-xs flex items-center gap-1">
                       <Zap className="w-3 h-3 fill-current" />
                       <span>Score: {pickedProduct.score}/100</span>
                     </div>
@@ -507,16 +581,16 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                 </div>
 
                 <div className="sm:col-span-7 space-y-2.5">
-                  <h3 className="font-black text-sm sm:text-base text-slate-900 leading-snug line-clamp-2">
+                  <h3 className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug line-clamp-2">
                     {pickedProduct.title}
                   </h3>
 
                   {/* Preço e Faixa */}
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                       Preço Estimado
                     </div>
-                    <div className="text-xl font-black text-emerald-700">
+                    <div className="text-xl font-black text-emerald-600">
                       {(() => {
                         const range = getProductPriceRange(pickedProduct.priceCents, pickedProduct.currencySymbol);
                         return range ? range.formattedRange : formatMoney(pickedProduct.priceCents, pickedProduct.currencySymbol);
@@ -526,11 +600,11 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
 
                   {/* Comissão por Venda */}
                   {commInfo ? (
-                    <div className="rounded-xl border border-emerald-300 bg-emerald-50/90 p-2.5 flex items-center justify-between gap-2">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-2.5 flex items-center justify-between gap-2">
                       <div className="text-xs font-black text-emerald-900">
                         💰 Ganho Estimado:
                       </div>
-                      <div className="text-sm font-black text-emerald-800">
+                      <div className="text-sm font-black text-emerald-700">
                         {commInfo.formattedCommission} ({commInfo.ratePercent}%)
                       </div>
                     </div>
@@ -551,7 +625,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
 
               {/* Video Associado (se houver) */}
               {pickedProduct.video ? (
-                <div className="rounded-2xl border border-amber-200/80 bg-amber-50/40 p-3 space-y-2 text-xs">
+                <div className="rounded-2xl border border-amber-200/80 bg-amber-50/30 p-3 space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-800 text-[11px] truncate">
                       Vídeo: @{pickedProduct.video.author || 'creator'}
@@ -568,10 +642,10 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                             onTrackClick?.(pickedProduct);
                             onPlayVideo(pickedProduct);
                           }}
-                          className="px-2 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] flex items-center gap-1 shadow-xs cursor-pointer"
+                          className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] flex items-center gap-1 shadow-xs cursor-pointer"
                         >
                           <Play className="w-2.5 h-2.5 fill-current" />
-                          Assistir
+                          <span>Assistir</span>
                         </button>
                       )}
                     </div>
@@ -604,7 +678,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenAnalysisModal(pickedProduct)}
-                    className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-200 shadow-2xs cursor-pointer"
                   >
                     <BarChart3 className="w-3.5 h-3.5 text-amber-600" />
                     <span>Analisar</span>
@@ -615,7 +689,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenDetailModal(pickedProduct)}
-                    className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-200 shadow-2xs cursor-pointer"
                   >
                     <span>Detalhes</span>
                   </button>
@@ -627,7 +701,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                     target="_blank"
                     rel="noreferrer"
                     onClick={() => onTrackClick?.(pickedProduct)}
-                    className="col-span-2 sm:col-span-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition-all"
+                    className="col-span-2 sm:col-span-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
                   >
                     <span>Ver Produto</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -636,9 +710,9 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
               </div>
             </article>
           ) : (
-            /* ESTADO ANTES DO GIRO (PLACEHOLDER DE CONVITE) */
-            <div className="rounded-3xl border-2 border-dashed border-amber-300/80 bg-amber-50/30 p-8 text-center space-y-4 flex flex-col items-center justify-center min-h-[340px]">
-              <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 shadow-sm">
+            /* ESTADO ANTES DO GIRO (PLACEHOLDER DE CONVITE LIGHT) */
+            <div className="rounded-3xl border-2 border-dashed border-amber-200 bg-amber-50/20 p-8 text-center space-y-4 flex flex-col items-center justify-center min-h-[340px]">
+              <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 shadow-xs">
                 <Trophy className="w-8 h-8" />
               </div>
 
@@ -647,7 +721,7 @@ export const DailyPickRoulette: React.FC<DailyPickRouletteProps> = ({
                   Pronto para descobrir o campeão de hoje?
                 </h4>
                 <p className="text-xs text-slate-600">
-                  Clique no botão &quot;Girar Roleta&quot; para sortear a categoria e revelar o produto com maior destaque e métricas de vendas.
+                  Clique no botão &quot;Girar Roleta&quot; para sortear a categoria e revelar o produto com maior destaque e métricas de vendas validadas.
                 </p>
               </div>
 
