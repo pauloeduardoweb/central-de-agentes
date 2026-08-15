@@ -315,7 +315,40 @@ export const CATEGORY_ALIASES_MAP: Record<string, string[]> = {
   'Joias, acessórios e derivados': ['Jewelry & Accessories', 'Jewelry, Accessories & Derivatives', 'Joias', 'Semi Joias', 'Semijoias', 'Joias e Acessórios'],
   'Livros, revistas e áudios': ['Books, Magazines & Audio', 'Books & Audio', 'Livros', 'Revistas', 'Educação'],
   'Malas e bolsas': ['Luggage & Bags', 'Bags & Luggage', 'Bolsas', 'Malas', 'Mochilas'],
-  'Moda muçulmana': ['Muslim Fashion', 'Islamic Fashion', 'Moda Islamica'],
+  'Moda muçulmana': [
+    'Moda Muçulmana',
+    'Moda Muculmana',
+    'Moda Islâmica',
+    'Moda Islamica',
+    'Muslim Fashion',
+    'Islamic Fashion',
+    'Moda Modesta',
+    'Modest Fashion',
+    'Roupas Islâmicas',
+    'Roupas Islamicas',
+    'Roupas Muçulmanas',
+    'Roupas Muculmanas',
+    'Vestimenta Islâmica',
+    'Vestimenta Islamica',
+    'Artigos Islâmicos',
+    'Artigos Islamicos',
+    'Hijab',
+    'Abaya',
+    'Balandrau',
+    'Burkini',
+    'Kaftan',
+    'Thobe',
+    'Kufi',
+    'Tasbih',
+    'Jilbab',
+    'Khimar',
+    'Niqab',
+    'Ihram',
+    'Misbaha',
+    'Kandura',
+    'Jubba',
+    'Shayla',
+  ],
   'Moda para crianças': ["Kids' Fashion", 'Children Fashion', 'Moda Infantil', 'Roupas Infantis', 'Infantil'],
   'Móveis': ['Furniture', 'Home Furniture', 'Moveis', 'Decoração de Móveis'],
   'Reformas residenciais': ['Home Improvement', 'Home Renovations', 'Construção', 'Reformas'],
@@ -472,15 +505,129 @@ export const SUBCATEGORY_ALIASES_MAP: Record<string, string[]> = {
   'Acessórios para bolsas': ['Bag Accessories', 'Alça para bolsa', 'Organizador de bolsa', 'Cadeado para mala', 'Tag de mala', 'Capa para mala'],
 
   // Moda muçulmana
-  'Hijabs': ['Hijab', 'Lenço hijab', 'Turban', 'Véu islâmico'],
-  'Roupas islâmicas femininas': ["Women's Islamic Clothing", 'Abaya', 'Vestido islâmico', 'Túnica', 'Kaftan'],
-  'Roupas islâmicas masculinas': ["Men's Islamic Clothing", 'Thobe', 'Kandura', 'Jubba'],
-  'Acessórios islâmicos': ['Islamic Accessories', 'Tasbih', 'Terço islâmico'],
-  'Traje e equipamento de oração': ['Prayer Attire & Equipment', 'Tapete de oração', 'Vestimenta de oração'],
-  'Roupas esportivas islâmicas': ['Islamic Sportswear', 'Burkini'],
-  'Agasalhos': ['Outerwear', 'Sobretudo modesto'],
-  'Roupas islâmicas infantis': ["Kids' Islamic Clothing"],
-  'Equipamento para umra': ['Umrah Equipment'],
+  'Hijabs': [
+    'Hijabs',
+    'Hijab',
+    'Lenço hijab',
+    'Lenco hijab',
+    'Turban',
+    'Turbante hijab',
+    'Véu islâmico',
+    'Veu islamico',
+    'Véu muçulmano',
+    'Veu muculmano',
+    'Shayla',
+    'Khimar',
+    'Niqab',
+    'Lenço muçulmano',
+    'Lenco muculmano',
+    'Touca hijab',
+    'Hijabe',
+  ],
+  'Roupas islâmicas femininas': [
+    "Women's Islamic Clothing",
+    'Abaya',
+    'Abayas',
+    'Vestido islâmico',
+    'Vestido islamico',
+    'Vestido muçulmano',
+    'Vestido muculmano',
+    'Túnica islâmica',
+    'Tunica islamica',
+    'Kaftan',
+    'Kaftan árabe',
+    'Kaftan arabe',
+    'Jilbab',
+    'Jalabiya',
+    'Roupas modestas femininas',
+    'Vestimenta islâmica feminina',
+  ],
+  'Roupas islâmicas masculinas': [
+    "Men's Islamic Clothing",
+    'Thobe',
+    'Thobes',
+    'Kandura',
+    'Jubba',
+    'Balandrau',
+    'Balandrau muçulmano',
+    'Balandrau muculmano',
+    'Túnica masculina muçulmana',
+    'Tunica masculina muculmana',
+    'Kufi',
+    'Touca islâmica masculina',
+    'Dishdasha',
+    'Roupas islâmicas masculinas',
+  ],
+  'Acessórios islâmicos': [
+    'Islamic Accessories',
+    'Tasbih',
+    'Tasbi',
+    'Terço islâmico',
+    'Terco islamico',
+    'Misbaha',
+    'Rosário islâmico',
+    'Rosario islamico',
+    'Contas de oração islâmica',
+    'Alfinete hijab',
+    'Broche hijab',
+    'Pins hijab',
+  ],
+  'Traje e equipamento de oração': [
+    'Prayer Attire & Equipment',
+    'Tapete de oração',
+    'Tapete de oracao',
+    'Tapete islâmico',
+    'Tapete islamico',
+    'Tapete de oração muçulmano',
+    'Tapete de oracao muculmano',
+    'Vestimenta de oração',
+    'Vestimenta de oracao',
+    'Roupa de oração',
+    'Roupa de oracao',
+    'Kit oração islâmica',
+  ],
+  'Roupas esportivas islâmicas': [
+    'Islamic Sportswear',
+    'Burkini',
+    'Burkinis',
+    'Burkini islâmico',
+    'Burkini islamico',
+    'Maiô modesto',
+    'Maio modesto',
+    'Maiô islâmico',
+    'Maio islamico',
+    'Burkine',
+    'Moda praia modesta',
+    'Roupa de banho modesta',
+  ],
+  'Agasalhos': [
+    'Outerwear',
+    'Sobretudo modesto',
+    'Casaco modesto',
+    'Cardigan modesto',
+    'Sobretudo islâmico',
+    'Sobretudo islamico',
+  ],
+  'Roupas islâmicas infantis': [
+    "Kids' Islamic Clothing",
+    'Abaya infantil',
+    'Hijab infantil',
+    'Thobe infantil',
+    'Roupas islâmicas infantis',
+    'Roupas islamicas para criancas',
+  ],
+  'Equipamento para umra': [
+    'Umrah Equipment',
+    'Equipamento para umra',
+    'Equipamento para hajj',
+    'Ihram',
+    'Kit umra',
+    'Kit umrah',
+    'Roupa para hajj',
+    'Roupa para umra',
+    'Cinto de ihram',
+    'Toalha de ihram',
+  ],
 
   // Moda para crianças
   'Calçados para meninas': ["Girls' Shoes", 'Sandália infantil menina', 'Tênis menina', 'Sapatilha menina', 'Bota infantil menina', 'Chinelo menina', 'Galocha infantil'],
@@ -595,6 +742,81 @@ export const SUBCATEGORY_ALIASES_MAP: Record<string, string[]> = {
   'Utensílios para chá e café': ['Tea & Coffee Ware', 'Prensa francesa vidro/inox', 'Cafeteira italiana moka', 'Chaleira de bico fino inox', 'Moedor manual de grãos de café', 'Filtro coador de café permanente inox', 'Bule térmico café', 'Espumador de leite mixer manual', 'Xícara de chá'],
 };
 
+export const HIGH_PRECISION_CATEGORY_TERMS: Record<string, string[]> = {
+  'Moda muçulmana': [
+    'hijab',
+    'hijabs',
+    'hijabe',
+    'abaya',
+    'abayas',
+    'balandrau',
+    'burkini',
+    'burkinis',
+    'burkine',
+    'kaftan',
+    'kaftans',
+    'thobe',
+    'thobes',
+    'kufi',
+    'tasbih',
+    'tasbi',
+    'misbaha',
+    'jilbab',
+    'khimar',
+    'niqab',
+    'ihram',
+    'kandura',
+    'jubba',
+    'shayla',
+    'dishdasha',
+    'mukena',
+    'sarongue',
+    'muculmana',
+    'muculmano',
+    'muculmanas',
+    'muculmanos',
+    'islamica',
+    'islamico',
+    'islamicas',
+    'islamicos',
+    'moda modesta',
+    'modest fashion',
+    'moda muculmana',
+    'moda islamica',
+    'vestimenta islamica',
+    'artigos islamicos',
+    'oracao islamica',
+    'tapete de oracao',
+    'lenco hijab',
+    'vestido islamico',
+    'vestido muculmano',
+    'tunica islamica',
+    'tunica muculmana',
+  ],
+};
+
+export const GENERIC_AMBIGUOUS_SUBCATEGORIES = new Set<string>([
+  'agasalhos',
+  'outerwear',
+  'conjuntos',
+  'geral',
+]);
+
+export function containsWordOrPhrase(text: string, phrase: string): boolean {
+  if (!text || !phrase) return false;
+  const pNorm = removeAccents(phrase).toLowerCase().trim();
+  const tNorm = removeAccents(text).toLowerCase().trim();
+  if (pNorm.length === 0 || tNorm.length === 0) return false;
+
+  if (pNorm.includes(' ')) {
+    // Multi-word phrase: match directly as substring
+    return tNorm.includes(pNorm);
+  }
+  // Single word: ensure word boundary so it won't match partial words
+  const padded = ` ${tNorm.replace(/[^a-z0-9]/g, ' ')} `;
+  return padded.includes(` ${pNorm} `);
+}
+
 export function removeAccents(str: string): string {
   if (!str) return '';
   return str
@@ -622,6 +844,7 @@ export function getCategoryAliases(catName: string): string[] {
  * 3. At most 1 Child Category (strictly belonging to the Subcategory from OFFICIAL_TIKTOK_CHILD_CATEGORIES, or null)
  * 4. Zero overlap across sibling subcategories.
  * 5. Zero arbitrary fallbacks (no forced fallback to Utensílios de cozinha).
+ * 6. Specificity precedence for high-precision niche domains over generic apparel/accessory terms.
  */
 export function classifyProductFull(product: {
   title?: string;
@@ -648,13 +871,36 @@ export function classifyProductFull(product: {
 
   // ----------------------------------------------------
   // STEP 1: RESOLVE MAIN CATEGORY
-  // Priority 1: Exact first token of category_path
-  // Priority 2: query_source matching official category
-  // Priority 3: category_path contains alias
-  // Priority 4: title contains alias
-  // No arbitrary fallback to Utensílios: if not resolved, category = null.
+  //
+  // PRECEDENCE BY SPECIFICITY:
+  // 1. High precision niche domain terms in Title or Path (e.g. Abaya, Hijab, Balandrau, Burkini, Tasbih)
+  //    These are unequivocal domain terms that override generic terms ("vestido", "lenço").
+  // 2. Exact first token of category_path matching official category or canonical alias.
+  // 3. query_source matching official category or strong/specific subcategory.
+  //    (Generic subcategories like "Agasalhos" are NOT standalone proof).
+  // 4. category_path contains alias.
+  // 5. title contains aliases (evaluated by specificity & phrase length descending).
   // ----------------------------------------------------
-  if (rawPath) {
+
+  // 1.1 High-precision domain terms check in title or path
+  for (const [catName, highPrecisionTerms] of Object.entries(HIGH_PRECISION_CATEGORY_TERMS)) {
+    for (const term of highPrecisionTerms) {
+      if (containsWordOrPhrase(rawTitle, term)) {
+        resolvedCat = catName;
+        resolutionSource = 'title';
+        break;
+      }
+      if (rawPath && containsWordOrPhrase(rawPath, term)) {
+        resolvedCat = catName;
+        resolutionSource = 'alias';
+        break;
+      }
+    }
+    if (resolvedCat) break;
+  }
+
+  // 1.2 Exact first token of category_path
+  if (!resolvedCat && rawPath) {
     const firstToken = rawPath.split(/[>/]/)[0]?.trim();
     if (firstToken) {
       const firstTokenNorm = removeAccents(firstToken);
@@ -669,8 +915,11 @@ export function classifyProductFull(product: {
     }
   }
 
+  // 1.3 query_source evaluation (with distinction between strong and generic subcategories)
   if (!resolvedCat && rawQuery) {
     const rawQueryNorm = removeAccents(rawQuery);
+    
+    // Check if query_source matches a main category name/alias directly
     for (const cat of COLLECTOR_CATEGORIES) {
       const catAliases = getCategoryAliases(cat).map(removeAccents);
       if (catAliases.includes(rawQueryNorm)) {
@@ -679,8 +928,25 @@ export function classifyProductFull(product: {
         break;
       }
     }
+
+    // Check if query_source matches a specific, non-generic subcategory
+    if (!resolvedCat && !GENERIC_AMBIGUOUS_SUBCATEGORIES.has(rawQueryNorm)) {
+      for (const [cat, subList] of Object.entries(OFFICIAL_TIKTOK_TAXONOMY)) {
+        for (const sub of subList) {
+          const subNorm = removeAccents(sub);
+          if (subNorm === rawQueryNorm && !GENERIC_AMBIGUOUS_SUBCATEGORIES.has(subNorm)) {
+            // Require that the title does not explicitly belong to a conflicting different category
+            resolvedCat = cat;
+            resolutionSource = 'alias';
+            break;
+          }
+        }
+        if (resolvedCat) break;
+      }
+    }
   }
 
+  // 1.4 category_path contains alias
   if (!resolvedCat && rawPath) {
     const pathNorm = removeAccents(rawPath);
     for (const cat of COLLECTOR_CATEGORIES) {
@@ -693,15 +959,30 @@ export function classifyProductFull(product: {
     }
   }
 
+  // 1.5 title contains alias (scored by specificity and phrase length to prevent single generic word capture)
   if (!resolvedCat && rawTitle) {
-    const titleNorm = removeAccents(rawTitle);
+    type CatScore = { cat: string; score: number; matchedAlias: string };
+    const candidates: CatScore[] = [];
+
     for (const cat of COLLECTOR_CATEGORIES) {
-      const catAliases = getCategoryAliases(cat).map(removeAccents);
-      if (catAliases.some((a) => titleNorm.includes(a))) {
-        resolvedCat = cat;
-        resolutionSource = 'title';
-        break;
+      const catAliases = getCategoryAliases(cat);
+      for (const alias of catAliases) {
+        const aliasNorm = removeAccents(alias).toLowerCase().trim();
+        if (aliasNorm.length < 3) continue;
+
+        if (containsWordOrPhrase(rawTitle, aliasNorm)) {
+          const isMultiWord = aliasNorm.includes(' ');
+          // Score: multi-word phrases get significant bonus, longer aliases get more weight
+          const score = (isMultiWord ? 50 : 0) + aliasNorm.length;
+          candidates.push({ cat, score, matchedAlias: alias });
+        }
       }
+    }
+
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => b.score - a.score);
+      resolvedCat = candidates[0].cat;
+      resolutionSource = 'title';
     }
   }
 
@@ -722,6 +1003,7 @@ export function classifyProductFull(product: {
   // Priority 2: 2nd level token normalized alias match
   // Priority 3: Contextual alias match in subsequent category_path tokens
   // Priority 4: Title keyword/alias match (sorted by length descending for precision)
+  // Priority 5: query_source fallback if it is a valid non-generic subcategory of resolvedCat
   // ----------------------------------------------------
   const officialSubs = OFFICIAL_TIKTOK_TAXONOMY[resolvedCat] || [];
 
@@ -763,26 +1045,49 @@ export function classifyProductFull(product: {
     }
   }
 
-  // Priority 4: Fallback title search ONLY if category_path didn't identify a subcategory
+  // Priority 4: Title search within the subcategories of resolvedCat
   if (!resolvedSub && rawTitle) {
-    const titleNorm = ` ${removeAccents(rawTitle)} `;
-    let bestTitleMatch: { sub: string; aliasLen: number } | null = null;
+    type SubMatch = { sub: string; aliasLen: number; isMultiWord: boolean };
+    const matches: SubMatch[] = [];
 
     for (const sub of officialSubs) {
-      const subAliases = getSubcategoryAliases(sub).map(removeAccents);
+      const subAliases = getSubcategoryAliases(sub);
       for (const a of subAliases) {
-        // Require meaningful matching phrase (at least 3 characters or framed by spaces)
-        if (a.length >= 3 && titleNorm.includes(a)) {
-          if (!bestTitleMatch || a.length > bestTitleMatch.aliasLen) {
-            bestTitleMatch = { sub, aliasLen: a.length };
-          }
+        const aNorm = removeAccents(a).toLowerCase().trim();
+        if (aNorm.length >= 3 && containsWordOrPhrase(rawTitle, aNorm)) {
+          matches.push({
+            sub,
+            aliasLen: aNorm.length,
+            isMultiWord: aNorm.includes(' '),
+          });
         }
       }
     }
 
-    if (bestTitleMatch) {
-      resolvedSub = bestTitleMatch.sub;
+    if (matches.length > 0) {
+      matches.sort((a, b) => {
+        if (a.isMultiWord && !b.isMultiWord) return -1;
+        if (!a.isMultiWord && b.isMultiWord) return 1;
+        return b.aliasLen - a.aliasLen;
+      });
+      resolvedSub = matches[0].sub;
       resolutionSource = 'title';
+    }
+  }
+
+  // Priority 5: Fallback to query_source if it strictly belongs to resolvedCat and is not generic
+  if (!resolvedSub && rawQuery) {
+    const rawQueryNorm = removeAccents(rawQuery);
+    if (!GENERIC_AMBIGUOUS_SUBCATEGORIES.has(rawQueryNorm)) {
+      for (const sub of officialSubs) {
+        const subNorm = removeAccents(sub);
+        const subAliases = getSubcategoryAliases(sub).map(removeAccents);
+        if (subNorm === rawQueryNorm || subAliases.includes(rawQueryNorm)) {
+          resolvedSub = sub;
+          resolutionSource = 'alias';
+          break;
+        }
+      }
     }
   }
 
@@ -830,11 +1135,10 @@ export function classifyProductFull(product: {
 
       // 3.3: Textual search in title ONLY within the official children of the winning subcategory
       if (!resolvedChild && rawTitle) {
-        const titleNorm = ` ${removeAccents(rawTitle)} `;
         let bestChildMatch: { child: string; len: number } | null = null;
         for (const child of officialChildren) {
-          const childNorm = removeAccents(child);
-          if (childNorm.length >= 3 && titleNorm.includes(childNorm)) {
+          const childNorm = removeAccents(child).toLowerCase().trim();
+          if (childNorm.length >= 3 && containsWordOrPhrase(rawTitle, childNorm)) {
             if (!bestChildMatch || childNorm.length > bestChildMatch.len) {
               bestChildMatch = { child, len: childNorm.length };
             }
