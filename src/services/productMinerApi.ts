@@ -464,7 +464,7 @@ export async function runBaseReclassification(studentCode: string): Promise<Recl
 
 export interface TrackInteractionParams {
   productId: string;
-  eventType: 'product_open' | 'product_click';
+  eventType: 'product_open' | 'product_click' | 'video_play';
   query?: string;
   category?: string;
   subcategory?: string;
