@@ -134,7 +134,9 @@ export async function searchProducts(
   childCategory?: string,
   classification?: string | null,
   hasVideoOnly?: boolean,
-  minVideoViews?: number | null
+  minVideoViews?: number | null,
+  maxVideoViews?: number | null,
+  videoViewRange?: string | null
 ): Promise<ProductSearchResponse> {
   const params = new URLSearchParams({ query, page: String(page) });
   if (category && category !== 'Todos' && category !== 'Todas') params.set('category', category);
@@ -142,7 +144,17 @@ export async function searchProducts(
   if (childCategory && childCategory !== 'Todas' && childCategory !== 'Todos') params.set('childCategory', childCategory);
   if (classification) params.set('classification', classification);
   if (hasVideoOnly) params.set('hasVideoOnly', 'true');
-  if (minVideoViews && minVideoViews > 0) params.set('minVideoViews', String(minVideoViews));
+  if (minVideoViews !== undefined && minVideoViews !== null && minVideoViews >= 0) {
+    params.set('minVideoViews', String(minVideoViews));
+    params.set('videoViewsMin', String(minVideoViews));
+  }
+  if (maxVideoViews !== undefined && maxVideoViews !== null && maxVideoViews >= 0) {
+    params.set('maxVideoViews', String(maxVideoViews));
+    params.set('videoViewsMax', String(maxVideoViews));
+  }
+  if (videoViewRange) {
+    params.set('videoViewRange', videoViewRange);
+  }
 
   const response = await fetch(`/api/product-miner/search?${params.toString()}`, {
     headers: authHeaders(studentCode),
