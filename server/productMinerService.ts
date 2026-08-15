@@ -1874,6 +1874,7 @@ export async function searchTikTokShopProducts(params: {
         minVideoViews,
       });
 
+      let finalWhereSql = whereSql;
       let orderClause = `ORDER BY p.last_seen_at DESC, p.sold_count DESC, p.product_id DESC`;
       let joinClause = ``;
 
@@ -2103,6 +2104,29 @@ export async function searchTikTokShopProducts(params: {
           cacheExpired: false,
           requestId: null,
         };
+      } else if (classification === 'highest_commission') {
+        // MAIOR COMISSÃO: Ordenação real pelo ganho efetivo em R$ por venda (effective_commission_cents)
+        // 1. estimated_commission_cents > 0
+        // 2. (price_cents * commission_rate_percent) / 100
+        // Produtos sem dado de comissão são estritamente excluídos da listagem.
+        const commissionCond = `(COALESCE(p.estimated_commission_cents, 0) > 0 OR (COALESCE(p.price_cents, 0) > 0 AND COALESCE(p.commission_rate_percent, 0) > 0))`;
+        finalWhereSql = finalWhereSql && finalWhereSql !== '1=1' ? `(${finalWhereSql}) AND ${commissionCond}` : commissionCond;
+
+        orderClause = `ORDER BY 
+          (CASE 
+            WHEN COALESCE(p.estimated_commission_cents, 0) > 0 THEN p.estimated_commission_cents 
+            WHEN COALESCE(p.price_cents, 0) > 0 AND COALESCE(p.commission_rate_percent, 0) > 0 THEN ROUND((p.price_cents * p.commission_rate_percent) / 100.0) 
+            ELSE 0 
+          END) DESC,
+          COALESCE(p.commission_rate_percent, 0) DESC,
+          COALESCE(p.price_cents, 0) DESC,
+          COALESCE(p.sold_count, 0) DESC,
+          COALESCE(p.rating, 0) DESC,
+          p.last_seen_at DESC`;
+      } else if (classification === 'best_sellers') {
+        orderClause = `ORDER BY p.sold_count DESC, p.last_seen_at DESC, p.product_id DESC`;
+      } else if (classification === 'top_rated') {
+        orderClause = `ORDER BY COALESCE(p.rating, 0) DESC, p.sold_count DESC, p.last_seen_at DESC`;
       } else if (classification === 'sales_24h') {
         // VENDAS 24H: Variação real de sold_count em janela coerente (~24h: 18h a 42h)
         joinClause = `
@@ -2249,7 +2273,7 @@ export async function searchTikTokShopProducts(params: {
         `SELECT p.*
          FROM tiktok_shop_products p
          ${joinClause}
-         WHERE ${whereSql}
+         WHERE ${finalWhereSql}
          ${orderClause}
          LIMIT ? OFFSET ?`,
         [...sqlParams, ...orderParams, safePageSize + 1, offset]
@@ -2265,7 +2289,7 @@ export async function searchTikTokShopProducts(params: {
           `SELECT p.*
            FROM tiktok_shop_products p
            ${joinClause}
-           WHERE ${whereSql}
+           WHERE ${finalWhereSql}
            ${orderClause}
            LIMIT ? OFFSET 0`,
           [...sqlParams, ...orderParams, safePageSize + 1]
