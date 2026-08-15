@@ -4572,91 +4572,102 @@ const FilterIconImage: React.FC<{
   );
 };
 
-/* Official View Icons Mapping with local assets and CDN fallback */
+/* Official View Icons Mapping with local assets and CDN fallback (Exclusive Ranges) */
 const getVideoViewBadge = (views?: number | null): { iconUrl: string; fallbackIconUrl: string; label: string } => {
   const v = Number(views || 0);
   if (v >= 10000000) {
     return {
       iconUrl: '/miner/video-filters/10m.png',
       fallbackIconUrl: 'https://i.postimg.cc/LnvggLW7/10M.png',
-      label: '10M+',
+      label: compactNumber(v),
     };
   }
   if (v >= 5000000) {
     return {
       iconUrl: '/miner/video-filters/5m.png',
       fallbackIconUrl: 'https://i.postimg.cc/XpxBBdPD/5M.png',
-      label: '5M+',
+      label: compactNumber(v),
     };
   }
   if (v >= 1000000) {
     return {
       iconUrl: '/miner/video-filters/1m.png',
       fallbackIconUrl: 'https://i.postimg.cc/jLvnnP1F/1M.png',
-      label: '1M+',
+      label: compactNumber(v),
     };
   }
   if (v >= 500000) {
     return {
       iconUrl: '/miner/video-filters/500k.png',
       fallbackIconUrl: 'https://i.postimg.cc/JGKHHZFF/500k.png',
-      label: '500K+',
+      label: compactNumber(v),
     };
   }
-  if (v >= 100000) {
-    return {
-      iconUrl: '/miner/video-filters/100k.png',
-      fallbackIconUrl: 'https://i.postimg.cc/8jwffMYX/100k.png',
-      label: '100K+',
-    };
-  }
+  // 0 - 499.999 views belong to the 100K level badge
   return {
-    iconUrl: '/miner/video-filters/todos-os-videos.png',
-    fallbackIconUrl: 'https://i.postimg.cc/k69ttsn9/todos-os-videos.png',
+    iconUrl: '/miner/video-filters/100k.png',
+    fallbackIconUrl: 'https://i.postimg.cc/8jwffMYX/100k.png',
     label: compactNumber(v),
   };
 };
 
-const VIDEO_FILTER_OPTIONS = [
+export type VideoViewRangeId = 'all_videos' | '100k' | '500k' | '1m' | '5m' | '10m';
+
+export interface VideoFilterOption {
+  id: VideoViewRangeId;
+  label: string;
+  min: number | null;
+  max: number | null;
+  iconUrl: string;
+  fallbackIconUrl: string;
+}
+
+const VIDEO_FILTER_OPTIONS: VideoFilterOption[] = [
   {
     id: 'all_videos',
     label: 'Todos os vídeos',
-    value: null,
+    min: null,
+    max: null,
     iconUrl: '/miner/video-filters/todos-os-videos.png',
     fallbackIconUrl: 'https://i.postimg.cc/k69ttsn9/todos-os-videos.png',
   },
   {
     id: '100k',
-    label: '100K+',
-    value: 100000,
+    label: '100K (0 a 499.999 views)',
+    min: 0,
+    max: 499999,
     iconUrl: '/miner/video-filters/100k.png',
     fallbackIconUrl: 'https://i.postimg.cc/8jwffMYX/100k.png',
   },
   {
     id: '500k',
-    label: '500K+',
-    value: 500000,
+    label: '500K (500.000 a 999.999 views)',
+    min: 500000,
+    max: 999999,
     iconUrl: '/miner/video-filters/500k.png',
     fallbackIconUrl: 'https://i.postimg.cc/JGKHHZFF/500k.png',
   },
   {
     id: '1m',
-    label: '1M+',
-    value: 1000000,
+    label: '1M (1.000.000 a 4.999.999 views)',
+    min: 1000000,
+    max: 4999999,
     iconUrl: '/miner/video-filters/1m.png',
     fallbackIconUrl: 'https://i.postimg.cc/jLvnnP1F/1M.png',
   },
   {
     id: '5m',
-    label: '5M+',
-    value: 5000000,
+    label: '5M (5.000.000 a 9.999.999 views)',
+    min: 5000000,
+    max: 9999999,
     iconUrl: '/miner/video-filters/5m.png',
     fallbackIconUrl: 'https://i.postimg.cc/XpxBBdPD/5M.png',
   },
   {
     id: '10m',
-    label: '10M+',
-    value: 10000000,
+    label: '10M (10.000.000+ views)',
+    min: 10000000,
+    max: null,
     iconUrl: '/miner/video-filters/10m.png',
     fallbackIconUrl: 'https://i.postimg.cc/LnvggLW7/10M.png',
   },
@@ -6179,7 +6190,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [selectedChildCategory, setSelectedChildCategory] = useState<string>('Todas');
   const [hasVideoOnly, setHasVideoOnly] = useState<boolean>(false);
   const [minVideoViews, setMinVideoViews] = useState<number | null>(null);
+  const [selectedVideoRange, setSelectedVideoRange] = useState<VideoViewRangeId>('all_videos');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+
+  const activeVideoRange = useMemo(
+    () => VIDEO_FILTER_OPTIONS.find((opt) => opt.id === selectedVideoRange) || VIDEO_FILTER_OPTIONS[0],
+    [selectedVideoRange]
+  );
 
   const catDrag = useDragToScroll<HTMLDivElement>();
   const subcatDrag = useDragToScroll<HTMLDivElement>();
@@ -6223,7 +6240,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   useEffect(() => {
     setRankingPage(1);
     setPage(1);
-  }, [selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, minVideoViews, selectedClassification, rankingSort, mode]);
+  }, [selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, minVideoViews, selectedVideoRange, selectedClassification, rankingSort, mode]);
 
   // Modals state
   const [scriptModalProduct, setScriptModalProduct] = useState<ProductMinerProduct | null>(null);
@@ -6355,10 +6372,29 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     }
 
     // 2. Filter by video options
-    if (hasVideoOnly) {
+    if (hasVideoOnly || selectedClassification === 'viral_video') {
       list = list.filter((p) => Boolean(p.video?.url || p.video?.id || (p.associatedVideos && p.associatedVideos.length > 0)));
     }
-    if (minVideoViews && minVideoViews > 0) {
+    if (selectedClassification === 'viral_video' && activeVideoRange) {
+      if (activeVideoRange.min !== null && activeVideoRange.min !== undefined) {
+        list = list.filter((p) => {
+          const topView = Math.max(
+            p.video?.views ?? 0,
+            ...(p.associatedVideos || []).map((v) => v.views ?? 0)
+          );
+          return topView >= activeVideoRange.min!;
+        });
+      }
+      if (activeVideoRange.max !== null && activeVideoRange.max !== undefined) {
+        list = list.filter((p) => {
+          const topView = Math.max(
+            p.video?.views ?? 0,
+            ...(p.associatedVideos || []).map((v) => v.views ?? 0)
+          );
+          return topView <= activeVideoRange.max!;
+        });
+      }
+    } else if (minVideoViews && minVideoViews > 0) {
       list = list.filter((p) => {
         const topView = Math.max(
           p.video?.views ?? 0,
@@ -6589,8 +6625,10 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     targetSubcategory = selectedSubcategory,
     targetChildCategory = selectedChildCategory,
     targetClassification = selectedClassification,
-    targetHasVideoOnly = hasVideoOnly,
-    targetMinVideoViews = minVideoViews
+    targetHasVideoOnly = (hasVideoOnly || selectedClassification === 'viral_video'),
+    targetMinVideoViews = selectedClassification === 'viral_video' ? activeVideoRange.min : minVideoViews,
+    targetMaxVideoViews = selectedClassification === 'viral_video' ? activeVideoRange.max : null,
+    targetVideoViewRange = selectedClassification === 'viral_video' ? selectedVideoRange : null
   ) => {
     const clean = targetQuery.trim();
 
@@ -6612,7 +6650,9 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             targetChildCategory,
             targetClassification,
             targetHasVideoOnly,
-            targetMinVideoViews
+            targetMinVideoViews,
+            targetMaxVideoViews,
+            targetVideoViewRange
           );
 
       setQuery(clean);
@@ -6647,16 +6687,29 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         selectedSubcategory,
         selectedChildCategory,
         selectedClassification,
-        hasVideoOnly,
-        minVideoViews
+        hasVideoOnly || selectedClassification === 'viral_video',
+        selectedClassification === 'viral_video' ? activeVideoRange.min : minVideoViews,
+        selectedClassification === 'viral_video' ? activeVideoRange.max : null,
+        selectedClassification === 'viral_video' ? selectedVideoRange : null
       );
     }
-  }, [mode, selectedCategory, selectedSubcategory, selectedChildCategory, selectedClassification, hasVideoOnly, minVideoViews, page]);
+  }, [
+    mode,
+    selectedCategory,
+    selectedSubcategory,
+    selectedChildCategory,
+    selectedClassification,
+    hasVideoOnly,
+    minVideoViews,
+    selectedVideoRange,
+    activeVideoRange,
+    page
+  ]);
 
   const activeFilterCount =
     (selectedCategory !== 'Todos' ? 1 : 0) +
     (selectedSubcategory !== 'Todas' ? 1 : 0) +
-    (minVideoViews ? 1 : (hasVideoOnly ? 1 : 0));
+    (selectedClassification === 'viral_video' ? 1 : (minVideoViews ? 1 : (hasVideoOnly ? 1 : 0)));
 
   return (
     <section className="space-y-2 sm:space-y-4 pb-12 rounded-2xl sm:rounded-3xl bg-slate-50 border border-slate-200/80 p-3 sm:p-6 shadow-xl text-slate-900 transition-all">
@@ -6690,8 +6743,14 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                   onClick={() => {
                     if (selectedClassification === c.id) {
                       setSelectedClassification(null);
+                      if (c.id === 'viral_video') {
+                        setHasVideoOnly(false);
+                      }
                     } else {
                       setSelectedClassification(c.id);
+                      if (c.id === 'viral_video') {
+                        setHasVideoOnly(true);
+                      }
                     }
                     setMode('search');
                     setPage(1);
@@ -7212,74 +7271,56 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         </div>
       )}
 
-      {/* Advanced Filters Drawer Panel */}
-      {showAdvancedFilters ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-md animate-fade-in">
+      {/* Advanced Filters Drawer / Video Performance Panel */}
+      {(showAdvancedFilters || selectedClassification === 'viral_video') ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-sm animate-fade-in">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-amber-500" /> Filtros de Vídeo e Desempenho
+              <Filter className="w-3.5 h-3.5 text-amber-500" /> Faixas de Visualização (Vídeos)
             </span>
             <button
               onClick={() => {
-                setSelectedCategory('Todos');
-                setSelectedSubcategory('Todas');
-                setHasVideoOnly(false);
+                setSelectedVideoRange('all_videos');
                 setMinVideoViews(null);
+                setHasVideoOnly(false);
+                if (selectedClassification === 'viral_video') {
+                  setSelectedClassification(null);
+                }
               }}
               className="text-[11px] text-rose-600 hover:underline font-bold cursor-pointer"
             >
-              Limpar Filtros
+              Limpar Filtro
             </button>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1.5 pt-1 scrollbar-none sm:flex-wrap">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none sm:flex-wrap">
             {VIDEO_FILTER_OPTIONS.map((opt) => {
-              const isActive = opt.value === null
-                ? (hasVideoOnly && minVideoViews === null)
-                : (minVideoViews === opt.value);
+              const isActive = selectedClassification === 'viral_video' && selectedVideoRange === opt.id;
 
               return (
                 <button
                   key={opt.id}
                   type="button"
+                  aria-label={opt.label}
+                  title={opt.label}
                   onClick={() => {
-                    if (opt.value === null) {
-                      if (isActive) {
-                        setHasVideoOnly(false);
-                        setMinVideoViews(null);
-                      } else {
-                        setHasVideoOnly(true);
-                        setMinVideoViews(null);
-                        setSelectedClassification('viral_video');
-                      }
-                    } else {
-                      if (isActive) {
-                        setMinVideoViews(null);
-                        setHasVideoOnly(false);
-                      } else {
-                        setMinVideoViews(opt.value);
-                        setHasVideoOnly(true);
-                        setSelectedClassification('viral_video');
-                      }
-                    }
+                    setSelectedClassification('viral_video');
+                    setHasVideoOnly(true);
+                    setSelectedVideoRange(opt.id);
+                    setPage(1);
                   }}
-                  className={`group relative flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 min-h-[56px] sm:min-h-[62px] rounded-2xl border transition-all duration-200 cursor-pointer shrink-0 shadow-2xs ${
+                  className={`group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl border transition-all duration-200 cursor-pointer shrink-0 p-2 sm:p-2.5 ${
                     isActive
-                      ? 'border-amber-400 bg-amber-500/15 text-amber-950 font-black ring-2 ring-amber-400/40 shadow-xs'
-                      : 'border-slate-200/90 bg-white text-slate-700 hover:border-amber-300 hover:bg-amber-50/40 hover:text-slate-900'
+                      ? 'border-amber-400 bg-amber-500/15 ring-2 ring-amber-400/40 shadow-md scale-[1.02]'
+                      : 'border-slate-200/90 bg-white hover:border-amber-300 hover:bg-amber-50/50 shadow-2xs'
                   }`}
                 >
-                  <div className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 flex items-center justify-center rounded-xl bg-slate-50 group-hover:bg-white p-1 transition-colors">
-                    <FilterIconImage
-                      src={opt.iconUrl}
-                      fallbackSrc={opt.fallbackIconUrl}
-                      alt={opt.label}
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <span className="text-xs sm:text-sm md:text-sm font-black whitespace-nowrap">
-                    {opt.label}
-                  </span>
+                  <FilterIconImage
+                    src={opt.iconUrl}
+                    fallbackSrc={opt.fallbackIconUrl}
+                    alt={opt.label}
+                    className="w-full h-full object-contain pointer-events-none transition-transform duration-200 group-hover:scale-105"
+                  />
                 </button>
               );
             })}
