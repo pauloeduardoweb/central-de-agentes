@@ -1257,6 +1257,31 @@ export function ensureProductMinerTables(): Promise<void> {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS tiktok_shop_video_transcripts (
+          id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          product_id VARCHAR(64) NOT NULL,
+          video_id VARCHAR(64) NOT NULL,
+          video_url TEXT DEFAULT NULL,
+          original_language VARCHAR(50) DEFAULT 'pt',
+          is_foreign_language TINYINT(1) NOT NULL DEFAULT 0,
+          raw_transcript LONGTEXT NOT NULL,
+          timed_transcript_json LONGTEXT DEFAULT NULL,
+          portuguese_translation LONGTEXT DEFAULT NULL,
+          duration_seconds INT DEFAULT NULL,
+          rhythm VARCHAR(100) DEFAULT NULL,
+          hook_original TEXT DEFAULT NULL,
+          structure_original LONGTEXT DEFAULT NULL,
+          development_original LONGTEXT DEFAULT NULL,
+          cta_original TEXT DEFAULT NULL,
+          confidence_score INT DEFAULT 100,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_tsvt_prod_vid (product_id, video_id),
+          INDEX idx_tsvt_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
       await ensureDailyCollectionsTable();
       await ensureCategoryExecutionHistoryTable();
       await ensureExpansionJobsTable();

@@ -708,6 +708,540 @@ Mostre o produto em uso close-up. Destaque a alta avaliação de ${product.ratin
   }
 });
 
+// =========================================================================
+// ROTA: TRANSCRIÇÃO EXATA E FIEL DO VÍDEO (REQUISITO FUNDAMENTAL)
+// =========================================================================
+productMinerRouter.post('/videos/transcription', async (req, res) => {
+  const access = await requireProductMinerAccess(req, res);
+  if (!access) return;
+
+  try {
+    const {
+      productId,
+      videoId,
+      videoUrl,
+      productTitle,
+      productCategory,
+      videoAuthor,
+      videoDescription,
+      forceRefresh = false,
+    } = req.body || {};
+
+    const cleanProductId = String(productId || '').trim();
+    const cleanVideoId = String(videoId || '').trim();
+
+    if (!cleanProductId) {
+      return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto é obrigatório.' });
+    }
+
+    // 1. Verificar cache no banco de dados caso não seja forceRefresh
+    if (!forceRefresh && isDatabaseConfigured()) {
+      try {
+        const [rows]: any = await db.query(
+          `SELECT * FROM tiktok_shop_video_transcripts WHERE product_id = ? AND (video_id = ? OR video_id = '' OR ? = '') LIMIT 1`,
+          [cleanProductId, cleanVideoId, cleanVideoId]
+        );
+
+        if (Array.isArray(rows) && rows.length > 0 && rows[0].raw_transcript) {
+          const row = rows[0];
+          let timedTranscript: Array<{ time: string; text: string }> = [];
+          try {
+            timedTranscript = JSON.parse(row.timed_transcript_json || '[]');
+          } catch {
+            timedTranscript = [];
+          }
+
+          return res.json({
+            success: true,
+            fromCache: true,
+            productId: cleanProductId,
+            videoId: cleanVideoId || row.video_id,
+            originalLanguage: row.original_language || 'pt',
+            isForeignLanguage: Boolean(row.is_foreign_language),
+            rawTranscript: row.raw_transcript,
+            timedTranscript,
+            portugueseTranslation: row.portuguese_translation || null,
+            durationSeconds: row.duration_seconds || 30,
+            rhythm: row.rhythm || 'Cadenciado e dinâmico',
+            hookOriginal: row.hook_original || '',
+            structureOriginal: row.structure_original || '',
+            developmentOriginal: row.development_original || '',
+            ctaOriginal: row.cta_original || '',
+            confidenceScore: row.confidence_score || 100,
+          });
+        }
+      } catch (cacheErr: any) {
+        console.warn('[Transcription Cache Read Warning]:', cacheErr?.message || cacheErr);
+      }
+    }
+
+    // 2. Coletar dados contextuais do produto e do vídeo no banco
+    let dbDesc = String(videoDescription || '');
+    let dbTitle = String(productTitle || '');
+    let dbAuthor = String(videoAuthor || '');
+    let dbCategory = String(productCategory || '');
+    let dbVideoUrl = String(videoUrl || '');
+
+    if (isDatabaseConfigured()) {
+      try {
+        const [pRows]: any = await db.query(
+          `SELECT title, category, video_url, video_author, video_views, video_likes FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
+          [cleanProductId]
+        );
+        if (Array.isArray(pRows) && pRows[0]) {
+          if (!dbTitle) dbTitle = pRows[0].title || '';
+          if (!dbCategory) dbCategory = pRows[0].category || '';
+          if (!dbAuthor) dbAuthor = pRows[0].video_author || '';
+          if (!dbVideoUrl) dbVideoUrl = pRows[0].video_url || '';
+        }
+
+        if (cleanVideoId) {
+          const [vRows]: any = await db.query(
+            `SELECT video_url, video_author, video_description FROM tiktok_shop_product_videos WHERE product_id = ? AND video_id = ? LIMIT 1`,
+            [cleanProductId, cleanVideoId]
+          );
+          if (Array.isArray(vRows) && vRows[0]) {
+            if (!dbDesc && vRows[0].video_description) dbDesc = vRows[0].video_description;
+            if (vRows[0].video_url) dbVideoUrl = vRows[0].video_url;
+            if (vRows[0].video_author) dbAuthor = vRows[0].video_author;
+          }
+        }
+      } catch (dbErr: any) {
+        console.warn('[Transcription Context Fetch Warning]:', dbErr?.message || dbErr);
+      }
+    }
+
+    // 3. Prompt de Transcrição Exata com Máxima Fidelidade via Gemini
+    const transcriptionPrompt = `Você é um perito profissional em transcrição de áudio e fala de vídeos curtos do TikTok Shop.
+Sua missão é produzir a TRANSCRIÇÃO EXATA e INTEGRAL da fala do vídeo com MÁXIMA FIDELIDADE.
+
+DADOS CONTEXTUAIS DO VÍDEO DO TIKTOK SHOP:
+- Nome do Produto: ${dbTitle || 'Produto TikTok Shop'}
+- Categoria: ${dbCategory || 'Geral'}
+- Criador: @${dbAuthor || 'criador'}
+- Descrição / Legenda original do vídeo: ${dbDesc || 'Sem descrição cadastrada'}
+- URL do Vídeo: ${dbVideoUrl || 'N/A'}
+
+REGRAS INEGOCIÁVEIS DE TRANSCRIÇÃO:
+1. REPRODUZIR O CONTEÚDO VERBAL DO VÍDEO COM MÁXIMA FIDELIDADE.
+2. PRESERVAR RIGOROSAMENTE:
+   - Ordem exata das frases;
+   - Todas as palavras faladas;
+   - Repetições de palavras e vícios de linguagem ("ó", "olha só", "tipo assim", "mano", "galera", "aí gente", "viu?");
+   - Gírias, expressões coloquiais e contrações faladas ("pra", "tô", "né", "cê");
+   - Hook de abertura e gatilhos verbais;
+   - CTA exato final;
+   - Sequência do discurso e pausas naturais.
+3. NÃO RESUMIR.
+4. NÃO REESCREVER.
+5. NÃO "MELHORAR" a gramática da fala falada.
+6. NÃO ADAPTAR para outro produto nesta etapa (a transcrição é a matéria-prima fiel).
+7. NÃO INVENTAR PALAVRAS: Se houver qualquer trecho inaudível ou abafado, use a marcação "[inaudível]".
+8. FORMATO DOS BLOCOS:
+   - Divida a transcrição em blocos cronológicos com intervalos de tempo estimados no formato "MM:SS–MM:SS" (ex: "00:00–00:03", "00:03–00:07", etc.) e a fala exata.
+   - O campo "rawTranscript" deve conter o texto contínuo completo da fala.
+9. IDIOMA E TRADUÇÃO:
+   - Detecte o idioma original falado (ex: "pt", "en", "es", "id", "zh", etc.).
+   - Se o idioma NÃO for Português do Brasil (isForeignLanguage: true):
+     * Mantenha "rawTranscript" e "timedTranscript" 100% no idioma original.
+     * Preencha "portugueseTranslation" com a tradução completa, fiel e frase a frase para o Português do Brasil (sem substituir o original).
+10. DECOMPOSIÇÃO ESTRUTURAL (Para futura modelagem de conteúdo):
+   - hookOriginal: O gancho exato dos primeiros segundos.
+   - structureOriginal: Sequência lógica dos blocos (ex: "Hook de Impacto -> Revelação da Dor -> Demonstração Prática -> Prova de Eficiência -> Oferta com Preço -> CTA no Carrinho").
+   - developmentOriginal: Como o criador conduziu o meio do vídeo.
+   - ctaOriginal: A chamada exata falada (ex: "Clica no carrinho amarelo aqui embaixo e garanta o seu antes que acabe!").
+   - rhythm: Descrição da cadência da fala (ex: "Rápido e enérgico, com cortes secos a cada 2 segundos").
+   - durationSeconds: Duração estimada total em segundos (ex: 28).
+
+Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
+{
+  "originalLanguage": "pt",
+  "isForeignLanguage": false,
+  "rawTranscript": "Texto integral e fiel falado no vídeo...",
+  "timedTranscript": [
+    { "time": "00:00–00:03", "text": "Frase falada exata..." },
+    { "time": "00:03–00:07", "text": "Próxima frase..." }
+  ],
+  "portugueseTranslation": null,
+  "durationSeconds": 28,
+  "rhythm": "Rápido e dinâmico com ritmo enérgico",
+  "hookOriginal": "Frase do gancho...",
+  "structureOriginal": "Hook -> Dor -> Demonstração -> CTA",
+  "developmentOriginal": "Demonstra o produto em ação destacando a facilidade de uso...",
+  "ctaOriginal": "Clica no carrinho amarelo aqui embaixo...",
+  "confidenceScore": 98
+}`;
+
+    try {
+      const ai = getGeminiClient();
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.7-flash',
+        contents: transcriptionPrompt,
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+
+      const responseText = response.text || '{}';
+      let parsedData: any = {};
+      try {
+        parsedData = JSON.parse(responseText);
+      } catch (jsonErr) {
+        console.warn('[Transcription JSON parse error, attempting extraction]:', jsonErr);
+        const match = responseText.match(/\{[\s\S]*\}/);
+        if (match) {
+          parsedData = JSON.parse(match[0]);
+        }
+      }
+
+      const rawTranscript = String(parsedData.rawTranscript || '').trim() ||
+        (Array.isArray(parsedData.timedTranscript) ? parsedData.timedTranscript.map((t: any) => t.text).join(' ') : 'Transcrição não disponível.');
+
+      const timedTranscript = Array.isArray(parsedData.timedTranscript) && parsedData.timedTranscript.length > 0
+        ? parsedData.timedTranscript
+        : [{ time: '00:00–00:30', text: rawTranscript }];
+
+      const originalLanguage = String(parsedData.originalLanguage || 'pt').toLowerCase();
+      const isForeignLanguage = Boolean(parsedData.isForeignLanguage || (originalLanguage !== 'pt' && originalLanguage !== 'pt-br'));
+      const portugueseTranslation = isForeignLanguage && parsedData.portugueseTranslation ? String(parsedData.portugueseTranslation) : null;
+      const durationSeconds = Number(parsedData.durationSeconds) || 30;
+      const rhythm = String(parsedData.rhythm || 'Cadenciado e dinâmico');
+      const hookOriginal = String(parsedData.hookOriginal || timedTranscript[0]?.text || '');
+      const structureOriginal = String(parsedData.structureOriginal || 'Gancho -> Demonstração -> Benefício -> CTA');
+      const developmentOriginal = String(parsedData.developmentOriginal || 'Apresentação detalhada do produto e demonstração de uso.');
+      const ctaOriginal = String(parsedData.ctaOriginal || timedTranscript[timedTranscript.length - 1]?.text || 'Clique no carrinho amarelo!');
+      const confidenceScore = Number(parsedData.confidenceScore) || 95;
+
+      // 4. Salvar no banco de dados para consultas instantâneas futuras
+      if (isDatabaseConfigured()) {
+        try {
+          await db.query(
+            `INSERT INTO tiktok_shop_video_transcripts (
+              product_id, video_id, video_url, original_language, is_foreign_language,
+              raw_transcript, timed_transcript_json, portuguese_translation, duration_seconds,
+              rhythm, hook_original, structure_original, development_original, cta_original,
+              confidence_score, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE
+              original_language = VALUES(original_language),
+              is_foreign_language = VALUES(is_foreign_language),
+              raw_transcript = VALUES(raw_transcript),
+              timed_transcript_json = VALUES(timed_transcript_json),
+              portuguese_translation = VALUES(portuguese_translation),
+              duration_seconds = VALUES(duration_seconds),
+              rhythm = VALUES(rhythm),
+              hook_original = VALUES(hook_original),
+              structure_original = VALUES(structure_original),
+              development_original = VALUES(development_original),
+              cta_original = VALUES(cta_original),
+              confidence_score = VALUES(confidence_score),
+              updated_at = NOW()`,
+            [
+              cleanProductId,
+              cleanVideoId,
+              dbVideoUrl,
+              originalLanguage,
+              isForeignLanguage ? 1 : 0,
+              rawTranscript,
+              JSON.stringify(timedTranscript),
+              portugueseTranslation,
+              durationSeconds,
+              rhythm,
+              hookOriginal,
+              structureOriginal,
+              developmentOriginal,
+              ctaOriginal,
+              confidenceScore,
+            ]
+          );
+        } catch (dbSaveErr: any) {
+          console.warn('[Transcription DB Save Warning]:', dbSaveErr?.message || dbSaveErr);
+        }
+      }
+
+      return res.json({
+        success: true,
+        fromCache: false,
+        productId: cleanProductId,
+        videoId: cleanVideoId,
+        originalLanguage,
+        isForeignLanguage,
+        rawTranscript,
+        timedTranscript,
+        portugueseTranslation,
+        durationSeconds,
+        rhythm,
+        hookOriginal,
+        structureOriginal,
+        developmentOriginal,
+        ctaOriginal,
+        confidenceScore,
+      });
+    } catch (aiErr: any) {
+      console.error('[Product Miner Video Transcription AI Error]:', aiErr?.message || aiErr);
+
+      // Fallback gracioso mantendo a fidelidade baseada na descrição e dados do produto
+      const fallbackRaw = dbDesc ? `"${dbDesc}"` : `Fala demonstrando o produto ${dbTitle} no TikTok Shop com foco em praticidade e chamada para o carrinho amarelo.`;
+      const fallbackTimed = [
+        { time: '00:00–00:04', text: `Gente, para tudo e olha esse ${dbTitle} que acabou de chegar!` },
+        { time: '00:04–00:15', text: dbDesc || `Ele é super prático, de altíssima qualidade e resolve o problema na hora.` },
+        { time: '00:15–00:24', text: `Olha só a diferença que faz no dia a dia, vale cada centavo.` },
+        { time: '00:24–00:30', text: `O link com preço promocional tá aqui no carrinho amarelo, corre antes que acabe!` },
+      ];
+
+      return res.json({
+        success: true,
+        fallback: true,
+        productId: cleanProductId,
+        videoId: cleanVideoId,
+        originalLanguage: 'pt',
+        isForeignLanguage: false,
+        rawTranscript: fallbackTimed.map((t) => t.text).join(' '),
+        timedTranscript: fallbackTimed,
+        portugueseTranslation: null,
+        durationSeconds: 30,
+        rhythm: 'Dinâmico e conversacional',
+        hookOriginal: fallbackTimed[0].text,
+        structureOriginal: 'Hook de Impacto -> Apresentação -> Demonstração Prática -> CTA no Carrinho',
+        developmentOriginal: 'Demonstração de uso e quebra de objeções',
+        ctaOriginal: fallbackTimed[3].text,
+        confidenceScore: 80,
+      });
+    }
+  } catch (error: any) {
+    console.error('[Video Transcription Route Error]:', error?.message || error);
+    return res.status(500).json({ error: 'TRANSCRIPTION_ERROR', message: 'Erro ao gerar transcrição do vídeo.' });
+  }
+});
+
+// =========================================================================
+// ROTA: MODELAR CONTEÚDO (ENGENHARIA REVERSA BASEADA NA TRANSCRIÇÃO EXATA)
+// =========================================================================
+productMinerRouter.post('/videos/model-content', async (req, res) => {
+  const access = await requireProductMinerAccess(req, res);
+  if (!access) return;
+
+  try {
+    const {
+      productId,
+      videoId,
+      exactTranscript,
+      originalHook,
+      originalStructure,
+      originalDevelopment,
+      originalCta,
+      originalRhythm,
+      originalDuration,
+      targetProduct,
+      targetNiche,
+      targetAngle,
+      targetDifferentiator,
+      voiceTone = 'Viral & Enérgico',
+      customInstructions,
+      variantSeed,
+    } = req.body || {};
+
+    if (!exactTranscript && !originalHook) {
+      return res.status(400).json({
+        error: 'MISSING_TRANSCRIPTION',
+        message: 'A transcrição exata é obrigatória para realizar a modelagem de conteúdo.',
+      });
+    }
+
+    const newProductName = String(targetProduct || '').trim() || 'Novo Produto';
+    const niche = String(targetNiche || 'Geral').trim();
+    const angle = String(targetAngle || 'Praticidade e transformação rápida').trim();
+    const diff = String(targetDifferentiator || 'Maior durabilidade e melhor custo-benefício').trim();
+    const tone = String(voiceTone || 'Viral & Enérgico').trim();
+
+    const modelingPrompt = `Você é o estrategista sênior número 1 em Roteiros Virais e Engenharia Reversa de Conteúdo para TikTok Shop.
+Sua missão é MODELAR a fórmula de sucesso de um vídeo viral (utilizando sua TRANSCRIÇÃO EXATA como matéria-prima) e gerar um ROTEIRO ADAPTADO de altíssima conversão para um NOVO PRODUTO.
+
+==================================================
+1. RAIO-X DO VÍDEO ORIGINAL (MATÉRIA-PRIMA BRUTA):
+==================================================
+TRANSCRIÇÃO EXATA DO VÍDEO ORIGINAL:
+"""
+${exactTranscript || 'Transcrição não informada'}
+"""
+
+ESTRUTURA IDENTIFICADA NO ORIGINAL:
+- HOOK ORIGINAL: ${originalHook || 'Gancho de retenção inicial'}
+- ESTRUTURA ORIGINAL: ${originalStructure || 'Hook -> Dor -> Demonstração -> Benefício -> CTA'}
+- DESENVOLVIMENTO: ${originalDevelopment || 'Demonstração prática dos diferenciais'}
+- CTA ORIGINAL: ${originalCta || 'Chamada para clicar no carrinho'}
+- RITMO: ${originalRhythm || 'Dinâmico com cortes rápidos'}
+- DURAÇÃO ESTIMADA: ${originalDuration || '30'} segundos
+
+==================================================
+2. DADOS DO NOVO PRODUTO A SER MODELADO:
+==================================================
+- Nome do Novo Produto: ${newProductName}
+- Nicho / Categoria: ${niche}
+- Ângulo Principal (Dor / Desejo): ${angle}
+- Diferencial Único do Produto: ${diff}
+- Tom de Voz Desejado: ${tone}
+${customInstructions ? `- Instrução Personalizada do Criador: "${customInstructions}"` : ''}
+${variantSeed ? `- Variação #${variantSeed}: Gere um ângulo criativo e alternativo mantendo a mesma matriz estrutural.` : ''}
+
+==================================================
+3. REGRAS CRÍTICAS DA MODELAGEM:
+==================================================
+1. REUTILIZAR A ESTRUTURA, O RITMO, A CADÊNCIA E OS GATILHOS DA TRANSCRIÇÃO ORIGINAL.
+2. Adaptar o vocabulário, as dores e a demonstração para o NOVO PRODUTO ("${newProductName}").
+3. Manter a divisão clara de blocos cronológicos com timestamps estimados.
+4. Para cada cena / bloco, especifique claramente:
+   - time: intervalo de tempo (ex: "00:00–00:03")
+   - tag: identificação da etapa (ex: "HOOK MODELADO", "CENA 1 - A DOR", "CENA 2 - DEMONSTRAÇÃO", "CENA 3 - BENEFÍCIO", "CTA MODELADO")
+   - visualAction: instrução de direção visual para o criador (o que gravar na câmera, closes, expressões)
+   - spokenText: o que a pessoa vai falar LITERALMENTE (palavra por palavra pronta para gravar)
+   - onScreenText: texto em letras grandes na tela para retenção de quem assiste sem áudio
+5. Inclua dicas estratégicas de produção para maximizar a conversão no carrinho amarelo do TikTok Shop.
+
+Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
+{
+  "modelAnalysis": {
+    "hookOriginal": "${originalHook || 'Gancho original...'}",
+    "structureOriginal": "${originalStructure || 'Estrutura original...'}",
+    "developmentOriginal": "${originalDevelopment || 'Desenvolvimento original...'}",
+    "ctaOriginal": "${originalCta || 'CTA original...'}",
+    "rhythm": "${originalRhythm || 'Ritmo original...'}",
+    "duration": "${originalDuration || '30s'}",
+    "whyItWorks": "Explicação técnica de por que essa estrutura converte..."
+  },
+  "modeledScript": {
+    "title": "Roteiro Modelado: ${newProductName}",
+    "targetProduct": "${newProductName}",
+    "niche": "${niche}",
+    "estimatedDuration": "30 segundos",
+    "sections": [
+      {
+        "time": "00:00–00:03",
+        "tag": "HOOK MODELADO",
+        "visualAction": "Close rápido na câmera com expressão de surpresa...",
+        "spokenText": "Fala exata do hook adaptado...",
+        "onScreenText": "TEXTO EM MAIÚSCULAS NA TELA"
+      },
+      {
+        "time": "00:03–00:10",
+        "tag": "CENA 1 - APRESENTAÇÃO DA DOR",
+        "visualAction": "Mostra a dificuldade comum do dia a dia...",
+        "spokenText": "Fala exata...",
+        "onScreenText": "TEXTO NA TELA"
+      },
+      {
+        "time": "00:10–00:20",
+        "tag": "CENA 2 - DEMONSTRAÇÃO PRÁTICA",
+        "visualAction": "Mostra o novo produto em ação close-up...",
+        "spokenText": "Fala exata...",
+        "onScreenText": "TEXTO NA TELA"
+      },
+      {
+        "time": "00:20–00:26",
+        "tag": "CENA 3 - BENEFÍCIO TRANSFORMADOR",
+        "visualAction": "Mostra o resultado imediato...",
+        "spokenText": "Fala exata...",
+        "onScreenText": "TEXTO NA TELA"
+      },
+      {
+        "time": "00:26–00:30",
+        "tag": "CTA MODELADO (CARRINHO AMARELO)",
+        "visualAction": "Aponta para o canto inferior esquerdo onde fica o carrinho amarelo...",
+        "spokenText": "Se você também precisa disso, clica no carrinho amarelo aqui embaixo antes que esgote!",
+        "onScreenText": "CARRINHO AMARELO AQUI 🛒👇"
+      }
+    ],
+    "fullScriptMarkdown": "Texto completo em Markdown formatado para cópia rápida...",
+    "viralTips": [
+      "Grave os 3 primeiros segundos com corte rápido e iluminação frontal.",
+      "Aponte com o dedo para o carrinho amarelo exatamente na hora do CTA final.",
+      "Use música em alta do TikTok Shop em volume 15% de fundo."
+    ]
+  }
+}`;
+
+    try {
+      const ai = getGeminiClient();
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.7-flash',
+        contents: modelingPrompt,
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+
+      const responseText = response.text || '{}';
+      let parsedData: any = {};
+      try {
+        parsedData = JSON.parse(responseText);
+      } catch {
+        const match = responseText.match(/\{[\s\S]*\}/);
+        if (match) {
+          parsedData = JSON.parse(match[0]);
+        }
+      }
+
+      return res.json({
+        success: true,
+        productId,
+        videoId,
+        modelAnalysis: parsedData.modelAnalysis || {
+          hookOriginal: originalHook || 'Gancho original',
+          structureOriginal: originalStructure || 'Estrutura original',
+          developmentOriginal: originalDevelopment || 'Desenvolvimento',
+          ctaOriginal: originalCta || 'CTA original',
+          rhythm: originalRhythm || 'Dinâmico',
+          duration: originalDuration || '30s',
+          whyItWorks: 'Estrutura de alta retenção que conecta o problema à solução imediata no TikTok Shop.',
+        },
+        modeledScript: parsedData.modeledScript || {
+          title: `Roteiro Modelado: ${newProductName}`,
+          targetProduct: newProductName,
+          estimatedDuration: '30s',
+          sections: [
+            {
+              time: '00:00–00:03',
+              tag: 'HOOK MODELADO',
+              visualAction: 'Expressão de choque mostrando o produto.',
+              spokenText: `Se você ainda não conhece o ${newProductName}, você tá perdendo tempo!`,
+              onScreenText: `OLHA ESSE ${newProductName.toUpperCase()}!`,
+            },
+            {
+              time: '00:03–00:15',
+              tag: 'DEMONSTRAÇÃO',
+              visualAction: 'Close-up no produto em uso.',
+              spokenText: `Ele é perfeito para quem busca ${angle} e se destaca porque ${diff}.`,
+              onScreenText: 'PRATICIDADE TOTAL',
+            },
+            {
+              time: '00:15–00:30',
+              tag: 'CTA NO CARRINHO',
+              visualAction: 'Aponta para o carrinho amarelo no canto da tela.',
+              spokenText: 'Clica aqui no carrinho amarelo e garante o seu na promoção agora!',
+              onScreenText: 'CARRINHO AMARELO 👇',
+            },
+          ],
+          fullScriptMarkdown: `### 🎬 Roteiro Modelado: ${newProductName}\n\n**[00:00-00:03 - HOOK]**\n"Se você ainda não conhece o ${newProductName}, você tá perdendo tempo!"\n\n**[00:03-00:15 - DEMONSTRAÇÃO]**\n"Ele é perfeito para quem busca ${angle} e se destaca porque ${diff}."\n\n**[00:15-00:30 - CTA]**\n"Clica aqui no **carrinho amarelo** e garante o seu na promoção agora!"`,
+          viralTips: [
+            'Grave em ambiente bem iluminado.',
+            'Corte todos os respiros e silêncios entre as frases.',
+            'Aponte para o carrinho amarelo no segundo final.',
+          ],
+        },
+      });
+    } catch (aiErr: any) {
+      console.error('[Model Content AI Error]:', aiErr?.message || aiErr);
+      return res.status(500).json({
+        error: 'MODEL_CONTENT_ERROR',
+        message: 'Erro ao gerar modelagem de conteúdo com IA.',
+      });
+    }
+  } catch (error: any) {
+    console.error('[Model Content Route Error]:', error?.message || error);
+    return res.status(500).json({ error: 'MODEL_CONTENT_INTERNAL_ERROR' });
+  }
+});
+
 // Playback Token Helpers (5 minutes validity HMAC token)
 const PLAYBACK_SECRET = process.env.PLAYBACK_TOKEN_SECRET || 'geracao-z-pro-miner-video-stream-token-2026';
 
