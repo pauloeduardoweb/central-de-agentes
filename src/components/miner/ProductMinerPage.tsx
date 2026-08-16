@@ -5640,9 +5640,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   const [isReclassifying, setIsReclassifying] = useState(false);
   const [reclassifyReport, setReclassifyReport] = useState<ReclassificationReport | null>(null);
+  const [reclassificationError, setReclassificationError] = useState<string | null>(null);
 
   const handleReclassifyBase = async () => {
     setIsReclassifying(true);
+    setReclassificationError(null);
     setCollectorNotice(null);
     try {
       const report = await runBaseReclassification(studentCode);
@@ -5650,7 +5652,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       await loadCategories();
       setCollectorNotice(`✨ ${report.totalClassified} de ${report.totalAnalyzed} produtos foram distribuídos nas ${CATEGORY_CONFIG.length} categorias com sucesso (0 créditos SocialCrawl consumidos)!`);
     } catch (err: any) {
-      alert(`Erro ao reclassificar base: ${err?.message || 'Falha ao reclassificar'}`);
+      setReclassificationError(err?.message || 'Não foi possível concluir a organização da base. Tente novamente em alguns instantes.');
     } finally {
       setIsReclassifying(false);
     }
@@ -7621,6 +7623,45 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                         {Object.keys(reclassifyReport.categoryCounts).length} categorias
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {reclassificationError && (
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-300 space-y-3 animate-fade-in text-xs text-rose-950 shadow-sm">
+                  <div className="flex items-center justify-between font-black text-rose-900 text-sm">
+                    <span className="flex items-center gap-2">
+                      <AlertCircle className="w-4.5 h-4.5 text-rose-600" />
+                      Aviso de Reclassificação da Base
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReclassificationError(null)}
+                      className="text-rose-700 hover:text-rose-950 font-extrabold text-xs px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors"
+                    >
+                      ✕ Fechar
+                    </button>
+                  </div>
+                  <p className="text-xs text-rose-800 font-medium leading-relaxed">
+                    {reclassificationError}
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleReclassifyBase}
+                      disabled={isReclassifying}
+                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isReclassifying ? 'animate-spin' : ''}`} />
+                      <span>Tentar novamente</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReclassificationError(null)}
+                      className="px-4 py-2 rounded-xl bg-white border border-rose-200 hover:bg-rose-100/50 text-rose-800 font-semibold text-xs transition-all"
+                    >
+                      Fechar
+                    </button>
                   </div>
                 </div>
               )}
