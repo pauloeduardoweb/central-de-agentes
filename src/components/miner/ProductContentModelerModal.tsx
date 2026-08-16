@@ -60,13 +60,15 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
       setTranscription(null);
       setModeledResult(null);
       setError(null);
+      setTargetProduct('');
+      setTargetNiche('');
       return;
     }
 
     if (initialTranscription) {
       setTranscription(initialTranscription);
       if (!targetProduct) {
-        setTargetProduct(`Versão Adaptada de ${product.title.slice(0, 45)}`);
+        setTargetProduct(product.title);
         setTargetNiche(product.category || 'Geral');
       }
     } else {
@@ -84,7 +86,7 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
         .then((data) => {
           setTranscription(data);
           if (!targetProduct) {
-            setTargetProduct(`Versão Adaptada de ${product.title.slice(0, 45)}`);
+            setTargetProduct(product.title);
             setTargetNiche(product.category || 'Geral');
           }
         })
