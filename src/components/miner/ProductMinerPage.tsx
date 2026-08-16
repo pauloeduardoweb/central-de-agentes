@@ -4861,30 +4861,30 @@ const ViralVideoCard: React.FC<{
               </div>
 
               <div className="grid grid-cols-5 gap-1.5 text-center text-xs text-slate-600 font-semibold pt-2 border-t border-amber-200/50">
-                <span title="Views" className="flex flex-col items-center">
-                  <Eye className="w-4 h-4 mb-0.5 text-slate-600" />
-                  <span className="font-black text-slate-900">{compactNumber(product.video.views)}</span>
-                  <span className="text-[10px] text-slate-500 font-bold">Views</span>
+                <span title="Visualizações" className="flex flex-col items-center min-w-0">
+                  <Eye className="w-4 h-4 mb-0.5 text-slate-600 shrink-0" />
+                  <span className="font-black text-slate-900 whitespace-nowrap">{compactNumber(product.video.views)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">Visualizações</span>
                 </span>
-                <span title="Likes" className="flex flex-col items-center">
-                  <Heart className="w-4 h-4 mb-0.5 text-rose-500" />
-                  <span className="font-black text-slate-900">{compactNumber(product.video.likes)}</span>
-                  <span className="text-[10px] text-slate-500 font-bold">Likes</span>
+                <span title="Curtidas" className="flex flex-col items-center min-w-0">
+                  <Heart className="w-4 h-4 mb-0.5 text-rose-500 shrink-0" />
+                  <span className="font-black text-slate-900 whitespace-nowrap">{compactNumber(product.video.likes)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">Curtidas</span>
                 </span>
-                <span title="Comentários" className="flex flex-col items-center">
-                  <MessageCircle className="w-4 h-4 mb-0.5 text-sky-600" />
-                  <span className="font-black text-slate-900">{compactNumber(product.video.comments)}</span>
-                  <span className="text-[10px] text-slate-500 font-bold">Com.</span>
+                <span title="Comentários" className="flex flex-col items-center min-w-0">
+                  <MessageCircle className="w-4 h-4 mb-0.5 text-sky-600 shrink-0" />
+                  <span className="font-black text-slate-900 whitespace-nowrap">{compactNumber(product.video.comments)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">Comentários</span>
                 </span>
-                <span title="Compartilhamentos" className="flex flex-col items-center">
-                  <Share2 className="w-4 h-4 mb-0.5 text-emerald-600" />
-                  <span className="font-black text-slate-900">{compactNumber(product.video.shares)}</span>
-                  <span className="text-[10px] text-slate-500 font-bold">Shares</span>
+                <span title="Compartilhamentos" className="flex flex-col items-center min-w-0">
+                  <Share2 className="w-4 h-4 mb-0.5 text-emerald-600 shrink-0" />
+                  <span className="font-black text-slate-900 whitespace-nowrap">{compactNumber(product.video.shares)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">Compart.</span>
                 </span>
-                <span title="Salvos" className="flex flex-col items-center">
-                  <Bookmark className="w-4 h-4 mb-0.5 text-amber-600" />
-                  <span className="font-black text-slate-900">{compactNumber(product.video.saves)}</span>
-                  <span className="text-[10px] text-slate-500 font-bold">Salvos</span>
+                <span title="Salvos" className="flex flex-col items-center min-w-0">
+                  <Bookmark className="w-4 h-4 mb-0.5 text-amber-600 shrink-0" />
+                  <span className="font-black text-slate-900 whitespace-nowrap">{compactNumber(product.video.saves)}</span>
+                  <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">Salvos</span>
                 </span>
               </div>
             </div>
@@ -5087,43 +5087,43 @@ const MobileViralVideoCard: React.FC<{
 
           <div className="space-y-1 pt-1.5 border-t border-amber-200/50">
             <div className="grid grid-cols-3 gap-1 text-center bg-white/80 rounded-lg p-1.5 border border-amber-200/30">
-              <div title="Views" className="flex flex-col items-center">
-                <Eye className="w-3.5 h-3.5 mb-0.5 text-slate-600" />
+              <div title="Visualizações" className="flex flex-col items-center min-w-0">
+                <Eye className="w-3.5 h-3.5 mb-0.5 text-slate-600 shrink-0" />
                 <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
                   {compactNumber(product.video.views)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Views</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Visualizações</span>
               </div>
-              <div title="Likes" className="flex flex-col items-center">
-                <Heart className="w-3.5 h-3.5 mb-0.5 text-rose-500" />
+              <div title="Curtidas" className="flex flex-col items-center min-w-0">
+                <Heart className="w-3.5 h-3.5 mb-0.5 text-rose-500 shrink-0" />
                 <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
                   {compactNumber(product.video.likes)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Likes</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Curtidas</span>
               </div>
-              <div title="Comentários" className="flex flex-col items-center">
-                <MessageCircle className="w-3.5 h-3.5 mb-0.5 text-sky-600" />
+              <div title="Comentários" className="flex flex-col items-center min-w-0">
+                <MessageCircle className="w-3.5 h-3.5 mb-0.5 text-sky-600 shrink-0" />
                 <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
                   {compactNumber(product.video.comments)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Com.</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Comentários</span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-1 text-center bg-white/80 rounded-lg p-1.5 border border-amber-200/30">
-              <div title="Compartilhamentos" className="flex flex-col items-center">
-                <Share2 className="w-3.5 h-3.5 mb-0.5 text-emerald-600" />
+              <div title="Compartilhamentos" className="flex flex-col items-center min-w-0">
+                <Share2 className="w-3.5 h-3.5 mb-0.5 text-emerald-600 shrink-0" />
                 <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
                   {compactNumber(product.video.shares)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Shares</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Compart.</span>
               </div>
-              <div title="Salvos" className="flex flex-col items-center">
-                <Bookmark className="w-3.5 h-3.5 mb-0.5 text-amber-600" />
+              <div title="Salvos" className="flex flex-col items-center min-w-0">
+                <Bookmark className="w-3.5 h-3.5 mb-0.5 text-amber-600 shrink-0" />
                 <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
                   {compactNumber(product.video.saves)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500">Salvos</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Salvos</span>
               </div>
             </div>
           </div>
@@ -7197,7 +7197,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             ) : null}
           </div>
 
-          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-4 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none sm:flex-wrap">
+          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none sm:flex-wrap">
             {VIDEO_FILTER_OPTIONS.map((opt) => {
               const isActive = selectedVideoRange === opt.id;
 
@@ -7219,20 +7219,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     }
                     setPage(1);
                   }}
-                  className="group relative flex items-center justify-center h-[52px] sm:h-[60px] md:h-[66px] w-auto max-w-[125px] rounded-xl bg-transparent border-0 ring-0 shadow-none outline-none focus:outline-none cursor-pointer shrink-0 px-1 py-0.5"
+                  className="group relative flex items-center justify-center h-[24px] sm:h-[26px] md:h-[28px] w-auto bg-transparent border-0 ring-0 shadow-none outline-none focus:outline-none cursor-pointer shrink-0 p-0 m-0"
                 >
                   <div
-                    className={`w-full h-full flex items-center justify-center transition-all duration-200 ${
+                    className={`flex items-center justify-center h-[24px] sm:h-[26px] md:h-[28px] w-auto transition-all duration-150 ${
                       isActive
-                        ? 'scale-105 brightness-110 saturate-125 drop-shadow-md -translate-y-0.5'
-                        : 'scale-100 opacity-90 hover:opacity-100 hover:scale-105'
+                        ? 'opacity-100 brightness-110 drop-shadow-xs -translate-y-0.5'
+                        : 'opacity-80 hover:opacity-100'
                     }`}
                   >
                     <FilterIconImage
                       src={opt.iconUrl}
                       fallbackSrc={opt.fallbackIconUrl}
                       alt={opt.label}
-                      className="h-full w-auto max-w-full max-h-full object-contain pointer-events-none transition-transform duration-200"
+                      className="h-[24px] sm:h-[26px] md:h-[28px] w-auto max-w-none object-contain pointer-events-none"
                     />
                   </div>
                 </button>
