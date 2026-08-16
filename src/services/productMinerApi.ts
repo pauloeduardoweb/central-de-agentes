@@ -1394,6 +1394,7 @@ export async function modelVideoContentApi(
     targetAngle?: string;
     targetDifferentiator?: string;
     voiceTone?: string;
+    structuralFidelity?: 'Alta' | 'Média' | 'Livre';
     customInstructions?: string;
     variantSeed?: number;
   }
