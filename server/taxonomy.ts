@@ -787,10 +787,10 @@ export const HIGH_PRECISION_CATEGORY_TERMS: Record<string, string[]> = {
     'dishdashas',
     'mukena',
     'mukenas',
-    'sarongue',
     'peci',
     'umra',
     'umrah',
+    'hajj',
     'muculmana',
     'muculmano',
     'muculmanas',
@@ -839,15 +839,69 @@ export const HIGH_PRECISION_CATEGORY_TERMS: Record<string, string[]> = {
     'tunica islâmica',
     'tunica muculmana',
     'tunica muçulmana',
+    'jalabiya',
   ],
 };
 
+const GENERIC_EXCLUSION_TERMS_FOR_MUSLIM = [
+  'camiseta basica',
+  'camiseta masculina',
+  'camiseta feminina',
+  'macacao fitness',
+  'macacao esportivo',
+  'joelheira',
+  'cotoveleira',
+  'calca jogger',
+  'calca jeans',
+  'calca legging',
+  'top fitness',
+  'top academia',
+  'short corrida',
+  'bermuda tactel',
+  'cueca boxer',
+  'sutia',
+  'cropped',
+  'regata fitness',
+  'meia compressao',
+  'luva academia',
+];
+
 export function hasHighConfidenceMuslimEvidence(rawTitle: string, rawPath: string): boolean {
+  const tNorm = removeAccents(rawTitle || '').toLowerCase().trim();
+  const pNorm = removeAccents(rawPath || '').toLowerCase().trim();
+
+  // 1. Explicit high-precision terms in TITLE always win
   const terms = HIGH_PRECISION_CATEGORY_TERMS['Moda muçulmana'] || [];
   for (const term of terms) {
-    if (containsWordOrPhrase(rawTitle, term)) return true;
-    if (rawPath && containsWordOrPhrase(rawPath, term)) return true;
+    if (containsWordOrPhrase(tNorm, term)) return true;
   }
+
+  // 2. If title contains clearly generic clothing/fitness terms without explicit Muslim terms, reject
+  for (const genTerm of GENERIC_EXCLUSION_TERMS_FOR_MUSLIM) {
+    if (containsWordOrPhrase(tNorm, genTerm)) {
+      return false;
+    }
+  }
+
+  // 3. For rawPath, require specific subcategories (e.g. hijabs, abaya, burkini, oracao, hajj) not merely generic strings
+  const specificPathEvidence = [
+    'hijab',
+    'abaya',
+    'burkini',
+    'jilbab',
+    'khimar',
+    'niqab',
+    'thobe',
+    'ihram',
+    'tasbih',
+    'oracao',
+    'umra',
+    'hajj',
+  ];
+  for (const sp of specificPathEvidence) {
+    if (pNorm && containsWordOrPhrase(pNorm, sp)) return true;
+  }
+
   return false;
 }
 

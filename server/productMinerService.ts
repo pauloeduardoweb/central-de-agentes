@@ -3060,6 +3060,8 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
   );
 
   const products = Array.isArray(rows) ? rows : [];
+  console.log(`[Reclassify Base] ${products.length} produtos carregados do banco para reclassificação.`);
+
   const categoryCounts: Record<string, number> = {};
   const unclassifiedByCategory: Record<string, number> = {};
   for (const cat of COLLECTOR_CATEGORIES) {
@@ -3138,18 +3140,60 @@ export async function reclassifyExistingDatabaseProducts(): Promise<Reclassifica
     }
   }
 
-  // Execute bulk updates on derived columns ONLY — NEVER overwrite raw category_path or query_source
-  for (const group of groupMap.values()) {
-    const { classifiedCat, classifiedSub, classifiedChild, source, ids } = group;
-    for (let i = 0; i < ids.length; i += 200) {
-      const chunk = ids.slice(i, i + 200);
-      const placeholders = chunk.map(() => '?').join(',');
-      await db.query(
-        `UPDATE tiktok_shop_products
-         SET classified_category = ?, classified_subcategory = ?, classified_child_category = ?, classification_source = ?
-         WHERE product_id IN (${placeholders})`,
-        [classifiedCat, classifiedSub, classifiedChild, source, ...chunk]
-      );
+  console.log(`[Reclassify Base] Classificação calculada: ${classifiedCount} classificados, ${totalChanged} com mudanças, ${totalMaintained} inalterados.`);
+
+  // Execute bulk updates on derived columns ONLY in resilient batches of 500 IDs — NEVER overwrite raw category_path or query_source
+  if (totalChanged > 0 && groupMap.size > 0) {
+    let updatedBatches = 0;
+    const BATCH_SIZE = 500;
+    
+    // Acquire dedicated connection for stable multi-batch execution
+    let conn: any = null;
+    try {
+      conn = await db.getConnection();
+    } catch (connErr) {
+      console.warn('[Reclassify Base] Não foi possível adquirir conexão dedicada, usando pool:', connErr);
+    }
+
+    const queryExecutor = conn || db;
+
+    try {
+      for (const group of groupMap.values()) {
+        const { classifiedCat, classifiedSub, classifiedChild, source, ids } = group;
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+          const chunk = ids.slice(i, i + BATCH_SIZE);
+          const placeholders = chunk.map(() => '?').join(',');
+          try {
+            await queryExecutor.query(
+              `UPDATE tiktok_shop_products
+               SET classified_category = ?, classified_subcategory = ?, classified_child_category = ?, classification_source = ?
+               WHERE product_id IN (${placeholders})`,
+              [classifiedCat, classifiedSub, classifiedChild, source, ...chunk]
+            );
+            updatedBatches++;
+          } catch (batchErr: any) {
+            console.error(`[Reclassify Base] Erro no lote ${updatedBatches + 1} (${chunk.length} produtos):`, batchErr?.message || batchErr);
+            // Fallback retry with smaller sub-chunks
+            for (let j = 0; j < chunk.length; j += 100) {
+              const subChunk = chunk.slice(j, j + 100);
+              const subPlaceholders = subChunk.map(() => '?').join(',');
+              await db.query(
+                `UPDATE tiktok_shop_products
+                 SET classified_category = ?, classified_subcategory = ?, classified_child_category = ?, classification_source = ?
+                 WHERE product_id IN (${subPlaceholders})`,
+                [classifiedCat, classifiedSub, classifiedChild, source, ...subChunk]
+              ).catch((subErr: any) => {
+                console.error('[Reclassify Base] Erro no sub-lote:', subErr?.message || subErr);
+              });
+            }
+          }
+        }
+      }
+      console.log(`[Reclassify Base] Processamento em lotes finalizado: ${updatedBatches} lotes executados com sucesso.`);
+    } finally {
+      if (conn && typeof conn.release === 'function') {
+        conn.release();
+      }
     }
   }
 
