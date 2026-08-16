@@ -38,8 +38,8 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
   // Form states for new target product
   const [targetProduct, setTargetProduct] = useState('');
   const [targetNiche, setTargetNiche] = useState('');
-  const [targetAngle, setTargetAngle] = useState('Praticidade e transformação rápida no dia a dia');
-  const [targetDifferentiator, setTargetDifferentiator] = useState('Alta durabilidade com melhor custo-benefício');
+  const [targetAngle, setTargetAngle] = useState('');
+  const [targetDifferentiator, setTargetDifferentiator] = useState('');
   const [voiceTone, setVoiceTone] = useState('Viral & Enérgico');
   const [structuralFidelity, setStructuralFidelity] = useState<'Alta' | 'Média' | 'Livre'>('Alta');
   const [customInstructions, setCustomInstructions] = useState('');
