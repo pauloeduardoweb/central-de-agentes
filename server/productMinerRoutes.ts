@@ -713,14 +713,143 @@ Mostre o produto em uso close-up. Destaque a alta avaliação de ${product.ratin
 
 // =========================================================================
 // =========================================================================
+// HELPER: VALIDAR ASSINATURA DE MÍDIA (MAGIC BYTES E CONTENT-TYPE)
+// =========================================================================
+interface MediaValidationResult {
+  isValid: boolean;
+  detectedMime: string;
+  rejectReason?: string;
+}
+
+function validateMediaBuffer(buffer: Buffer, receivedContentType?: string | null): MediaValidationResult {
+  if (!buffer || buffer.length < 4096) {
+    return { isValid: false, detectedMime: 'unknown', rejectReason: 'BUFFER_TOO_SMALL' };
+  }
+
+  const rawMime = String(receivedContentType || '').toLowerCase().split(';')[0].trim();
+
+  // Rejeitar expressamente formatos de texto, HTML, JSON, XML e imagens
+  if (
+    rawMime.startsWith('text/') ||
+    rawMime.includes('html') ||
+    rawMime.includes('json') ||
+    rawMime.includes('xml') ||
+    rawMime.startsWith('image/')
+  ) {
+    return { isValid: false, detectedMime: rawMime, rejectReason: `INVALID_CONTENT_TYPE_${rawMime}` };
+  }
+
+  // Verificar se o início do buffer é HTML ou JSON disfarçado
+  const headStr = buffer.slice(0, 256).toString('utf8').trim().toLowerCase();
+  if (
+    headStr.startsWith('<!doctype') ||
+    headStr.startsWith('<html') ||
+    headStr.startsWith('<?xml') ||
+    headStr.startsWith('{') ||
+    headStr.startsWith('/*') ||
+    headStr.includes('<body') ||
+    headStr.includes('<script')
+  ) {
+    return { isValid: false, detectedMime: 'text/html', rejectReason: 'DETECTED_HTML_JSON_PAYLOAD' };
+  }
+
+  // Verificar Magic Bytes conhecidos:
+  // 1. MP4 / MOV (ISO Base Media File Format: contém 'ftyp', 'moov', 'mdat' nos primeiros 32 bytes)
+  const headHex = buffer.slice(0, 32).toString('hex');
+  const headAscii = buffer.slice(0, 32).toString('ascii');
+
+  if (headAscii.includes('ftyp') || headAscii.includes('moov') || headAscii.includes('mdat')) {
+    return { isValid: true, detectedMime: rawMime.startsWith('video/') ? rawMime : 'video/mp4' };
+  }
+
+  // 2. WebM / MKV (EBML: 0x1A 0x45 0xDF 0xA3)
+  if (buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) {
+    return { isValid: true, detectedMime: 'video/webm' };
+  }
+
+  // 3. MP3 (ID3 header ou Frame Sync 0xFF 0xFB/F3/F2)
+  if (
+    (buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33) || // 'ID3'
+    (buffer[0] === 0xff && (buffer[1] === 0xfb || buffer[1] === 0xf3 || buffer[1] === 0xf2))
+  ) {
+    return { isValid: true, detectedMime: 'audio/mpeg' };
+  }
+
+  // 4. AAC (ADTS Sync: 0xFF 0xF1 ou 0xFF 0xF9)
+  if (buffer[0] === 0xff && (buffer[1] === 0xf1 || buffer[1] === 0xf9)) {
+    return { isValid: true, detectedMime: 'audio/aac' };
+  }
+
+  // 5. WAV (RIFF....WAVE)
+  if (headAscii.startsWith('RIFF') && headAscii.includes('WAVE')) {
+    return { isValid: true, detectedMime: 'audio/wav' };
+  }
+
+  // 6. OGG (OggS)
+  if (buffer[0] === 0x4f && buffer[1] === 0x67 && buffer[2] === 0x67 && buffer[3] === 0x53) {
+    return { isValid: true, detectedMime: 'audio/ogg' };
+  }
+
+  // 7. Se Content-Type for explicitamente video/* ou audio/* e não tiver sido rejeitado por texto/html
+  if (rawMime.startsWith('video/') || rawMime.startsWith('audio/')) {
+    return { isValid: true, detectedMime: rawMime };
+  }
+
+  return { isValid: false, detectedMime: rawMime || 'unknown', rejectReason: 'UNKNOWN_MEDIA_SIGNATURE' };
+}
+
+function isDirectCdnMediaUrl(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  const lower = urlStr.toLowerCase();
+  // URLs de páginas web do TikTok não são mídias diretas
+  if (
+    (lower.includes('tiktok.com/@') && lower.includes('/video/')) ||
+    lower.includes('vt.tiktok.com/') ||
+    lower.includes('vm.tiktok.com/') ||
+    lower.includes('tiktok.com/t/')
+  ) {
+    return false;
+  }
+  // Verificar se tem domínios ou padrões de CDN de mídia conhecidos
+  return (
+    lower.includes('tiktokcdn') ||
+    lower.includes('muscdn') ||
+    lower.includes('v16-webapp') ||
+    lower.includes('v16a') ||
+    lower.includes('v16m') ||
+    lower.includes('.mp4') ||
+    lower.includes('.webm') ||
+    lower.includes('.mp3') ||
+    lower.includes('.m4a') ||
+    lower.includes('socialcrawl') ||
+    lower.includes('download_media')
+  );
+}
+
+// =========================================================================
 // HELPER: BAIXAR BUFFER REAL DO VÍDEO/ÁUDIO PARA TRANSCRIÇÃO FIEL
 // =========================================================================
-async function fetchVideoMediaBuffer(productId: string, videoId?: string, fallbackUrl?: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+interface FetchVideoMediaBufferResult {
+  buffer: Buffer;
+  mimeType: string;
+  mediaSource: 'DB_DIRECT_MEDIA' | 'PREPARED_DIRECT_MEDIA' | 'FALLBACK_VIDEO_URL';
+  httpStatus: number;
+  domain: string;
+  bufferBytes: number;
+}
+
+async function fetchVideoMediaBuffer(
+  productId: string,
+  videoId?: string,
+  fallbackUrl?: string
+): Promise<{ result?: FetchVideoMediaBufferResult; errorStage?: string; errorDetails?: any }> {
   const cleanProductId = String(productId || '').trim();
   const cleanVideoId = String(videoId || '').trim();
 
-  // 1. Verificar registro persistido no banco
   let cdnUrl: string | null = null;
+  let mediaSource: 'DB_DIRECT_MEDIA' | 'PREPARED_DIRECT_MEDIA' | 'FALLBACK_VIDEO_URL' = 'DB_DIRECT_MEDIA';
+
+  // 1. Verificar registro persistido no banco de dados
   if (isDatabaseConfigured()) {
     try {
       const [rows]: any = await db.query(
@@ -730,54 +859,114 @@ async function fetchVideoMediaBuffer(productId: string, videoId?: string, fallba
       const record = Array.isArray(rows) && rows[0];
       if (record && record.status === 'COMPLETED' && record.direct_media_url) {
         cdnUrl = String(record.direct_media_url);
+        mediaSource = 'DB_DIRECT_MEDIA';
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.warn('[fetchVideoMediaBuffer DB read warning]:', dbErr?.message || dbErr);
+    }
   }
 
-  // 2. Se não estiver preparado ainda, acionar prepareVideoDownload
+  // 2. Se não estiver preparado no banco, acionar prepareVideoDownload
   if (!cdnUrl) {
     try {
       const prepRes = await prepareVideoDownload(cleanProductId, cleanVideoId || undefined);
       if (prepRes.success && prepRes.directMediaUrl) {
         cdnUrl = String(prepRes.directMediaUrl);
+        mediaSource = 'PREPARED_DIRECT_MEDIA';
       }
     } catch (prepErr: any) {
       console.warn('[fetchVideoMediaBuffer prepare error]:', prepErr?.message || prepErr);
     }
   }
 
-  // 3. Fallback para URL direta caso exista e seja válida
+  // 3. Fallback APENAS se for URL direta de CDN de mídia (NUNCA página HTML do TikTok)
   if (!cdnUrl && fallbackUrl && (fallbackUrl.startsWith('http://') || fallbackUrl.startsWith('https://'))) {
-    cdnUrl = fallbackUrl;
-  }
-
-  // 4. Se tivermos a URL de CDN, baixar o buffer do vídeo com timeout seguro
-  if (cdnUrl) {
-    try {
-      const res = await fetch(cdnUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': '*/*',
-        },
-        redirect: 'follow',
-        signal: AbortSignal.timeout(45000),
-      });
-
-      if (res.ok) {
-        const arrayBuffer = await res.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        if (buffer.length > 500) {
-          const rawMime = res.headers.get('content-type') || 'video/mp4';
-          const mimeType = rawMime.split(';')[0].trim() || 'video/mp4';
-          return { buffer, mimeType };
-        }
-      }
-    } catch (dlErr: any) {
-      console.warn('[fetchVideoMediaBuffer cdn download error]:', dlErr?.message || dlErr);
+    if (isDirectCdnMediaUrl(fallbackUrl)) {
+      cdnUrl = fallbackUrl;
+      mediaSource = 'FALLBACK_VIDEO_URL';
+    } else {
+      console.info('[fetchVideoMediaBuffer] Ignorando fallbackUrl pois é página web e não mídia direta:', fallbackUrl.slice(0, 60));
     }
   }
 
-  return null;
+  if (!cdnUrl) {
+    return { errorStage: 'MEDIA_PREPARE', errorDetails: { reason: 'NO_DIRECT_MEDIA_URL' } };
+  }
+
+  let domain = 'unknown';
+  try {
+    domain = new URL(cdnUrl).hostname;
+  } catch {}
+
+  // 4. Baixar buffer de mídia real com timeout e validação estrita
+  try {
+    const res = await fetch(cdnUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(45000),
+    });
+
+    const httpStatus = res.status;
+    const rawContentType = res.headers.get('content-type');
+
+    if (!res.ok) {
+      return {
+        errorStage: 'MEDIA_FETCH',
+        errorDetails: { httpStatus, statusText: res.statusText, domain, mediaSource },
+      };
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // 5. Validar que o buffer é de fato mídia e não HTML de erro ou JSON
+    const validation = validateMediaBuffer(buffer, rawContentType);
+    if (!validation.isValid) {
+      console.warn('[fetchVideoMediaBuffer validation failed]:', {
+        rejectReason: validation.rejectReason,
+        detectedMime: validation.detectedMime,
+        rawContentType,
+        bufferBytes: buffer.length,
+        domain,
+        mediaSource,
+      });
+      return {
+        errorStage: 'MEDIA_VALIDATE',
+        errorDetails: {
+          rejectReason: validation.rejectReason,
+          rawContentType,
+          bufferBytes: buffer.length,
+          domain,
+          mediaSource,
+        },
+      };
+    }
+
+    return {
+      result: {
+        buffer,
+        mimeType: validation.detectedMime || 'video/mp4',
+        mediaSource,
+        httpStatus,
+        domain,
+        bufferBytes: buffer.length,
+      },
+    };
+  } catch (dlErr: any) {
+    console.error('[fetchVideoMediaBuffer download exception]:', {
+      message: dlErr?.message,
+      name: dlErr?.name,
+      domain,
+      mediaSource,
+    });
+    return {
+      errorStage: 'MEDIA_FETCH',
+      errorDetails: { message: dlErr?.message, name: dlErr?.name, domain, mediaSource },
+    };
+  }
 }
 
 // =========================================================================
@@ -786,6 +975,16 @@ async function fetchVideoMediaBuffer(productId: string, videoId?: string, fallba
 productMinerRouter.post('/videos/transcription', async (req, res) => {
   const access = await requireProductMinerAccess(req, res);
   if (!access) return;
+
+  let currentStage = 'MEDIA_CONTEXT';
+  let cleanProductId = '';
+  let cleanVideoId = '';
+  let mediaSourceTracked: string = 'UNKNOWN';
+  let mediaHttpStatusTracked: number = 0;
+  let mediaDomainTracked: string = 'unknown';
+  let mediaMimeTracked: string = 'unknown';
+  let mediaBytesTracked: number = 0;
+  let uploadModeTracked: 'INLINE' | 'FILE' = 'INLINE';
 
   try {
     const {
@@ -799,8 +998,8 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
       forceRefresh = false,
     } = req.body || {};
 
-    const cleanProductId = String(productId || '').trim();
-    const cleanVideoId = String(videoId || '').trim();
+    cleanProductId = String(productId || '').trim();
+    cleanVideoId = String(videoId || '').trim();
 
     if (!cleanProductId) {
       return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto é obrigatório.' });
@@ -853,6 +1052,7 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
     }
 
     // 2. Coletar dados contextuais do banco
+    currentStage = 'MEDIA_CONTEXT';
     let dbDesc = String(videoDescription || '');
     let dbTitle = String(productTitle || '');
     let dbAuthor = String(videoAuthor || '');
@@ -889,15 +1089,29 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
     }
 
     // 3. Obter arquivo de mídia REAL do vídeo para o Gemini ouvir o áudio
-    const media = await fetchVideoMediaBuffer(cleanProductId, cleanVideoId || undefined, dbVideoUrl);
+    currentStage = 'MEDIA_PREPARE';
+    const mediaFetch = await fetchVideoMediaBuffer(cleanProductId, cleanVideoId || undefined, dbVideoUrl);
 
-    if (!media || !media.buffer || media.buffer.length < 500) {
-      // REGRA INEGOCIÁVEL: Se o áudio não puder ser obtido, NÃO inventar transcrição.
+    if (!mediaFetch.result) {
+      console.error('[Video Transcription Media Unavailable]:', {
+        stage: mediaFetch.errorStage || currentStage,
+        productId: cleanProductId,
+        videoId: cleanVideoId,
+        details: mediaFetch.errorDetails,
+      });
+
       return res.status(422).json({
         error: 'AUDIO_UNAVAILABLE',
         message: 'Não foi possível acessar o áudio deste vídeo para gerar uma transcrição fiel. O arquivo de mídia não está acessível no momento.',
       });
     }
+
+    const media = mediaFetch.result;
+    mediaSourceTracked = media.mediaSource;
+    mediaHttpStatusTracked = media.httpStatus;
+    mediaDomainTracked = media.domain;
+    mediaMimeTracked = media.mimeType;
+    mediaBytesTracked = media.bufferBytes;
 
     // 4. Prompt de Transcrição Exata com Máxima Fidelidade Fonética
     const transcriptionPrompt = `Você é um perito profissional em transcrição fonética e textual de vídeos curtos do TikTok Shop.
@@ -968,8 +1182,10 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
     let contentsPayload: any = null;
 
     try {
-      // Se o buffer for menor que 12MB, enviar via inlineData (rápido e direto)
+      // Se o buffer for menor ou igual a 12MB, enviar via inlineData
       if (media.buffer.length <= 12 * 1024 * 1024) {
+        currentStage = 'GEMINI_INLINE_PREPARE';
+        uploadModeTracked = 'INLINE';
         contentsPayload = [
           {
             inlineData: {
@@ -980,7 +1196,9 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
           transcriptionPrompt,
         ];
       } else {
-        // Se for maior, salvar em arquivo temporário e fazer upload via Files API
+        // Se for maior que 12MB, salvar temporariamente e fazer upload via Files API
+        currentStage = 'GEMINI_FILE_UPLOAD';
+        uploadModeTracked = 'FILE';
         tmpFilePath = path.join(os.tmpdir(), `tiktok_media_${cleanProductId}_${cleanVideoId || 'main'}_${Date.now()}.mp4`);
         await fs.promises.writeFile(tmpFilePath, media.buffer);
 
@@ -992,17 +1210,32 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
           },
         });
 
+        currentStage = 'GEMINI_FILE_PROCESSING';
         let fileState = uploadedFile;
         let pollCount = 0;
-        while (fileState.state === 'PROCESSING' && pollCount < 15) {
+        while (fileState.state === 'PROCESSING' && pollCount < 20) {
           await new Promise((r) => setTimeout(r, 2000));
           fileState = await ai.files.get({ name: uploadedFile.name });
           pollCount++;
         }
 
-        contentsPayload = [fileState, transcriptionPrompt];
+        if (fileState.state === 'FAILED') {
+          throw new Error(`GEMINI_FILE_PROCESSING_FAILED: File processing failed with state ${fileState.state}`);
+        }
+
+        // Utilizar fileData para o Files API
+        contentsPayload = [
+          {
+            fileData: {
+              fileUri: fileState.uri,
+              mimeType: fileState.mimeType || media.mimeType || 'video/mp4',
+            },
+          },
+          transcriptionPrompt,
+        ];
       }
 
+      currentStage = 'GEMINI_GENERATE';
       const response = await ai.models.generateContent({
         model: 'gemini-3.7-flash',
         contents: contentsPayload,
@@ -1011,12 +1244,15 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
         },
       });
 
+      currentStage = 'GEMINI_RESPONSE';
       const responseText = response.text || '{}';
+
+      currentStage = 'JSON_PARSE';
       let parsedData: any = {};
       try {
         parsedData = JSON.parse(responseText);
       } catch (jsonErr) {
-        console.warn('[Transcription JSON parse error, attempting extraction]:', jsonErr);
+        console.warn('[Transcription JSON parse error, attempting regex extraction]:', jsonErr);
         const match = responseText.match(/\{[\s\S]*\}/);
         if (match) {
           parsedData = JSON.parse(match[0]);
@@ -1043,6 +1279,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
       const confidenceScore = Number(parsedData.confidenceScore) || 98;
 
       // 5. Salvar no banco com transcription_source = 'audio_extracted' e transcription_version = 2
+      currentStage = 'DATABASE_SAVE';
       if (isDatabaseConfigured()) {
         try {
           await db.query(
@@ -1110,8 +1347,25 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
         confidenceScore,
       });
     } catch (aiErr: any) {
-      console.error('[Video Transcription AI Error]:', aiErr?.message || aiErr);
-      // REGRA INEGOCIÁVEL: Se a IA falhar na análise do áudio, retornar erro em vez de inventar dados fictícios
+      console.error('[Video Transcription Server Error Details]:', {
+        stage: currentStage,
+        errorName: aiErr?.name,
+        errorMessage: aiErr?.message,
+        errorCode: aiErr?.code,
+        errorStatus: aiErr?.status,
+        errorStatusText: aiErr?.statusText,
+        errorCause: aiErr?.cause ? String(aiErr.cause) : undefined,
+        stackSummary: aiErr?.stack ? String(aiErr.stack).split('\n').slice(0, 4).join('\n') : undefined,
+        productId: cleanProductId,
+        videoId: cleanVideoId,
+        mediaSource: mediaSourceTracked,
+        httpStatus: mediaHttpStatusTracked,
+        domain: mediaDomainTracked,
+        mimeType: mediaMimeTracked,
+        bufferBytes: mediaBytesTracked,
+        uploadMode: uploadModeTracked,
+      });
+
       return res.status(500).json({
         error: 'TRANSCRIPTION_ERROR',
         message: 'Não foi possível analisar o áudio deste vídeo com a IA. Verifique se o vídeo possui som e tente novamente.',
@@ -1129,7 +1383,14 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
       }
     }
   } catch (error: any) {
-    console.error('[Video Transcription Route Error]:', error?.message || error);
+    console.error('[Video Transcription Route Fatal Error]:', {
+      stage: currentStage,
+      errorName: error?.name,
+      errorMessage: error?.message,
+      errorCode: error?.code,
+      productId: cleanProductId,
+      videoId: cleanVideoId,
+    });
     return res.status(500).json({ error: 'TRANSCRIPTION_INTERNAL_ERROR', message: 'Erro interno ao processar transcrição do vídeo.' });
   }
 });
