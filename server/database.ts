@@ -1275,12 +1275,22 @@ export function ensureProductMinerTables(): Promise<void> {
           development_original LONGTEXT DEFAULT NULL,
           cta_original TEXT DEFAULT NULL,
           confidence_score INT DEFAULT 100,
+          transcription_source VARCHAR(50) DEFAULT 'audio_extracted',
+          transcription_version INT DEFAULT 2,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           UNIQUE KEY uq_tsvt_prod_vid (product_id, video_id),
           INDEX idx_tsvt_created (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      // Idempotent column migrations for transcription versioning
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_video_transcripts ADD COLUMN transcription_source VARCHAR(50) DEFAULT 'audio_extracted' AFTER confidence_score`);
+      } catch {}
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_video_transcripts ADD COLUMN transcription_version INT DEFAULT 2 AFTER transcription_source`);
+      } catch {}
 
       await ensureDailyCollectionsTable();
       await ensureCategoryExecutionHistoryTable();

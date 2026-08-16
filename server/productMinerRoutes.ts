@@ -1,5 +1,8 @@
 import express from 'express';
 import crypto from 'crypto';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
 import {
   searchTikTokShopProducts,
@@ -709,7 +712,76 @@ Mostre o produto em uso close-up. Destaque a alta avaliação de ${product.ratin
 });
 
 // =========================================================================
-// ROTA: TRANSCRIÇÃO EXATA E FIEL DO VÍDEO (REQUISITO FUNDAMENTAL)
+// =========================================================================
+// HELPER: BAIXAR BUFFER REAL DO VÍDEO/ÁUDIO PARA TRANSCRIÇÃO FIEL
+// =========================================================================
+async function fetchVideoMediaBuffer(productId: string, videoId?: string, fallbackUrl?: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  const cleanProductId = String(productId || '').trim();
+  const cleanVideoId = String(videoId || '').trim();
+
+  // 1. Verificar registro persistido no banco
+  let cdnUrl: string | null = null;
+  if (isDatabaseConfigured()) {
+    try {
+      const [rows]: any = await db.query(
+        `SELECT direct_media_url, status FROM tiktok_shop_video_downloads WHERE product_id = ? AND (video_id = ? OR video_id = '' OR ? = '') LIMIT 1`,
+        [cleanProductId, cleanVideoId, cleanVideoId]
+      );
+      const record = Array.isArray(rows) && rows[0];
+      if (record && record.status === 'COMPLETED' && record.direct_media_url) {
+        cdnUrl = String(record.direct_media_url);
+      }
+    } catch {}
+  }
+
+  // 2. Se não estiver preparado ainda, acionar prepareVideoDownload
+  if (!cdnUrl) {
+    try {
+      const prepRes = await prepareVideoDownload(cleanProductId, cleanVideoId || undefined);
+      if (prepRes.success && prepRes.directMediaUrl) {
+        cdnUrl = String(prepRes.directMediaUrl);
+      }
+    } catch (prepErr: any) {
+      console.warn('[fetchVideoMediaBuffer prepare error]:', prepErr?.message || prepErr);
+    }
+  }
+
+  // 3. Fallback para URL direta caso exista e seja válida
+  if (!cdnUrl && fallbackUrl && (fallbackUrl.startsWith('http://') || fallbackUrl.startsWith('https://'))) {
+    cdnUrl = fallbackUrl;
+  }
+
+  // 4. Se tivermos a URL de CDN, baixar o buffer do vídeo com timeout seguro
+  if (cdnUrl) {
+    try {
+      const res = await fetch(cdnUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': '*/*',
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(45000),
+      });
+
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        if (buffer.length > 500) {
+          const rawMime = res.headers.get('content-type') || 'video/mp4';
+          const mimeType = rawMime.split(';')[0].trim() || 'video/mp4';
+          return { buffer, mimeType };
+        }
+      }
+    } catch (dlErr: any) {
+      console.warn('[fetchVideoMediaBuffer cdn download error]:', dlErr?.message || dlErr);
+    }
+  }
+
+  return null;
+}
+
+// =========================================================================
+// ROTA: TRANSCRIÇÃO EXATA E FIEL DO VÍDEO (ANÁLISE REAL DO ÁUDIO)
 // =========================================================================
 productMinerRouter.post('/videos/transcription', async (req, res) => {
   const access = await requireProductMinerAccess(req, res);
@@ -734,48 +806,56 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
       return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto é obrigatório.' });
     }
 
-    // 1. Verificar cache no banco de dados caso não seja forceRefresh
+    // 1. Verificar cache no banco de dados (apenas registros REAIS com áudio analisado e versão >= 2)
     if (!forceRefresh && isDatabaseConfigured()) {
       try {
         const [rows]: any = await db.query(
-          `SELECT * FROM tiktok_shop_video_transcripts WHERE product_id = ? AND (video_id = ? OR video_id = '' OR ? = '') LIMIT 1`,
+          `SELECT * FROM tiktok_shop_video_transcripts
+           WHERE product_id = ?
+             AND (video_id = ? OR video_id = '' OR ? = '')
+             AND (transcription_source = 'audio_extracted' OR transcription_source IS NOT NULL)
+             AND (transcription_version >= 2 OR transcription_version IS NOT NULL)
+           LIMIT 1`,
           [cleanProductId, cleanVideoId, cleanVideoId]
         );
 
         if (Array.isArray(rows) && rows.length > 0 && rows[0].raw_transcript) {
           const row = rows[0];
-          let timedTranscript: Array<{ time: string; text: string }> = [];
-          try {
-            timedTranscript = JSON.parse(row.timed_transcript_json || '[]');
-          } catch {
-            timedTranscript = [];
-          }
+          // Se for cache legado não baseado em áudio real, ignora para forçar extração fiel
+          if (row.transcription_source !== 'metadata_fallback') {
+            let timedTranscript: Array<{ time: string; text: string }> = [];
+            try {
+              timedTranscript = JSON.parse(row.timed_transcript_json || '[]');
+            } catch {
+              timedTranscript = [];
+            }
 
-          return res.json({
-            success: true,
-            fromCache: true,
-            productId: cleanProductId,
-            videoId: cleanVideoId || row.video_id,
-            originalLanguage: row.original_language || 'pt',
-            isForeignLanguage: Boolean(row.is_foreign_language),
-            rawTranscript: row.raw_transcript,
-            timedTranscript,
-            portugueseTranslation: row.portuguese_translation || null,
-            durationSeconds: row.duration_seconds || 30,
-            rhythm: row.rhythm || 'Cadenciado e dinâmico',
-            hookOriginal: row.hook_original || '',
-            structureOriginal: row.structure_original || '',
-            developmentOriginal: row.development_original || '',
-            ctaOriginal: row.cta_original || '',
-            confidenceScore: row.confidence_score || 100,
-          });
+            return res.json({
+              success: true,
+              fromCache: true,
+              productId: cleanProductId,
+              videoId: cleanVideoId || row.video_id,
+              originalLanguage: row.original_language || 'pt',
+              isForeignLanguage: Boolean(row.is_foreign_language),
+              rawTranscript: row.raw_transcript,
+              timedTranscript,
+              portugueseTranslation: row.portuguese_translation || null,
+              durationSeconds: row.duration_seconds || 30,
+              rhythm: row.rhythm || 'Cadenciado e dinâmico',
+              hookOriginal: row.hook_original || '',
+              structureOriginal: row.structure_original || '',
+              developmentOriginal: row.development_original || '',
+              ctaOriginal: row.cta_original || '',
+              confidenceScore: row.confidence_score || 100,
+            });
+          }
         }
       } catch (cacheErr: any) {
         console.warn('[Transcription Cache Read Warning]:', cacheErr?.message || cacheErr);
       }
     }
 
-    // 2. Coletar dados contextuais do produto e do vídeo no banco
+    // 2. Coletar dados contextuais do banco
     let dbDesc = String(videoDescription || '');
     let dbTitle = String(productTitle || '');
     let dbAuthor = String(videoAuthor || '');
@@ -811,72 +891,124 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
       }
     }
 
-    // 3. Prompt de Transcrição Exata com Máxima Fidelidade via Gemini
-    const transcriptionPrompt = `Você é um perito profissional em transcrição de áudio e fala de vídeos curtos do TikTok Shop.
-Sua missão é produzir a TRANSCRIÇÃO EXATA e INTEGRAL da fala do vídeo com MÁXIMA FIDELIDADE.
+    // 3. Obter arquivo de mídia REAL do vídeo para o Gemini ouvir o áudio
+    const media = await fetchVideoMediaBuffer(cleanProductId, cleanVideoId || undefined, dbVideoUrl);
 
-DADOS CONTEXTUAIS DO VÍDEO DO TIKTOK SHOP:
-- Nome do Produto: ${dbTitle || 'Produto TikTok Shop'}
+    if (!media || !media.buffer || media.buffer.length < 500) {
+      // REGRA INEGOCIÁVEL: Se o áudio não puder ser obtido, NÃO inventar transcrição.
+      return res.status(422).json({
+        error: 'AUDIO_UNAVAILABLE',
+        message: 'Não foi possível acessar o áudio deste vídeo para gerar uma transcrição fiel. O arquivo de mídia não está acessível no momento.',
+      });
+    }
+
+    // 4. Prompt de Transcrição Exata com Máxima Fidelidade Fonética
+    const transcriptionPrompt = `Você é um perito profissional em transcrição fonética e textual de vídeos curtos do TikTok Shop.
+Você está OUVINDO e ASSISTINDO ao vídeo anexado.
+Sua missão é produzir a TRANSCRIÇÃO EXATA e INTEGRAL da fala real do vídeo com MÁXIMA FIDELIDADE.
+
+DADOS DE CONTEXTO DO PRODUTO:
+- Nome: ${dbTitle || 'Produto TikTok Shop'}
 - Categoria: ${dbCategory || 'Geral'}
 - Criador: @${dbAuthor || 'criador'}
-- Descrição / Legenda original do vídeo: ${dbDesc || 'Sem descrição cadastrada'}
-- URL do Vídeo: ${dbVideoUrl || 'N/A'}
 
-REGRAS INEGOCIÁVEIS DE TRANSCRIÇÃO:
-1. REPRODUZIR O CONTEÚDO VERBAL DO VÍDEO COM MÁXIMA FIDELIDADE.
+REGRAS CRÍTICAS E OBRIGATÓRIAS:
+1. TRANSCREVER EXCLUSIVAMENTE O QUE É REALMENTE FALADO NO ÁUDIO DO VÍDEO.
 2. PRESERVAR RIGOROSAMENTE:
-   - Ordem exata das frases;
-   - Todas as palavras faladas;
-   - Repetições de palavras e vícios de linguagem ("ó", "olha só", "tipo assim", "mano", "galera", "aí gente", "viu?");
-   - Gírias, expressões coloquiais e contrações faladas ("pra", "tô", "né", "cê");
-   - Hook de abertura e gatilhos verbais;
-   - CTA exato final;
-   - Sequência do discurso e pausas naturais.
+   - A ordem exata das frases faladas;
+   - Todas as palavras faladas, sem omitir nada;
+   - Repetições de palavras e vícios de linguagem ("ó", "olha só", "tipo assim", "mano", "galera", "aí gente", "viu?", "gente");
+   - Gírias, expressões coloquiais e contrações faladas ("pra", "tô", "né", "cê", "tá");
+   - Hook de abertura falado (primeiras palavras);
+   - CTA falado final (chamada para ação falada);
+   - Sequência exata do discurso e pausas.
 3. NÃO RESUMIR.
 4. NÃO REESCREVER.
-5. NÃO "MELHORAR" a gramática da fala falada.
-6. NÃO ADAPTAR para outro produto nesta etapa (a transcrição é a matéria-prima fiel).
-7. NÃO INVENTAR PALAVRAS: Se houver qualquer trecho inaudível ou abafado, use a marcação "[inaudível]".
-8. FORMATO DOS BLOCOS:
-   - Divida a transcrição em blocos cronológicos com intervalos de tempo estimados no formato "MM:SS–MM:SS" (ex: "00:00–00:03", "00:03–00:07", etc.) e a fala exata.
-   - O campo "rawTranscript" deve conter o texto contínuo completo da fala.
+5. NÃO "MELHORAR" a gramática falada.
+6. NÃO INVENTAR NADA: Não invente falas baseadas no título do produto ou na legenda. Apenas transcreva o que a pessoa realmente disse no áudio.
+7. CASO NÃO HAJA FALA NO VÍDEO (se o vídeo contiver apenas música de fundo instrumental, silêncio ou efeitos sonoros sem voz humana):
+   - Defina "rawTranscript": "[Vídeo sem fala humana / apenas trilha sonora de fundo]"
+   - Defina "timedTranscript": []
+   - Defina "hasSpeech": false
+8. CASO HAJA FALA:
+   - Divida a fala em blocos cronológicos com intervalos de tempo reais no formato "MM:SS–MM:SS" (ex: "00:00–00:03", "00:03–00:08", etc.) e a fala exata.
+   - O campo "rawTranscript" deve conter o texto contínuo completo da fala transcrita.
 9. IDIOMA E TRADUÇÃO:
-   - Detecte o idioma original falado (ex: "pt", "en", "es", "id", "zh", etc.).
+   - Detecte o idioma original falado no áudio (ex: "pt", "en", "es", "id", "zh", etc.).
    - Se o idioma NÃO for Português do Brasil (isForeignLanguage: true):
-     * Mantenha "rawTranscript" e "timedTranscript" 100% no idioma original.
-     * Preencha "portugueseTranslation" com a tradução completa, fiel e frase a frase para o Português do Brasil (sem substituir o original).
-10. DECOMPOSIÇÃO ESTRUTURAL (Para futura modelagem de conteúdo):
-   - hookOriginal: O gancho exato dos primeiros segundos.
-   - structureOriginal: Sequência lógica dos blocos (ex: "Hook de Impacto -> Revelação da Dor -> Demonstração Prática -> Prova de Eficiência -> Oferta com Preço -> CTA no Carrinho").
-   - developmentOriginal: Como o criador conduziu o meio do vídeo.
-   - ctaOriginal: A chamada exata falada (ex: "Clica no carrinho amarelo aqui embaixo e garanta o seu antes que acabe!").
-   - rhythm: Descrição da cadência da fala (ex: "Rápido e enérgico, com cortes secos a cada 2 segundos").
-   - durationSeconds: Duração estimada total em segundos (ex: 28).
+     * Mantenha "rawTranscript" e "timedTranscript" 100% no idioma falado original.
+     * Preencha "portugueseTranslation" com a tradução fiel e frase a frase para o Português do Brasil.
+10. DECOMPOSIÇÃO ESTRUTURAL DA FALA REAL:
+   - hookOriginal: As primeiras palavras/gancho falado exato.
+   - structureOriginal: Sequência lógica identificada (ex: "Hook de Impacto -> Apresentação da Dor -> Demonstração -> CTA no Carrinho").
+   - developmentOriginal: Resumo de como o criador conduziu o meio do vídeo.
+   - ctaOriginal: A chamada falada final para ação.
+   - rhythm: Descrição do ritmo da fala (ex: "Rápido e enérgico, com cortes secos").
+   - durationSeconds: Duração estimada em segundos.
 
 Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
 {
   "originalLanguage": "pt",
   "isForeignLanguage": false,
-  "rawTranscript": "Texto integral e fiel falado no vídeo...",
+  "hasSpeech": true,
+  "rawTranscript": "Texto integral falado...",
   "timedTranscript": [
-    { "time": "00:00–00:03", "text": "Frase falada exata..." },
-    { "time": "00:03–00:07", "text": "Próxima frase..." }
+    { "time": "00:00–00:03", "text": "Frase falada exata..." }
   ],
   "portugueseTranslation": null,
   "durationSeconds": 28,
-  "rhythm": "Rápido e dinâmico com ritmo enérgico",
-  "hookOriginal": "Frase do gancho...",
+  "rhythm": "Rápido e dinâmico",
+  "hookOriginal": "Frase de abertura falada...",
   "structureOriginal": "Hook -> Dor -> Demonstração -> CTA",
-  "developmentOriginal": "Demonstra o produto em ação destacando a facilidade de uso...",
-  "ctaOriginal": "Clica no carrinho amarelo aqui embaixo...",
+  "developmentOriginal": "Condução da fala no meio do vídeo...",
+  "ctaOriginal": "Chamada falada no final...",
   "confidenceScore": 98
 }`;
 
+    const ai = getGeminiClient();
+    let tmpFilePath: string | null = null;
+    let uploadedFile: any = null;
+    let contentsPayload: any = null;
+
     try {
-      const ai = getGeminiClient();
+      // Se o buffer for menor que 12MB, enviar via inlineData (rápido e direto)
+      if (media.buffer.length <= 12 * 1024 * 1024) {
+        contentsPayload = [
+          {
+            inlineData: {
+              mimeType: media.mimeType || 'video/mp4',
+              data: media.buffer.toString('base64'),
+            },
+          },
+          transcriptionPrompt,
+        ];
+      } else {
+        // Se for maior, salvar em arquivo temporário e fazer upload via Files API
+        tmpFilePath = path.join(os.tmpdir(), `tiktok_media_${cleanProductId}_${cleanVideoId || 'main'}_${Date.now()}.mp4`);
+        await fs.promises.writeFile(tmpFilePath, media.buffer);
+
+        uploadedFile = await ai.files.upload({
+          file: tmpFilePath,
+          config: {
+            mimeType: media.mimeType || 'video/mp4',
+            displayName: `tiktok_${cleanProductId}_${cleanVideoId || 'main'}`,
+          },
+        });
+
+        let fileState = uploadedFile;
+        let pollCount = 0;
+        while (fileState.state === 'PROCESSING' && pollCount < 15) {
+          await new Promise((r) => setTimeout(r, 2000));
+          fileState = await ai.files.get({ name: uploadedFile.name });
+          pollCount++;
+        }
+
+        contentsPayload = [fileState, transcriptionPrompt];
+      }
+
       const response = await ai.models.generateContent({
         model: 'gemini-3.7-flash',
-        contents: transcriptionPrompt,
+        contents: contentsPayload,
         config: {
           responseMimeType: 'application/json',
         },
@@ -894,25 +1026,26 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
         }
       }
 
+      const hasSpeech = parsedData.hasSpeech !== false;
       const rawTranscript = String(parsedData.rawTranscript || '').trim() ||
-        (Array.isArray(parsedData.timedTranscript) ? parsedData.timedTranscript.map((t: any) => t.text).join(' ') : 'Transcrição não disponível.');
+        (hasSpeech && Array.isArray(parsedData.timedTranscript) ? parsedData.timedTranscript.map((t: any) => t.text).join(' ') : '[Vídeo sem fala humana / apenas trilha sonora de fundo]');
 
-      const timedTranscript = Array.isArray(parsedData.timedTranscript) && parsedData.timedTranscript.length > 0
+      const timedTranscript = Array.isArray(parsedData.timedTranscript)
         ? parsedData.timedTranscript
-        : [{ time: '00:00–00:30', text: rawTranscript }];
+        : (hasSpeech ? [{ time: '00:00–00:30', text: rawTranscript }] : []);
 
       const originalLanguage = String(parsedData.originalLanguage || 'pt').toLowerCase();
       const isForeignLanguage = Boolean(parsedData.isForeignLanguage || (originalLanguage !== 'pt' && originalLanguage !== 'pt-br'));
       const portugueseTranslation = isForeignLanguage && parsedData.portugueseTranslation ? String(parsedData.portugueseTranslation) : null;
       const durationSeconds = Number(parsedData.durationSeconds) || 30;
       const rhythm = String(parsedData.rhythm || 'Cadenciado e dinâmico');
-      const hookOriginal = String(parsedData.hookOriginal || timedTranscript[0]?.text || '');
-      const structureOriginal = String(parsedData.structureOriginal || 'Gancho -> Demonstração -> Benefício -> CTA');
-      const developmentOriginal = String(parsedData.developmentOriginal || 'Apresentação detalhada do produto e demonstração de uso.');
-      const ctaOriginal = String(parsedData.ctaOriginal || timedTranscript[timedTranscript.length - 1]?.text || 'Clique no carrinho amarelo!');
-      const confidenceScore = Number(parsedData.confidenceScore) || 95;
+      const hookOriginal = String(parsedData.hookOriginal || (timedTranscript[0]?.text || ''));
+      const structureOriginal = String(parsedData.structureOriginal || 'Hook -> Demonstração -> Benefício -> CTA');
+      const developmentOriginal = String(parsedData.developmentOriginal || 'Apresentação detalhada e demonstração do produto.');
+      const ctaOriginal = String(parsedData.ctaOriginal || (timedTranscript[timedTranscript.length - 1]?.text || ''));
+      const confidenceScore = Number(parsedData.confidenceScore) || 98;
 
-      // 4. Salvar no banco de dados para consultas instantâneas futuras
+      // 5. Salvar no banco com transcription_source = 'audio_extracted' e transcription_version = 2
       if (isDatabaseConfigured()) {
         try {
           await db.query(
@@ -920,8 +1053,8 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
               product_id, video_id, video_url, original_language, is_foreign_language,
               raw_transcript, timed_transcript_json, portuguese_translation, duration_seconds,
               rhythm, hook_original, structure_original, development_original, cta_original,
-              confidence_score, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+              confidence_score, transcription_source, transcription_version, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'audio_extracted', 2, NOW())
             ON DUPLICATE KEY UPDATE
               original_language = VALUES(original_language),
               is_foreign_language = VALUES(is_foreign_language),
@@ -935,6 +1068,8 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
               development_original = VALUES(development_original),
               cta_original = VALUES(cta_original),
               confidence_score = VALUES(confidence_score),
+              transcription_source = 'audio_extracted',
+              transcription_version = 2,
               updated_at = NOW()`,
             [
               cleanProductId,
@@ -978,39 +1113,27 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
         confidenceScore,
       });
     } catch (aiErr: any) {
-      console.error('[Product Miner Video Transcription AI Error]:', aiErr?.message || aiErr);
-
-      // Fallback gracioso mantendo a fidelidade baseada na descrição e dados do produto
-      const fallbackRaw = dbDesc ? `"${dbDesc}"` : `Fala demonstrando o produto ${dbTitle} no TikTok Shop com foco em praticidade e chamada para o carrinho amarelo.`;
-      const fallbackTimed = [
-        { time: '00:00–00:04', text: `Gente, para tudo e olha esse ${dbTitle} que acabou de chegar!` },
-        { time: '00:04–00:15', text: dbDesc || `Ele é super prático, de altíssima qualidade e resolve o problema na hora.` },
-        { time: '00:15–00:24', text: `Olha só a diferença que faz no dia a dia, vale cada centavo.` },
-        { time: '00:24–00:30', text: `O link com preço promocional tá aqui no carrinho amarelo, corre antes que acabe!` },
-      ];
-
-      return res.json({
-        success: true,
-        fallback: true,
-        productId: cleanProductId,
-        videoId: cleanVideoId,
-        originalLanguage: 'pt',
-        isForeignLanguage: false,
-        rawTranscript: fallbackTimed.map((t) => t.text).join(' '),
-        timedTranscript: fallbackTimed,
-        portugueseTranslation: null,
-        durationSeconds: 30,
-        rhythm: 'Dinâmico e conversacional',
-        hookOriginal: fallbackTimed[0].text,
-        structureOriginal: 'Hook de Impacto -> Apresentação -> Demonstração Prática -> CTA no Carrinho',
-        developmentOriginal: 'Demonstração de uso e quebra de objeções',
-        ctaOriginal: fallbackTimed[3].text,
-        confidenceScore: 80,
+      console.error('[Video Transcription AI Error]:', aiErr?.message || aiErr);
+      // REGRA INEGOCIÁVEL: Se a IA falhar na análise do áudio, retornar erro em vez de inventar dados fictícios
+      return res.status(500).json({
+        error: 'TRANSCRIPTION_ERROR',
+        message: 'Não foi possível analisar o áudio deste vídeo com a IA. Verifique se o vídeo possui som e tente novamente.',
       });
+    } finally {
+      if (tmpFilePath && fs.existsSync(tmpFilePath)) {
+        try {
+          await fs.promises.unlink(tmpFilePath);
+        } catch {}
+      }
+      if (uploadedFile?.name) {
+        try {
+          await ai.files.delete({ name: uploadedFile.name });
+        } catch {}
+      }
     }
   } catch (error: any) {
     console.error('[Video Transcription Route Error]:', error?.message || error);
-    return res.status(500).json({ error: 'TRANSCRIPTION_ERROR', message: 'Erro ao gerar transcrição do vídeo.' });
+    return res.status(500).json({ error: 'TRANSCRIPTION_INTERNAL_ERROR', message: 'Erro interno ao processar transcrição do vídeo.' });
   }
 });
 
@@ -1037,14 +1160,16 @@ productMinerRouter.post('/videos/model-content', async (req, res) => {
       targetAngle,
       targetDifferentiator,
       voiceTone = 'Viral & Enérgico',
+      structuralFidelity = 'Alta',
       customInstructions,
       variantSeed,
     } = req.body || {};
 
-    if (!exactTranscript && !originalHook) {
+    const cleanTranscript = String(exactTranscript || '').trim();
+    if (!cleanTranscript || cleanTranscript === '[Vídeo sem fala humana / apenas trilha sonora de fundo]' || cleanTranscript === 'Transcrição não disponível.') {
       return res.status(400).json({
         error: 'MISSING_TRANSCRIPTION',
-        message: 'A transcrição exata é obrigatória para realizar a modelagem de conteúdo.',
+        message: 'A transcrição exata e fiel do vídeo é obrigatória para realizar a modelagem de conteúdo.',
       });
     }
 
@@ -1054,6 +1179,23 @@ productMinerRouter.post('/videos/model-content', async (req, res) => {
     const diff = String(targetDifferentiator || 'Maior durabilidade e melhor custo-benefício').trim();
     const tone = String(voiceTone || 'Viral & Enérgico').trim();
 
+    // Instruções de fidelidade estrutural
+    let fidelityDirectives = '';
+    if (structuralFidelity === 'Alta') {
+      fidelityDirectives = `1. FIDELIDADE ALTA (MÁXIMA ADERÊNCIA À MATRIZ DO VÍDEO ORIGINAL):
+- Mantenha RIGOROSAMENTE a mesma sequência cronológica, quantidade de blocos, timestamps relativos e estilo de abertura (Hook) da transcrição original.
+- Mantenha o mesmo padrão de chamada para ação (CTA no carrinho amarelo) e ritmo de fala.
+- Substitua com precisão cirúrgica apenas as menções ao produto original pelas características, dores e diferenciais do NOVO PRODUTO ("${newProductName}").`;
+    } else if (structuralFidelity === 'Livre') {
+      fidelityDirectives = `1. FIDELIDADE LIVRE (INSPIRAÇÃO NO CONCEITO VIRAL):
+- Use a transcrição original como inspiração de formato, gatilhos mentais e tom de voz.
+- Crie uma narrativa fluida, totalmente personalizada e altamente persuasiva para o NOVO PRODUTO ("${newProductName}"), otimizada para o TikTok Shop.`;
+    } else {
+      fidelityDirectives = `1. FIDELIDADE MÉDIA (EQUILÍBRIO ENTRE ESTRUTURA E CRIATIVIDADE):
+- Preserve a macroestrutura essencial (Hook de retenção, Apresentação da Dor, Demonstração do Produto e CTA de Conversão).
+- Adapte livremente o vocabulário e os argumentos intermediários para valorizar ao máximo o NOVO PRODUTO ("${newProductName}").`;
+    }
+
     const modelingPrompt = `Você é o estrategista sênior número 1 em Roteiros Virais e Engenharia Reversa de Conteúdo para TikTok Shop.
 Sua missão é MODELAR a fórmula de sucesso de um vídeo viral (utilizando sua TRANSCRIÇÃO EXATA como matéria-prima) e gerar um ROTEIRO ADAPTADO de altíssima conversão para um NOVO PRODUTO.
 
@@ -1062,7 +1204,7 @@ Sua missão é MODELAR a fórmula de sucesso de um vídeo viral (utilizando sua 
 ==================================================
 TRANSCRIÇÃO EXATA DO VÍDEO ORIGINAL:
 """
-${exactTranscript || 'Transcrição não informada'}
+${cleanTranscript}
 """
 
 ESTRUTURA IDENTIFICADA NO ORIGINAL:
@@ -1081,22 +1223,22 @@ ESTRUTURA IDENTIFICADA NO ORIGINAL:
 - Ângulo Principal (Dor / Desejo): ${angle}
 - Diferencial Único do Produto: ${diff}
 - Tom de Voz Desejado: ${tone}
+- Nível de Fidelidade Estrutural: ${structuralFidelity}
 ${customInstructions ? `- Instrução Personalizada do Criador: "${customInstructions}"` : ''}
 ${variantSeed ? `- Variação #${variantSeed}: Gere um ângulo criativo e alternativo mantendo a mesma matriz estrutural.` : ''}
 
 ==================================================
-3. REGRAS CRÍTICAS DA MODELAGEM:
+3. DIRETRIZES DE MODELAGEM:
 ==================================================
-1. REUTILIZAR A ESTRUTURA, O RITMO, A CADÊNCIA E OS GATILHOS DA TRANSCRIÇÃO ORIGINAL.
-2. Adaptar o vocabulário, as dores e a demonstração para o NOVO PRODUTO ("${newProductName}").
-3. Manter a divisão clara de blocos cronológicos com timestamps estimados.
-4. Para cada cena / bloco, especifique claramente:
+${fidelityDirectives}
+2. Dividir o roteiro adaptado em blocos cronológicos claros com timestamps estimados.
+3. Para cada cena / bloco, especifique claramente:
    - time: intervalo de tempo (ex: "00:00–00:03")
    - tag: identificação da etapa (ex: "HOOK MODELADO", "CENA 1 - A DOR", "CENA 2 - DEMONSTRAÇÃO", "CENA 3 - BENEFÍCIO", "CTA MODELADO")
    - visualAction: instrução de direção visual para o criador (o que gravar na câmera, closes, expressões)
    - spokenText: o que a pessoa vai falar LITERALMENTE (palavra por palavra pronta para gravar)
    - onScreenText: texto em letras grandes na tela para retenção de quem assiste sem áudio
-5. Inclua dicas estratégicas de produção para maximizar a conversão no carrinho amarelo do TikTok Shop.
+4. Inclua dicas estratégicas de produção para maximizar a conversão no carrinho amarelo do TikTok Shop.
 
 Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
 {
@@ -1181,64 +1323,27 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
         }
       }
 
+      if (!parsedData.modeledScript || !parsedData.modeledScript.sections) {
+        throw new Error('A resposta do modelo de IA não conteve os blocos do roteiro esperados.');
+      }
+
       return res.json({
         success: true,
         productId,
         videoId,
-        modelAnalysis: parsedData.modelAnalysis || {
-          hookOriginal: originalHook || 'Gancho original',
-          structureOriginal: originalStructure || 'Estrutura original',
-          developmentOriginal: originalDevelopment || 'Desenvolvimento',
-          ctaOriginal: originalCta || 'CTA original',
-          rhythm: originalRhythm || 'Dinâmico',
-          duration: originalDuration || '30s',
-          whyItWorks: 'Estrutura de alta retenção que conecta o problema à solução imediata no TikTok Shop.',
-        },
-        modeledScript: parsedData.modeledScript || {
-          title: `Roteiro Modelado: ${newProductName}`,
-          targetProduct: newProductName,
-          estimatedDuration: '30s',
-          sections: [
-            {
-              time: '00:00–00:03',
-              tag: 'HOOK MODELADO',
-              visualAction: 'Expressão de choque mostrando o produto.',
-              spokenText: `Se você ainda não conhece o ${newProductName}, você tá perdendo tempo!`,
-              onScreenText: `OLHA ESSE ${newProductName.toUpperCase()}!`,
-            },
-            {
-              time: '00:03–00:15',
-              tag: 'DEMONSTRAÇÃO',
-              visualAction: 'Close-up no produto em uso.',
-              spokenText: `Ele é perfeito para quem busca ${angle} e se destaca porque ${diff}.`,
-              onScreenText: 'PRATICIDADE TOTAL',
-            },
-            {
-              time: '00:15–00:30',
-              tag: 'CTA NO CARRINHO',
-              visualAction: 'Aponta para o carrinho amarelo no canto da tela.',
-              spokenText: 'Clica aqui no carrinho amarelo e garante o seu na promoção agora!',
-              onScreenText: 'CARRINHO AMARELO 👇',
-            },
-          ],
-          fullScriptMarkdown: `### 🎬 Roteiro Modelado: ${newProductName}\n\n**[00:00-00:03 - HOOK]**\n"Se você ainda não conhece o ${newProductName}, você tá perdendo tempo!"\n\n**[00:03-00:15 - DEMONSTRAÇÃO]**\n"Ele é perfeito para quem busca ${angle} e se destaca porque ${diff}."\n\n**[00:15-00:30 - CTA]**\n"Clica aqui no **carrinho amarelo** e garante o seu na promoção agora!"`,
-          viralTips: [
-            'Grave em ambiente bem iluminado.',
-            'Corte todos os respiros e silêncios entre as frases.',
-            'Aponte para o carrinho amarelo no segundo final.',
-          ],
-        },
+        modelAnalysis: parsedData.modelAnalysis,
+        modeledScript: parsedData.modeledScript,
       });
     } catch (aiErr: any) {
-      console.error('[Model Content AI Error]:', aiErr?.message || aiErr);
+      console.error('[Model Content AI Error Details]:', aiErr?.message || aiErr);
       return res.status(500).json({
         error: 'MODEL_CONTENT_ERROR',
-        message: 'Erro ao gerar modelagem de conteúdo com IA.',
+        message: `Falha ao gerar modelagem de conteúdo com IA: ${aiErr?.message || 'Erro de processamento'}. Tente novamente.`,
       });
     }
   } catch (error: any) {
     console.error('[Model Content Route Error]:', error?.message || error);
-    return res.status(500).json({ error: 'MODEL_CONTENT_INTERNAL_ERROR' });
+    return res.status(500).json({ error: 'MODEL_CONTENT_INTERNAL_ERROR', message: 'Erro interno ao processar modelagem de conteúdo.' });
   }
 });
 
