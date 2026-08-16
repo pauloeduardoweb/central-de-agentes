@@ -43,6 +43,7 @@ import {
 } from './ProductMinerModals';
 import { DailyPickRoulette } from './DailyPickRoulette';
 import { getProductPriceRange } from '../../utils/priceHelper';
+import { deduplicateProducts } from '../../utils/productDeduplication';
 
 interface ProductMinerPageProps {
   studentCode: string;
@@ -6339,7 +6340,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       return copy;
     }
 
-    return list;
+    // In viral_video mode, each item is a distinct viral video card.
+    // In product grid mode (all other modes), deduplicate identical product titles to show unique representative products
+    if (selectedClassification === 'viral_video') {
+      return list;
+    }
+    return deduplicateProducts(list);
   }, [products, ranking, favorites, mode, selectedCategory, selectedSubcategory, selectedChildCategory, hasVideoOnly, minVideoViews, selectedClassification, query]);
 
   const totalRankingPages = useMemo(() => {
@@ -7213,12 +7219,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                     }
                     setPage(1);
                   }}
-                  className="group relative flex items-center justify-center w-[84px] h-[68px] sm:w-[104px] sm:h-[82px] md:w-[114px] md:h-[86px] rounded-2xl bg-transparent border-0 ring-0 shadow-none outline-none focus:outline-none cursor-pointer shrink-0 p-1"
+                  className="group relative flex items-center justify-center h-[52px] sm:h-[60px] md:h-[66px] w-auto max-w-[125px] rounded-xl bg-transparent border-0 ring-0 shadow-none outline-none focus:outline-none cursor-pointer shrink-0 px-1 py-0.5"
                 >
                   <div
                     className={`w-full h-full flex items-center justify-center transition-all duration-200 ${
                       isActive
-                        ? 'scale-105 sm:scale-110 brightness-110 saturate-125 drop-shadow-md -translate-y-0.5'
+                        ? 'scale-105 brightness-110 saturate-125 drop-shadow-md -translate-y-0.5'
                         : 'scale-100 opacity-90 hover:opacity-100 hover:scale-105'
                     }`}
                   >
@@ -7226,11 +7232,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                       src={opt.iconUrl}
                       fallbackSrc={opt.fallbackIconUrl}
                       alt={opt.label}
-                      className={`w-full h-full object-contain pointer-events-none transition-transform duration-200 ${
-                        opt.id === 'all_videos'
-                          ? 'scale-[1.32] sm:scale-[1.38] md:scale-[1.4] origin-center'
-                          : ''
-                      }`}
+                      className="h-full w-auto max-w-full max-h-full object-contain pointer-events-none transition-transform duration-200"
                     />
                   </div>
                 </button>
