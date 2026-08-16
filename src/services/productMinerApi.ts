@@ -91,6 +91,28 @@ function authHeaders(studentCode: string): HeadersInit {
 
 function accessError(data: any): Error {
   const code = String(data?.error || '');
+
+  // Erros específicos de Transcrição e Modelagem
+  if (code === 'AUDIO_UNAVAILABLE') {
+    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível acessar o áudio deste vídeo.');
+  }
+  if (code === 'TRANSCRIPTION_ERROR') {
+    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível transcrever o áudio deste vídeo. Tente novamente.');
+  }
+  if (code === 'TRANSCRIPTION_INTERNAL_ERROR') {
+    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível processar a transcrição neste momento.');
+  }
+  if (code === 'MISSING_TRANSCRIPTION') {
+    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'É necessário gerar uma transcrição válida antes de modelar o conteúdo.');
+  }
+  if (code === 'MODEL_CONTENT_ERROR') {
+    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível gerar a modelagem deste conteúdo. Tente novamente.');
+  }
+  if (code === 'MODEL_CONTENT_INTERNAL_ERROR') {
+    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível processar a modelagem neste momento.');
+  }
+
+  // Erros de permissão e configurações gerais
   if (code === 'PRODUCT_MINER_STUDENTS_DISABLED') {
     return new Error('O Minerador de Produtos ainda não foi liberado para alunos.');
   }
@@ -111,6 +133,9 @@ function accessError(data: any): Error {
   }
   if (code === 'PRODUCT_MINER_COLLECTOR_STATS_ERROR') {
     return new Error('Não foi possível carregar as estatísticas do coletor.');
+  }
+  if (data?.message && typeof data.message === 'string') {
+    return new Error(data.message);
   }
   if (data?.detail && typeof data.detail === 'string') {
     return new Error(data.detail);
