@@ -41,6 +41,7 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
   const [targetAngle, setTargetAngle] = useState('Praticidade e transformação rápida no dia a dia');
   const [targetDifferentiator, setTargetDifferentiator] = useState('Alta durabilidade com melhor custo-benefício');
   const [voiceTone, setVoiceTone] = useState('Viral & Enérgico');
+  const [structuralFidelity, setStructuralFidelity] = useState<'Alta' | 'Média' | 'Livre'>('Alta');
   const [customInstructions, setCustomInstructions] = useState('');
 
   // Result states
@@ -131,6 +132,7 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
         targetAngle: targetAngle.trim(),
         targetDifferentiator: targetDifferentiator.trim(),
         voiceTone,
+        structuralFidelity,
         customInstructions: customInstructions.trim(),
         variantSeed: currentVariant,
       });
@@ -390,6 +392,73 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
                           placeholder="Ex: Não esquenta o cabo e tem 3 temperaturas"
                           className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-900 focus:bg-white focus:border-amber-500 focus:outline-none transition-all"
                         />
+                      </div>
+
+                      {/* Nível de Fidelidade Estrutural */}
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-700">
+                            Nível de Fidelidade Estrutural
+                          </label>
+                          <span className="text-[10px] text-amber-800 font-black bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            {structuralFidelity === 'Alta' ? '1:1 Estrutura e Timestamps' : structuralFidelity === 'Média' ? 'Equilíbrio Viral' : 'Inspiração Criativa'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setStructuralFidelity('Alta')}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                              structuralFidelity === 'Alta'
+                                ? 'bg-amber-50/90 border-amber-400 text-amber-950 shadow-2xs ring-2 ring-amber-400/30'
+                                : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 font-black text-xs text-amber-900">
+                              <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>Alta (1:1 Rigoroso)</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 line-clamp-2 mt-1 font-medium leading-tight">
+                              Copia a matriz cronológica, pausas e gatilhos exatos.
+                            </p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setStructuralFidelity('Média')}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                              structuralFidelity === 'Média'
+                                ? 'bg-amber-50/90 border-amber-400 text-amber-950 shadow-2xs ring-2 ring-amber-400/30'
+                                : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 font-black text-xs text-orange-900">
+                              <Sliders className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                              <span>Média (Equilíbrio)</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 line-clamp-2 mt-1 font-medium leading-tight">
+                              Mantém a macroestrutura com adaptação de copy.
+                            </p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setStructuralFidelity('Livre')}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                              structuralFidelity === 'Livre'
+                                ? 'bg-amber-50/90 border-amber-400 text-amber-950 shadow-2xs ring-2 ring-amber-400/30'
+                                : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 font-black text-xs text-purple-900">
+                              <Lightbulb className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                              <span>Livre (Criativo)</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 line-clamp-2 mt-1 font-medium leading-tight">
+                              Nova narrativa fluida inspirada no conceito do vídeo.
+                            </p>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="space-y-1 sm:col-span-2">
