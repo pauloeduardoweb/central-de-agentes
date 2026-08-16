@@ -1285,4 +1285,132 @@ export async function spinDailyPickApi(studentCode: string, targetCategory?: str
   return data;
 }
 
+// =========================================================================
+// TRANSCRIÇÃO EXATA E MODELAGEM DE CONTEÚDO
+// =========================================================================
+
+export interface TimedTranscriptBlock {
+  time: string;
+  text: string;
+}
+
+export interface VideoTranscriptionResponse {
+  success: boolean;
+  fromCache?: boolean;
+  fallback?: boolean;
+  productId: string;
+  videoId?: string;
+  originalLanguage: string;
+  isForeignLanguage: boolean;
+  rawTranscript: string;
+  timedTranscript: TimedTranscriptBlock[];
+  portugueseTranslation?: string | null;
+  durationSeconds: number;
+  rhythm: string;
+  hookOriginal: string;
+  structureOriginal: string;
+  developmentOriginal: string;
+  ctaOriginal: string;
+  confidenceScore: number;
+}
+
+export interface ModeledScriptSection {
+  time: string;
+  tag: string;
+  visualAction: string;
+  spokenText: string;
+  onScreenText: string;
+}
+
+export interface ContentModelAnalysis {
+  hookOriginal: string;
+  structureOriginal: string;
+  developmentOriginal: string;
+  ctaOriginal: string;
+  rhythm: string;
+  duration: string;
+  whyItWorks?: string;
+}
+
+export interface ModeledScriptData {
+  title: string;
+  targetProduct: string;
+  niche?: string;
+  estimatedDuration: string;
+  sections: ModeledScriptSection[];
+  fullScriptMarkdown: string;
+  viralTips?: string[];
+}
+
+export interface ModelContentResponse {
+  success: boolean;
+  productId: string;
+  videoId?: string;
+  modelAnalysis: ContentModelAnalysis;
+  modeledScript: ModeledScriptData;
+}
+
+export async function fetchVideoTranscriptionApi(
+  studentCode: string,
+  params: {
+    productId: string;
+    videoId?: string;
+    videoUrl?: string;
+    productTitle?: string;
+    productCategory?: string;
+    videoAuthor?: string;
+    videoDescription?: string;
+    forceRefresh?: boolean;
+  }
+): Promise<VideoTranscriptionResponse> {
+  const response = await fetch('/api/product-miner/videos/transcription', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data as VideoTranscriptionResponse;
+}
+
+export async function modelVideoContentApi(
+  studentCode: string,
+  params: {
+    productId: string;
+    videoId?: string;
+    exactTranscript: string;
+    originalHook?: string;
+    originalStructure?: string;
+    originalDevelopment?: string;
+    originalCta?: string;
+    originalRhythm?: string;
+    originalDuration?: number | string;
+    targetProduct: string;
+    targetNiche?: string;
+    targetAngle?: string;
+    targetDifferentiator?: string;
+    voiceTone?: string;
+    customInstructions?: string;
+    variantSeed?: number;
+  }
+): Promise<ModelContentResponse> {
+  const response = await fetch('/api/product-miner/videos/model-content', {
+    method: 'POST',
+    headers: {
+      ...authHeaders(studentCode),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data as ModelContentResponse;
+}
+
+
 
