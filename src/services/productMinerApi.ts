@@ -462,7 +462,12 @@ export async function runBaseReclassification(studentCode: string): Promise<Recl
     headers: authHeaders(studentCode),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw accessError(data);
+  if (!response.ok || data.success === false) {
+    const message = data?.message || 'Não foi possível concluir a organização da base. Tente novamente em alguns instantes.';
+    const err = new Error(message);
+    (err as any).code = data?.error || 'RECLASSIFY_FAILED';
+    throw err;
+  }
   return data.report as ReclassificationReport;
 }
 
