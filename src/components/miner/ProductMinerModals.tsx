@@ -2,13 +2,19 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Sparkles, Copy, Check, Play, Eye, Heart, MessageCircle, Share2,
   Bookmark, Zap, Loader2, AlertCircle, FileText, Wand2, RefreshCw, ExternalLink, ShieldCheck, BarChart3,
-  Store, Star, Flame, ShoppingBag, Info, Tag, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Film, VideoOff, Layers, Users
+  Store, Star, Flame, ShoppingBag, Info, Tag, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Film, VideoOff, Layers, Users,
+  Languages, Target, Clock, ArrowRight, Quote, FileCheck
 } from 'lucide-react';
 import {
   ProductMinerProduct,
   ProductScriptType,
   generateProductScript,
   calculateVideoAnalysis,
+  fetchVideoTranscriptionApi,
+  modelVideoContentApi,
+  VideoTranscriptionResponse,
+  ModelContentResponse,
+  TimedTranscriptBlock,
 } from '../../services/productMinerApi';
 import { getProductPriceRange } from '../../utils/priceHelper';
 
@@ -508,6 +514,8 @@ interface ProductDetailModalProps {
   onToggleFavorite?: (p: ProductMinerProduct) => void;
   onOpenScriptModal?: (p: ProductMinerProduct) => void;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
+  onOpenTranscriptionModal?: (p: ProductMinerProduct) => void;
+  onOpenContentModelerModal?: (p: ProductMinerProduct) => void;
   onTrackClick?: (p: ProductMinerProduct) => void;
 }
 
@@ -519,6 +527,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onToggleFavorite,
   onOpenScriptModal,
   onOpenAnalysisModal,
+  onOpenTranscriptionModal,
+  onOpenContentModelerModal,
   onTrackClick,
 }) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -832,6 +842,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Action Buttons Grid */}
           <div className="pt-2 border-t border-slate-100 space-y-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {activeVideo && onOpenTranscriptionModal ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenTranscriptionModal({ ...product, video: activeVideo });
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-950 border border-amber-300 font-black text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                >
+                  <Quote className="w-4 h-4 text-amber-600" />
+                  📝 Transcrição Exata
+                </button>
+              ) : null}
+
+              {activeVideo && onOpenContentModelerModal ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenContentModelerModal({ ...product, video: activeVideo });
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 hover:from-orange-500/20 hover:to-amber-500/20 text-orange-950 border border-orange-300 font-black text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                >
+                  <Target className="w-4 h-4 text-orange-600" />
+                  🎯 Modelar Conteúdo
+                </button>
+              ) : null}
+
               {activeVideo ? (
                 <button
                   type="button"
@@ -931,6 +969,8 @@ interface TikTokVideoPlayerModalProps {
   product: ProductMinerProduct | null;
   onOpenAnalysisModal?: (p: ProductMinerProduct) => void;
   onOpenDetailModal?: (p: ProductMinerProduct) => void;
+  onOpenTranscriptionModal?: (p: ProductMinerProduct) => void;
+  onOpenContentModelerModal?: (p: ProductMinerProduct) => void;
   onToggleFavorite?: (p: ProductMinerProduct) => void;
   isFavorite?: boolean;
   onTrackClick?: (p: ProductMinerProduct) => void;
@@ -942,6 +982,8 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
   product,
   onOpenAnalysisModal,
   onOpenDetailModal,
+  onOpenTranscriptionModal,
+  onOpenContentModelerModal,
   onToggleFavorite,
   isFavorite = false,
   onTrackClick,
@@ -1231,9 +1273,37 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
               </div>
             </div>
 
-            {/* 2.4 AÇÕES DO MODAL */}
+            {/* 2.4 AÇÕES DO MODAL (4 BOTÕES ESTRUTURADOS) */}
             <div className="space-y-2 pt-1">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
+                {onOpenTranscriptionModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenTranscriptionModal(product);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 hover:from-amber-500/20 hover:to-orange-500/20 text-amber-950 font-black text-xs flex items-center justify-center gap-1.5 border border-amber-300 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Quote className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Transcrição</span>
+                  </button>
+                )}
+
+                {onOpenContentModelerModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenContentModelerModal(product);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-500/10 to-amber-500/10 hover:from-orange-500/20 hover:to-amber-500/20 text-orange-950 font-black text-xs flex items-center justify-center gap-1.5 border border-orange-300 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Target className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Modelar Conteúdo</span>
+                  </button>
+                )}
+
                 {onOpenAnalysisModal && (
                   <button
                     type="button"
@@ -1257,6 +1327,7 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
                     }}
                     className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-all cursor-pointer shadow-2xs"
                   >
+                    <Info className="w-3.5 h-3.5 text-slate-600" />
                     <span>Detalhes do Produto</span>
                   </button>
                 )}
@@ -1294,3 +1365,7 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
     </div>
   );
 };
+
+export { ProductTranscriptionModal } from './ProductTranscriptionModal';
+export { ProductContentModelerModal } from './ProductContentModelerModal';
+

@@ -33,12 +33,15 @@ import {
   type CategoryExpansionPlan,
   type CategoryExecutionSummaryApi,
   type CategoryHistoryStatApi,
+  type VideoTranscriptionResponse,
 } from '../../services/productMinerApi';
 import {
   ScriptGeneratorModal,
   VideoAnalysisModal,
   ProductDetailModal,
   TikTokVideoPlayerModal,
+  ProductTranscriptionModal,
+  ProductContentModelerModal,
   formatStoreName,
 } from './ProductMinerModals';
 import { DailyPickRoulette } from './DailyPickRoulette';
@@ -6110,6 +6113,44 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [analysisModalProduct, setAnalysisModalProduct] = useState<ProductMinerProduct | null>(null);
   const [detailModalProduct, setDetailModalProduct] = useState<ProductMinerProduct | null>(null);
   const [videoPlayerModalProduct, setVideoPlayerModalProduct] = useState<ProductMinerProduct | null>(null);
+  const [transcriptionModalProduct, setTranscriptionModalProduct] = useState<ProductMinerProduct | null>(null);
+  const [contentModelerModalProduct, setContentModelerModalProduct] = useState<ProductMinerProduct | null>(null);
+  const [modelerInitialTranscript, setModelerInitialTranscript] = useState<VideoTranscriptionResponse | null>(null);
+
+  const handleOpenTranscriptionModal = useCallback(
+    (p: ProductMinerProduct | null) => {
+      setTranscriptionModalProduct(p);
+      if (p?.productId && studentCode) {
+        trackProductInteraction(studentCode, {
+          productId: p.productId,
+          eventType: 'product_open',
+          query,
+          category: selectedCategory,
+          subcategory: selectedSubcategory,
+          childCategory: selectedChildCategory,
+        });
+      }
+    },
+    [studentCode, query, selectedCategory, selectedSubcategory, selectedChildCategory]
+  );
+
+  const handleOpenContentModelerModal = useCallback(
+    (p: ProductMinerProduct | null, transcriptData?: VideoTranscriptionResponse) => {
+      setContentModelerModalProduct(p);
+      setModelerInitialTranscript(transcriptData || null);
+      if (p?.productId && studentCode) {
+        trackProductInteraction(studentCode, {
+          productId: p.productId,
+          eventType: 'product_open',
+          query,
+          category: selectedCategory,
+          subcategory: selectedSubcategory,
+          childCategory: selectedChildCategory,
+        });
+      }
+    },
+    [studentCode, query, selectedCategory, selectedSubcategory, selectedChildCategory]
+  );
 
   const handleOpenVideoPlayerModal = useCallback(
     (p: ProductMinerProduct | null) => {
@@ -8816,6 +8857,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         onToggleFavorite={toggleFavorite}
         onOpenAnalysisModal={handleOpenAnalysisModal}
         onOpenDetailModal={handleOpenDetailModal}
+        onOpenTranscriptionModal={handleOpenTranscriptionModal}
+        onOpenContentModelerModal={(p) => handleOpenContentModelerModal(p)}
         onTrackClick={handleTrackProductClick}
       />
 
@@ -8841,6 +8884,29 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         onToggleFavorite={toggleFavorite}
         onOpenScriptModal={(p) => setScriptModalProduct(p)}
         onOpenAnalysisModal={handleOpenAnalysisModal}
+        onOpenTranscriptionModal={handleOpenTranscriptionModal}
+        onOpenContentModelerModal={(p) => handleOpenContentModelerModal(p)}
+        onTrackClick={handleTrackProductClick}
+      />
+
+      <ProductTranscriptionModal
+        isOpen={Boolean(transcriptionModalProduct)}
+        onClose={() => setTranscriptionModalProduct(null)}
+        product={transcriptionModalProduct}
+        studentCode={studentCode}
+        onOpenContentModelerModal={(p, transcriptData) => handleOpenContentModelerModal(p, transcriptData)}
+        onTrackClick={handleTrackProductClick}
+      />
+
+      <ProductContentModelerModal
+        isOpen={Boolean(contentModelerModalProduct)}
+        onClose={() => {
+          setContentModelerModalProduct(null);
+          setModelerInitialTranscript(null);
+        }}
+        product={contentModelerModalProduct}
+        studentCode={studentCode}
+        initialTranscription={modelerInitialTranscript}
         onTrackClick={handleTrackProductClick}
       />
     </section>
