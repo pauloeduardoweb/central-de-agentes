@@ -297,23 +297,49 @@ productMinerRouter.post('/admin/activate-all', async (req, res) => {
 // ADMIN: Reclassify existing local products into categories without calling SocialCrawl or consuming credits
 productMinerRouter.post('/admin/reclassify', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
+  const startTime = Date.now();
   try {
     const report = await reclassifyExistingDatabaseProducts();
     return res.json({ success: true, report });
   } catch (error: any) {
-    console.error('[Admin Reclassify Error]:', error?.message || error);
-    return res.status(500).json({ error: 'RECLASSIFY_FAILED', message: error?.message || 'Falha ao reclassificar produtos.' });
+    console.error('[Admin Reclassify Route Error - Server Only Log]:', {
+      durationMs: Date.now() - startTime,
+      message: error?.message,
+      code: error?.code,
+      sqlState: error?.sqlState,
+      sqlMessage: error?.sqlMessage,
+      name: error?.name,
+      stack: error?.stack ? String(error.stack).split('\n').slice(0, 5).join('\n') : undefined,
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'RECLASSIFY_FAILED',
+      message: 'Não foi possível concluir a organização da base. Tente novamente em alguns instantes.',
+    });
   }
 });
 
 productMinerRouter.get('/admin/reclassify', async (req, res) => {
   if (!requireMentorRefresh(req, res)) return;
+  const startTime = Date.now();
   try {
     const report = await reclassifyExistingDatabaseProducts();
     return res.json({ success: true, report });
   } catch (error: any) {
-    console.error('[Admin Reclassify Error]:', error?.message || error);
-    return res.status(500).json({ error: 'RECLASSIFY_FAILED', message: error?.message || 'Falha ao reclassificar produtos.' });
+    console.error('[Admin Reclassify Route Error - Server Only Log]:', {
+      durationMs: Date.now() - startTime,
+      message: error?.message,
+      code: error?.code,
+      sqlState: error?.sqlState,
+      sqlMessage: error?.sqlMessage,
+      name: error?.name,
+      stack: error?.stack ? String(error.stack).split('\n').slice(0, 5).join('\n') : undefined,
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'RECLASSIFY_FAILED',
+      message: 'Não foi possível concluir a organização da base. Tente novamente em alguns instantes.',
+    });
   }
 });
 
