@@ -1172,25 +1172,32 @@ productMinerRouter.post('/videos/model-content', async (req, res) => {
 
     const newProductName = String(targetProduct || '').trim() || 'Novo Produto';
     const niche = String(targetNiche || 'Geral').trim();
-    const angle = String(targetAngle || 'Praticidade e transformação rápida').trim();
-    const diff = String(targetDifferentiator || 'Maior durabilidade e melhor custo-benefício').trim();
+    const angle = String(targetAngle || '').trim();
+    const diff = String(targetDifferentiator || '').trim();
     const tone = String(voiceTone || 'Viral & Enérgico').trim();
 
     // Instruções de fidelidade estrutural
     let fidelityDirectives = '';
     if (structuralFidelity === 'Alta') {
-      fidelityDirectives = `1. FIDELIDADE ALTA (MÁXIMA ADERÊNCIA À MATRIZ DO VÍDEO ORIGINAL):
-- Mantenha RIGOROSAMENTE a mesma sequência cronológica, quantidade de blocos, timestamps relativos e estilo de abertura (Hook) da transcrição original.
-- Mantenha o mesmo padrão de chamada para ação (CTA no carrinho amarelo) e ritmo de fala.
-- Substitua com precisão cirúrgica apenas as menções ao produto original pelas características, dores e diferenciais do NOVO PRODUTO ("${newProductName}").`;
+      fidelityDirectives = `1. FIDELIDADE ALTA (MÁXIMA ADERÊNCIA 1:1 À MATRIZ DO VÍDEO ORIGINAL):
+- PRIORIDADE DO RITMO/TOM ORIGINAL: O ritmo ("${originalRhythm || 'Cadência da fala original'}") e a naturalidade do áudio original têm prioridade máxima sobre o tom genérico selecionado.
+- SE O PRODUTO FOR O MESMO DO VÍDEO ORIGINAL: PRESERVE A FALA ORIGINAL O MÁXIMO POSSÍVEL. Não substitua frases nem reescreva o texto por reescrever. Se uma frase já comunica a mensagem, mantenha-a idêntica ou com mínimo ajuste.
+- SE O PRODUTO FOR OUTRO: Substitua com precisão cirúrgica APENAS as menções ao produto anterior pelas características do NOVO PRODUTO ("${newProductName}"), mantendo rigorosamente a mesma sequência, pausas e gatilhos da transcrição original.
+- NÃO INVENTAR DADOS: É ESTRITAMENTE PROIBIDO inventar benefícios, dores, diferenciais, preço, descontos, urgências ou promessas que não estejam presentes na transcrição original ou explicitamente fornecidos nos campos abaixo.
+${angle ? `- Ângulo Solicitado: "${angle}" (utilize este ângulo fornecido pelo criador).` : '- Ângulo: NÃO foi fornecido ângulo adicional. NÃO invente novas dores ou ângulos artificiais.'}
+${diff ? `- Diferencial Solicitado: "${diff}" (utilize este diferencial fornecido pelo criador).` : '- Diferencial: NÃO foi fornecido diferencial adicional. NÃO invente novos benefícios ou características não mencionadas.'}`;
     } else if (structuralFidelity === 'Livre') {
       fidelityDirectives = `1. FIDELIDADE LIVRE (INSPIRAÇÃO NO CONCEITO VIRAL):
-- Use a transcrição original como inspiração de formato, gatilhos mentais e tom de voz.
-- Crie uma narrativa fluida, totalmente personalizada e altamente persuasiva para o NOVO PRODUTO ("${newProductName}"), otimizada para o TikTok Shop.`;
+- Use a transcrição original como inspiração de formato, gatilhos mentais e estrutura.
+- Crie uma narrativa fluida, totalmente personalizada e persuasiva para o NOVO PRODUTO ("${newProductName}"), otimizada para o TikTok Shop.
+${angle ? `- Ângulo Solicitado: "${angle}".` : '- Sem ângulo adicional; foque na utilidade principal do produto.'}
+${diff ? `- Diferencial Solicitado: "${diff}".` : '- Sem diferencial adicional.'}`;
     } else {
-      fidelityDirectives = `1. FIDELIDADE MÉDIA (EQUILÍBRIO ENTRE ESTRUTURA E CRIATIVIDADE):
+      fidelityDirectives = `1. FIDELIDADE MÉDIA (EQUILÍBRIO ENTRE ESTRUTURA E ADAPTAÇÃO):
 - Preserve a macroestrutura essencial (Hook de retenção, Apresentação da Dor, Demonstração do Produto e CTA de Conversão).
-- Adapte livremente o vocabulário e os argumentos intermediários para valorizar ao máximo o NOVO PRODUTO ("${newProductName}").`;
+- Adapte o vocabulário e os argumentos intermediários para valorizar o NOVO PRODUTO ("${newProductName}").
+${angle ? `- Ângulo Solicitado: "${angle}".` : ''}
+${diff ? `- Diferencial Solicitado: "${diff}".` : ''}`;
     }
 
     const modelingPrompt = `Você é o estrategista sênior número 1 em Roteiros Virais e Engenharia Reversa de Conteúdo para TikTok Shop.
@@ -1209,20 +1216,20 @@ ESTRUTURA IDENTIFICADA NO ORIGINAL:
 - ESTRUTURA ORIGINAL: ${originalStructure || 'Hook -> Dor -> Demonstração -> Benefício -> CTA'}
 - DESENVOLVIMENTO: ${originalDevelopment || 'Demonstração prática dos diferenciais'}
 - CTA ORIGINAL: ${originalCta || 'Chamada para clicar no carrinho'}
-- RITMO: ${originalRhythm || 'Dinâmico com cortes rápidos'}
+- RITMO ORIGINAL: ${originalRhythm || 'Dinâmico com cortes rápidos'}
 - DURAÇÃO ESTIMADA: ${originalDuration || '30'} segundos
 
 ==================================================
-2. DADOS DO NOVO PRODUTO A SER MODELADO:
+2. DADOS DO PRODUTO A SER MODELADO:
 ==================================================
-- Nome do Novo Produto: ${newProductName}
+- Nome do Produto Alvo: ${newProductName}
 - Nicho / Categoria: ${niche}
-- Ângulo Principal (Dor / Desejo): ${angle}
-- Diferencial Único do Produto: ${diff}
-- Tom de Voz Desejado: ${tone}
+- Ângulo Informado: ${angle || '(Nenhum ângulo adicional informado - NÃO INVENTAR DOR ARTIFICIAL)'}
+- Diferencial Informado: ${diff || '(Nenhum diferencial adicional informado - NÃO INVENTAR BENEFÍCIO ARTIFICIAL)'}
+- Tom de Voz Solicitado: ${tone}
 - Nível de Fidelidade Estrutural: ${structuralFidelity}
 ${customInstructions ? `- Instrução Personalizada do Criador: "${customInstructions}"` : ''}
-${variantSeed ? `- Variação #${variantSeed}: Gere um ângulo criativo e alternativo mantendo a mesma matriz estrutural.` : ''}
+${variantSeed ? `- Variação #${variantSeed}: Gere uma abordagem criativa mantendo a mesma matriz estrutural.` : ''}
 
 ==================================================
 3. DIRETRIZES DE MODELAGEM:
