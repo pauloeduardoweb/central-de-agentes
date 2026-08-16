@@ -747,53 +747,109 @@ export const HIGH_PRECISION_CATEGORY_TERMS: Record<string, string[]> = {
     'hijab',
     'hijabs',
     'hijabe',
+    'hijabes',
     'abaya',
     'abayas',
     'balandrau',
+    'balandraus',
     'burkini',
     'burkinis',
     'burkine',
     'kaftan',
     'kaftans',
+    'caftan',
+    'caftans',
     'thobe',
     'thobes',
+    'thob',
     'kufi',
+    'kufis',
     'tasbih',
     'tasbi',
+    'tasbeeh',
     'misbaha',
     'jilbab',
+    'jilbabs',
+    'djellaba',
     'khimar',
+    'khimars',
     'niqab',
+    'niqabs',
     'ihram',
     'kandura',
+    'kanduras',
     'jubba',
+    'jubbah',
+    'jubbas',
     'shayla',
+    'shaylas',
     'dishdasha',
+    'dishdashas',
     'mukena',
+    'mukenas',
     'sarongue',
+    'peci',
+    'umra',
+    'umrah',
     'muculmana',
     'muculmano',
     'muculmanas',
     'muculmanos',
+    'muçulmana',
+    'muçulmano',
+    'muçulmanas',
+    'muçulmanos',
     'islamica',
     'islamico',
     'islamicas',
     'islamicos',
+    'islâmica',
+    'islâmico',
+    'islâmicas',
+    'islâmicos',
     'moda modesta',
     'modest fashion',
+    'roupa modesta',
+    'vestimenta modesta',
     'moda muculmana',
+    'moda muçulmana',
     'moda islamica',
+    'moda islâmica',
     'vestimenta islamica',
+    'vestimenta islâmica',
+    'vestimenta muculmana',
+    'vestimenta muçulmana',
     'artigos islamicos',
+    'artigos islâmicos',
+    'acessorios islamicos',
+    'acessórios islâmicos',
     'oracao islamica',
+    'oração islâmica',
     'tapete de oracao',
+    'tapete de oração',
     'lenco hijab',
+    'lenço hijab',
+    'veu islamico',
+    'véu islâmico',
     'vestido islamico',
+    'vestido islâmico',
     'vestido muculmano',
+    'vestido muçulmano',
     'tunica islamica',
+    'tunica islâmica',
     'tunica muculmana',
+    'tunica muçulmana',
   ],
 };
+
+export function hasHighConfidenceMuslimEvidence(rawTitle: string, rawPath: string): boolean {
+  const terms = HIGH_PRECISION_CATEGORY_TERMS['Moda muçulmana'] || [];
+  for (const term of terms) {
+    if (containsWordOrPhrase(rawTitle, term)) return true;
+    if (rawPath && containsWordOrPhrase(rawPath, term)) return true;
+  }
+  return false;
+}
 
 export const GENERIC_AMBIGUOUS_SUBCATEGORIES = new Set<string>([
   'agasalhos',
@@ -905,6 +961,9 @@ export function classifyProductFull(product: {
     if (firstToken) {
       const firstTokenNorm = removeAccents(firstToken);
       for (const cat of COLLECTOR_CATEGORIES) {
+        if (cat === 'Moda muçulmana' && !hasHighConfidenceMuslimEvidence(rawTitle, rawPath)) {
+          continue;
+        }
         const catAliases = getCategoryAliases(cat).map(removeAccents);
         if (catAliases.includes(firstTokenNorm)) {
           resolvedCat = cat;
@@ -921,6 +980,9 @@ export function classifyProductFull(product: {
     
     // Check if query_source matches a main category name/alias directly
     for (const cat of COLLECTOR_CATEGORIES) {
+      if (cat === 'Moda muçulmana' && !hasHighConfidenceMuslimEvidence(rawTitle, rawPath)) {
+        continue;
+      }
       const catAliases = getCategoryAliases(cat).map(removeAccents);
       if (catAliases.includes(rawQueryNorm)) {
         resolvedCat = cat;
@@ -932,6 +994,9 @@ export function classifyProductFull(product: {
     // Check if query_source matches a specific, non-generic subcategory
     if (!resolvedCat && !GENERIC_AMBIGUOUS_SUBCATEGORIES.has(rawQueryNorm)) {
       for (const [cat, subList] of Object.entries(OFFICIAL_TIKTOK_TAXONOMY)) {
+        if (cat === 'Moda muçulmana' && !hasHighConfidenceMuslimEvidence(rawTitle, rawPath)) {
+          continue;
+        }
         for (const sub of subList) {
           const subNorm = removeAccents(sub);
           if (subNorm === rawQueryNorm && !GENERIC_AMBIGUOUS_SUBCATEGORIES.has(subNorm)) {
@@ -950,6 +1015,9 @@ export function classifyProductFull(product: {
   if (!resolvedCat && rawPath) {
     const pathNorm = removeAccents(rawPath);
     for (const cat of COLLECTOR_CATEGORIES) {
+      if (cat === 'Moda muçulmana' && !hasHighConfidenceMuslimEvidence(rawTitle, rawPath)) {
+        continue;
+      }
       const catAliases = getCategoryAliases(cat).map(removeAccents);
       if (catAliases.some((a) => pathNorm.includes(a))) {
         resolvedCat = cat;
@@ -965,6 +1033,9 @@ export function classifyProductFull(product: {
     const candidates: CatScore[] = [];
 
     for (const cat of COLLECTOR_CATEGORIES) {
+      if (cat === 'Moda muçulmana' && !hasHighConfidenceMuslimEvidence(rawTitle, rawPath)) {
+        continue;
+      }
       const catAliases = getCategoryAliases(cat);
       for (const alias of catAliases) {
         const aliasNorm = removeAccents(alias).toLowerCase().trim();
@@ -984,6 +1055,12 @@ export function classifyProductFull(product: {
       resolvedCat = candidates[0].cat;
       resolutionSource = 'title';
     }
+  }
+
+  // Final check: if resolvedCat is Moda muçulmana, enforce strict evidence
+  if (resolvedCat === 'Moda muçulmana' && !hasHighConfidenceMuslimEvidence(rawTitle, rawPath)) {
+    resolvedCat = null;
+    resolutionSource = 'none';
   }
 
   // If category cannot be determined with confidence, return all nulls

@@ -2429,8 +2429,8 @@ export async function searchTikTokShopProducts(params: {
         orderClause = `ORDER BY CASE WHEN LOWER(TRIM(p.query_source)) = LOWER(?) THEN 0 ELSE 1 END, p.sold_count DESC, p.last_seen_at DESC`;
       }
 
-      // When a minVideoViews filter is active, force ordering by video_views DESC
-      if (minVideoViews) {
+      // When a minVideoViews filter is active and no specific classification is requested, force ordering by video_views DESC
+      if (minVideoViews && !classification) {
         if (!joinClause.includes('pv ON pv.product_id')) {
           joinClause += `
             LEFT JOIN (
