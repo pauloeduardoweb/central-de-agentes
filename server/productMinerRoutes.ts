@@ -813,42 +813,39 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
           `SELECT * FROM tiktok_shop_video_transcripts
            WHERE product_id = ?
              AND (video_id = ? OR video_id = '' OR ? = '')
-             AND (transcription_source = 'audio_extracted' OR transcription_source IS NOT NULL)
-             AND (transcription_version >= 2 OR transcription_version IS NOT NULL)
+             AND transcription_source = 'audio_extracted'
+             AND transcription_version >= 2
            LIMIT 1`,
           [cleanProductId, cleanVideoId, cleanVideoId]
         );
 
         if (Array.isArray(rows) && rows.length > 0 && rows[0].raw_transcript) {
           const row = rows[0];
-          // Se for cache legado não baseado em áudio real, ignora para forçar extração fiel
-          if (row.transcription_source !== 'metadata_fallback') {
-            let timedTranscript: Array<{ time: string; text: string }> = [];
-            try {
-              timedTranscript = JSON.parse(row.timed_transcript_json || '[]');
-            } catch {
-              timedTranscript = [];
-            }
-
-            return res.json({
-              success: true,
-              fromCache: true,
-              productId: cleanProductId,
-              videoId: cleanVideoId || row.video_id,
-              originalLanguage: row.original_language || 'pt',
-              isForeignLanguage: Boolean(row.is_foreign_language),
-              rawTranscript: row.raw_transcript,
-              timedTranscript,
-              portugueseTranslation: row.portuguese_translation || null,
-              durationSeconds: row.duration_seconds || 30,
-              rhythm: row.rhythm || 'Cadenciado e dinâmico',
-              hookOriginal: row.hook_original || '',
-              structureOriginal: row.structure_original || '',
-              developmentOriginal: row.development_original || '',
-              ctaOriginal: row.cta_original || '',
-              confidenceScore: row.confidence_score || 100,
-            });
+          let timedTranscript: Array<{ time: string; text: string }> = [];
+          try {
+            timedTranscript = JSON.parse(row.timed_transcript_json || '[]');
+          } catch {
+            timedTranscript = [];
           }
+
+          return res.json({
+            success: true,
+            fromCache: true,
+            productId: cleanProductId,
+            videoId: cleanVideoId || row.video_id,
+            originalLanguage: row.original_language || 'pt',
+            isForeignLanguage: Boolean(row.is_foreign_language),
+            rawTranscript: row.raw_transcript,
+            timedTranscript,
+            portugueseTranslation: row.portuguese_translation || null,
+            durationSeconds: row.duration_seconds || 30,
+            rhythm: row.rhythm || 'Cadenciado e dinâmico',
+            hookOriginal: row.hook_original || '',
+            structureOriginal: row.structure_original || '',
+            developmentOriginal: row.development_original || '',
+            ctaOriginal: row.cta_original || '',
+            confidenceScore: row.confidence_score || 100,
+          });
         }
       } catch (cacheErr: any) {
         console.warn('[Transcription Cache Read Warning]:', cacheErr?.message || cacheErr);
@@ -1338,7 +1335,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
       console.error('[Model Content AI Error Details]:', aiErr?.message || aiErr);
       return res.status(500).json({
         error: 'MODEL_CONTENT_ERROR',
-        message: `Falha ao gerar modelagem de conteúdo com IA: ${aiErr?.message || 'Erro de processamento'}. Tente novamente.`,
+        message: 'Não foi possível gerar a modelagem deste conteúdo. Tente novamente.',
       });
     }
   } catch (error: any) {
