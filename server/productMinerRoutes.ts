@@ -29,6 +29,15 @@ import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmi
 
 export const productMinerRouter = express.Router();
 
+/**
+ * Feature Flag Central no Backend para Transcrição e Modelagem de Conteúdo por IA.
+ * Quando `false`:
+ * - Bloqueia imediatamente as rotas de transcrição e modelagem de conteúdo com status 503.
+ * - Impede qualquer chamada externa a serviços pagos (SocialCrawl, Gemini, FFmpeg) e consumo de créditos.
+ * - Mantém toda a infraestrutura, tabelas de banco, pipelines e parsers preservados.
+ */
+const PRODUCT_CONTENT_AI_ENABLED = false;
+
 function getRequesterCode(req: express.Request): string | null {
   const raw =
     req.header('x-access-code') ||
@@ -1671,6 +1680,13 @@ productMinerRouter.get(['/videos/audit-socialcrawl-post/:productId/:videoId', '/
 // ROTA DE CONSULTA (CONSULTATION): GET /videos/transcription/:videoId
 // =========================================================================
 productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {
+  if (!PRODUCT_CONTENT_AI_ENABLED) {
+    return res.status(503).json({
+      error: 'FEATURE_TEMPORARILY_DISABLED',
+      message: 'O recurso de transcrição de vídeo está temporariamente indisponível.',
+    });
+  }
+
   const access = await requireProductMinerAccess(req, res);
   if (!access) return;
 
@@ -1750,6 +1766,13 @@ productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {
 
 // Alias da rota no padrão do HAR do Vyral (v2)
 productMinerRouter.get('/transcriptions/v2/:videoId', async (req, res) => {
+  if (!PRODUCT_CONTENT_AI_ENABLED) {
+    return res.status(503).json({
+      error: 'FEATURE_TEMPORARILY_DISABLED',
+      message: 'O recurso de transcrição está temporariamente indisponível.',
+    });
+  }
+
   const access = await requireProductMinerAccess(req, res);
   if (!access) return;
 
@@ -1813,6 +1836,13 @@ const inFlightTranscriptionLocks = new Map<string, Promise<any>>();
 // ROTA DE GERAÇÃO E RESOLUÇÃO (RESOLUTION): POST /videos/transcription
 // =========================================================================
 productMinerRouter.post('/videos/transcription', async (req, res) => {
+  if (!PRODUCT_CONTENT_AI_ENABLED) {
+    return res.status(503).json({
+      error: 'FEATURE_TEMPORARILY_DISABLED',
+      message: 'O recurso de transcrição de vídeo está temporariamente indisponível.',
+    });
+  }
+
   const access = await requireProductMinerAccess(req, res);
   if (!access) return;
 
@@ -2308,6 +2338,13 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
 // ROTA: MODELAR CONTEÚDO (ENGENHARIA REVERSA BASEADA NA TRANSCRIÇÃO EXATA)
 // =========================================================================
 productMinerRouter.post('/videos/model-content', async (req, res) => {
+  if (!PRODUCT_CONTENT_AI_ENABLED) {
+    return res.status(503).json({
+      error: 'FEATURE_TEMPORARILY_DISABLED',
+      message: 'O recurso de modelagem de conteúdo está temporariamente indisponível.',
+    });
+  }
+
   const access = await requireProductMinerAccess(req, res);
   if (!access) return;
 
