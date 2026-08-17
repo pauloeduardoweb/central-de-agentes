@@ -1157,6 +1157,57 @@ function parseStoredTimedTranscript(jsonStr: string | null | undefined): {
 }
 
 // =========================================================================
+// ROTA DE DIAGNÓSTICO DE BANCO DE DADOS: GET /database-health
+// (ACESSO EXCLUSIVO MENTOR / MASTER - NUNCA EXPÕE DADOS SENSÍVEIS)
+// =========================================================================
+productMinerRouter.get('/database-health', async (req, res) => {
+  if (!requireMentorRefresh(req, res)) return;
+
+  const dbHostPresent = Boolean(process.env.DB_HOST && process.env.DB_HOST.trim().length > 0);
+  const dbNamePresent = Boolean(process.env.DB_NAME && process.env.DB_NAME.trim().length > 0);
+  const dbUserPresent = Boolean(process.env.DB_USER && process.env.DB_USER.trim().length > 0);
+  const dbPasswordPresent = Boolean(process.env.DB_PASSWORD && process.env.DB_PASSWORD.trim().length > 0);
+  const dbConfigured = isDatabaseConfigured();
+
+  let connectionTest = false;
+  let productsTableAccessible = false;
+  let totalProducts = 0;
+
+  if (dbConfigured) {
+    try {
+      const [rows] = await db.query('SELECT 1 AS connected');
+      connectionTest = Array.isArray(rows) && rows.length > 0;
+    } catch (err: any) {
+      connectionTest = false;
+    }
+
+    if (connectionTest) {
+      try {
+        const [prodRows]: any = await db.query('SELECT COUNT(*) AS total FROM tiktok_shop_products');
+        if (Array.isArray(prodRows) && prodRows.length > 0) {
+          productsTableAccessible = true;
+          totalProducts = Number(prodRows[0]?.total || 0);
+        }
+      } catch (err: any) {
+        productsTableAccessible = false;
+      }
+    }
+  }
+
+  return res.json({
+    environment: process.env.NODE_ENV || 'development',
+    dbHostPresent,
+    dbNamePresent,
+    dbUserPresent,
+    dbPasswordPresent,
+    isDatabaseConfigured: dbConfigured,
+    connectionTest,
+    productsTableAccessible,
+    totalProducts,
+  });
+});
+
+// =========================================================================
 // ROTA DE DIAGNÓSTICO DE ÁUDIO: GET /audio-health
 // =========================================================================
 productMinerRouter.get('/audio-health', async (req, res) => {
