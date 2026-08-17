@@ -1437,6 +1437,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
     // 6. Enviar áudio compacto para o Gemini (MP3 ~400KB é instantâneo e 100% suportado em inlineData)
     currentStage = 'GEMINI_GENERATE';
     let responseText = '';
+    let modelUsed = '';
     const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
     let lastGeminiErr: any = null;
 
@@ -1459,6 +1460,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
         });
         responseText = response.text || '';
         if (responseText) {
+          modelUsed = targetModel;
           break;
         }
       } catch (mErr: any) {
@@ -1470,6 +1472,8 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
     if (!responseText) {
       throw lastGeminiErr || new Error('GEMINI_EMPTY_RESPONSE');
     }
+
+    console.log(`[Transcription Success]: Audio processed via Gemini model: ${modelUsed} for videoId: ${cleanVideoId}`);
 
     currentStage = 'GEMINI_RESPONSE';
 
@@ -1798,6 +1802,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
     try {
       const ai = getGeminiClient();
       let responseText = '';
+      let modelUsed = '';
       const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
       let lastGeminiErr: any = null;
 
@@ -1812,6 +1817,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
           });
           responseText = response.text || '';
           if (responseText) {
+            modelUsed = targetModel;
             break;
           }
         } catch (mErr: any) {
@@ -1823,6 +1829,8 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
       if (!responseText) {
         throw lastGeminiErr || new Error('A resposta do modelo de IA não retornou conteúdo.');
       }
+
+      console.log(`[Model Content Success]: Content modeling processed via Gemini model: ${modelUsed} for videoId: ${videoId}`);
 
       let parsedData: any = {};
       try {

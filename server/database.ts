@@ -1291,6 +1291,17 @@ export function ensureProductMinerTables(): Promise<void> {
       try {
         await db.query(`ALTER TABLE tiktok_shop_video_transcripts ADD COLUMN transcription_version INT DEFAULT 1 AFTER transcription_source`);
       } catch {}
+      // Garantir idempotentemente que o DEFAULT estrutural da tabela em produção seja exatamente NULL e 1
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_video_transcripts MODIFY COLUMN transcription_source VARCHAR(50) DEFAULT NULL`);
+      } catch (modErr: any) {
+        console.warn('[MySQL Migration MODIFY COLUMN transcription_source Warning]:', modErr?.message || modErr);
+      }
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_video_transcripts MODIFY COLUMN transcription_version INT DEFAULT 1`);
+      } catch (modErr: any) {
+        console.warn('[MySQL Migration MODIFY COLUMN transcription_version Warning]:', modErr?.message || modErr);
+      }
       try {
         await db.query(`ALTER TABLE tiktok_shop_video_transcripts ADD INDEX idx_tsvt_video_id (video_id)`);
       } catch {}
