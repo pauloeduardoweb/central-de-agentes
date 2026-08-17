@@ -17,6 +17,7 @@ import {
   TimedTranscriptBlock,
 } from '../../services/productMinerApi';
 import { getProductPriceRange } from '../../utils/priceHelper';
+import { PRODUCT_CONTENT_AI_ENABLED } from '../../config/featureFlags';
 
 function compactNumber(value: number | null | undefined) {
   if (value === null || value === undefined) return '—';
@@ -842,7 +843,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Action Buttons Grid */}
           <div className="pt-2 border-t border-slate-100 space-y-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {activeVideo && onOpenTranscriptionModal ? (
+              {PRODUCT_CONTENT_AI_ENABLED && activeVideo && onOpenTranscriptionModal ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -856,7 +857,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </button>
               ) : null}
 
-              {activeVideo && onOpenContentModelerModal ? (
+              {PRODUCT_CONTENT_AI_ENABLED && activeVideo && onOpenContentModelerModal ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -1276,7 +1277,7 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
             {/* 2.4 AÇÕES DO MODAL (4 BOTÕES ESTRUTURADOS) */}
             <div className="space-y-2 pt-1">
               <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
-                {onOpenTranscriptionModal && (
+                {PRODUCT_CONTENT_AI_ENABLED && onOpenTranscriptionModal && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1290,7 +1291,7 @@ export const TikTokVideoPlayerModal: React.FC<TikTokVideoPlayerModalProps> = ({
                   </button>
                 )}
 
-                {onOpenContentModelerModal && (
+                {PRODUCT_CONTENT_AI_ENABLED && onOpenContentModelerModal && (
                   <button
                     type="button"
                     onClick={() => {

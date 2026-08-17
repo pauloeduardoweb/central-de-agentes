@@ -47,6 +47,8 @@ import {
 import { DailyPickRoulette } from './DailyPickRoulette';
 import { getProductPriceRange } from '../../utils/priceHelper';
 import { deduplicateProducts } from '../../utils/productDeduplication';
+import { PRODUCT_CONTENT_AI_ENABLED } from '../../config/featureFlags';
+
 
 interface ProductMinerPageProps {
   studentCode: string;
@@ -6119,6 +6121,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   const handleOpenTranscriptionModal = useCallback(
     (p: ProductMinerProduct | null) => {
+      if (!PRODUCT_CONTENT_AI_ENABLED) return;
       setTranscriptionModalProduct(p);
       if (p?.productId && studentCode) {
         trackProductInteraction(studentCode, {
@@ -6136,6 +6139,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
   const handleOpenContentModelerModal = useCallback(
     (p: ProductMinerProduct | null, transcriptData?: VideoTranscriptionResponse) => {
+      if (!PRODUCT_CONTENT_AI_ENABLED) return;
       setContentModelerModalProduct(p);
       setModelerInitialTranscript(transcriptData || null);
       if (p?.productId && studentCode) {
@@ -8857,8 +8861,8 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         onToggleFavorite={toggleFavorite}
         onOpenAnalysisModal={handleOpenAnalysisModal}
         onOpenDetailModal={handleOpenDetailModal}
-        onOpenTranscriptionModal={handleOpenTranscriptionModal}
-        onOpenContentModelerModal={(p) => handleOpenContentModelerModal(p)}
+        onOpenTranscriptionModal={PRODUCT_CONTENT_AI_ENABLED ? handleOpenTranscriptionModal : undefined}
+        onOpenContentModelerModal={PRODUCT_CONTENT_AI_ENABLED ? ((p) => handleOpenContentModelerModal(p)) : undefined}
         onTrackClick={handleTrackProductClick}
       />
 
@@ -8884,32 +8888,36 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         onToggleFavorite={toggleFavorite}
         onOpenScriptModal={(p) => setScriptModalProduct(p)}
         onOpenAnalysisModal={handleOpenAnalysisModal}
-        onOpenTranscriptionModal={handleOpenTranscriptionModal}
-        onOpenContentModelerModal={(p) => handleOpenContentModelerModal(p)}
+        onOpenTranscriptionModal={PRODUCT_CONTENT_AI_ENABLED ? handleOpenTranscriptionModal : undefined}
+        onOpenContentModelerModal={PRODUCT_CONTENT_AI_ENABLED ? ((p) => handleOpenContentModelerModal(p)) : undefined}
         onTrackClick={handleTrackProductClick}
       />
 
-      <ProductTranscriptionModal
-        isOpen={Boolean(transcriptionModalProduct)}
-        onClose={() => setTranscriptionModalProduct(null)}
-        product={transcriptionModalProduct}
-        studentCode={studentCode}
-        onOpenContentModelerModal={(p, transcriptData) => handleOpenContentModelerModal(p, transcriptData)}
-        onTrackClick={handleTrackProductClick}
-      />
+      {PRODUCT_CONTENT_AI_ENABLED && (
+        <ProductTranscriptionModal
+          isOpen={Boolean(transcriptionModalProduct)}
+          onClose={() => setTranscriptionModalProduct(null)}
+          product={transcriptionModalProduct}
+          studentCode={studentCode}
+          onOpenContentModelerModal={(p, transcriptData) => handleOpenContentModelerModal(p, transcriptData)}
+          onTrackClick={handleTrackProductClick}
+        />
+      )}
 
-      <ProductContentModelerModal
-        isOpen={Boolean(contentModelerModalProduct)}
-        onClose={() => {
-          setContentModelerModalProduct(null);
-          setModelerInitialTranscript(null);
-        }}
-        product={contentModelerModalProduct}
-        studentCode={studentCode}
-        initialTranscription={modelerInitialTranscript}
-        onOpenTranscriptionModal={handleOpenTranscriptionModal}
-        onTrackClick={handleTrackProductClick}
-      />
+      {PRODUCT_CONTENT_AI_ENABLED && (
+        <ProductContentModelerModal
+          isOpen={Boolean(contentModelerModalProduct)}
+          onClose={() => {
+            setContentModelerModalProduct(null);
+            setModelerInitialTranscript(null);
+          }}
+          product={contentModelerModalProduct}
+          studentCode={studentCode}
+          initialTranscription={modelerInitialTranscript}
+          onOpenTranscriptionModal={handleOpenTranscriptionModal}
+          onTrackClick={handleTrackProductClick}
+        />
+      )}
     </section>
   );
 };
