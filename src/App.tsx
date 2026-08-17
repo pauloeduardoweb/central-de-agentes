@@ -41,6 +41,10 @@ export default function App() {
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [activeView, setActiveView] = useState<'hub' | 'mentor' | 'chat' | 'miner'>('hub');
   const [productMinerAccess, setProductMinerAccess] = useState<{ enabled: boolean; canRefresh: boolean }>({ enabled: false, canRefresh: false });
+  const [minerAccessLoading, setMinerAccessLoading] = useState<boolean>(() => {
+    const savedCode = typeof window !== 'undefined' ? localStorage.getItem('user_student_access_code') || '' : '';
+    return Boolean(savedCode && !isMasterKey(savedCode));
+  });
   const [currentPath, setCurrentPath] = useState<string>(() => {
     return typeof window !== 'undefined' ? window.location.pathname : '/';
   });
@@ -66,28 +70,72 @@ export default function App() {
   const canAccessProductMiner = isMaster || productMinerAccess.enabled;
   const canRefreshProductMiner = isMaster || productMinerAccess.canRefresh;
 
+  const refreshMinerAccess = (code: string) => {
+    if (!code) {
+      setProductMinerAccess({ enabled: false, canRefresh: false });
+      setMinerAccessLoading(false);
+      return;
+    }
+    if (isMasterKey(code)) {
+      setProductMinerAccess({ enabled: true, canRefresh: true });
+      setMinerAccessLoading(false);
+      return;
+    }
+    getProductMinerAccess(code)
+      .then((access) => {
+        setProductMinerAccess({ enabled: access.enabled, canRefresh: access.canRefresh });
+      })
+      .catch(() => {
+        setProductMinerAccess({ enabled: false, canRefresh: false });
+      })
+      .finally(() => {
+        setMinerAccessLoading(false);
+      });
+  };
+
   useEffect(() => {
     let cancelled = false;
     if (!studentCode) {
       setProductMinerAccess({ enabled: false, canRefresh: false });
+      setMinerAccessLoading(false);
       return;
     }
     if (isMaster) {
       setProductMinerAccess({ enabled: true, canRefresh: true });
+      setMinerAccessLoading(false);
       return;
     }
+    setMinerAccessLoading(true);
     getProductMinerAccess(studentCode)
       .then((access) => {
         if (!cancelled) setProductMinerAccess({ enabled: access.enabled, canRefresh: access.canRefresh });
       })
       .catch(() => {
         if (!cancelled) setProductMinerAccess({ enabled: false, canRefresh: false });
+      })
+      .finally(() => {
+        if (!cancelled) setMinerAccessLoading(false);
       });
     return () => { cancelled = true; };
   }, [studentCode, isMaster]);
 
+  // Re-sync miner permissions when window is focused or becomes visible
   useEffect(() => {
-    if (activeView === 'miner' && !canAccessProductMiner) {
+    const handleSync = () => {
+      if (document.visibilityState === 'visible' && studentCode && !isMaster) {
+        refreshMinerAccess(studentCode);
+      }
+    };
+    window.addEventListener('focus', handleSync);
+    document.addEventListener('visibilitychange', handleSync);
+    return () => {
+      window.removeEventListener('focus', handleSync);
+      document.removeEventListener('visibilitychange', handleSync);
+    };
+  }, [studentCode, isMaster]);
+
+  useEffect(() => {
+    if (activeView === 'miner' && !canAccessProductMiner && !minerAccessLoading) {
       setActiveView('hub');
       if (typeof window !== 'undefined' && window.location.pathname.startsWith('/miner')) {
         window.history.replaceState({}, '', '/');
@@ -95,7 +143,7 @@ export default function App() {
       setCurrentPath('/');
       triggerToast('Este recurso não está habilitado para sua conta.');
     }
-  }, [activeView, canAccessProductMiner]);
+  }, [activeView, canAccessProductMiner, minerAccessLoading]);
 
   const handleSelectView = (view: 'hub' | 'mentor' | 'chat' | 'miner') => {
     if (view === 'miner' && !canAccessProductMiner) {
@@ -148,7 +196,7 @@ export default function App() {
     if (currentPath.startsWith('/miner')) {
       if (canAccessProductMiner) {
         setActiveView('miner');
-      } else {
+      } else if (!minerAccessLoading) {
         if (typeof window !== 'undefined' && window.location.pathname.startsWith('/miner')) {
           window.history.replaceState({}, '', '/');
         }
@@ -177,7 +225,7 @@ export default function App() {
         setActiveView('hub');
       }
     }
-  }, [currentPath, isMaster, canAccessProductMiner]);
+  }, [currentPath, isMaster, canAccessProductMiner, minerAccessLoading]);
 
   const userIdentifier = studentCode
     ? (isMaster ? 'MASTER' : normalizeAccessCode(studentCode))
@@ -397,7 +445,14 @@ export default function App() {
           return;
         }
 
-        if (!res.ok) {
+        if (res.ok) {
+          try {
+            const okData = await res.json();
+            if (okData && typeof okData.productMinerEnabled === 'boolean' && !isMaster) {
+              setProductMinerAccess((prev) => ({ ...prev, enabled: okData.productMinerEnabled }));
+            }
+          } catch {}
+        } else {
           let data: any = {};
           try {
             data = await res.json();
