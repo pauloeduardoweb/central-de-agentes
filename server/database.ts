@@ -1291,6 +1291,9 @@ export function ensureProductMinerTables(): Promise<void> {
       try {
         await db.query(`ALTER TABLE tiktok_shop_video_transcripts ADD COLUMN transcription_version INT DEFAULT 2 AFTER transcription_source`);
       } catch {}
+      try {
+        await db.query(`ALTER TABLE tiktok_shop_video_transcripts ADD INDEX idx_tsvt_video_id (video_id)`);
+      } catch {}
 
       await ensureDailyCollectionsTable();
       await ensureCategoryExecutionHistoryTable();
