@@ -7,6 +7,7 @@ import {
 import {
   ProductMinerProduct,
   VideoTranscriptionResponse,
+  fetchPersistedTranscriptionByVideoIdApi,
   fetchVideoTranscriptionApi,
 } from '../../services/productMinerApi';
 
@@ -49,6 +50,23 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
     setError(null);
 
     try {
+      // 1. Se não for forceRefresh, tentar consulta rápida persistida por videoId / productId (GET)
+      if (!force) {
+        try {
+          const cleanVid = videoId || '';
+          const cached = await fetchPersistedTranscriptionByVideoIdApi(studentCode, cleanVid, productId);
+          if (cached && cached.exists && cached.rawTranscript) {
+            setTranscriptionData(cached);
+            setLoading(false);
+            setRefreshing(false);
+            return;
+          }
+        } catch (consultErr) {
+          console.warn('[Transcription Fast Consultation Miss/Error]:', consultErr);
+        }
+      }
+
+      // 2. Se não existir ou for forceRefresh, acionar a resolução/geração (POST)
       const data = await fetchVideoTranscriptionApi(studentCode, {
         productId,
         videoId,

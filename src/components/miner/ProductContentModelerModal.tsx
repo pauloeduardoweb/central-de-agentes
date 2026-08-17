@@ -9,6 +9,7 @@ import {
   ProductMinerProduct,
   VideoTranscriptionResponse,
   ModelContentResponse,
+  fetchPersistedTranscriptionByVideoIdApi,
   fetchVideoTranscriptionApi,
   modelVideoContentApi,
 } from '../../services/productMinerApi';
@@ -54,7 +55,7 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
   const productId = product?.productId;
   const videoId = video?.id || (video as any)?.videoId || (video as any)?.video_id || '';
 
-  // Load transcription if not provided
+  // Load transcription: strictly prioritize persisted transcription without auto-generating if not found
   useEffect(() => {
     if (!isOpen || !product) {
       setTranscription(null);
@@ -65,7 +66,7 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
       return;
     }
 
-    if (initialTranscription) {
+    if (initialTranscription && initialTranscription.rawTranscript) {
       setTranscription(initialTranscription);
       if (!targetProduct) {
         setTargetProduct(product.title);
@@ -74,29 +75,48 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
     } else {
       setLoadingTranscription(true);
       setError(null);
-      fetchVideoTranscriptionApi(studentCode, {
-        productId: product.productId,
-        videoId,
-        videoUrl: video?.url || product.videoUrl,
-        productTitle: product.title,
-        productCategory: product.category,
-        videoAuthor: video?.author || product.videoAuthor,
-        videoDescription: video?.description || product.videoDescription,
-      })
+
+      // Usar rota de consulta GET por videoId / productId
+      const cleanVid = videoId || '';
+      fetchPersistedTranscriptionByVideoIdApi(studentCode, cleanVid, product.productId)
         .then((data) => {
-          setTranscription(data);
-          if (!targetProduct) {
-            setTargetProduct(product.title);
-            setTargetNiche(product.category || 'Geral');
+          if (data && data.exists && data.rawTranscript) {
+            setTranscription(data);
+            if (!targetProduct) {
+              setTargetProduct(product.title);
+              setTargetNiche(product.category || 'Geral');
+            }
+          } else {
+            // Se não houver transcrição salva ainda, carregar via POST de resolução
+            return fetchVideoTranscriptionApi(studentCode, {
+              productId: product.productId,
+              videoId: cleanVid,
+              videoUrl: video?.url || product.videoUrl,
+              productTitle: product.title,
+              productCategory: product.category,
+              videoAuthor: video?.author || product.videoAuthor,
+              videoDescription: video?.description || product.videoDescription,
+              forceRefresh: false,
+            }).then((genData) => {
+              if (genData && genData.rawTranscript) {
+                setTranscription(genData);
+                if (!targetProduct) {
+                  setTargetProduct(product.title);
+                  setTargetNiche(product.category || 'Geral');
+                }
+              } else {
+                setError('Este vídeo ainda não possui uma transcrição válida.');
+              }
+            });
           }
         })
         .catch((err: any) => {
           console.error('[Modeler Transcription Fetch Error]:', err);
-          setError('Não foi possível carregar a transcrição base do vídeo.');
+          setError(err?.message || 'Este vídeo ainda não possui uma transcrição válida.');
         })
         .finally(() => setLoadingTranscription(false));
     }
-  }, [isOpen, productId, initialTranscription]);
+  }, [isOpen, productId, videoId, initialTranscription]);
 
   // ESC key listener
   useEffect(() => {
