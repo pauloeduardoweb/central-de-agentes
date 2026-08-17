@@ -62,8 +62,8 @@ export const AfiliadosModal: React.FC<AfiliadosModalProps> = ({ onClose }) => {
               <span className="text-xs font-black uppercase tracking-wider text-cyan-300">
                 GANHE
               </span>
-              <div className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-emerald-300 drop-shadow-[0_2px_10px_rgba(0,210,255,0.4)]">
-                R$ 88,81
+              <div className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-emerald-300 drop-shadow-[0_2px_10px_rgba(0,210,255,0.4)] whitespace-nowrap">
+                R$ 111,56
               </div>
               <span className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-cyan-200">
                 POR CADA VENDA REALIZADA
@@ -84,7 +84,7 @@ export const AfiliadosModal: React.FC<AfiliadosModalProps> = ({ onClose }) => {
                   <ShoppingCart className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Preço do Produto:</span>
                 </span>
-                <span className="font-black text-cyan-300">R$ 197,90</span>
+                <span className="font-black text-cyan-300 whitespace-nowrap">R$ 247,90</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800">
@@ -92,7 +92,7 @@ export const AfiliadosModal: React.FC<AfiliadosModalProps> = ({ onClose }) => {
                   <Percent className="w-3.5 h-3.5 text-amber-400" />
                   <span>Taxa Kiwify:</span>
                 </span>
-                <span className="font-black text-amber-400">- R$ 20,28</span>
+                <span className="font-black text-amber-400 whitespace-nowrap">- R$ 24,78</span>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/40">
@@ -100,7 +100,7 @@ export const AfiliadosModal: React.FC<AfiliadosModalProps> = ({ onClose }) => {
                   <DollarSign className="w-4 h-4 text-emerald-400" />
                   <span>Comissão Líquida Total:</span>
                 </span>
-                <span className="font-black text-emerald-400 text-sm">R$ 177,62</span>
+                <span className="font-black text-emerald-400 text-sm whitespace-nowrap">R$ 223,12</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 pt-1">
@@ -108,8 +108,8 @@ export const AfiliadosModal: React.FC<AfiliadosModalProps> = ({ onClose }) => {
                   <span className="text-[10px] font-bold text-emerald-300 uppercase block">
                     Afiliado (50%)
                   </span>
-                  <span className="text-lg font-black text-white block">
-                    R$ 88,81
+                  <span className="text-lg font-black text-white block whitespace-nowrap">
+                    R$ 111,56
                   </span>
                 </div>
 
@@ -117,8 +117,8 @@ export const AfiliadosModal: React.FC<AfiliadosModalProps> = ({ onClose }) => {
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">
                     Geração Z Pro (50%)
                   </span>
-                  <span className="text-lg font-black text-slate-200 block">
-                    R$ 88,81
+                  <span className="text-lg font-black text-slate-200 block whitespace-nowrap">
+                    R$ 111,56
                   </span>
                 </div>
               </div>
