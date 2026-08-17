@@ -45,6 +45,7 @@ import {
   formatStoreName,
 } from './ProductMinerModals';
 import { DailyPickRoulette } from './DailyPickRoulette';
+import { ProductMinerTour, TOUR_STORAGE_KEY } from './ProductMinerTour';
 import { getProductPriceRange } from '../../utils/priceHelper';
 import { deduplicateProducts } from '../../utils/productDeduplication';
 import { PRODUCT_CONTENT_AI_ENABLED } from '../../config/featureFlags';
@@ -4439,6 +4440,7 @@ const MobileProductCard: React.FC<{
 
   return (
     <article
+      id={position === 1 ? 'tour-first-product' : undefined}
       onClick={() => onOpenDetailModal?.(product)}
       className="group rounded-xl border border-slate-200/90 bg-white shadow-xs hover:shadow-md hover:border-amber-400/60 transition-all flex flex-col h-full relative overflow-hidden text-slate-900 cursor-pointer p-2"
     >
@@ -4453,7 +4455,11 @@ const MobileProductCard: React.FC<{
 
         {/* Video Associated Indicator */}
         {product.video?.url ? (
-          <div className="absolute bottom-1 left-1 z-10 p-1 rounded-full bg-amber-500 text-white shadow-xs" title="Possui vídeo">
+          <div
+            id={position === 1 ? 'tour-video-action' : undefined}
+            className="absolute bottom-1 left-1 z-10 p-1 rounded-full bg-amber-500 text-white shadow-xs"
+            title="Possui vídeo"
+          >
             <Play className="w-2.5 h-2.5 fill-current" />
           </div>
         ) : null}
@@ -4771,9 +4777,13 @@ const ViralVideoCard: React.FC<{
   };
 
   return (
-    <article className="group rounded-3xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/80 transition-all flex flex-col h-full text-slate-900 relative">
+    <article
+      id={position === 1 ? 'tour-first-product' : undefined}
+      className="group rounded-3xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/80 transition-all flex flex-col h-full text-slate-900 relative"
+    >
       {/* Video / Media Hero (aspect 9:16) */}
       <div
+        id={position === 1 ? 'tour-video-action' : undefined}
         className="relative aspect-[9/16] max-h-[520px] w-full bg-slate-950 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center cursor-pointer group/media"
         onClick={handlePlayClick}
       >
@@ -4999,9 +5009,13 @@ const MobileViralVideoCard: React.FC<{
   };
 
   return (
-    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-xs flex flex-col h-full text-slate-900 relative p-2.5 sm:p-3 space-y-2.5">
+    <article
+      id={position === 1 ? 'tour-first-product' : undefined}
+      className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-xs flex flex-col h-full text-slate-900 relative p-2.5 sm:p-3 space-y-2.5"
+    >
       {/* Video Container (aspect 9:16) */}
       <div
+        id={position === 1 ? 'tour-video-action' : undefined}
         className="relative aspect-[9/16] max-h-[380px] w-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center shrink-0 cursor-pointer"
         onClick={handlePlayClick}
       >
@@ -5076,7 +5090,7 @@ const MobileViralVideoCard: React.FC<{
         </button>
       </div>
 
-      {/* Video Creator & Non-Overlapping Stats */}
+      {/* Video Creator & Structured 3+2 Metrics */}
       {product.video ? (
         <div className="rounded-xl border border-amber-200/70 bg-amber-50/40 p-2.5 space-y-2">
           <div className="space-y-0.5">
@@ -5090,45 +5104,57 @@ const MobileViralVideoCard: React.FC<{
             ) : null}
           </div>
 
-          <div className="space-y-1 pt-1.5 border-t border-amber-200/50">
-            <div className="grid grid-cols-3 gap-1 text-center bg-white/80 rounded-lg p-1.5 border border-amber-200/30">
+          <div className="space-y-1.5 pt-1.5 border-t border-amber-200/50">
+            {/* Linha 1: 3 colunas (Visualizações, Curtidas, Comentários) */}
+            <div className="grid grid-cols-3 gap-1 text-center bg-white/85 rounded-xl p-1.5 border border-amber-200/40">
               <div title="Visualizações" className="flex flex-col items-center min-w-0">
-                <Eye className="w-3.5 h-3.5 mb-0.5 text-slate-600 shrink-0" />
-                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                <Eye className="w-3.5 h-3.5 mb-0.5 text-cyan-600 shrink-0" />
+                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
                   {compactNumber(product.video.views)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Visualizações</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                  Visualizações
+                </span>
               </div>
               <div title="Curtidas" className="flex flex-col items-center min-w-0">
-                <Heart className="w-3.5 h-3.5 mb-0.5 text-rose-500 shrink-0" />
-                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                <Heart className="w-3.5 h-3.5 mb-0.5 text-rose-500 fill-rose-500/20 shrink-0" />
+                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
                   {compactNumber(product.video.likes)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Curtidas</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                  Curtidas
+                </span>
               </div>
               <div title="Comentários" className="flex flex-col items-center min-w-0">
                 <MessageCircle className="w-3.5 h-3.5 mb-0.5 text-sky-600 shrink-0" />
-                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
                   {compactNumber(product.video.comments)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Comentários</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                  Coment.
+                </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-1 text-center bg-white/80 rounded-lg p-1.5 border border-amber-200/30">
+            {/* Linha 2: 2 colunas centralizadas (Compartilhamentos, Salvos) */}
+            <div className="grid grid-cols-2 gap-1 text-center bg-white/85 rounded-xl p-1.5 border border-amber-200/40 max-w-[90%] mx-auto">
               <div title="Compartilhamentos" className="flex flex-col items-center min-w-0">
                 <Share2 className="w-3.5 h-3.5 mb-0.5 text-emerald-600 shrink-0" />
-                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
                   {compactNumber(product.video.shares)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Compart.</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                  Compart.
+                </span>
               </div>
               <div title="Salvos" className="flex flex-col items-center min-w-0">
                 <Bookmark className="w-3.5 h-3.5 mb-0.5 text-amber-600 shrink-0" />
-                <span className="font-extrabold text-slate-900 text-[11px] sm:text-[12px] whitespace-nowrap">
+                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
                   {compactNumber(product.video.saves)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 whitespace-nowrap">Salvos</span>
+                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                  Salvos
+                </span>
               </div>
             </div>
           </div>
@@ -5138,31 +5164,31 @@ const MobileViralVideoCard: React.FC<{
       {/* Secondary Product info */}
       <div className="space-y-2 flex-1 flex flex-col justify-between">
         <div className="space-y-1.5 rounded-xl bg-slate-50/90 p-2.5 border border-slate-200/70">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+          <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             Produto Relacionado
           </span>
-          <h3 className="font-bold text-[12px] text-slate-900 leading-snug line-clamp-2 min-h-[32px]" title={product.title}>
+          <h3 className="font-bold text-[12px] sm:text-[13px] text-slate-900 leading-snug line-clamp-2 min-h-[32px]" title={product.title}>
             {product.title}
           </h3>
 
-          <div className="space-y-0.5 pt-0.5">
+          <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-200/60">
             {(() => {
               const range = getProductPriceRange(product.priceCents, product.currencySymbol);
               if (!range) {
                 return (
-                  <span className="font-black text-emerald-700 text-[12px] sm:text-[13px] block">
+                  <span className="font-black text-emerald-700 text-xs sm:text-[13px] truncate">
                     {formatMoney(product.priceCents, product.currencySymbol)}
                   </span>
                 );
               }
               return (
-                <span className="font-black text-emerald-700 text-[12px] sm:text-[13px] block">
+                <span className="font-black text-emerald-700 text-xs sm:text-[13px] truncate">
                   {range.formattedRange}
                 </span>
               );
             })()}
 
-            <span className="text-[10px] sm:text-[11px] text-amber-700 font-bold block">
+            <span className="text-[10px] sm:text-[11px] text-amber-700 font-extrabold shrink-0 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60">
               {compactNumber(product.soldCount)} vendas
             </span>
           </div>
@@ -5240,7 +5266,10 @@ const ProductCard: React.FC<{
   const commInfo = getEffectiveCommissionInfo(product);
 
   return (
-    <article className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative">
+    <article
+      id={position === 1 ? 'tour-first-product' : undefined}
+      className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-amber-400/70 transition-all flex flex-col h-full text-slate-900 relative"
+    >
       <div className="relative aspect-[4/3] bg-slate-50 overflow-hidden shrink-0 border-b border-slate-100 flex items-center justify-center p-2">
         <button
           type="button"
@@ -5280,7 +5309,10 @@ const ProductCard: React.FC<{
             <Flame className="w-3 h-3 fill-current" /> DISPARANDO
           </div>
         ) : product.video?.url ? (
-          <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-amber-500 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm">
+          <div
+            id={position === 1 ? 'tour-video-action' : undefined}
+            className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-amber-500 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm"
+          >
             <Play className="w-3 h-3 fill-current text-white" /> Vídeo associado
           </div>
         ) : null}
@@ -6009,6 +6041,26 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   const [selectedVideoRange, setSelectedVideoRange] = useState<VideoViewRangeId | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
+  // Tour Guiado do Minerador
+  const [isTourOpen, setIsTourOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const completed = localStorage.getItem(TOUR_STORAGE_KEY);
+      if (!completed) {
+        setIsTourOpen(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleTourStepChange = (stepIndex: number) => {
+    if (stepIndex === 5) {
+      setShowAdvancedFilters(true);
+    }
+  };
+
   // Adquirir Produtos - Painéis Recolhíveis com persistência no localStorage
   const [isExpansionTargetCollapsed, setIsExpansionTargetCollapsed] = useState<boolean>(() => {
     if (typeof localStorage !== 'undefined') {
@@ -6655,12 +6707,23 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       {/* 1 — CLASSIFICAÇÕES DE PRODUTOS (9 CLASSIFICATIONS)  */}
       {/* ================================================== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-2">
+      <div id="tour-classifications" className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs sm:text-sm md:text-base font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
             <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
             Classificações de Produtos
           </span>
+
+          <button
+            id="tour-help-button"
+            type="button"
+            onClick={() => setIsTourOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200/80 text-amber-900 font-extrabold text-[11px] sm:text-xs transition-all shadow-2xs cursor-pointer"
+            title="Iniciar Tour Guiado do Minerador"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>Tour do Minerador</span>
+          </button>
         </div>
 
         {/* Horizontal scrollable row on mobile/tablet, 9-column full-width grid on desktop */}
@@ -6678,6 +6741,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
               return (
                 <button
                   key={c.id}
+                  id={`tour-classification-${c.id}`}
                   type="button"
                   onClick={() => {
                     if (selectedClassification === c.id) {
@@ -6714,7 +6778,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* ================================================== */}
       {/* 2 — CATEGORIAS E SUBCATEGORIAS TIKTOK SHOP          */}
       {/* ================================================== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-sm">
+      <div id="tour-categories" className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-600">Categorias:</span>
@@ -7121,6 +7185,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         {/* Superior group: Pesquisa & Meus Favoritos */}
         <div className="inline-flex p-1 rounded-xl border border-slate-200 bg-white shadow-xs self-start items-center gap-1">
           <button
+            id="tour-search-btn"
             onClick={() => setMode('search')}
             className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mode === 'search'
@@ -7133,6 +7198,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           </button>
 
           <button
+            id="tour-favorites-btn"
             onClick={() => setMode('favorites')}
             className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               mode === 'favorites'
@@ -7154,6 +7220,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         <div className="flex flex-row items-center gap-2 flex-nowrap">
           {/* Advanced Filters Toggle Button */}
           <button
+            id="tour-advanced-filters-btn"
             type="button"
             onClick={() => setShowAdvancedFilters((prev) => !prev)}
             className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl border text-xs sm:text-xs md:text-sm font-bold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0 whitespace-nowrap ${
@@ -7193,7 +7260,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* 4 — CAMPO DE PESQUISA (SOMENTE NA ABA PESQUISA)     */}
       {/* ================================================== */}
       {mode === 'search' && (
-        <div className="relative w-full animate-fade-in">
+        <div id="tour-search-bar" className="relative w-full animate-fade-in">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
@@ -7222,7 +7289,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       {/* Advanced Filters Drawer / Video Performance Panel */}
       {(showAdvancedFilters || selectedClassification === 'viral_video') ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-sm animate-fade-in">
+        <div id="tour-video-ranges" className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-sm animate-fade-in">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
@@ -8918,6 +8985,13 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
           onTrackClick={handleTrackProductClick}
         />
       )}
+
+      {/* Tour Guiado de Boas-Vindas */}
+      <ProductMinerTour
+        isOpen={isTourOpen}
+        onClose={() => setIsTourOpen(false)}
+        onStepChange={handleTourStepChange}
+      />
     </section>
   );
 };
