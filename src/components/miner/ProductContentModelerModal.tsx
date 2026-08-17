@@ -20,6 +20,7 @@ interface ProductContentModelerModalProps {
   product: ProductMinerProduct | null;
   studentCode: string;
   initialTranscription?: VideoTranscriptionResponse | null;
+  onOpenTranscriptionModal?: (product: ProductMinerProduct) => void;
   onTrackClick?: (product: ProductMinerProduct) => void;
 }
 
@@ -29,11 +30,13 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
   product,
   studentCode,
   initialTranscription,
+  onOpenTranscriptionModal,
   onTrackClick,
 }) => {
   const [loadingTranscription, setLoadingTranscription] = useState(false);
   const [modelingLoading, setModelingLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [missingTranscription, setMissingTranscription] = useState(false);
   const [transcription, setTranscription] = useState<VideoTranscriptionResponse | null>(null);
 
   // Form states for new target product
@@ -61,6 +64,7 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
       setTranscription(null);
       setModeledResult(null);
       setError(null);
+      setMissingTranscription(false);
       setTargetProduct('');
       setTargetNiche('');
       return;
@@ -68,6 +72,7 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
 
     if (initialTranscription && initialTranscription.rawTranscript) {
       setTranscription(initialTranscription);
+      setMissingTranscription(false);
       if (!targetProduct) {
         setTargetProduct(product.title);
         setTargetNiche(product.category || 'Geral');
@@ -75,44 +80,29 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
     } else {
       setLoadingTranscription(true);
       setError(null);
+      setMissingTranscription(false);
 
-      // Usar rota de consulta GET por videoId / productId
+      // Usar estritamente rota de consulta GET por videoId / productId
       const cleanVid = videoId || '';
       fetchPersistedTranscriptionByVideoIdApi(studentCode, cleanVid, product.productId)
         .then((data) => {
           if (data && data.exists && data.rawTranscript) {
             setTranscription(data);
+            setMissingTranscription(false);
             if (!targetProduct) {
               setTargetProduct(product.title);
               setTargetNiche(product.category || 'Geral');
             }
           } else {
-            // Se não houver transcrição salva ainda, carregar via POST de resolução
-            return fetchVideoTranscriptionApi(studentCode, {
-              productId: product.productId,
-              videoId: cleanVid,
-              videoUrl: video?.url || product.videoUrl,
-              productTitle: product.title,
-              productCategory: product.category,
-              videoAuthor: video?.author || product.videoAuthor,
-              videoDescription: video?.description || product.videoDescription,
-              forceRefresh: false,
-            }).then((genData) => {
-              if (genData && genData.rawTranscript) {
-                setTranscription(genData);
-                if (!targetProduct) {
-                  setTargetProduct(product.title);
-                  setTargetNiche(product.category || 'Geral');
-                }
-              } else {
-                setError('Este vídeo ainda não possui uma transcrição válida.');
-              }
-            });
+            // NÃO chamar POST /videos/transcription automaticamente!
+            setTranscription(null);
+            setMissingTranscription(true);
           }
         })
         .catch((err: any) => {
           console.error('[Modeler Transcription Fetch Error]:', err);
-          setError(err?.message || 'Este vídeo ainda não possui uma transcrição válida.');
+          setTranscription(null);
+          setMissingTranscription(true);
         })
         .finally(() => setLoadingTranscription(false));
     }
@@ -131,7 +121,12 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
   if (!isOpen || !product) return null;
 
   const handleGenerateModel = async (isNewVariant = false) => {
-    if (!transcription && !product) return;
+    // BLOQUEIO DUPLO: Nunca prosseguir sem transcrição válida
+    if (!transcription || !transcription.rawTranscript?.trim()) {
+      setError('É necessário gerar uma transcrição válida antes de modelar o conteúdo.');
+      return;
+    }
+    if (!product) return;
     setModelingLoading(true);
     setError(null);
 
@@ -142,7 +137,7 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
       const response = await modelVideoContentApi(studentCode, {
         productId: product.productId,
         videoId,
-        exactTranscript: transcription?.rawTranscript || '',
+        exactTranscript: transcription.rawTranscript.trim(),
         originalHook: transcription?.hookOriginal,
         originalStructure: transcription?.structureOriginal,
         originalDevelopment: transcription?.developmentOriginal,
@@ -297,6 +292,43 @@ export const ProductContentModelerModal: React.FC<ProductContentModelerModalProp
               <p className="text-xs text-slate-600 font-bold">
                 Carregando transcrição exata para matéria-prima da modelagem...
               </p>
+            </div>
+          ) : missingTranscription || (!transcription && !error) ? (
+            <div className="rounded-3xl border border-amber-200 bg-gradient-to-b from-amber-50/80 to-white p-6 sm:p-8 text-center space-y-4 shadow-sm">
+              <div className="w-14 h-14 rounded-2xl bg-amber-100 border border-amber-300 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
+                <FileText className="w-7 h-7" />
+              </div>
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h4 className="font-extrabold text-base text-slate-900">
+                  Este vídeo ainda não possui uma transcrição válida.
+                </h4>
+                <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                  Para fazer a engenharia reversa e modelar um novo roteiro com fidelidade, é necessário extrair a fala real do vídeo primeiro.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    if (onOpenTranscriptionModal && product) {
+                      onOpenTranscriptionModal(product);
+                    }
+                  }}
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs uppercase tracking-wide flex items-center justify-center gap-2 shadow-md shadow-amber-500/25 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Gerar Transcrição</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer"
+                >
+                  Voltar
+                </button>
+              </div>
             </div>
           ) : error ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-center space-y-2">

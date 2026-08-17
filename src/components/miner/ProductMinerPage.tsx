@@ -8907,6 +8907,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         product={contentModelerModalProduct}
         studentCode={studentCode}
         initialTranscription={modelerInitialTranscript}
+        onOpenTranscriptionModal={handleOpenTranscriptionModal}
         onTrackClick={handleTrackProductClick}
       />
     </section>
