@@ -835,16 +835,43 @@ async function validateDirectMediaUrl(urlStr: string): Promise<{
   httpStatus?: number;
   contentType?: string | null;
   domain?: string;
-  error?: string;
+  error?: 'EMPTY_URL' | 'INVALID_PROTOCOL' | 'NOT_DIRECT_CDN' | 'EXPIRED_OR_FORBIDDEN' | 'HTML_OR_JSON_RESPONSE' | string;
 }> {
   if (!urlStr || typeof urlStr !== 'string') return { isValid: false, error: 'EMPTY_URL' };
   if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) return { isValid: false, error: 'INVALID_PROTOCOL' };
-  if (!isDirectCdnMediaUrl(urlStr)) return { isValid: false, error: 'NOT_DIRECT_CDN' };
 
   let domain = 'unknown';
   try {
     domain = new URL(urlStr).hostname;
   } catch {}
+
+  const isCdn = isDirectCdnMediaUrl(urlStr);
+
+  // Se não passar no filtro de CDN direto, tentar uma requisição de cabeçalho para diagnóstico exato sem mascarar
+  if (!isCdn) {
+    try {
+      const probeRes = await fetch(urlStr, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Range': 'bytes=0-512',
+          'Accept': '*/*',
+        },
+        signal: AbortSignal.timeout(6000),
+      });
+      const httpStatus = probeRes.status;
+      const contentType = probeRes.headers.get('content-type');
+      return {
+        isValid: false,
+        httpStatus,
+        contentType,
+        domain,
+        error: 'NOT_DIRECT_CDN',
+      };
+    } catch {
+      return { isValid: false, domain, error: 'NOT_DIRECT_CDN' };
+    }
+  }
 
   try {
     const res = await fetch(urlStr, {
@@ -861,7 +888,13 @@ async function validateDirectMediaUrl(urlStr: string): Promise<{
     const contentType = res.headers.get('content-type');
 
     if (httpStatus === 401 || httpStatus === 403 || httpStatus === 404 || httpStatus === 410) {
-      return { isValid: false, httpStatus, contentType, domain, error: 'EXPIRED_OR_FORBIDDEN' };
+      return {
+        isValid: false,
+        httpStatus,
+        contentType,
+        domain,
+        error: httpStatus === 403 ? 'HTTP_403' : 'EXPIRED_OR_FORBIDDEN',
+      };
     }
 
     if (!res.ok && httpStatus !== 206) {
@@ -1143,10 +1176,10 @@ productMinerRouter.get('/audio-health', async (req, res) => {
 
 // =========================================================================
 // ROTA DE DIAGNÓSTICO DE RESOLUÇÃO DE MÍDIA: GET /videos/media-diagnostic/:productId/:videoId?
+// (ACESSO EXCLUSIVO MENTOR / MASTER)
 // =========================================================================
 productMinerRouter.get(['/videos/media-diagnostic/:productId/:videoId', '/videos/media-diagnostic/:productId'], async (req, res) => {
-  const access = await requireProductMinerAccess(req, res);
-  if (!access) return;
+  if (!requireMentorRefresh(req, res)) return;
 
   const cleanProductId = String(req.params.productId || '').trim();
   const cleanVideoId = String(req.params.videoId || req.query.videoId || '').trim();
@@ -1204,7 +1237,14 @@ productMinerRouter.get(['/videos/media-diagnostic/:productId/:videoId', '/videos
   }
 
   // Validação da URL do banco se houver
-  let dbValidation: any = null;
+  let dbValidation: {
+    isValid: boolean;
+    httpStatus?: number;
+    contentType?: string | null;
+    domain?: string;
+    error?: string;
+  } | null = null;
+
   if (dbDirectUrl) {
     dbValidation = await validateDirectMediaUrl(dbDirectUrl);
     if (!dbValidation.isValid) {
@@ -1255,6 +1295,14 @@ productMinerRouter.get(['/videos/media-diagnostic/:productId/:videoId', '/videos
     hasDirectMediaUrl: false,
   };
 
+  let preparedValidation: {
+    isValid: boolean;
+    httpStatus?: number;
+    contentType?: string | null;
+    domain?: string;
+    error?: string;
+  } | null = null;
+
   let finalResolution = {
     success: false,
     mediaSource: null as 'DB_DIRECT_MEDIA' | 'PREPARED_DIRECT_MEDIA' | 'FALLBACK_VIDEO_URL' | null,
@@ -1274,13 +1322,13 @@ productMinerRouter.get(['/videos/media-diagnostic/:productId/:videoId', '/videos
       prepareVideoDownloadResult.hasDirectMediaUrl = Boolean(prep.directMediaUrl);
 
       if (prep.success && prep.directMediaUrl) {
-        const prepVal = await validateDirectMediaUrl(prep.directMediaUrl);
-        if (prepVal.isValid) {
+        preparedValidation = await validateDirectMediaUrl(prep.directMediaUrl);
+        if (preparedValidation.isValid) {
           finalResolution.success = true;
           finalResolution.mediaSource = 'PREPARED_DIRECT_MEDIA';
           finalResolution.reason = 'Successfully resolved fresh direct media URL from provider.';
         } else {
-          finalResolution.reason = `Prepared media URL failed validation: ${prepVal.error || 'INVALID'}`;
+          finalResolution.reason = `Prepared media URL failed validation: ${preparedValidation.error || 'INVALID'}`;
         }
       } else {
         finalResolution.reason = `Prepare video download failed: ${prep.message || prep.error || 'UNKNOWN'}`;
@@ -1301,7 +1349,9 @@ productMinerRouter.get(['/videos/media-diagnostic/:productId/:videoId', '/videos
     productId: cleanProductId,
     videoId: cleanVideoId,
     databaseRecord,
+    dbValidation,
     prepareVideoDownload: prepareVideoDownloadResult,
+    preparedValidation,
     fallbackVideo,
     finalResolution,
   });
