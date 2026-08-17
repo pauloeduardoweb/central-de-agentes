@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { lookupKeyType, normalizeAccessCode, type KeyCategory } from './authKeys.js';
+import { normalizeAccessCode, type KeyCategory } from './authKeys.js';
 import {
   searchTikTokShopProducts,
   refreshMultiPageTikTokShopProducts,
@@ -25,7 +25,7 @@ import {
 import { getGeminiClient } from './geminiHelper.js';
 import { extractAudioFromMediaBuffer, getAudioBinariesHealth } from './audioExtractor.js';
 import { db, isDatabaseConfigured, ensureCodigosAcessoTable, ensureProductMinerTables } from './database.js';
-import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin } from './presenceService.js';
+import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin, checkCodeKeyType } from './presenceService.js';
 
 export const productMinerRouter = express.Router();
 
@@ -49,9 +49,9 @@ function getRequesterCode(req: express.Request): string | null {
   return code || null;
 }
 
-function getRequesterType(req: express.Request): KeyCategory {
+async function getRequesterType(req: express.Request): Promise<KeyCategory> {
   const code = getRequesterCode(req);
-  return code ? lookupKeyType(code) : 'INVALID';
+  return code ? await checkCodeKeyType(code) : 'INVALID';
 }
 
 export async function isProductMinerEnabledForCode(studentCode: string): Promise<boolean> {
@@ -59,13 +59,15 @@ export async function isProductMinerEnabledForCode(studentCode: string): Promise
   if (!norm) return false;
 
   // Master/Mentor key ALWAYS has access
-  if (lookupKeyType(norm) === 'MASTER') return true;
+  const keyType = await checkCodeKeyType(norm);
+  if (keyType === 'MASTER') return true;
+  if (keyType === 'INVALID') return false;
 
   if (isDatabaseConfigured()) {
     try {
       await ensureCodigosAcessoTable();
       const [rows]: any = await db.query(
-        `SELECT product_miner_enabled FROM codigos_acesso WHERE codigo = ? LIMIT 1`,
+        `SELECT product_miner_enabled FROM codigos_acesso WHERE UPPER(TRIM(codigo)) = ? LIMIT 1`,
         [norm]
       );
       if (Array.isArray(rows) && rows.length > 0) {
@@ -87,7 +89,7 @@ async function requireProductMinerAccess(req: express.Request, res: express.Resp
     res.status(401).json({ error: 'AUTH_REQUIRED' });
     return null;
   }
-  const type = lookupKeyType(code);
+  const type = await checkCodeKeyType(code);
   if (type === 'INVALID') {
     res.status(401).json({ error: 'AUTH_REQUIRED' });
     return null;
@@ -105,8 +107,8 @@ async function requireProductMinerAccess(req: express.Request, res: express.Resp
   return 'STUDENT';
 }
 
-function requireMentorRefresh(req: express.Request, res: express.Response): boolean {
-  const type = getRequesterType(req);
+async function requireMentorRefresh(req: express.Request, res: express.Response): Promise<boolean> {
+  const type = await getRequesterType(req);
   if (type === 'INVALID') {
     res.status(401).json({ error: 'AUTH_REQUIRED' });
     return false;
@@ -122,7 +124,7 @@ function requireMentorRefresh(req: express.Request, res: express.Response): bool
 productMinerRouter.get('/access', async (req, res) => {
   const code = getRequesterCode(req);
   if (!code) return res.status(401).json({ error: 'AUTH_REQUIRED' });
-  const type = lookupKeyType(code);
+  const type = await checkCodeKeyType(code);
   if (type === 'INVALID') return res.status(401).json({ error: 'AUTH_REQUIRED' });
 
   const isMaster = type === 'MASTER';
@@ -138,7 +140,7 @@ productMinerRouter.get('/access', async (req, res) => {
 
 // ADMIN: Get list of students and their Product Miner access status
 productMinerRouter.get('/admin/students', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     let students: any[] = [];
     if (isDatabaseConfigured()) {
@@ -204,7 +206,7 @@ productMinerRouter.get('/admin/students', async (req, res) => {
 
 // ADMIN: Toggle Product Miner access for a student code
 productMinerRouter.post('/admin/toggle', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const { accessKeyId, codigo, enabled } = req.body || {};
     const wantEnable = Boolean(enabled);
@@ -230,7 +232,7 @@ productMinerRouter.post('/admin/toggle', async (req, res) => {
            product_miner_enabled = ?,
            product_miner_enabled_at = IF(? = 1, NOW(), product_miner_enabled_at),
            product_miner_enabled_by = IF(? = 1, 'SESSION_MASTER', NULL)
-         WHERE codigo = ? OR id = ?`,
+         WHERE UPPER(TRIM(codigo)) = ? OR id = ?`,
         [wantEnable ? 1 : 0, wantEnable ? 1 : 0, wantEnable ? 1 : 0, targetCode, accessKeyId || 0]
       );
     }
@@ -266,7 +268,7 @@ productMinerRouter.post('/admin/toggle', async (req, res) => {
 
 // ADMIN: Enable Product Miner access for ALL eligible students currently without access
 productMinerRouter.post('/admin/activate-all', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     let activatedCount = 0;
 
@@ -311,7 +313,7 @@ productMinerRouter.post('/admin/activate-all', async (req, res) => {
 
 // ADMIN: Reclassify existing local products into categories without calling SocialCrawl or consuming credits
 productMinerRouter.post('/admin/reclassify', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   const startTime = Date.now();
   try {
     const report = await reclassifyExistingDatabaseProducts();
@@ -335,7 +337,7 @@ productMinerRouter.post('/admin/reclassify', async (req, res) => {
 });
 
 productMinerRouter.get('/admin/reclassify', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   const startTime = Date.now();
   try {
     const report = await reclassifyExistingDatabaseProducts();
@@ -471,7 +473,7 @@ productMinerRouter.post('/track-interaction', async (req, res) => {
 
 // PAID refresh: only the Mentor can intentionally spend SocialCrawl credits.
 productMinerRouter.post('/refresh', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const query = String(req.body?.query || req.body?.q || req.query.query || req.query.q || '').trim();
     const page = req.body?.page ? Number(req.body.page) : undefined;
@@ -533,7 +535,7 @@ productMinerRouter.get('/ranking', async (req, res) => {
 
 // Coletor: Mentor-only category statistics
 productMinerRouter.get('/collector/categories', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -552,7 +554,7 @@ productMinerRouter.get('/collector/categories', async (req, res) => {
 
 // Coletor: Status da Atualização Diária da Base (Mentor-only)
 productMinerRouter.get('/collector/daily-status', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const status = await getDailyRefreshStatus();
     return res.json({ success: true, status });
@@ -564,7 +566,7 @@ productMinerRouter.get('/collector/daily-status', async (req, res) => {
 
 // Coletor: Executar Atualização Diária da Base (Mentor-only)
 productMinerRouter.post('/collector/daily-refresh', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const force = Boolean(req.body?.force);
     const status = await executeDailyRefresh({ force });
@@ -586,7 +588,7 @@ productMinerRouter.post('/collector/daily-refresh', async (req, res) => {
 productMinerRouter.post('/generate-script', async (req, res) => {
   if (!await requireProductMinerAccess(req, res)) return;
   try {
-    const userRole = getRequesterType(req);
+    const userRole = await getRequesterType(req);
     const rawCode = req.body.studentCode || req.header('x-access-code') || req.header('x-student-access-code') || '';
     const studentCode = normalizeAccessCode(rawCode) || 'STUDENT';
 
@@ -1172,7 +1174,7 @@ function parseStoredTimedTranscript(jsonStr: string | null | undefined): {
 // (ACESSO EXCLUSIVO MENTOR / MASTER - NUNCA EXPÕE DADOS SENSÍVEIS)
 // =========================================================================
 productMinerRouter.get('/database-health', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
 
   const dbHostPresent = Boolean(process.env.DB_HOST && process.env.DB_HOST.trim().length > 0);
   const dbNamePresent = Boolean(process.env.DB_NAME && process.env.DB_NAME.trim().length > 0);
@@ -1241,7 +1243,7 @@ productMinerRouter.get('/audio-health', async (req, res) => {
 // (ACESSO EXCLUSIVO MENTOR / MASTER)
 // =========================================================================
 productMinerRouter.get(['/videos/media-diagnostic/:productId/:videoId', '/videos/media-diagnostic/:productId'], async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
 
   const cleanProductId = String(req.params.productId || '').trim();
   const cleanVideoId = String(req.params.videoId || req.query.videoId || '').trim();
@@ -1426,7 +1428,7 @@ productMinerRouter.get('/videos/transcript-diagnostic/:productId/:videoId?', asy
   const access = await requireProductMinerAccess(req, res);
   if (!access) return;
 
-  const role = getRequesterType(req);
+  const role = await getRequesterType(req);
   if (role !== 'MASTER') {
     return res.status(403).json({ error: 'MENTOR_ONLY', message: 'Acesso restrito ao mentor.' });
   }
@@ -2648,7 +2650,7 @@ productMinerRouter.post('/videos/playback-token', async (req, res) => {
 
 // Video Download Preparation (Mentor Only)
 productMinerRouter.post('/videos/prepare-download', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const { productId, videoId } = req.body || {};
     if (!productId) {
@@ -2804,7 +2806,7 @@ productMinerRouter.get('/videos/:productId/stream', async (req, res) => {
 
 // Video Download Delivery/Proxy (Mentor Only)
 productMinerRouter.get('/videos/:productId/download', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const { productId } = req.params;
     const videoId = String(req.query.videoId || '').trim();
@@ -2873,7 +2875,7 @@ productMinerRouter.get('/videos/:productId/download', async (req, res) => {
 
 // Admin Route: Manual backfill from legacy video columns to product_videos table
 productMinerRouter.post('/admin/backfill-videos', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const result = await backfillLegacyVideosToProductVideos();
     return res.json({ success: true, ...result });
@@ -2885,7 +2887,7 @@ productMinerRouter.post('/admin/backfill-videos', async (req, res) => {
 
 // Admin Route: 100% READ-ONLY real taxonomy audit
 productMinerRouter.get('/admin/audit-taxonomy-readonly', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const { runReadOnlyTaxonomyAudit } = await import('../scripts/diagnoseTaxonomy.js');
     const result = await runReadOnlyTaxonomyAudit();
@@ -2898,7 +2900,7 @@ productMinerRouter.get('/admin/audit-taxonomy-readonly', async (req, res) => {
 
 // Admin Route: 100% READ-ONLY Deep audit of unclassified subcategories
 productMinerRouter.get('/admin/audit-unclassified-products-readonly', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const { runDeepUnclassifiedAudit } = await import('./unclassifiedAuditService.js');
     const result = await runDeepUnclassifiedAudit();
@@ -2911,7 +2913,7 @@ productMinerRouter.get('/admin/audit-unclassified-products-readonly', async (req
 
 // Admin Route: 100% READ-ONLY Expansion Plan by Official Subcategories
 productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const { buildSubcategoryExpansionPlan, getCategoryExecutionHistoryStats } = await import('./subcategoryExpansionService.js');
     const { getCollectorCategoriesStats } = await import('./productMinerService.js');
@@ -2978,7 +2980,7 @@ productMinerRouter.get('/admin/expansion-plan-readonly', async (req, res) => {
 
 // Admin Route: Get category execution history stats for estimating credits
 productMinerRouter.get('/admin/category-execution-history', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const { getCategoryExecutionHistoryStats } = await import('./subcategoryExpansionService.js');
     const selectedCatsParam = req.query.categories ? String(req.query.categories).split(',') : undefined;
@@ -2992,7 +2994,7 @@ productMinerRouter.get('/admin/category-execution-history', async (req, res) => 
 
 // Admin Route: Execute subcategory expansion with Real-time Stream (Mentor only)
 productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
 
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -3111,7 +3113,7 @@ productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (re
 
 // Admin Route: Iniciar Job de Expansão Passo a Passo (Resumable Job)
 productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   try {
     const { initializeExpansionJobState } = await import('./subcategoryExpansionService.js');
     const { createExpansionJobInDb, updateExpansionJobInDb } = await import('./database.js');
@@ -3166,7 +3168,7 @@ productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
 
 // Admin Route: Executar um Step do Job de Expansão (Resumable Job)
 productMinerRouter.post('/admin/expansion-jobs/:executionId/step', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   const executionId = req.params.executionId;
   const { getExpansionJobFromDb, updateExpansionJobInDb, tryAcquireExpansionJobStepLock, releaseExpansionJobStepLock } = await import('./database.js');
   const { executeSubcategoryExpansionStep, finalizeExpansionJobState } = await import('./subcategoryExpansionService.js');
@@ -3279,7 +3281,7 @@ productMinerRouter.post('/admin/expansion-jobs/:executionId/step', async (req, r
 
 // Admin Route: Status do Job de Expansão
 productMinerRouter.get('/admin/expansion-jobs/:executionId/status', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   const executionId = req.params.executionId;
   try {
     const { getExpansionJobFromDb } = await import('./database.js');
@@ -3319,7 +3321,7 @@ productMinerRouter.get('/admin/expansion-jobs/:executionId/status', async (req, 
 
 // Admin Route: Cancelar Job de Expansão
 productMinerRouter.post('/admin/expansion-jobs/:executionId/cancel', async (req, res) => {
-  if (!requireMentorRefresh(req, res)) return;
+  if (!await requireMentorRefresh(req, res)) return;
   const executionId = req.params.executionId;
   try {
     const { getExpansionJobFromDb, updateExpansionJobInDb } = await import('./database.js');

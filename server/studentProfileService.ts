@@ -2,6 +2,7 @@ import express from 'express';
 import { db, isDatabaseConfigured, ensureProfilesTable, ensureProgressTable } from './database.js';
 import { normalizeAccessCode, lookupKeyType, STUDENT_KEYS, MASTER_KEYS } from './authKeys.js';
 import { maskStudentCode, calculateLevelFromXp } from './rankingService.js';
+import { checkCodeKeyType } from './presenceService.js';
 
 export const RESERVED_USERNAMES = new Set([
   'mentor',
@@ -86,21 +87,23 @@ export const memoryProfilesMap = new Map<string, MemoryProfile>();
  * Extracts and verifies student access code from request session headers.
  * NEVER trusts req.body.codigo!
  */
-export function getAuthenticatedStudentSession(req: express.Request): {
+export async function getAuthenticatedStudentSession(req: express.Request): Promise<{
   code: string | null;
   isMaster: boolean;
   isValidStudent: boolean;
-} {
+}> {
   const codeHeader =
     req.headers['x-access-code'] ||
-    req.headers['x-student-access-code'];
+    req.headers['x-student-access-code'] ||
+    req.headers['x-master-key'] ||
+    req.headers['authorization']?.toString().replace(/^Bearer\s+/i, '');
 
   const cleanCode = normalizeAccessCode(codeHeader);
   if (!cleanCode) {
     return { code: null, isMaster: false, isValidStudent: false };
   }
 
-  const keyType = lookupKeyType(cleanCode);
+  const keyType = await checkCodeKeyType(cleanCode);
   if (keyType === 'MASTER') {
     return { code: cleanCode, isMaster: true, isValidStudent: false };
   }
@@ -118,7 +121,7 @@ export function getAuthenticatedStudentSession(req: express.Request): {
  */
 export async function getStudentProfileHandler(req: express.Request, res: express.Response) {
   try {
-    const { code, isMaster, isValidStudent } = getAuthenticatedStudentSession(req);
+    const { code, isMaster, isValidStudent } = await getAuthenticatedStudentSession(req);
 
     if (!code || (!isValidStudent && !isMaster)) {
       return res.status(401).json({
@@ -440,7 +443,7 @@ export async function createOrUpdateStudentProfile(
  */
 export async function createStudentProfileHandler(req: express.Request, res: express.Response) {
   try {
-    const { code, isMaster, isValidStudent } = getAuthenticatedStudentSession(req);
+    const { code, isMaster, isValidStudent } = await getAuthenticatedStudentSession(req);
 
     if (!code || (!isValidStudent && !isMaster)) {
       return res.status(401).json({
@@ -496,7 +499,7 @@ export async function createStudentProfileHandler(req: express.Request, res: exp
  */
 export async function updateUsernameHandler(req: express.Request, res: express.Response) {
   try {
-    const { code, isMaster, isValidStudent } = getAuthenticatedStudentSession(req);
+    const { code, isMaster, isValidStudent } = await getAuthenticatedStudentSession(req);
 
     if (!code || (!isValidStudent && !isMaster)) {
       return res.status(401).json({
@@ -552,7 +555,7 @@ export async function updateUsernameHandler(req: express.Request, res: express.R
  */
 export async function updateAvatarHandler(req: express.Request, res: express.Response) {
   try {
-    const { code, isMaster, isValidStudent } = getAuthenticatedStudentSession(req);
+    const { code, isMaster, isValidStudent } = await getAuthenticatedStudentSession(req);
 
     if (!code || (!isValidStudent && !isMaster)) {
       return res.status(401).json({
@@ -605,7 +608,7 @@ export async function updateAvatarHandler(req: express.Request, res: express.Res
  */
 export async function getMentorStudentsHandler(req: express.Request, res: express.Response) {
   try {
-    const { isMaster } = getAuthenticatedStudentSession(req);
+    const { isMaster } = await getAuthenticatedStudentSession(req);
 
     if (!isMaster) {
       return res.status(403).json({

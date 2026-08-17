@@ -11,19 +11,26 @@ import {
   getTikTokClientSecret,
 } from './tiktokService.js';
 import { extractChatCredentials } from './chatService.js';
-import { lookupKeyType, normalizeAccessCode } from './authKeys.js';
+import { normalizeAccessCode } from './authKeys.js';
+import { checkCodeKeyType } from './presenceService.js';
 
 export const tiktokRouter = express.Router();
 
 /**
  * Helper to identify authenticated student session code.
  */
-function getSessionUserCode(req: express.Request): string | null {
+async function getSessionUserCode(req: express.Request): Promise<string | null> {
   const { accessCode } = extractChatCredentials(req);
-  const cleanCode = normalizeAccessCode(accessCode);
+  const raw =
+    accessCode ||
+    req.headers['x-access-code'] ||
+    req.headers['x-student-access-code'] ||
+    req.query.code ||
+    req.query.accessCode;
+  const cleanCode = normalizeAccessCode(raw);
   if (!cleanCode) return null;
 
-  const keyType = lookupKeyType(cleanCode);
+  const keyType = await checkCodeKeyType(cleanCode);
   if (keyType === 'STUDENT' || keyType === 'MASTER') {
     return cleanCode;
   }
@@ -37,7 +44,7 @@ function getSessionUserCode(req: express.Request): string | null {
  */
 tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Response) => {
   try {
-    const userCode = getSessionUserCode(req) || normalizeAccessCode(req.query.code || req.query.accessCode);
+    const userCode = (await getSessionUserCode(req)) || normalizeAccessCode(req.query.code || req.query.accessCode);
 
     if (!userCode) {
       return res.status(401).redirect('/mentor/integracoes/tiktok?status=error&message=Autenticacao_Necessaria');
@@ -277,7 +284,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
  */
 tiktokRouter.get('/connection', async (req: express.Request, res: express.Response) => {
   try {
-    const userCode = getSessionUserCode(req);
+    const userCode = await getSessionUserCode(req);
     if (!userCode) {
       return res.status(401).json({ error: 'UNAUTHORIZED', connected: false });
     }
@@ -296,7 +303,7 @@ tiktokRouter.get('/connection', async (req: express.Request, res: express.Respon
  */
 tiktokRouter.delete('/connection', async (req: express.Request, res: express.Response) => {
   try {
-    const userCode = getSessionUserCode(req);
+    const userCode = await getSessionUserCode(req);
     if (!userCode) {
       return res.status(401).json({ error: 'UNAUTHORIZED', success: false });
     }

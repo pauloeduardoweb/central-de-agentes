@@ -660,7 +660,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
 
     // Master keys are exempt from session table persistence (Rule 3)
     if (keyType === 'MASTER') {
-      return res.json({ status: 'ok', online: true, isMaster: true, role: 'mentor', presenceVersion: PRESENCE_VERSION });
+      return res.json({ status: 'ok', online: true, isMaster: true, role: 'mentor', productMinerEnabled: true, presenceVersion: PRESENCE_VERSION });
     }
 
     // Check key status first (Suspended / Banned)
@@ -888,9 +888,27 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
       expiresAt,
     });
 
+    // Fetch up-to-date product miner access flag for student
+    let productMinerEnabled = false;
+    if (isDatabaseConfigured()) {
+      try {
+        const [pmRows]: any = await db.query(
+          `SELECT product_miner_enabled FROM codigos_acesso WHERE UPPER(TRIM(codigo)) = ? LIMIT 1`,
+          [cleanCode]
+        );
+        if (Array.isArray(pmRows) && pmRows.length > 0) {
+          productMinerEnabled = Boolean(pmRows[0].product_miner_enabled);
+        }
+      } catch {}
+    } else {
+      const mem = memoryKeyStatusMap.get(cleanCode);
+      productMinerEnabled = Boolean(mem?.productMinerEnabled);
+    }
+
     return res.json({
       status: 'ok',
       online: true,
+      productMinerEnabled,
       presenceVersion: PRESENCE_VERSION,
       lastHeartbeatAt: now.toISOString(),
     });
