@@ -168,10 +168,282 @@ type TrendMetrics = {
   trendScore: number | null;
 };
 
-function getSocialCrawlApiKey(): string {
+export function getSocialCrawlApiKey(): string {
   const key = String(process.env.SOCIALCRAWL_API_KEY || '').trim();
   if (!key) throw new Error('SOCIALCRAWL_API_KEY_MISSING');
   return key;
+}
+
+export interface WebVttCaption {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface ParsedWebVttResult {
+  transcription: string;
+  captions: WebVttCaption[];
+  timedTranscript: Array<{ time: string; text: string }>;
+  durationSeconds: number;
+  hookOriginal: string;
+  ctaOriginal: string;
+}
+
+export function parseVttTimestampToSeconds(ts: string): number {
+  if (!ts) return 0;
+  const clean = ts.trim().replace(',', '.');
+  const parts = clean.split(':');
+  if (parts.length === 3) {
+    const hours = parseFloat(parts[0]) || 0;
+    const minutes = parseFloat(parts[1]) || 0;
+    const seconds = parseFloat(parts[2]) || 0;
+    return Number((hours * 3600 + minutes * 60 + seconds).toFixed(3));
+  } else if (parts.length === 2) {
+    const minutes = parseFloat(parts[0]) || 0;
+    const seconds = parseFloat(parts[1]) || 0;
+    return Number((minutes * 60 + seconds).toFixed(3));
+  } else if (parts.length === 1) {
+    return Number((parseFloat(parts[0]) || 0).toFixed(3));
+  }
+  return 0;
+}
+
+function formatVttTimeLabel(sec: number): string {
+  const total = Math.floor(Math.max(0, sec));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+export function formatVttSecondsInterval(start: number, end: number): string {
+  return `${formatVttTimeLabel(start)}–${formatVttTimeLabel(end)}`;
+}
+
+export function parseWebVttTranscript(webvttRaw: string): ParsedWebVttResult {
+  if (!webvttRaw || typeof webvttRaw !== 'string') {
+    return {
+      transcription: '',
+      captions: [],
+      timedTranscript: [],
+      durationSeconds: 0,
+      hookOriginal: '',
+      ctaOriginal: '',
+    };
+  }
+
+  // Normalize line breaks
+  const normalized = webvttRaw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rawLines = normalized.split('\n');
+
+  const captions: WebVttCaption[] = [];
+  let i = 0;
+
+  // Skip WEBVTT header & blocks (NOTE, STYLE, REGION)
+  while (i < rawLines.length) {
+    const line = rawLines[i].trim();
+    if (line.startsWith('WEBVTT') || line.startsWith('NOTE') || line.startsWith('STYLE') || line.startsWith('REGION')) {
+      i++;
+      while (i < rawLines.length && rawLines[i].trim().length > 0) {
+        i++;
+      }
+    } else {
+      break;
+    }
+  }
+
+  while (i < rawLines.length) {
+    const line = rawLines[i].trim();
+    if (!line) {
+      i++;
+      continue;
+    }
+
+    // Check if current line has "-->" or next line has "-->"
+    let timestampLine = '';
+    if (line.includes('-->')) {
+      timestampLine = line;
+    } else if (i + 1 < rawLines.length && rawLines[i + 1].trim().includes('-->')) {
+      timestampLine = rawLines[i + 1].trim();
+      i++; // advance past cue index / ID
+    }
+
+    if (timestampLine && timestampLine.includes('-->')) {
+      const parts = timestampLine.split('-->');
+      const startStr = parts[0]?.trim() || '';
+      const endWithSettings = parts[1]?.trim() || '';
+      const endStr = endWithSettings.split(/\s+/)[0] || '';
+
+      const start = parseVttTimestampToSeconds(startStr);
+      const end = parseVttTimestampToSeconds(endStr);
+
+      i++; // advance to cue text lines
+
+      const textLines: string[] = [];
+      while (i < rawLines.length) {
+        const textLine = rawLines[i].trim();
+        if (!textLine) {
+          break; // empty line terminates cue
+        }
+        if (textLine.includes('-->') || (i + 1 < rawLines.length && rawLines[i + 1].trim().includes('-->') && /^\d+$/.test(textLine))) {
+          break;
+        }
+        // Remove WebVTT formatting tags e.g. <v Speaker>, <b>, <c.color>, etc.
+        const cleanText = textLine.replace(/<[^>]+>/g, '').trim();
+        if (cleanText) {
+          textLines.push(cleanText);
+        }
+        i++;
+      }
+
+      const cueText = textLines.join(' ').trim();
+      if (cueText) {
+        captions.push({
+          start,
+          end: end >= start ? end : Number((start + 1).toFixed(3)),
+          text: cueText,
+        });
+      }
+    } else {
+      i++;
+    }
+  }
+
+  const transcription = captions.map((c) => c.text).join(' ').trim();
+  const timedTranscript = captions.map((c) => ({
+    time: formatVttSecondsInterval(c.start, c.end),
+    text: c.text,
+  }));
+
+  const lastEnd = captions.length > 0 ? captions[captions.length - 1].end : 0;
+  const durationSeconds = Math.round(lastEnd) || 0;
+  const hookOriginal = captions.length > 0 ? captions[0].text : '';
+  const ctaOriginal = captions.length > 0 ? captions[captions.length - 1].text : '';
+
+  return {
+    transcription,
+    captions,
+    timedTranscript,
+    durationSeconds,
+    hookOriginal,
+    ctaOriginal,
+  };
+}
+
+export async function fetchSocialCrawlTranscript(videoUrl: string): Promise<{
+  success: boolean;
+  httpStatus?: number;
+  creditsUsed?: number;
+  cached?: boolean;
+  requestId?: string | null;
+  rawTranscript?: string | null;
+  parsed?: ParsedWebVttResult | null;
+  error?: string;
+  message?: string;
+}> {
+  const cleanUrl = String(videoUrl || '').trim();
+  if (!cleanUrl) {
+    return { success: false, error: 'MISSING_VIDEO_URL', message: 'URL do vídeo não informada.' };
+  }
+
+  let apiKey = '';
+  try {
+    apiKey = getSocialCrawlApiKey();
+  } catch (err: any) {
+    return { success: false, error: 'SOCIALCRAWL_API_KEY_MISSING', message: 'Chave SOCIALCRAWL_API_KEY não configurada.' };
+  }
+
+  try {
+    const scUrl = new URL('https://www.socialcrawl.dev/v1/tiktok/post/transcript');
+    scUrl.searchParams.set('url', cleanUrl);
+
+    const response = await fetch(scUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'x-api-key': apiKey,
+        'Accept': 'application/json',
+        'User-Agent': 'GeracaoZPro/1.0',
+      },
+      signal: AbortSignal.timeout(30000),
+    });
+
+    const httpStatus = response.status;
+    const rawText = await response.text();
+    let payload: any = null;
+    try {
+      payload = JSON.parse(rawText);
+    } catch {
+      return {
+        success: false,
+        httpStatus,
+        error: `SOCIALCRAWL_INVALID_JSON_${httpStatus}`,
+        message: 'Resposta JSON inválida da SocialCrawl.',
+      };
+    }
+
+    const creditsUsed = payload?.credits_used ?? payload?.credits ?? payload?.cost ?? 0;
+    const cached = Boolean(payload?.cached);
+    const requestId = payload?.request_id || null;
+
+    if (!response.ok || payload?.success === false) {
+      const msg = payload?.message || payload?.error || `HTTP_${httpStatus}`;
+      return {
+        success: false,
+        httpStatus,
+        creditsUsed,
+        cached,
+        requestId,
+        error: 'SOCIALCRAWL_TRANSCRIPT_ERROR',
+        message: msg,
+      };
+    }
+
+    const transcriptVtt = payload?.data?.transcript || payload?.transcript || payload?.data?.webvtt || '';
+
+    if (!transcriptVtt || typeof transcriptVtt !== 'string' || !transcriptVtt.trim()) {
+      return {
+        success: false,
+        httpStatus,
+        creditsUsed,
+        cached,
+        requestId,
+        rawTranscript: '',
+        error: 'SOCIALCRAWL_TRANSCRIPT_EMPTY',
+        message: 'A SocialCrawl retornou uma transcrição vazia para este vídeo.',
+      };
+    }
+
+    const parsed = parseWebVttTranscript(transcriptVtt);
+
+    if (!parsed.transcription) {
+      return {
+        success: false,
+        httpStatus,
+        creditsUsed,
+        cached,
+        requestId,
+        rawTranscript: transcriptVtt,
+        error: 'SOCIALCRAWL_TRANSCRIPT_EMPTY',
+        message: 'Transcrição sem falas identificadas no formato WebVTT.',
+      };
+    }
+
+    return {
+      success: true,
+      httpStatus,
+      creditsUsed,
+      cached,
+      requestId,
+      rawTranscript: transcriptVtt,
+      parsed,
+    };
+  } catch (err: any) {
+    const isTimeout = err?.name === 'TimeoutError' || err?.message?.includes('timeout') || err?.code === 'ETIMEDOUT';
+    return {
+      success: false,
+      error: isTimeout ? 'SOCIALCRAWL_TRANSCRIPT_TIMEOUT' : 'SOCIALCRAWL_TRANSCRIPT_ERROR',
+      message: err?.message || 'Erro ao conectar à API de Transcrição da SocialCrawl.',
+    };
+  }
 }
 
 function parseInteger(value: unknown): number | null {

@@ -19,6 +19,8 @@ import {
   logProductInteractionEvent,
   getDailyPickStatus,
   spinDailyPick,
+  fetchSocialCrawlTranscript,
+  parseWebVttTranscript,
 } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
 import { extractAudioFromMediaBuffer, getAudioBinariesHealth } from './audioExtractor.js';
@@ -1409,6 +1411,78 @@ productMinerRouter.get(['/videos/media-diagnostic/:productId/:videoId', '/videos
 });
 
 // =========================================================================
+// ROTA DE DIAGNÓSTICO SOCIALCRAWL TRANSCRIPT (SOMENTE MENTOR)
+// =========================================================================
+productMinerRouter.get('/videos/transcript-diagnostic/:productId/:videoId?', async (req, res) => {
+  const access = await requireProductMinerAccess(req, res);
+  if (!access) return;
+
+  const role = getRequesterType(req);
+  if (role !== 'MASTER') {
+    return res.status(403).json({ error: 'MENTOR_ONLY', message: 'Acesso restrito ao mentor.' });
+  }
+
+  const cleanProductId = String(req.params.productId || '').trim();
+  const cleanVideoId = String(req.params.videoId || req.query.videoId || '').trim();
+
+  let resolvedVideoUrl = String(req.query.videoUrl || '').trim();
+  let dbRecord: any = null;
+
+  if (isDatabaseConfigured()) {
+    try {
+      if (cleanVideoId) {
+        const [vRows]: any = await db.query(
+          `SELECT video_id, video_url, video_author, video_description FROM tiktok_shop_product_videos WHERE video_id = ? LIMIT 1`,
+          [cleanVideoId]
+        );
+        if (Array.isArray(vRows) && vRows[0]) {
+          dbRecord = vRows[0];
+          if (!resolvedVideoUrl && vRows[0].video_url) resolvedVideoUrl = vRows[0].video_url;
+        }
+      }
+
+      if (cleanProductId && !resolvedVideoUrl) {
+        const [pRows]: any = await db.query(
+          `SELECT product_id, title, category, video_url, video_author FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
+          [cleanProductId]
+        );
+        if (Array.isArray(pRows) && pRows[0]) {
+          if (!dbRecord) dbRecord = pRows[0];
+          if (!resolvedVideoUrl && pRows[0].video_url) resolvedVideoUrl = pRows[0].video_url;
+        }
+      }
+    } catch (dbErr: any) {
+      console.warn('[Transcript Diagnostic DB Warning]:', dbErr?.message || dbErr);
+    }
+  }
+
+  if (!resolvedVideoUrl && cleanVideoId && /^\d+$/.test(cleanVideoId)) {
+    resolvedVideoUrl = `https://www.tiktok.com/@tiktok/video/${cleanVideoId}`;
+  }
+
+  const scResult = await fetchSocialCrawlTranscript(resolvedVideoUrl);
+
+  return res.json({
+    productId: cleanProductId,
+    videoId: cleanVideoId,
+    resolvedVideoUrl,
+    dbRecord,
+    socialCrawlResult: {
+      success: scResult.success,
+      httpStatus: scResult.httpStatus,
+      creditsUsed: scResult.creditsUsed,
+      cached: scResult.cached,
+      requestId: scResult.requestId,
+      error: scResult.error,
+      message: scResult.message,
+      hasRawTranscript: Boolean(scResult.rawTranscript),
+      rawTranscriptPreview: scResult.rawTranscript ? scResult.rawTranscript.slice(0, 300) : null,
+      parsed: scResult.parsed,
+    },
+  });
+});
+
+// =========================================================================
 // ROTA DE CONSULTA (CONSULTATION): GET /videos/transcription/:videoId
 // =========================================================================
 productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {
@@ -1432,11 +1506,11 @@ productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {
   }
 
   try {
-    // Exigir estritamente transcrição real comprovada por áudio (source = 'audio_extracted' AND version >= 3)
+    // Buscar transcrição real persistida (SocialCrawl Transcript V3 ou áudio extraído V3)
     const [rows]: any = await db.query(
       `SELECT * FROM tiktok_shop_video_transcripts
        WHERE ((video_id = ? AND ? != '') OR (product_id = ? AND ? != ''))
-         AND transcription_source = 'audio_extracted'
+         AND transcription_source IN ('socialcrawl_transcript', 'audio_extracted')
          AND transcription_version >= 3
        ORDER BY updated_at DESC
        LIMIT 1`,
@@ -1469,7 +1543,7 @@ productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {
         developmentOriginal: row.development_original || 'Apresentação detalhada e demonstração do produto.',
         ctaOriginal: row.cta_original || (captions[captions.length - 1]?.text || ''),
         confidenceScore: row.confidence_score || 100,
-        source: 'audio_extracted',
+        source: row.transcription_source || 'socialcrawl_transcript',
         version: row.transcription_version || 3,
         status: 'completed',
       });
@@ -1512,7 +1586,7 @@ productMinerRouter.get('/transcriptions/v2/:videoId', async (req, res) => {
     const [rows]: any = await db.query(
       `SELECT * FROM tiktok_shop_video_transcripts
        WHERE video_id = ?
-         AND transcription_source = 'audio_extracted'
+         AND transcription_source IN ('socialcrawl_transcript', 'audio_extracted')
          AND transcription_version >= 3
        ORDER BY updated_at DESC
        LIMIT 1`,
@@ -1529,7 +1603,7 @@ productMinerRouter.get('/transcriptions/v2/:videoId', async (req, res) => {
         captions,
         original: null,
         translationSource: 'stored',
-        source: 'audio_extracted',
+        source: row.transcription_source || 'socialcrawl_transcript',
         version: row.transcription_version || 3,
         status: 'completed',
       });
@@ -1547,6 +1621,9 @@ productMinerRouter.get('/transcriptions/v2/:videoId', async (req, res) => {
   }
 });
 
+// In-flight transcription request lock map to avoid duplicate concurrent API calls
+const inFlightTranscriptionLocks = new Map<string, Promise<any>>();
+
 // =========================================================================
 // ROTA DE GERAÇÃO E RESOLUÇÃO (RESOLUTION): POST /videos/transcription
 // =========================================================================
@@ -1554,42 +1631,44 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
   const access = await requireProductMinerAccess(req, res);
   if (!access) return;
 
-  let currentStage = 'MEDIA_CONTEXT';
-  let cleanProductId = '';
-  let cleanVideoId = '';
-  let mediaSourceTracked: string = 'UNKNOWN';
-  let mediaHttpStatusTracked: number = 0;
-  let mediaDomainTracked: string = 'unknown';
-  let mediaMimeTracked: string = 'unknown';
-  let mediaBytesTracked: number = 0;
-  let audioBytesTracked: number = 0;
+  const {
+    productId,
+    videoId,
+    videoUrl,
+    productTitle,
+    productCategory,
+    videoAuthor,
+    videoDescription,
+    forceRefresh = false,
+  } = req.body || {};
 
-  try {
-    const {
-      productId,
-      videoId,
-      videoUrl,
-      productTitle,
-      productCategory,
-      videoAuthor,
-      videoDescription,
-      forceRefresh = false,
-    } = req.body || {};
+  const cleanProductId = String(productId || '').trim();
+  const cleanVideoId = String(videoId || '').trim();
 
-    cleanProductId = String(productId || '').trim();
-    cleanVideoId = String(videoId || '').trim();
+  if (!cleanProductId && !cleanVideoId) {
+    return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto ou vídeo é obrigatório.' });
+  }
 
-    if (!cleanProductId && !cleanVideoId) {
-      return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto ou vídeo é obrigatório.' });
+  const lockKey = `${cleanProductId || 'none'}:${cleanVideoId || 'none'}`;
+
+  // Se houver uma requisição em andamento idêntica, aguarda o mesmo resultado (previne double-click e chamadas simultâneas)
+  if (inFlightTranscriptionLocks.has(lockKey)) {
+    try {
+      const activeResult = await inFlightTranscriptionLocks.get(lockKey);
+      return res.json(activeResult);
+    } catch {
+      // Se falhou, continua com nova tentativa
     }
+  }
 
-    // 1. Verificar cache no banco de dados (se já existe transcrição de áudio real version >= 3 e !forceRefresh)
+  const executionPromise = (async () => {
+    // 1. PRIORIDADE 1: CACHE NO BANCO DE DADOS (V3)
     if (!forceRefresh && isDatabaseConfigured()) {
       try {
         const [rows]: any = await db.query(
           `SELECT * FROM tiktok_shop_video_transcripts
            WHERE ((video_id = ? AND ? != '') OR (product_id = ? AND ? != ''))
-             AND transcription_source = 'audio_extracted'
+             AND transcription_source IN ('socialcrawl_transcript', 'audio_extracted')
              AND transcription_version >= 3
            ORDER BY updated_at DESC
            LIMIT 1`,
@@ -1599,7 +1678,7 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
         if (Array.isArray(rows) && rows.length > 0 && rows[0].raw_transcript) {
           const row = rows[0];
           const { captions, timedTranscript } = parseStoredTimedTranscript(row.timed_transcript_json);
-          return res.json({
+          return {
             success: true,
             fromCache: true,
             productId: cleanProductId || row.product_id,
@@ -1609,7 +1688,7 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
             captions,
             rawTranscript: row.raw_transcript,
             timedTranscript,
-            originalLanguage: row.original_language || 'pt',
+            originalLanguage: row.original_language || 'pt-BR',
             isForeignLanguage: Boolean(row.is_foreign_language),
             portugueseTranslation: row.portuguese_translation || null,
             durationSeconds: row.duration_seconds || (captions[captions.length - 1]?.end ? Math.round(captions[captions.length - 1].end) : 30),
@@ -1619,26 +1698,37 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
             developmentOriginal: row.development_original || 'Apresentação detalhada e demonstração do produto.',
             ctaOriginal: row.cta_original || (captions[captions.length - 1]?.text || ''),
             confidenceScore: row.confidence_score || 100,
-            source: 'audio_extracted',
+            source: row.transcription_source || 'socialcrawl_transcript',
             version: row.transcription_version || 3,
             status: 'completed',
-          });
+          };
         }
       } catch (cacheErr: any) {
         console.warn('[Transcription Cache Read Warning]:', cacheErr?.message || cacheErr);
       }
     }
 
-    // 2. Coletar dados contextuais
-    currentStage = 'MEDIA_CONTEXT';
+    // 2. Coletar dados contextuais e URL canônica do vídeo
     let dbDesc = String(videoDescription || '');
     let dbTitle = String(productTitle || '');
     let dbAuthor = String(videoAuthor || '');
     let dbCategory = String(productCategory || '');
-    let dbVideoUrl = String(videoUrl || '');
+    let dbVideoUrl = String(videoUrl || '').trim();
 
     if (isDatabaseConfigured()) {
       try {
+        if (cleanVideoId) {
+          const [vRows]: any = await db.query(
+            `SELECT video_url, video_author, video_description FROM tiktok_shop_product_videos WHERE video_id = ? LIMIT 1`,
+            [cleanVideoId]
+          );
+          if (Array.isArray(vRows) && vRows[0]) {
+            if (!dbDesc && vRows[0].video_description) dbDesc = vRows[0].video_description;
+            if (!dbVideoUrl && vRows[0].video_url) dbVideoUrl = vRows[0].video_url;
+            if (!dbAuthor && vRows[0].video_author) dbAuthor = vRows[0].video_author;
+          }
+        }
+
         if (cleanProductId) {
           const [pRows]: any = await db.query(
             `SELECT title, category, video_url, video_author, video_views, video_likes FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
@@ -1647,20 +1737,8 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
           if (Array.isArray(pRows) && pRows[0]) {
             if (!dbTitle) dbTitle = pRows[0].title || '';
             if (!dbCategory) dbCategory = pRows[0].category || '';
-            if (!dbAuthor) dbAuthor = pRows[0].video_author || '';
-            if (!dbVideoUrl) dbVideoUrl = pRows[0].video_url || '';
-          }
-        }
-
-        if (cleanVideoId) {
-          const [vRows]: any = await db.query(
-            `SELECT video_url, video_author, video_description FROM tiktok_shop_product_videos WHERE video_id = ? LIMIT 1`,
-            [cleanVideoId]
-          );
-          if (Array.isArray(vRows) && vRows[0]) {
-            if (!dbDesc && vRows[0].video_description) dbDesc = vRows[0].video_description;
-            if (vRows[0].video_url) dbVideoUrl = vRows[0].video_url;
-            if (vRows[0].video_author) dbAuthor = vRows[0].video_author;
+            if (!dbAuthor && pRows[0].video_author) dbAuthor = pRows[0].video_author || '';
+            if (!dbVideoUrl && pRows[0].video_url) dbVideoUrl = pRows[0].video_url || '';
           }
         }
       } catch (dbErr: any) {
@@ -1668,67 +1746,155 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
       }
     }
 
-    // 3. Obter arquivo de mídia REAL do vídeo
-    currentStage = 'MEDIA_PREPARE';
+    // Normalizar ou construir URL canônica do TikTok caso tenhamos apenas o ID
+    let resolvedTiktokUrl = dbVideoUrl;
+    if (!resolvedTiktokUrl && cleanVideoId && /^\d+$/.test(cleanVideoId)) {
+      resolvedTiktokUrl = `https://www.tiktok.com/@tiktok/video/${cleanVideoId}`;
+    }
+
+    // 3. PRIORIDADE 2: SOCIALCRAWL OFFICIAL TRANSCRIPT API
+    if (resolvedTiktokUrl) {
+      try {
+        console.log(`[Transcription SocialCrawl API]: Solicitando transcrição oficial para URL: ${resolvedTiktokUrl}`);
+        const scResult = await fetchSocialCrawlTranscript(resolvedTiktokUrl);
+
+        if (scResult.success && scResult.parsed && scResult.parsed.transcription) {
+          const parsed = scResult.parsed;
+          const language = 'pt-BR';
+          const isForeignLanguage = false;
+          const durationSeconds = parsed.durationSeconds || 30;
+          const rhythm = 'Cadenciado e dinâmico';
+          const hookOriginal = parsed.hookOriginal || (parsed.captions[0]?.text || '');
+          const structureOriginal = 'Hook -> Demonstração -> Benefício -> CTA';
+          const developmentOriginal = 'Apresentação detalhada e demonstração do produto.';
+          const ctaOriginal = parsed.ctaOriginal || (parsed.captions[parsed.captions.length - 1]?.text || '');
+          const confidenceScore = 100;
+
+          // Salvar persistência V3 no MySQL
+          if (isDatabaseConfigured()) {
+            try {
+              const storedJson = JSON.stringify({
+                captions: parsed.captions,
+                timedTranscript: parsed.timedTranscript,
+              });
+
+              await db.query(
+                `INSERT INTO tiktok_shop_video_transcripts (
+                  product_id, video_id, video_url, original_language, is_foreign_language,
+                  raw_transcript, timed_transcript_json, portuguese_translation, duration_seconds,
+                  rhythm, hook_original, structure_original, development_original, cta_original,
+                  confidence_score, transcription_source, transcription_version, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'socialcrawl_transcript', 3, NOW())
+                ON DUPLICATE KEY UPDATE
+                  original_language = VALUES(original_language),
+                  is_foreign_language = VALUES(is_foreign_language),
+                  raw_transcript = VALUES(raw_transcript),
+                  timed_transcript_json = VALUES(timed_transcript_json),
+                  portuguese_translation = VALUES(portuguese_translation),
+                  duration_seconds = VALUES(duration_seconds),
+                  rhythm = VALUES(rhythm),
+                  hook_original = VALUES(hook_original),
+                  structure_original = VALUES(structure_original),
+                  development_original = VALUES(development_original),
+                  cta_original = VALUES(cta_original),
+                  confidence_score = VALUES(confidence_score),
+                  transcription_source = 'socialcrawl_transcript',
+                  transcription_version = 3,
+                  updated_at = NOW()`,
+                [
+                  cleanProductId,
+                  cleanVideoId,
+                  resolvedTiktokUrl,
+                  language,
+                  isForeignLanguage ? 1 : 0,
+                  parsed.transcription,
+                  storedJson,
+                  null,
+                  durationSeconds,
+                  rhythm,
+                  hookOriginal,
+                  structureOriginal,
+                  developmentOriginal,
+                  ctaOriginal,
+                  confidenceScore,
+                ]
+              );
+            } catch (dbSaveErr: any) {
+              console.warn('[SocialCrawl Transcript DB Save Warning]:', dbSaveErr?.message || dbSaveErr);
+            }
+          }
+
+          console.log(`[Transcription SocialCrawl API Success]: Transcrição obtida via SocialCrawl para videoId: ${cleanVideoId}`);
+
+          return {
+            success: true,
+            fromCache: false,
+            productId: cleanProductId,
+            videoId: cleanVideoId,
+            transcription: parsed.transcription,
+            language,
+            captions: parsed.captions,
+            rawTranscript: parsed.transcription,
+            timedTranscript: parsed.timedTranscript,
+            original: null,
+            translationSource: 'socialcrawl',
+            originalLanguage: language,
+            isForeignLanguage,
+            portugueseTranslation: null,
+            durationSeconds,
+            rhythm,
+            hookOriginal,
+            structureOriginal,
+            developmentOriginal,
+            ctaOriginal,
+            confidenceScore,
+            source: 'socialcrawl_transcript',
+            version: 3,
+            status: 'completed',
+          };
+        } else {
+          console.warn(`[Transcription SocialCrawl Notice]: SocialCrawl retornou sem transcrição (${scResult.error || scResult.message}). Executando fallback para pipeline de áudio...`);
+        }
+      } catch (scErr: any) {
+        console.warn(`[Transcription SocialCrawl Error]: Erro na consulta SocialCrawl (${scErr?.message}). Executando fallback para pipeline de áudio...`);
+      }
+    }
+
+    // 4. PRIORIDADE 3 (FALLBACK): FFMPEG + GEMINI VIA DOWNLOAD DE MÍDIA
+    console.log(`[Transcription Fallback]: Tentando obter áudio via download de mídia para productId: ${cleanProductId}, videoId: ${cleanVideoId}`);
     const mediaFetch = await fetchVideoMediaBuffer(cleanProductId, cleanVideoId || undefined, dbVideoUrl);
 
     if (!mediaFetch.result) {
-      console.error('[Video Transcription Media Unavailable]:', {
-        stage: mediaFetch.errorStage || currentStage,
+      console.error('[Video Transcription Media Unavailable in Fallback]:', {
         productId: cleanProductId,
         videoId: cleanVideoId,
         details: mediaFetch.errorDetails,
       });
 
-      return res.status(422).json({
-        error: 'AUDIO_UNAVAILABLE',
-        message: 'Não foi possível acessar o vídeo para extrair o áudio. O arquivo de mídia não está acessível no momento.',
-      });
+      const err: any = new Error('Não foi possível acessar o vídeo para extrair o áudio. O arquivo de mídia não está acessível no momento.');
+      err.status = 422;
+      err.code = 'AUDIO_UNAVAILABLE';
+      throw err;
     }
 
     const media = mediaFetch.result;
-    mediaSourceTracked = media.mediaSource;
-    mediaHttpStatusTracked = media.httpStatus;
-    mediaDomainTracked = media.domain;
-    mediaMimeTracked = media.mimeType;
-    mediaBytesTracked = media.bufferBytes;
-
-    // 4. Extrair faixa de áudio REAL via FFmpeg (isolando o áudio em MP3 mono 16kHz)
-    currentStage = 'AUDIO_EXTRACT';
     const audioExtraction = await extractAudioFromMediaBuffer(media.buffer, media.mimeType);
 
     if (!audioExtraction.success || !audioExtraction.hasAudio || !audioExtraction.audioBuffer) {
-      console.warn('[Video Transcription Audio Extraction Failed]:', {
-        error: audioExtraction.error,
-        productId: cleanProductId,
-        videoId: cleanVideoId,
-      });
-
-      if (audioExtraction.error === 'FFMPEG_NOT_AVAILABLE' || audioExtraction.error === 'FFPROBE_NOT_AVAILABLE') {
-        return res.status(503).json({
-          error: audioExtraction.error,
-          message: 'Não foi possível processar o áudio deste vídeo no momento.',
-        });
-      }
-
-      if (audioExtraction.error === 'VIDEO_WITHOUT_AUDIO') {
-        return res.status(422).json({
-          error: 'VIDEO_WITHOUT_AUDIO',
-          message: 'Não foi detectada nenhuma faixa de áudio neste vídeo.',
-        });
-      }
-
-      return res.status(422).json({
-        error: 'AUDIO_UNAVAILABLE',
-        message: 'Não foi possível extrair o áudio deste vídeo para transcrição.',
-      });
+      const err: any = new Error(
+        audioExtraction.error === 'VIDEO_WITHOUT_AUDIO'
+          ? 'Não foi detectada nenhuma faixa de áudio neste vídeo.'
+          : 'Não foi possível extrair o áudio deste vídeo para transcrição.'
+      );
+      err.status = 422;
+      err.code = audioExtraction.error || 'AUDIO_UNAVAILABLE';
+      throw err;
     }
 
     const audioBuffer = audioExtraction.audioBuffer;
-    audioBytesTracked = audioBuffer.length;
     const audioDurationSeconds = audioExtraction.durationSeconds || 30;
 
-    // 5. Prompt de Transcrição Fonética e Temporal Exata
+    // Prompt de transcrição fonética e temporal exata
     const transcriptionPrompt = `Você é um perito profissional em transcrição fonética e textual de áudio de vídeos curtos.
 Você está OUVINDO a faixa de áudio extraída de um vídeo real.
 Sua missão é produzir a TRANSCRIÇÃO EXATA e INTEGRAL da fala real com MÁXIMA FIDELIDADE FONÉTICA e TIMESTAMPS REAIS.
@@ -1749,28 +1915,19 @@ REGRAS CRÍTICAS E OBRIGATÓRIAS:
    - CTA falado final (chamada para ação falada);
    - Sequência exata do discurso.
 3. NÃO RESUMIR, NÃO REESCREVER e NÃO "MELHORAR" a gramática falada.
-4. NÃO INVENTAR NADA: Não invente falas baseadas no título do produto ou na legenda. Apenas transcreva o que a pessoa realmente disse no áudio.
-5. CASO NÃO HAJA FALA NO ÁUDIO (se o áudio for apenas música de fundo, ruído ou silêncio sem voz humana):
+4. NÃO INVENTAR NADA.
+5. CASO NÃO HAJA FALA NO ÁUDIO:
    - Defina "hasSpeech": false
    - Defina "transcription": "[Vídeo sem fala humana / apenas trilha sonora de fundo]"
    - Defina "captions": []
 6. CASO HAJA FALA HUMANA:
    - Defina "hasSpeech": true
-   - Divida a fala em segmentos cronológicos curtos (de 2 a 8 segundos cada) com "start" (segundo inicial, ex: 0.031) e "end" (segundo final, ex: 3.450) e "text" (fala exata desse trecho).
-   - O campo "transcription" deve conter o texto contínuo completo da fala transcrita (concatenação fiel de captions).
+   - Divida a fala em segmentos cronológicos curtos (de 2 a 8 segundos cada) com "start", "end" e "text".
+   - O campo "transcription" deve conter o texto contínuo completo.
 7. IDIOMA E TRADUÇÃO:
-   - Identifique o idioma falado no áudio (ex: "pt-BR", "en-US", "es-ES", etc.).
-   - Se o idioma NÃO for Português do Brasil:
-     * Defina isForeignLanguage: true
-     * Mantenha "captions" e "transcription" 100% no idioma falado original.
-     * Preencha "portugueseTranslation" com a tradução fiel para Português do Brasil.
+   - Identifique o idioma falado ("pt-BR", "en-US", "es-ES", etc.).
 8. DECOMPOSIÇÃO ESTRUTURAL DA FALA REAL:
-   - hookOriginal: As primeiras palavras/gancho falado exato.
-   - structureOriginal: Sequência lógica identificada da fala (ex: "Hook de Impacto -> Apresentação da Dor -> Demonstração -> CTA").
-   - developmentOriginal: Resumo de como o criador conduziu o meio da fala.
-   - ctaOriginal: A chamada falada final para ação.
-   - rhythm: Ritmo da fala (ex: "Rápido e dinâmico, com cortes secos").
-   - durationSeconds: Duração total da fala em segundos.
+   - hookOriginal, structureOriginal, developmentOriginal, ctaOriginal, rhythm, durationSeconds.
 
 Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
 {
@@ -1779,8 +1936,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
   "isForeignLanguage": false,
   "transcription": "Texto integral falado...",
   "captions": [
-    { "start": 0.0, "end": 3.4, "text": "Frase falada exata..." },
-    { "start": 3.4, "end": 7.2, "text": "Próxima frase..." }
+    { "start": 0.0, "end": 3.4, "text": "Frase falada exata..." }
   ],
   "portugueseTranslation": null,
   "durationSeconds": 28,
@@ -1793,11 +1949,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
 }`;
 
     const ai = getGeminiClient();
-
-    // 6. Enviar áudio compacto para o Gemini (MP3 ~400KB é instantâneo e 100% suportado em inlineData)
-    currentStage = 'GEMINI_GENERATE';
     let responseText = '';
-    let modelUsed = '';
     const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
     let lastGeminiErr: any = null;
 
@@ -1819,13 +1971,9 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
           },
         });
         responseText = response.text || '';
-        if (responseText) {
-          modelUsed = targetModel;
-          break;
-        }
+        if (responseText) break;
       } catch (mErr: any) {
         lastGeminiErr = mErr;
-        console.warn(`[Transcription Model ${targetModel} failed, trying fallback]:`, mErr?.message || mErr);
       }
     }
 
@@ -1833,20 +1981,12 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
       throw lastGeminiErr || new Error('GEMINI_EMPTY_RESPONSE');
     }
 
-    console.log(`[Transcription Success]: Audio processed via Gemini model: ${modelUsed} for videoId: ${cleanVideoId}`);
-
-    currentStage = 'GEMINI_RESPONSE';
-
-    currentStage = 'JSON_PARSE';
     let parsedData: any = {};
     try {
       parsedData = JSON.parse(responseText);
-    } catch (jsonErr) {
-      console.warn('[Transcription JSON parse error, attempting regex extraction]:', jsonErr);
+    } catch {
       const match = responseText.match(/\{[\s\S]*\}/);
-      if (match) {
-        parsedData = JSON.parse(match[0]);
-      }
+      if (match) parsedData = JSON.parse(match[0]);
     }
 
     const hasSpeech = parsedData.hasSpeech !== false;
@@ -1883,8 +2023,6 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
     const ctaOriginal = String(parsedData.ctaOriginal || (rawCaptions[rawCaptions.length - 1]?.text || ''));
     const confidenceScore = Number(parsedData.confidenceScore) || 98;
 
-    // 7. Salvar no banco de dados com chave (product_id, video_id) e versão 3 (áudio real comprovado)
-    currentStage = 'DATABASE_SAVE';
     if (isDatabaseConfigured()) {
       try {
         const storedJson = JSON.stringify({
@@ -1938,8 +2076,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
       }
     }
 
-    // 8. Retornar resposta completa
-    return res.json({
+    return {
       success: true,
       fromCache: false,
       productId: cleanProductId,
@@ -1964,26 +2101,21 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
       source: 'audio_extracted',
       version: 3,
       status: 'completed',
-    });
-  } catch (aiErr: any) {
-    console.error('[Video Transcription Error Details]:', {
-      stage: currentStage,
-      errorName: aiErr?.name,
-      errorMessage: aiErr?.message,
-      errorCode: aiErr?.code,
-      productId: cleanProductId,
-      videoId: cleanVideoId,
-      mediaSource: mediaSourceTracked,
-      mediaHttpStatus: mediaHttpStatusTracked,
-      mediaDomain: mediaDomainTracked,
-      mediaBytes: mediaBytesTracked,
-      audioBytes: audioBytesTracked,
-    });
+    };
+  })();
 
-    return res.status(500).json({
-      error: 'TRANSCRIPTION_ERROR',
-      message: 'Não foi possível analisar o áudio deste vídeo com a IA. Verifique se o vídeo possui som e tente novamente.',
-    });
+  inFlightTranscriptionLocks.set(lockKey, executionPromise);
+
+  try {
+    const result = await executionPromise;
+    return res.json(result);
+  } catch (err: any) {
+    const status = err?.status || 500;
+    const code = err?.code || (status === 422 ? 'AUDIO_UNAVAILABLE' : 'TRANSCRIPTION_ERROR');
+    const message = err?.message || 'Não foi possível processar a transcrição deste vídeo.';
+    return res.status(status).json({ error: code, message });
+  } finally {
+    inFlightTranscriptionLocks.delete(lockKey);
   }
 });
 
