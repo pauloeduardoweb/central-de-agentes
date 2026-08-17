@@ -7,3 +7,14 @@
  * - `true`: Toda a Academia de Desafios é liberada automaticamente para todos os alunos.
  */
 export const ACADEMIA_DESAFIOS_LIBERADA = false;
+
+/**
+ * Feature Flag para Transcrição e Modelagem de Conteúdo por IA no Minerador de Produtos.
+ * 
+ * - `false`: Oculta os botões "Transcrição" e "Modelar Conteúdo" da interface e bloqueia as rotas no backend,
+ *   garantindo 0 consumo extra de créditos. A arquitetura, cache e pipelines permanecem preservados.
+ * 
+ * - `true`: Reativa os botões e a funcionalidade completa de Transcrição e Modelagem de Conteúdo.
+ */
+export const PRODUCT_CONTENT_AI_ENABLED = false;
+
