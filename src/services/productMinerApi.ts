@@ -1319,12 +1319,22 @@ export interface TimedTranscriptBlock {
   text: string;
 }
 
+export interface VideoCaptionBlock {
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface VideoTranscriptionResponse {
   success: boolean;
+  exists?: boolean;
   fromCache?: boolean;
   fallback?: boolean;
   productId: string;
   videoId?: string;
+  transcription?: string;
+  language?: string;
+  captions?: VideoCaptionBlock[];
   originalLanguage: string;
   isForeignLanguage: boolean;
   rawTranscript: string;
@@ -1337,6 +1347,8 @@ export interface VideoTranscriptionResponse {
   developmentOriginal: string;
   ctaOriginal: string;
   confidenceScore: number;
+  source?: string;
+  status?: string;
 }
 
 export interface ModeledScriptSection {
@@ -1373,6 +1385,24 @@ export interface ModelContentResponse {
   videoId?: string;
   modelAnalysis: ContentModelAnalysis;
   modeledScript: ModeledScriptData;
+}
+
+export async function fetchPersistedTranscriptionByVideoIdApi(
+  studentCode: string,
+  videoId: string,
+  productId?: string
+): Promise<VideoTranscriptionResponse> {
+  const params = new URLSearchParams();
+  if (productId) params.set('productId', productId);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+
+  const response = await fetch(`/api/product-miner/videos/transcription/${encodeURIComponent(videoId)}${qs}`, {
+    headers: authHeaders(studentCode),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw accessError(data);
+  return data as VideoTranscriptionResponse;
 }
 
 export async function fetchVideoTranscriptionApi(
