@@ -3,13 +3,12 @@ import {
   X, Copy, Check, Sparkles, Loader2, AlertCircle, RefreshCw,
   Clock, Languages, Wand2, FileText, Quote, Volume2, ShieldCheck,
   ChevronRight, Users, Play, Pause, ExternalLink, RotateCcw,
-  Radio, AlignLeft, Eye, MessageSquare, Flame, CheckCircle2
+  Radio, AlignLeft, Eye, MessageSquare, Flame, CheckCircle2,
+  BookOpen, ListOrdered
 } from 'lucide-react';
 import {
   ProductMinerProduct,
   VideoTranscriptionResponse,
-  VideoCaptionBlock,
-  TimedTranscriptBlock,
   fetchPersistedTranscriptionByVideoIdApi,
   fetchVideoTranscriptionApi,
 } from '../../services/productMinerApi';
@@ -27,7 +26,7 @@ interface ProductTranscriptionModalProps {
   onTrackClick?: (product: ProductMinerProduct) => void;
 }
 
-interface NormalizedCaption {
+interface RealTimedCaption {
   id: number;
   start: number;
   end: number;
@@ -69,11 +68,10 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
   const [error, setError] = useState<string | null>(null);
   const [transcriptionData, setTranscriptionData] = useState<VideoTranscriptionResponse | null>(null);
 
-  // Modos de visualização e sincronização
-  const [viewMode, setViewMode] = useState<'synchronized' | 'fullText'>('synchronized');
-  const [followPlayback, setFollowPlayback] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  // Modos de visualização reais:
+  // - 'timed': Leitura com Timestamps reais (captions V3 / timedTranscript)
+  // - 'fullText': Texto Integral
+  const [viewMode, setViewMode] = useState<'timed' | 'fullText'>('timed');
 
   // Player iframe states
   const [iframeLoading, setIframeLoading] = useState(true);
@@ -83,9 +81,6 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
   const [copiedOriginal, setCopiedOriginal] = useState(false);
   const [copiedTranslation, setCopiedTranslation] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState(false);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const activeBlockRef = useRef<HTMLDivElement>(null);
 
   const video = product?.video || (product?.associatedVideos && product.associatedVideos[0]) || null;
   const productId = product?.productId;
@@ -146,15 +141,11 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
   useEffect(() => {
     if (isOpen && product) {
       loadTranscription(false);
-      setCurrentTime(0);
-      setIsPlaying(true);
       setIframeLoading(true);
       setIframeError(false);
     } else {
       setTranscriptionData(null);
       setError(null);
-      setIsPlaying(false);
-      setCurrentTime(0);
     }
   }, [isOpen, productId, videoId]);
 
@@ -168,13 +159,11 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Normalização unificada das falas com timestamps em segundos
-  const normalizedCaptions = useMemo<NormalizedCaption[]>(() => {
+  // Captions reais (extraídas da V3 - NUNCA inventadas/estimadas por divisão de texto)
+  const realCaptions = useMemo<RealTimedCaption[]>(() => {
     if (!transcriptionData) return [];
 
-    const totalDuration = transcriptionData.durationSeconds || 30;
-
-    // 1. Se possuir captions com start e end precisos
+    // 1. Se possuir captions com start e end reais
     if (Array.isArray(transcriptionData.captions) && transcriptionData.captions.length > 0) {
       return transcriptionData.captions.map((cap, idx) => {
         const start = typeof cap.start === 'number' ? cap.start : 0;
@@ -189,13 +178,13 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
       });
     }
 
-    // 2. Se possuir timedTranscript com formato cronológico
+    // 2. Se possuir timedTranscript estruturado real
     if (Array.isArray(transcriptionData.timedTranscript) && transcriptionData.timedTranscript.length > 0) {
       return transcriptionData.timedTranscript.map((item, idx, arr) => {
         const start = parseTimeToSeconds(item.time);
         const nextItem = arr[idx + 1];
-        const nextStart = nextItem ? parseTimeToSeconds(nextItem.time) : 0;
-        const end = nextStart > start ? nextStart : Math.min(start + 3.5, totalDuration);
+        const nextStart = nextItem ? parseTimeToSeconds(nextItem.time) : start + 3.5;
+        const end = nextStart > start ? nextStart : start + 3.5;
 
         return {
           id: idx,
@@ -209,98 +198,27 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
       });
     }
 
-    // 3. Fallback: dividir rawTranscript em frases ou parágrafos
-    if (transcriptionData.rawTranscript) {
-      const sentences = transcriptionData.rawTranscript
-        .split(/(?<=[.?!])\s+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      if (sentences.length === 0) return [];
-
-      const segmentDuration = totalDuration / sentences.length;
-      return sentences.map((text, idx) => {
-        const start = idx * segmentDuration;
-        const end = Math.min((idx + 1) * segmentDuration, totalDuration);
-        return {
-          id: idx,
-          start,
-          end,
-          timeLabel: `${formatSecondsToTime(start)} – ${formatSecondsToTime(end)}`,
-          text,
-        };
-      });
-    }
-
+    // REGRA ESTRITA: Se houver somente rawTranscript, NÃO inventar timestamps.
     return [];
   }, [transcriptionData]);
 
-  // Duração total máxima para a barra e sincronização
-  const maxDuration = useMemo(() => {
-    if (transcriptionData?.durationSeconds && transcriptionData.durationSeconds > 0) {
-      return transcriptionData.durationSeconds;
-    }
-    if (normalizedCaptions.length > 0) {
-      return Math.max(...normalizedCaptions.map((c) => c.end), 30);
-    }
-    return 30;
-  }, [transcriptionData, normalizedCaptions]);
+  const hasRealTimestamps = realCaptions.length > 0;
 
-  // Identificar caption ativa pelo currentTime
-  const activeCaptionIndex = useMemo(() => {
-    if (normalizedCaptions.length === 0) return -1;
-    const foundIndex = normalizedCaptions.findIndex(
-      (c) => currentTime >= c.start && currentTime < c.end
-    );
-    if (foundIndex !== -1) return foundIndex;
-
-    // Se passou do último, destaca o último
-    if (currentTime >= (normalizedCaptions[normalizedCaptions.length - 1]?.end || 0)) {
-      return normalizedCaptions.length - 1;
-    }
-
-    // Se antes do primeiro, destaca o primeiro
-    return 0;
-  }, [normalizedCaptions, currentTime]);
-
-  // Timer de reprodução sincronizada
+  // Se não houver timestamps reais, abrir automaticamente em Texto Integral
   useEffect(() => {
-    if (!isOpen || !isPlaying || normalizedCaptions.length === 0) return;
-
-    const interval = setInterval(() => {
-      setCurrentTime((prev) => {
-        const next = prev + 0.25;
-        if (next >= maxDuration) {
-          return 0; // Loop sincronizado com o vídeo
-        }
-        return parseFloat(next.toFixed(2));
-      });
-    }, 250);
-
-    return () => clearInterval(interval);
-  }, [isOpen, isPlaying, maxDuration, normalizedCaptions.length]);
-
-  // Auto-scroll para o elemento ativo
-  useEffect(() => {
-    if (followPlayback && viewMode === 'synchronized' && activeBlockRef.current) {
-      activeBlockRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-      });
+    if (transcriptionData && !hasRealTimestamps) {
+      setViewMode('fullText');
+    } else if (transcriptionData && hasRealTimestamps) {
+      setViewMode('timed');
     }
-  }, [activeCaptionIndex, followPlayback, viewMode]);
+  }, [transcriptionData, hasRealTimestamps]);
 
   if (!isOpen || !product) return null;
 
-  const handleSeek = (seconds: number) => {
-    setCurrentTime(Math.min(Math.max(seconds, 0), maxDuration));
-    setIsPlaying(true);
-  };
-
   const handleCopyOriginal = async () => {
     if (!transcriptionData) return;
-    const textToCopy = normalizedCaptions.length > 0
-      ? normalizedCaptions.map((b) => `[${b.timeLabel}] "${b.text}"`).join('\n\n')
+    const textToCopy = hasRealTimestamps
+      ? realCaptions.map((b) => `[${b.timeLabel}] "${b.text}"`).join('\n\n')
       : transcriptionData.rawTranscript;
 
     await navigator.clipboard.writeText(textToCopy);
@@ -344,15 +262,22 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>TRANSCRIÇÃO SINCRONIZADA</span>
+                  <span>TRANSCRIÇÃO E ROTEIRO</span>
                   <span className="text-amber-500 text-xs px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 font-black uppercase">
-                    V3 Player
+                    Modo Leitura
                   </span>
                 </h3>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-black text-[10px] uppercase">
-                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                  Fidelidade Máxima
-                </span>
+                {hasRealTimestamps ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-black text-[10px] uppercase">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    Fidelidade Máxima (Timestamps Reais)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-bold text-[10px] uppercase">
+                    <BookOpen className="w-3 h-3 text-slate-500" />
+                    Texto Integral
+                  </span>
+                )}
                 {isForeign ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-800 font-black text-[10px] uppercase">
                     <Languages className="w-3 h-3 text-sky-600" />
@@ -410,10 +335,10 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
               </div>
               <div className="space-y-1">
                 <h4 className="font-extrabold text-sm text-slate-900">
-                  Extraindo Transcrição Fiel do Vídeo...
+                  Carregando Transcrição Fiel do Vídeo...
                 </h4>
                 <p className="text-xs text-slate-500 max-w-sm">
-                  Analisando a fala integral do vídeo sem resumir, preservando termos, ordem, gírias e pontuação.
+                  Analisando a fala integral do vídeo sem resumir, preservando termos, ordem e pontuação.
                 </p>
               </div>
             </div>
@@ -447,7 +372,7 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
                       {iframeLoading && (
                         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-slate-950 text-amber-400">
                           <Loader2 className="w-7 h-7 animate-spin text-amber-500" />
-                          <span className="text-xs font-bold text-slate-200">Carregando Player...</span>
+                          <span className="text-xs font-bold text-slate-200">Carregando Player Oficial...</span>
                         </div>
                       )}
                       <iframe
@@ -490,7 +415,7 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
                   )}
                 </div>
 
-                {/* Metadados rápidos do criador e vídeo */}
+                {/* Metadados do criador e vídeo */}
                 <div className="w-full max-w-[340px] grid grid-cols-3 gap-1.5 text-center text-xs">
                   <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
                     <span className="block text-[9px] font-bold text-slate-500 uppercase">Criador</span>
@@ -514,25 +439,26 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
               </div>
 
               {/* ============================================== */}
-              {/* COLUNA DIREITA: TRANSCRIÇÃO SINCRONIZADA (58%) */}
+              {/* COLUNA DIREITA: TRANSCRIÇÃO / ROTEIRO (58%)    */}
               {/* ============================================== */}
               <div className="lg:col-span-7 flex flex-col space-y-3 min-w-0">
-                {/* Barra de Controles da Transcrição */}
+                {/* Barra de Seleção de Visualização */}
                 <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
-                  {/* Alternância de Modo */}
                   <div className="inline-flex p-1 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('synchronized')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                        viewMode === 'synchronized'
-                          ? 'bg-amber-500 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Radio className="w-3.5 h-3.5" />
-                      <span>Sincronizado</span>
-                    </button>
+                    {hasRealTimestamps && (
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('timed')}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                          viewMode === 'timed'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                        }`}
+                      >
+                        <ListOrdered className="w-3.5 h-3.5" />
+                        <span>Com Timestamps</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setViewMode('fullText')}
@@ -547,140 +473,42 @@ export const ProductTranscriptionModal: React.FC<ProductTranscriptionModalProps>
                     </button>
                   </div>
 
-                  {/* Controles de Reprodução Sincronizada */}
-                  {viewMode === 'synchronized' && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsPlaying(!isPlaying)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-amber-50 text-slate-700 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
-                        title={isPlaying ? 'Pausar sincronização' : 'Retomar sincronização'}
-                      >
-                        {isPlaying ? (
-                          <>
-                            <Pause className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Pausar</span>
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
-                            <span>Seguir</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCurrentTime(0);
-                          setIsPlaying(true);
-                        }}
-                        className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
-                        title="Voltar ao início (00:00)"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-
-                      <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer select-none pl-1">
-                        <input
-                          type="checkbox"
-                          checked={followPlayback}
-                          onChange={(e) => setFollowPlayback(e.target.checked)}
-                          className="w-3.5 h-3.5 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
-                        />
-                        <span>Seguir reprodução</span>
-                      </label>
-                    </div>
+                  {!hasRealTimestamps && (
+                    <span className="text-[11px] font-medium text-slate-500">
+                      Timestamps por trecho indisponíveis para esta transcrição.
+                    </span>
                   )}
                 </div>
 
-                {/* Linha do Tempo e Barra de Progresso Interativa */}
-                {viewMode === 'synchronized' && (
-                  <div className="px-3 py-2 rounded-xl bg-amber-50/50 border border-amber-200/70 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-mono font-bold text-amber-950">
-                      <span className="flex items-center gap-1.5">
-                        <Volume2 className={`w-3.5 h-3.5 text-amber-600 ${isPlaying ? 'animate-pulse' : ''}`} />
-                        <span>{formatSecondsToTime(currentTime)}</span>
-                      </span>
-                      <span className="text-slate-500">{formatSecondsToTime(maxDuration)}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={maxDuration}
-                      step={0.5}
-                      value={currentTime}
-                      onChange={(e) => handleSeek(parseFloat(e.target.value))}
-                      className="w-full h-1.5 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
-                    />
-                  </div>
-                )}
-
                 {/* ============================================== */}
-                {/* MODO 1: SINCRONIZADO (BLOCO A BLOCO)           */}
+                {/* MODO 1: LEITURA COM TIMESTAMPS REAIS           */}
                 {/* ============================================== */}
-                {viewMode === 'synchronized' ? (
-                  <div
-                    ref={containerRef}
-                    className="space-y-2 max-h-[46dvh] lg:max-h-[48dvh] overflow-y-auto pr-1 select-text scroll-smooth"
-                  >
-                    {normalizedCaptions.length > 0 ? (
-                      normalizedCaptions.map((block, index) => {
-                        const isActive = index === activeCaptionIndex;
-                        return (
-                          <div
-                            key={block.id}
-                            ref={isActive ? activeBlockRef : null}
-                            onClick={() => handleSeek(block.start)}
-                            className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
-                              isActive
-                                ? 'bg-amber-50/90 border-amber-400 ring-2 ring-amber-400/20 shadow-md transform scale-[1.01]'
-                                : 'bg-slate-50/70 hover:bg-amber-50/30 border-slate-200/80 text-slate-700'
-                            }`}
-                          >
-                            <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
-                              <span
-                                className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-bold border transition-colors ${
-                                  isActive
-                                    ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
-                                    : 'bg-white text-slate-600 border-slate-200'
-                                }`}
-                              >
-                                {block.timeLabel}
-                              </span>
-                              {isActive && (
-                                <span className="flex h-2 w-2 relative mt-0.5">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                </span>
-                              )}
-                            </div>
+                {viewMode === 'timed' && hasRealTimestamps ? (
+                  <div className="space-y-2 max-h-[50dvh] lg:max-h-[52dvh] overflow-y-auto pr-1 select-text scroll-smooth">
+                    {realCaptions.map((block) => (
+                      <div
+                        key={block.id}
+                        className="p-3 rounded-2xl bg-slate-50/80 hover:bg-amber-50/40 border border-slate-200/90 hover:border-amber-300 transition-all flex items-start gap-3"
+                      >
+                        <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+                          <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-white text-slate-700 border border-slate-200 shadow-2xs">
+                            {block.timeLabel}
+                          </span>
+                        </div>
 
-                            <div className="min-w-0 flex-1">
-                              <p
-                                className={`text-xs sm:text-sm leading-relaxed transition-colors ${
-                                  isActive
-                                    ? 'font-bold text-amber-950'
-                                    : 'font-medium text-slate-800'
-                                }`}
-                              >
-                                &ldquo;{block.text}&rdquo;
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500">
-                        Nenhum bloco de fala individual identificado.
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs sm:text-sm leading-relaxed font-medium text-slate-800">
+                            &ldquo;{block.text}&rdquo;
+                          </p>
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
                 ) : (
                   /* ============================================== */
-                  /* MODO 2: TEXTO INTEGRAL (SEM BLOCOS)            */
+                  /* MODO 2: TEXTO INTEGRAL                         */
                   /* ============================================== */
-                  <div className="space-y-3 max-h-[46dvh] lg:max-h-[48dvh] overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-[50dvh] lg:max-h-[52dvh] overflow-y-auto pr-1">
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                       <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200/80">
                         <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider">
