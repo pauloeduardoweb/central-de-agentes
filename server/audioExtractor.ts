@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -10,6 +10,103 @@ export interface AudioExtractionResult {
   audioMime?: string;
   durationSeconds?: number;
   error?: string;
+}
+
+export interface AudioBinariesHealth {
+  ffmpegAvailable: boolean;
+  ffprobeAvailable: boolean;
+  ffmpegPath: string | null;
+  ffprobePath: string | null;
+  ffmpegVersion?: string;
+}
+
+/**
+ * Resolução dinâmica e segura de binários do FFmpeg e FFprobe
+ */
+let cachedFfmpegPath: string | null = null;
+let cachedFfprobePath: string | null = null;
+let cachedFfmpegVersion: string | undefined = undefined;
+
+export function resolveFfmpegPath(): string | null {
+  if (cachedFfmpegPath && isExecutable(cachedFfmpegPath)) {
+    return cachedFfmpegPath;
+  }
+
+  const candidates = [
+    process.env.FFMPEG_PATH,
+    '/usr/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    'ffmpeg',
+  ].filter((p): p is string => Boolean(p && p.trim()));
+
+  for (const candidate of candidates) {
+    try {
+      const res = spawnSync(candidate, ['-version'], { timeout: 2000 });
+      if (res.status === 0) {
+        cachedFfmpegPath = candidate;
+        const outStr = res.stdout ? res.stdout.toString() : '';
+        const match = outStr.match(/ffmpeg version\s+([^\s]+)/i);
+        if (match && match[1]) {
+          cachedFfmpegVersion = match[1];
+        }
+        return candidate;
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+export function resolveFfprobePath(): string | null {
+  if (cachedFfprobePath && isExecutable(cachedFfprobePath)) {
+    return cachedFfprobePath;
+  }
+
+  const candidates = [
+    process.env.FFPROBE_PATH,
+    '/usr/bin/ffprobe',
+    '/usr/local/bin/ffprobe',
+    'ffprobe',
+  ].filter((p): p is string => Boolean(p && p.trim()));
+
+  for (const candidate of candidates) {
+    try {
+      const res = spawnSync(candidate, ['-version'], { timeout: 2000 });
+      if (res.status === 0) {
+        cachedFfprobePath = candidate;
+        return candidate;
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+function isExecutable(filePath: string): boolean {
+  try {
+    if (filePath.includes(path.sep)) {
+      fs.accessSync(filePath, fs.constants.X_OK);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Health check dos binários de áudio
+ */
+export function getAudioBinariesHealth(): AudioBinariesHealth {
+  const ffmpegPath = resolveFfmpegPath();
+  const ffprobePath = resolveFfprobePath();
+
+  return {
+    ffmpegAvailable: Boolean(ffmpegPath),
+    ffprobeAvailable: Boolean(ffprobePath),
+    ffmpegPath,
+    ffprobePath,
+    ffmpegVersion: cachedFfmpegVersion,
+  };
 }
 
 /**
@@ -28,6 +125,21 @@ export async function extractAudioFromMediaBuffer(
     };
   }
 
+  const ffmpegPath = resolveFfmpegPath();
+  if (!ffmpegPath) {
+    console.error('[AudioExtractor]: FFMPEG_NOT_AVAILABLE - No working ffmpeg binary found.');
+    return {
+      success: false,
+      hasAudio: false,
+      error: 'FFMPEG_NOT_AVAILABLE',
+    };
+  }
+
+  const ffprobePath = resolveFfprobePath();
+  if (!ffprobePath) {
+    console.warn('[AudioExtractor]: FFPROBE_NOT_AVAILABLE - Proceeding without probe verification.');
+  }
+
   const tmpDir = os.tmpdir();
   const fileId = `tiktok_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const inputExt = hintMime.includes('webm') ? 'webm' : hintMime.includes('ogg') ? 'ogg' : hintMime.includes('mp3') ? 'mp3' : 'mp4';
@@ -38,21 +150,25 @@ export async function extractAudioFromMediaBuffer(
     // 1. Gravar arquivo temporário de entrada
     await fs.promises.writeFile(inputPath, mediaBuffer);
 
-    // 2. Executar ffprobe para verificar se há stream de áudio e extrair duração
-    const probeResult = await runFfprobe(inputPath);
-    if (!probeResult.hasAudioStream) {
-      return {
-        success: false,
-        hasAudio: false,
-        durationSeconds: probeResult.durationSeconds || 0,
-        error: 'VIDEO_WITHOUT_AUDIO',
-      };
+    // 2. Executar ffprobe (se disponível) para verificar se há stream de áudio e extrair duração
+    let durationSeconds = 0;
+    if (ffprobePath) {
+      const probeResult = await runFfprobe(ffprobePath, inputPath);
+      if (!probeResult.hasAudioStream) {
+        return {
+          success: false,
+          hasAudio: false,
+          durationSeconds: probeResult.durationSeconds || 0,
+          error: 'VIDEO_WITHOUT_AUDIO',
+        };
+      }
+      durationSeconds = probeResult.durationSeconds;
     }
 
     // 3. Executar ffmpeg para converter em MP3 de alta fidelidade para voz (16kHz, mono, 64kbps)
     // 16kHz mono a 64kbps gera ~8KB por segundo de áudio (1 min = ~480 KB!), com excelente fidelidade fonética.
     await new Promise<void>((resolve, reject) => {
-      const ffmpeg = spawn('/usr/bin/ffmpeg', [
+      const ffmpeg = spawn(ffmpegPath, [
         '-y', // sobrescrever saída se existir
         '-i', inputPath, // entrada
         '-vn', // sem vídeo
@@ -72,7 +188,12 @@ export async function extractAudioFromMediaBuffer(
         if (code === 0) {
           resolve();
         } else {
-          reject(new Error(`FFMPEG_EXTRACTION_FAILED (code ${code}): ${stderr.slice(-300)}`));
+          // Se o erro indicar que não há streams de áudio correspondentes:
+          if (stderr.includes('does not contain any stream') || stderr.includes('Output file is empty')) {
+            reject(new Error('VIDEO_WITHOUT_AUDIO'));
+          } else {
+            reject(new Error(`FFMPEG_EXTRACTION_FAILED (code ${code}): ${stderr.slice(-300)}`));
+          }
         }
       });
 
@@ -104,10 +225,17 @@ export async function extractAudioFromMediaBuffer(
       hasAudio: true,
       audioBuffer,
       audioMime: 'audio/mp3',
-      durationSeconds: probeResult.durationSeconds || Math.round(audioBuffer.length / (8000)),
+      durationSeconds: durationSeconds || Math.max(1, Math.round(audioBuffer.length / 8000)),
     };
   } catch (err: any) {
     console.error('[extractAudioFromMediaBuffer Error]:', err?.message || err);
+    if (err?.message === 'VIDEO_WITHOUT_AUDIO') {
+      return {
+        success: false,
+        hasAudio: false,
+        error: 'VIDEO_WITHOUT_AUDIO',
+      };
+    }
     return {
       success: false,
       hasAudio: false,
@@ -127,9 +255,9 @@ export async function extractAudioFromMediaBuffer(
 /**
  * Roda ffprobe para detectar se existe stream de áudio e descobrir duração
  */
-function runFfprobe(filePath: string): Promise<{ hasAudioStream: boolean; durationSeconds: number }> {
+function runFfprobe(ffprobePath: string, filePath: string): Promise<{ hasAudioStream: boolean; durationSeconds: number }> {
   return new Promise((resolve) => {
-    const ffprobe = spawn('/usr/bin/ffprobe', [
+    const ffprobe = spawn(ffprobePath, [
       '-v', 'error',
       '-show_entries', 'stream=codec_type,duration:format=duration',
       '-of', 'json',

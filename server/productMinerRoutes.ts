@@ -21,7 +21,7 @@ import {
   spinDailyPick,
 } from './productMinerService.js';
 import { getGeminiClient } from './geminiHelper.js';
-import { extractAudioFromMediaBuffer } from './audioExtractor.js';
+import { extractAudioFromMediaBuffer, getAudioBinariesHealth } from './audioExtractor.js';
 import { db, isDatabaseConfigured, ensureCodigosAcessoTable, ensureProductMinerTables } from './database.js';
 import { memoryKeyStatusMap, recordAdminAuditAction, getClientIp, maskKeyForAdmin } from './presenceService.js';
 
@@ -1031,6 +1031,24 @@ function parseStoredTimedTranscript(jsonStr: string | null | undefined): {
 }
 
 // =========================================================================
+// ROTA DE DIAGNÓSTICO DE ÁUDIO: GET /audio-health
+// =========================================================================
+productMinerRouter.get('/audio-health', async (req, res) => {
+  const access = await requireProductMinerAccess(req, res);
+  if (!access) return;
+
+  const health = getAudioBinariesHealth();
+  return res.json({
+    success: true,
+    ffmpegAvailable: health.ffmpegAvailable,
+    ffprobeAvailable: health.ffprobeAvailable,
+    ffmpegConfigured: Boolean(health.ffmpegPath),
+    ffprobeConfigured: Boolean(health.ffprobePath),
+    ffmpegVersion: health.ffmpegVersion || null,
+  });
+});
+
+// =========================================================================
 // ROTA DE CONSULTA (CONSULTATION): GET /videos/transcription/:videoId
 // =========================================================================
 productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {
@@ -1054,11 +1072,13 @@ productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {
   }
 
   try {
+    // Exigir estritamente transcrição real comprovada por áudio (source = 'audio_extracted' AND version >= 3)
     const [rows]: any = await db.query(
       `SELECT * FROM tiktok_shop_video_transcripts
-       WHERE (video_id = ? AND ? != '')
-          OR (product_id = ? AND ? != '')
-       ORDER BY (transcription_source = 'audio_extracted') DESC, transcription_version DESC, updated_at DESC
+       WHERE ((video_id = ? AND ? != '') OR (product_id = ? AND ? != ''))
+         AND transcription_source = 'audio_extracted'
+         AND transcription_version >= 3
+       ORDER BY updated_at DESC
        LIMIT 1`,
       [cleanVideoId, cleanVideoId, cleanProductId, cleanProductId]
     );
@@ -1089,7 +1109,8 @@ productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {
         developmentOriginal: row.development_original || 'Apresentação detalhada e demonstração do produto.',
         ctaOriginal: row.cta_original || (captions[captions.length - 1]?.text || ''),
         confidenceScore: row.confidence_score || 100,
-        source: row.transcription_source || 'audio_extracted',
+        source: 'audio_extracted',
+        version: row.transcription_version || 3,
         status: 'completed',
       });
     }
@@ -1131,7 +1152,9 @@ productMinerRouter.get('/transcriptions/v2/:videoId', async (req, res) => {
     const [rows]: any = await db.query(
       `SELECT * FROM tiktok_shop_video_transcripts
        WHERE video_id = ?
-       ORDER BY (transcription_source = 'audio_extracted') DESC, transcription_version DESC, updated_at DESC
+         AND transcription_source = 'audio_extracted'
+         AND transcription_version >= 3
+       ORDER BY updated_at DESC
        LIMIT 1`,
       [cleanVideoId]
     );
@@ -1146,6 +1169,8 @@ productMinerRouter.get('/transcriptions/v2/:videoId', async (req, res) => {
         captions,
         original: null,
         translationSource: 'stored',
+        source: 'audio_extracted',
+        version: row.transcription_version || 3,
         status: 'completed',
       });
     }
@@ -1198,47 +1223,46 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
       return res.status(400).json({ error: 'MISSING_PRODUCT_ID', message: 'ID do produto ou vídeo é obrigatório.' });
     }
 
-    // 1. Verificar cache no banco de dados (se já existe transcrição de áudio real e !forceRefresh)
+    // 1. Verificar cache no banco de dados (se já existe transcrição de áudio real version >= 3 e !forceRefresh)
     if (!forceRefresh && isDatabaseConfigured()) {
       try {
         const [rows]: any = await db.query(
           `SELECT * FROM tiktok_shop_video_transcripts
-           WHERE (video_id = ? AND ? != '')
-              OR (product_id = ? AND ? != '')
-           ORDER BY (transcription_source = 'audio_extracted') DESC, transcription_version DESC, updated_at DESC
+           WHERE ((video_id = ? AND ? != '') OR (product_id = ? AND ? != ''))
+             AND transcription_source = 'audio_extracted'
+             AND transcription_version >= 3
+           ORDER BY updated_at DESC
            LIMIT 1`,
           [cleanVideoId, cleanVideoId, cleanProductId, cleanProductId]
         );
 
         if (Array.isArray(rows) && rows.length > 0 && rows[0].raw_transcript) {
           const row = rows[0];
-          // Se for transcrição válida por extração de áudio, retornar imediatamente!
-          if (row.transcription_source === 'audio_extracted' && row.transcription_version >= 2) {
-            const { captions, timedTranscript } = parseStoredTimedTranscript(row.timed_transcript_json);
-            return res.json({
-              success: true,
-              fromCache: true,
-              productId: cleanProductId || row.product_id,
-              videoId: cleanVideoId || row.video_id,
-              transcription: row.raw_transcript,
-              language: row.original_language || 'pt-BR',
-              captions,
-              rawTranscript: row.raw_transcript,
-              timedTranscript,
-              originalLanguage: row.original_language || 'pt',
-              isForeignLanguage: Boolean(row.is_foreign_language),
-              portugueseTranslation: row.portuguese_translation || null,
-              durationSeconds: row.duration_seconds || (captions[captions.length - 1]?.end ? Math.round(captions[captions.length - 1].end) : 30),
-              rhythm: row.rhythm || 'Cadenciado e dinâmico',
-              hookOriginal: row.hook_original || (captions[0]?.text || ''),
-              structureOriginal: row.structure_original || 'Hook -> Demonstração -> Benefício -> CTA',
-              developmentOriginal: row.development_original || 'Apresentação detalhada e demonstração do produto.',
-              ctaOriginal: row.cta_original || (captions[captions.length - 1]?.text || ''),
-              confidenceScore: row.confidence_score || 100,
-              source: 'audio_extracted',
-              status: 'completed',
-            });
-          }
+          const { captions, timedTranscript } = parseStoredTimedTranscript(row.timed_transcript_json);
+          return res.json({
+            success: true,
+            fromCache: true,
+            productId: cleanProductId || row.product_id,
+            videoId: cleanVideoId || row.video_id,
+            transcription: row.raw_transcript,
+            language: row.original_language || 'pt-BR',
+            captions,
+            rawTranscript: row.raw_transcript,
+            timedTranscript,
+            originalLanguage: row.original_language || 'pt',
+            isForeignLanguage: Boolean(row.is_foreign_language),
+            portugueseTranslation: row.portuguese_translation || null,
+            durationSeconds: row.duration_seconds || (captions[captions.length - 1]?.end ? Math.round(captions[captions.length - 1].end) : 30),
+            rhythm: row.rhythm || 'Cadenciado e dinâmico',
+            hookOriginal: row.hook_original || (captions[0]?.text || ''),
+            structureOriginal: row.structure_original || 'Hook -> Demonstração -> Benefício -> CTA',
+            developmentOriginal: row.development_original || 'Apresentação detalhada e demonstração do produto.',
+            ctaOriginal: row.cta_original || (captions[captions.length - 1]?.text || ''),
+            confidenceScore: row.confidence_score || 100,
+            source: 'audio_extracted',
+            version: row.transcription_version || 3,
+            status: 'completed',
+          });
         }
       } catch (cacheErr: any) {
         console.warn('[Transcription Cache Read Warning]:', cacheErr?.message || cacheErr);
@@ -1319,6 +1343,13 @@ productMinerRouter.post('/videos/transcription', async (req, res) => {
         productId: cleanProductId,
         videoId: cleanVideoId,
       });
+
+      if (audioExtraction.error === 'FFMPEG_NOT_AVAILABLE' || audioExtraction.error === 'FFPROBE_NOT_AVAILABLE') {
+        return res.status(503).json({
+          error: audioExtraction.error,
+          message: 'Não foi possível processar o áudio deste vídeo no momento.',
+        });
+      }
 
       if (audioExtraction.error === 'VIDEO_WITHOUT_AUDIO') {
         return res.status(422).json({
@@ -1405,24 +1436,42 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
 
     // 6. Enviar áudio compacto para o Gemini (MP3 ~400KB é instantâneo e 100% suportado em inlineData)
     currentStage = 'GEMINI_GENERATE';
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
-      contents: [
-        {
-          inlineData: {
-            mimeType: 'audio/mp3',
-            data: audioBuffer.toString('base64'),
+    let responseText = '';
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
+    let lastGeminiErr: any = null;
+
+    for (const targetModel of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: targetModel,
+          contents: [
+            {
+              inlineData: {
+                mimeType: 'audio/mp3',
+                data: audioBuffer.toString('base64'),
+              },
+            },
+            transcriptionPrompt,
+          ],
+          config: {
+            responseMimeType: 'application/json',
           },
-        },
-        transcriptionPrompt,
-      ],
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
+        });
+        responseText = response.text || '';
+        if (responseText) {
+          break;
+        }
+      } catch (mErr: any) {
+        lastGeminiErr = mErr;
+        console.warn(`[Transcription Model ${targetModel} failed, trying fallback]:`, mErr?.message || mErr);
+      }
+    }
+
+    if (!responseText) {
+      throw lastGeminiErr || new Error('GEMINI_EMPTY_RESPONSE');
+    }
 
     currentStage = 'GEMINI_RESPONSE';
-    const responseText = response.text || '{}';
 
     currentStage = 'JSON_PARSE';
     let parsedData: any = {};
@@ -1470,7 +1519,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
     const ctaOriginal = String(parsedData.ctaOriginal || (rawCaptions[rawCaptions.length - 1]?.text || ''));
     const confidenceScore = Number(parsedData.confidenceScore) || 98;
 
-    // 7. Salvar no banco de dados com chave (product_id, video_id) e versão 2
+    // 7. Salvar no banco de dados com chave (product_id, video_id) e versão 3 (áudio real comprovado)
     currentStage = 'DATABASE_SAVE';
     if (isDatabaseConfigured()) {
       try {
@@ -1485,7 +1534,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
             raw_transcript, timed_transcript_json, portuguese_translation, duration_seconds,
             rhythm, hook_original, structure_original, development_original, cta_original,
             confidence_score, transcription_source, transcription_version, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'audio_extracted', 2, NOW())
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'audio_extracted', 3, NOW())
           ON DUPLICATE KEY UPDATE
             original_language = VALUES(original_language),
             is_foreign_language = VALUES(is_foreign_language),
@@ -1500,7 +1549,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
             cta_original = VALUES(cta_original),
             confidence_score = VALUES(confidence_score),
             transcription_source = 'audio_extracted',
-            transcription_version = 2,
+            transcription_version = 3,
             updated_at = NOW()`,
           [
             cleanProductId,
@@ -1549,6 +1598,7 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
       ctaOriginal,
       confidenceScore,
       source: 'audio_extracted',
+      version: 3,
       status: 'completed',
     });
   } catch (aiErr: any) {
@@ -1747,15 +1797,33 @@ Retorne OBRIGATORIAMENTE um JSON estrito no seguinte formato:
 
     try {
       const ai = getGeminiClient();
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents: modelingPrompt,
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
+      let responseText = '';
+      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
+      let lastGeminiErr: any = null;
 
-      const responseText = response.text || '{}';
+      for (const targetModel of modelsToTry) {
+        try {
+          const response = await ai.models.generateContent({
+            model: targetModel,
+            contents: modelingPrompt,
+            config: {
+              responseMimeType: 'application/json',
+            },
+          });
+          responseText = response.text || '';
+          if (responseText) {
+            break;
+          }
+        } catch (mErr: any) {
+          lastGeminiErr = mErr;
+          console.warn(`[Model Content ${targetModel} failed, trying fallback]:`, mErr?.message || mErr);
+        }
+      }
+
+      if (!responseText) {
+        throw lastGeminiErr || new Error('A resposta do modelo de IA não retornou conteúdo.');
+      }
+
       let parsedData: any = {};
       try {
         parsedData = JSON.parse(responseText);
