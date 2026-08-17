@@ -828,6 +828,57 @@ function isDirectCdnMediaUrl(urlStr: string): boolean {
 }
 
 // =========================================================================
+// HELPER: VALIDAÇÃO ATIVA DE URL DIRETA DE CDN (DETECTAR EXPIRAÇÃO / STATUS)
+// =========================================================================
+async function validateDirectMediaUrl(urlStr: string): Promise<{
+  isValid: boolean;
+  httpStatus?: number;
+  contentType?: string | null;
+  domain?: string;
+  error?: string;
+}> {
+  if (!urlStr || typeof urlStr !== 'string') return { isValid: false, error: 'EMPTY_URL' };
+  if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) return { isValid: false, error: 'INVALID_PROTOCOL' };
+  if (!isDirectCdnMediaUrl(urlStr)) return { isValid: false, error: 'NOT_DIRECT_CDN' };
+
+  let domain = 'unknown';
+  try {
+    domain = new URL(urlStr).hostname;
+  } catch {}
+
+  try {
+    const res = await fetch(urlStr, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Range': 'bytes=0-1024',
+        'Accept': '*/*',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    const httpStatus = res.status;
+    const contentType = res.headers.get('content-type');
+
+    if (httpStatus === 401 || httpStatus === 403 || httpStatus === 404 || httpStatus === 410) {
+      return { isValid: false, httpStatus, contentType, domain, error: 'EXPIRED_OR_FORBIDDEN' };
+    }
+
+    if (!res.ok && httpStatus !== 206) {
+      return { isValid: false, httpStatus, contentType, domain, error: `HTTP_${httpStatus}` };
+    }
+
+    if (contentType && (contentType.includes('text/html') || contentType.includes('application/json'))) {
+      return { isValid: false, httpStatus, contentType, domain, error: 'HTML_OR_JSON_RESPONSE' };
+    }
+
+    return { isValid: true, httpStatus, contentType, domain };
+  } catch (err: any) {
+    return { isValid: false, domain, error: err?.message || 'NETWORK_ERROR' };
+  }
+}
+
+// =========================================================================
 // HELPER: BAIXAR BUFFER REAL DO VÍDEO/ÁUDIO PARA TRANSCRIÇÃO FIEL
 // =========================================================================
 interface FetchVideoMediaBufferResult {
@@ -849,8 +900,11 @@ async function fetchVideoMediaBuffer(
 
   let cdnUrl: string | null = null;
   let mediaSource: 'DB_DIRECT_MEDIA' | 'PREPARED_DIRECT_MEDIA' | 'FALLBACK_VIDEO_URL' = 'DB_DIRECT_MEDIA';
+  let prepareError: string | null = null;
+  let prepareMessage: string | null = null;
+  let dbUrlExpired = false;
 
-  // 1. Verificar registro persistido no banco de dados
+  // 1. Verificar registro persistido no banco de dados e validar se a URL não expirou
   if (isDatabaseConfigured()) {
     try {
       const [rows]: any = await db.query(
@@ -859,39 +913,76 @@ async function fetchVideoMediaBuffer(
       );
       const record = Array.isArray(rows) && rows[0];
       if (record && record.status === 'COMPLETED' && record.direct_media_url) {
-        cdnUrl = String(record.direct_media_url);
-        mediaSource = 'DB_DIRECT_MEDIA';
+        const storedUrl = String(record.direct_media_url);
+        const val = await validateDirectMediaUrl(storedUrl);
+        if (val.isValid) {
+          cdnUrl = storedUrl;
+          mediaSource = 'DB_DIRECT_MEDIA';
+        } else {
+          console.warn('[fetchVideoMediaBuffer] Stored direct_media_url is expired or invalid:', {
+            httpStatus: val.httpStatus,
+            contentType: val.contentType,
+            error: val.error,
+            domain: val.domain,
+          });
+          dbUrlExpired = true;
+        }
       }
     } catch (dbErr: any) {
       console.warn('[fetchVideoMediaBuffer DB read warning]:', dbErr?.message || dbErr);
     }
   }
 
-  // 2. Se não estiver preparado no banco, acionar prepareVideoDownload
+  // 2. Se não estiver preparado no banco ou estiver expirada, acionar prepareVideoDownload com forceRefresh
   if (!cdnUrl) {
     try {
-      const prepRes = await prepareVideoDownload(cleanProductId, cleanVideoId || undefined);
+      const prepRes = await prepareVideoDownload(cleanProductId, cleanVideoId || undefined, dbUrlExpired);
       if (prepRes.success && prepRes.directMediaUrl) {
-        cdnUrl = String(prepRes.directMediaUrl);
-        mediaSource = 'PREPARED_DIRECT_MEDIA';
+        const prepVal = await validateDirectMediaUrl(prepRes.directMediaUrl);
+        if (prepVal.isValid) {
+          cdnUrl = String(prepRes.directMediaUrl);
+          mediaSource = 'PREPARED_DIRECT_MEDIA';
+        } else {
+          console.warn('[fetchVideoMediaBuffer] Newly prepared directMediaUrl failed validation:', prepVal);
+          prepareError = prepVal.error || 'PREPARED_URL_VALIDATION_FAILED';
+          prepareMessage = 'A URL gerada pelo provedor de mídia não respondeu com áudio/vídeo válido.';
+        }
+      } else {
+        prepareError = prepRes.error || 'PREPARE_FAILED';
+        prepareMessage = prepRes.message || 'Falha ao preparar download do vídeo.';
       }
     } catch (prepErr: any) {
       console.warn('[fetchVideoMediaBuffer prepare error]:', prepErr?.message || prepErr);
+      prepareError = prepErr?.name || 'PREPARE_EXCEPTION';
+      prepareMessage = prepErr?.message || 'Exceção ao preparar vídeo.';
     }
   }
 
   // 3. Fallback APENAS se for URL direta de CDN de mídia (NUNCA página HTML do TikTok)
   if (!cdnUrl && fallbackUrl && (fallbackUrl.startsWith('http://') || fallbackUrl.startsWith('https://'))) {
     if (isDirectCdnMediaUrl(fallbackUrl)) {
-      cdnUrl = fallbackUrl;
-      mediaSource = 'FALLBACK_VIDEO_URL';
+      const fbVal = await validateDirectMediaUrl(fallbackUrl);
+      if (fbVal.isValid) {
+        cdnUrl = fallbackUrl;
+        mediaSource = 'FALLBACK_VIDEO_URL';
+      } else {
+        console.info('[fetchVideoMediaBuffer] fallbackUrl failed validation:', fbVal);
+      }
     } else {
       console.info('[fetchVideoMediaBuffer] Ignorando fallbackUrl pois é página web e não mídia direta:', fallbackUrl.slice(0, 60));
     }
   }
 
   if (!cdnUrl) {
-    return { errorStage: 'MEDIA_PREPARE', errorDetails: { reason: 'NO_DIRECT_MEDIA_URL' } };
+    return {
+      errorStage: 'MEDIA_PREPARE',
+      errorDetails: {
+        reason: prepareError ? 'PREPARE_VIDEO_DOWNLOAD_FAILED' : 'NO_DIRECT_MEDIA_URL',
+        prepareError,
+        prepareMessage,
+        dbUrlExpired,
+      },
+    };
   }
 
   let domain = 'unknown';
@@ -916,7 +1007,7 @@ async function fetchVideoMediaBuffer(
     if (!res.ok) {
       return {
         errorStage: 'MEDIA_FETCH',
-        errorDetails: { httpStatus, statusText: res.statusText, domain, mediaSource },
+        errorDetails: { httpStatus, statusText: res.statusText, domain, mediaSource, prepareError, prepareMessage },
       };
     }
 
@@ -942,6 +1033,8 @@ async function fetchVideoMediaBuffer(
           bufferBytes: buffer.length,
           domain,
           mediaSource,
+          prepareError,
+          prepareMessage,
         },
       };
     }
@@ -965,7 +1058,7 @@ async function fetchVideoMediaBuffer(
     });
     return {
       errorStage: 'MEDIA_FETCH',
-      errorDetails: { message: dlErr?.message, name: dlErr?.name, domain, mediaSource },
+      errorDetails: { message: dlErr?.message, name: dlErr?.name, domain, mediaSource, prepareError, prepareMessage },
     };
   }
 }
@@ -1045,6 +1138,172 @@ productMinerRouter.get('/audio-health', async (req, res) => {
     ffmpegConfigured: Boolean(health.ffmpegPath),
     ffprobeConfigured: Boolean(health.ffprobePath),
     ffmpegVersion: health.ffmpegVersion || null,
+  });
+});
+
+// =========================================================================
+// ROTA DE DIAGNÓSTICO DE RESOLUÇÃO DE MÍDIA: GET /videos/media-diagnostic/:productId/:videoId?
+// =========================================================================
+productMinerRouter.get(['/videos/media-diagnostic/:productId/:videoId', '/videos/media-diagnostic/:productId'], async (req, res) => {
+  const access = await requireProductMinerAccess(req, res);
+  if (!access) return;
+
+  const cleanProductId = String(req.params.productId || '').trim();
+  const cleanVideoId = String(req.params.videoId || req.query.videoId || '').trim();
+
+  let databaseRecord = {
+    found: false,
+    status: null as string | null,
+    hasDirectMediaUrl: false,
+    provider: null as string | null,
+    preparedAt: null as string | null,
+    errorMessage: null as string | null,
+  };
+
+  let dbDirectUrl: string | null = null;
+  let dbUrlExpired = false;
+
+  if (isDatabaseConfigured()) {
+    try {
+      const [rows]: any = await db.query(
+        `SELECT
+           product_id,
+           video_id,
+           status,
+           provider,
+           provider_cached,
+           prepared_at,
+           error_message,
+           direct_media_url,
+           CASE
+             WHEN direct_media_url IS NULL OR direct_media_url = '' THEN 0
+             ELSE 1
+           END AS has_direct_media_url
+         FROM tiktok_shop_video_downloads
+         WHERE product_id = ? AND (video_id = ? OR video_id = '' OR ? = '')
+         LIMIT 1`,
+        [cleanProductId, cleanVideoId, cleanVideoId]
+      );
+      if (Array.isArray(rows) && rows[0]) {
+        const r = rows[0];
+        databaseRecord = {
+          found: true,
+          status: r.status || null,
+          hasDirectMediaUrl: Boolean(r.has_direct_media_url),
+          provider: r.provider || null,
+          preparedAt: r.prepared_at ? new Date(r.prepared_at).toISOString() : null,
+          errorMessage: r.error_message || null,
+        };
+        if (r.direct_media_url) {
+          dbDirectUrl = String(r.direct_media_url);
+        }
+      }
+    } catch (err: any) {
+      databaseRecord.errorMessage = `DB_QUERY_ERROR: ${err?.message || err}`;
+    }
+  }
+
+  // Validação da URL do banco se houver
+  let dbValidation: any = null;
+  if (dbDirectUrl) {
+    dbValidation = await validateDirectMediaUrl(dbDirectUrl);
+    if (!dbValidation.isValid) {
+      dbUrlExpired = true;
+    }
+  }
+
+  // Verificar se fallbackVideo existe
+  let fallbackVideo = {
+    exists: false,
+    isDirectCdn: false,
+  };
+
+  let fallbackVideoUrl = '';
+  if (isDatabaseConfigured()) {
+    try {
+      if (cleanVideoId) {
+        const [vRows]: any = await db.query(
+          `SELECT video_url FROM tiktok_shop_product_videos WHERE product_id = ? AND video_id = ? LIMIT 1`,
+          [cleanProductId, cleanVideoId]
+        );
+        if (Array.isArray(vRows) && vRows[0]?.video_url) {
+          fallbackVideoUrl = String(vRows[0].video_url);
+        }
+      }
+      if (!fallbackVideoUrl && cleanProductId) {
+        const [pRows]: any = await db.query(
+          `SELECT video_url FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
+          [cleanProductId]
+        );
+        if (Array.isArray(pRows) && pRows[0]?.video_url) {
+          fallbackVideoUrl = String(pRows[0].video_url);
+        }
+      }
+    } catch {}
+  }
+
+  if (fallbackVideoUrl) {
+    fallbackVideo.exists = true;
+    fallbackVideo.isDirectCdn = isDirectCdnMediaUrl(fallbackVideoUrl);
+  }
+
+  // Testar ou simular prepareVideoDownload se não tiver URL válida do DB
+  let prepareVideoDownloadResult = {
+    attempted: false,
+    success: false,
+    error: null as string | null,
+    hasDirectMediaUrl: false,
+  };
+
+  let finalResolution = {
+    success: false,
+    mediaSource: null as 'DB_DIRECT_MEDIA' | 'PREPARED_DIRECT_MEDIA' | 'FALLBACK_VIDEO_URL' | null,
+    reason: '',
+  };
+
+  if (dbValidation?.isValid) {
+    finalResolution.success = true;
+    finalResolution.mediaSource = 'DB_DIRECT_MEDIA';
+    finalResolution.reason = 'Valid direct media URL found in database cache.';
+  } else {
+    prepareVideoDownloadResult.attempted = true;
+    try {
+      const prep = await prepareVideoDownload(cleanProductId, cleanVideoId || undefined, dbUrlExpired);
+      prepareVideoDownloadResult.success = prep.success;
+      prepareVideoDownloadResult.error = prep.error || null;
+      prepareVideoDownloadResult.hasDirectMediaUrl = Boolean(prep.directMediaUrl);
+
+      if (prep.success && prep.directMediaUrl) {
+        const prepVal = await validateDirectMediaUrl(prep.directMediaUrl);
+        if (prepVal.isValid) {
+          finalResolution.success = true;
+          finalResolution.mediaSource = 'PREPARED_DIRECT_MEDIA';
+          finalResolution.reason = 'Successfully resolved fresh direct media URL from provider.';
+        } else {
+          finalResolution.reason = `Prepared media URL failed validation: ${prepVal.error || 'INVALID'}`;
+        }
+      } else {
+        finalResolution.reason = `Prepare video download failed: ${prep.message || prep.error || 'UNKNOWN'}`;
+      }
+    } catch (prepErr: any) {
+      prepareVideoDownloadResult.error = prepErr?.message || 'EXCEPTION';
+      finalResolution.reason = `Exception during prepareVideoDownload: ${prepErr?.message}`;
+    }
+
+    if (!finalResolution.success && fallbackVideo.isDirectCdn) {
+      finalResolution.success = true;
+      finalResolution.mediaSource = 'FALLBACK_VIDEO_URL';
+      finalResolution.reason = 'Direct CDN URL used from fallback metadata.';
+    }
+  }
+
+  return res.json({
+    productId: cleanProductId,
+    videoId: cleanVideoId,
+    databaseRecord,
+    prepareVideoDownload: prepareVideoDownloadResult,
+    fallbackVideo,
+    finalResolution,
   });
 });
 
