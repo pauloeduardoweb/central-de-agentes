@@ -1483,6 +1483,191 @@ productMinerRouter.get('/videos/transcript-diagnostic/:productId/:videoId?', asy
 });
 
 // =========================================================================
+// ROTA DE AUDITORIA SOCIALCRAWL POST MEDIA: GET /videos/audit-socialcrawl-post/:productId/:videoId?
+// =========================================================================
+function maskAuditUrl(urlStr: string): string {
+  try {
+    const u = new URL(urlStr);
+    return `${u.protocol}//${u.host}${u.pathname}${u.search ? '?<masked_tokens>' : ''}`;
+  } catch {
+    return urlStr.slice(0, 60) + '...';
+  }
+}
+
+function recursiveFindUrlCandidates(obj: any, currentPath = ''): Array<{ path: string; key: string; value: string }> {
+  const candidates: Array<{ path: string; key: string; value: string }> = [];
+  if (!obj || typeof obj !== 'object') return candidates;
+
+  const INTERESTING_KEYS = ['url', 'play', 'download', 'media', 'src', 'stream', 'video', 'addr', 'link', 'audio', 'uri'];
+
+  if (Array.isArray(obj)) {
+    obj.forEach((item, index) => {
+      candidates.push(...recursiveFindUrlCandidates(item, `${currentPath}[${index}]`));
+    });
+  } else {
+    for (const [k, v] of Object.entries(obj)) {
+      const fieldPath = currentPath ? `${currentPath}.${k}` : k;
+      const lowerK = k.toLowerCase();
+      const isInterestingKey = INTERESTING_KEYS.some((ik) => lowerK.includes(ik));
+
+      if (typeof v === 'string') {
+        if (v.startsWith('http://') || v.startsWith('https://')) {
+          candidates.push({ path: fieldPath, key: k, value: v });
+        } else if (isInterestingKey && v.length > 5 && !v.includes(' ') && (v.includes('/') || v.includes('.'))) {
+          candidates.push({ path: fieldPath, key: k, value: v });
+        }
+      } else if (typeof v === 'object' && v !== null) {
+        candidates.push(...recursiveFindUrlCandidates(v, fieldPath));
+      }
+    }
+  }
+
+  return candidates;
+}
+
+productMinerRouter.get(['/videos/audit-socialcrawl-post/:productId/:videoId', '/videos/audit-socialcrawl-post/:productId'], async (req, res) => {
+  const cleanProductId = String(req.params.productId || '').trim();
+  const cleanVideoId = String(req.params.videoId || req.query.videoId || '').trim();
+
+  let resolvedVideoUrl = String(req.query.videoUrl || '').trim();
+  let dbRecord: any = null;
+
+  if (isDatabaseConfigured()) {
+    try {
+      if (cleanVideoId) {
+        const [vRows]: any = await db.query(
+          `SELECT video_id, video_url, video_author, video_description FROM tiktok_shop_product_videos WHERE video_id = ? LIMIT 1`,
+          [cleanVideoId]
+        );
+        if (Array.isArray(vRows) && vRows[0]) {
+          dbRecord = vRows[0];
+          if (!resolvedVideoUrl && vRows[0].video_url) resolvedVideoUrl = String(vRows[0].video_url);
+        }
+      }
+
+      if (cleanProductId && !resolvedVideoUrl) {
+        const [pRows]: any = await db.query(
+          `SELECT product_id, title, category, video_url, video_author FROM tiktok_shop_products WHERE product_id = ? LIMIT 1`,
+          [cleanProductId]
+        );
+        if (Array.isArray(pRows) && pRows[0]) {
+          if (!dbRecord) dbRecord = pRows[0];
+          if (!resolvedVideoUrl && pRows[0].video_url) resolvedVideoUrl = String(pRows[0].video_url);
+        }
+      }
+    } catch (dbErr: any) {
+      console.warn('[Audit SocialCrawl DB Warning]:', dbErr?.message || dbErr);
+    }
+  }
+
+  if (!resolvedVideoUrl && cleanVideoId && /^\d+$/.test(cleanVideoId)) {
+    resolvedVideoUrl = `https://www.tiktok.com/@tiktok/video/${cleanVideoId}`;
+  }
+
+  if (!resolvedVideoUrl) {
+    return res.status(400).json({ error: 'NO_VIDEO_URL', message: 'Nenhuma video_url encontrada para o produto/vídeo.' });
+  }
+
+  const apiKey = String(process.env.SOCIALCRAWL_API_KEY || '').trim();
+  if (!apiKey) {
+    return res.status(500).json({ error: 'SOCIALCRAWL_API_KEY_MISSING' });
+  }
+
+  const scUrl = new URL('https://www.socialcrawl.dev/v1/tiktok/post');
+  scUrl.searchParams.set('url', resolvedVideoUrl);
+  scUrl.searchParams.set('download_media', 'true');
+
+  const startTime = Date.now();
+  let httpStatus = 0;
+  let rawJson: any = null;
+
+  try {
+    const fetchRes = await fetch(scUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'x-api-key': apiKey,
+        Accept: 'application/json',
+        'User-Agent': 'GeracaoZPro/1.0',
+      },
+      signal: AbortSignal.timeout(30000),
+    });
+
+    httpStatus = fetchRes.status;
+    const rawText = await fetchRes.text();
+    try {
+      rawJson = JSON.parse(rawText);
+    } catch {
+      return res.status(502).json({
+        error: 'INVALID_JSON_FROM_SOCIALCRAWL',
+        httpStatus,
+        snippet: rawText.slice(0, 200),
+      });
+    }
+  } catch (fetchErr: any) {
+    return res.status(500).json({
+      error: 'SOCIALCRAWL_FETCH_FAILED',
+      message: fetchErr?.message || String(fetchErr),
+    });
+  }
+
+  const durationMs = Date.now() - startTime;
+
+  // Extract candidate URLs recursively
+  const candidateFields = recursiveFindUrlCandidates(rawJson);
+  const auditResults: any[] = [];
+
+  for (const c of candidateFields) {
+    if (!c.value.startsWith('http://') && !c.value.startsWith('https://')) {
+      continue;
+    }
+
+    const cdnPattern = isDirectCdnMediaUrl(c.value);
+    const val = await validateDirectMediaUrl(c.value);
+
+    auditResults.push({
+      jsonPath: c.path,
+      keyName: c.key,
+      maskedUrl: maskAuditUrl(c.value),
+      domain: val.domain || 'unknown',
+      isDirectCdnPattern: cdnPattern,
+      httpStatus: val.httpStatus || null,
+      contentType: val.contentType || null,
+      isValidMedia: val.isValid,
+      error: val.error || null,
+    });
+  }
+
+  const validMediaUrls = auditResults.filter(
+    (r) => r.isValidMedia && r.contentType && !r.contentType.includes('text/html') && !r.contentType.includes('application/json')
+  );
+
+  const topLevelKeys = rawJson ? Object.keys(rawJson) : [];
+  const dataKeys = rawJson?.data && typeof rawJson.data === 'object' && !Array.isArray(rawJson.data)
+    ? Object.keys(rawJson.data)
+    : (Array.isArray(rawJson?.data) ? `array[${rawJson.data.length}]` : typeof rawJson?.data);
+
+  return res.json({
+    success: true,
+    productId: cleanProductId,
+    videoId: cleanVideoId,
+    resolvedVideoUrl: maskAuditUrl(resolvedVideoUrl),
+    socialCrawlResponseStatus: httpStatus,
+    durationMs,
+    creditsUsed: rawJson?.credits_used ?? rawJson?.credits ?? 0,
+    topLevelKeys,
+    dataKeys,
+    totalCandidateFields: candidateFields.length,
+    candidatesAudited: auditResults,
+    validMediaUrlsCount: validMediaUrls.length,
+    validMediaUrls,
+    hasFreeMediaUrlAvailable: validMediaUrls.length > 0,
+    summary: validMediaUrls.length > 0
+      ? `Encontrada(s) ${validMediaUrls.length} URL(s) de mídia válida(s) na resposta de /v1/tiktok/post.`
+      : 'NO_FREE_MEDIA_URL_AVAILABLE',
+  });
+});
+
+// =========================================================================
 // ROTA DE CONSULTA (CONSULTATION): GET /videos/transcription/:videoId
 // =========================================================================
 productMinerRouter.get('/videos/transcription/:videoId', async (req, res) => {

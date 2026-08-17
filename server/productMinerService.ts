@@ -1735,21 +1735,60 @@ export async function prepareVideoDownload(
     }
 
     const ext = jsonPayload?.data?.post?.ext || jsonPayload?.post?.ext;
-    const downloadMediaUrls = ext?.download_media_urls || [];
+    const downloadMediaUrls = ext?.download_media_urls || jsonPayload?.data?.download_media_urls || [];
 
     let mediaItem: any = null;
     let cdnUrl = '';
 
+    // 1. Verificar download_media_urls
     if (Array.isArray(downloadMediaUrls)) {
-      mediaItem = downloadMediaUrls.find((m: any) => m && (m.cdn_url || m.url || m.download_url || m.play_url));
+      mediaItem = downloadMediaUrls.find((m: any) => m && (m.cdn_url || m.url || m.download_url || m.play_url || m.play_addr || m.download_addr));
       if (mediaItem) {
-        cdnUrl = String(mediaItem.cdn_url || mediaItem.url || mediaItem.download_url || mediaItem.play_url || '');
+        cdnUrl = String(mediaItem.cdn_url || mediaItem.url || mediaItem.download_url || mediaItem.play_url || mediaItem.play_addr || mediaItem.download_addr || '');
       }
     }
 
+    // 2. Verificar post.video / post.download_addr / post.play_addr
     if (!cdnUrl) {
       const post = jsonPayload?.data?.post || jsonPayload?.post || jsonPayload?.data;
-      cdnUrl = String(post?.video?.play_addr || post?.video?.download_addr || post?.download_addr || post?.play_url || '');
+      const videoObj = post?.video;
+
+      const candidates: string[] = [];
+
+      if (typeof videoObj?.play_addr === 'string') candidates.push(videoObj.play_addr);
+      if (Array.isArray(videoObj?.play_addr?.url_list)) candidates.push(...videoObj.play_addr.url_list);
+      if (typeof videoObj?.download_addr === 'string') candidates.push(videoObj.download_addr);
+      if (Array.isArray(videoObj?.download_addr?.url_list)) candidates.push(...videoObj.download_addr.url_list);
+      if (typeof videoObj?.play_addr_h264 === 'string') candidates.push(videoObj.play_addr_h264);
+      if (Array.isArray(videoObj?.play_addr_h264?.url_list)) candidates.push(...videoObj.play_addr_h264.url_list);
+      if (typeof videoObj?.play_addr_bytevc1 === 'string') candidates.push(videoObj.play_addr_bytevc1);
+      if (Array.isArray(videoObj?.play_addr_bytevc1?.url_list)) candidates.push(...videoObj.play_addr_bytevc1.url_list);
+      if (typeof videoObj?.play_url === 'string') candidates.push(videoObj.play_url);
+      if (typeof videoObj?.download_url === 'string') candidates.push(videoObj.download_url);
+      if (typeof videoObj?.url === 'string') candidates.push(videoObj.url);
+
+      if (Array.isArray(videoObj?.bit_rate)) {
+        for (const br of videoObj.bit_rate) {
+          if (typeof br?.play_addr === 'string') candidates.push(br.play_addr);
+          if (Array.isArray(br?.play_addr?.url_list)) candidates.push(...br.play_addr.url_list);
+        }
+      }
+
+      if (typeof post?.play_url === 'string') candidates.push(post.play_url);
+      if (typeof post?.download_addr === 'string') candidates.push(post.download_addr);
+      if (typeof post?.download_url === 'string') candidates.push(post.download_url);
+
+      // 3. Fallback de áudio: se o vídeo não tiver URL direta, tentar a faixa de música/áudio do post
+      const musicObj = post?.music;
+      if (typeof musicObj?.play_url === 'string') candidates.push(musicObj.play_url);
+      if (Array.isArray(musicObj?.play_url?.url_list)) candidates.push(...musicObj.play_url.url_list);
+
+      for (const cand of candidates) {
+        if (cand && typeof cand === 'string' && (cand.startsWith('http://') || cand.startsWith('https://'))) {
+          cdnUrl = cand;
+          break;
+        }
+      }
     }
 
     if (!cdnUrl) {
