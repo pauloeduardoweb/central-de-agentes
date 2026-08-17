@@ -4976,7 +4976,7 @@ const ViralVideoCard: React.FC<{
   );
 };
 
-/* Viral Video Mode Card (Mobile) */
+/* Viral Video Mode Card (Mobile - 1 card per row) */
 const MobileViralVideoCard: React.FC<{
   product: ProductMinerProduct;
   studentCode?: string;
@@ -4998,8 +4998,6 @@ const MobileViralVideoCard: React.FC<{
   onTrackClick,
 }) => {
   const targetProductUrl = getOfficialProductUrl(product);
-  const views = product.video?.views ?? 0;
-  const badge = getVideoViewBadge(views);
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -5011,23 +5009,23 @@ const MobileViralVideoCard: React.FC<{
   return (
     <article
       id={position === 1 ? 'tour-first-product' : undefined}
-      className="group rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-xs flex flex-col h-full text-slate-900 relative p-2.5 sm:p-3 space-y-2.5"
+      className="group rounded-3xl border border-slate-200/90 bg-white overflow-hidden shadow-sm flex flex-col h-full text-slate-900 relative p-3 sm:p-4 space-y-3 w-full"
     >
-      {/* Video Container (aspect 9:16) */}
+      {/* 1. Video Container (aspect 9:16) */}
       <div
         id={position === 1 ? 'tour-video-action' : undefined}
-        className="relative aspect-[9/16] max-h-[380px] w-full bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center shrink-0 cursor-pointer"
+        className="relative aspect-[9/16] max-h-[460px] w-full bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 cursor-pointer shadow-inner"
         onClick={handlePlayClick}
       >
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
             alt={product.title}
-            className="w-full h-full object-cover bg-slate-900"
+            className="w-full h-full object-cover bg-slate-900 group-hover:scale-[1.02] transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-900">
-            <ShoppingBag className="w-8 h-8" />
+            <ShoppingBag className="w-10 h-10" />
           </div>
         )}
 
@@ -5035,124 +5033,97 @@ const MobileViralVideoCard: React.FC<{
         <div className="absolute inset-0 bg-black/45" />
 
         {/* Play Button Overlay */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 z-10">
           <button
             type="button"
             onClick={handlePlayClick}
-            className="w-13 h-13 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-xl border-2 border-white flex items-center justify-center transition-all cursor-pointer"
+            className="w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white shadow-2xl border-2 border-white flex items-center justify-center transition-all cursor-pointer"
             title="Assistir vídeo no player oficial do TikTok"
           >
-            <Play className="w-6 h-6 fill-current ml-0.5 text-white" />
+            <Play className="w-7 h-7 fill-current ml-0.5 text-white" />
           </button>
           <button
             type="button"
             onClick={handlePlayClick}
-            className="px-3 py-1 rounded-full bg-black/80 text-white text-[10px] sm:text-[11px] font-bold border border-white/20 shadow-xs backdrop-blur-xs flex items-center gap-1 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-full bg-black/80 text-white text-xs font-bold border border-white/20 shadow-sm backdrop-blur-xs flex items-center gap-1.5 cursor-pointer"
           >
             Assistir vídeo
           </button>
         </div>
 
-        {/* Position badge */}
+        {/* Position badge - TOP LEFT ONLY (Limpo, sem favorito nem badge repetido disputando espaço) */}
         {position ? (
-          <div className="absolute top-2 left-2 z-20 px-2 py-0.5 rounded-lg bg-white/95 border border-amber-400 text-amber-800 text-[11px] font-black shadow-xs pointer-events-none">
+          <div className="absolute top-2.5 left-2.5 z-20 px-2.5 py-1 rounded-lg bg-white/95 border border-amber-400 text-amber-800 text-xs font-black shadow-xs pointer-events-none">
             #{position}
           </div>
         ) : null}
-
-        {/* Official View Badge */}
-        <div className="absolute top-2 left-10 z-20 h-[26px] px-2 rounded-lg bg-white/95 border border-amber-300 shadow-xs flex items-center gap-1 pointer-events-none">
-          <div className="w-4 h-4 flex items-center justify-center">
-            <FilterIconImage
-              src={badge.iconUrl}
-              fallbackSrc={badge.fallbackIconUrl}
-              alt={badge.label}
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <span className="text-[10px] sm:text-[11px] font-black text-amber-950">{badge.label}</span>
-        </div>
-
-        {/* Favorite Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onToggleFavorite?.(product);
-          }}
-          className={`absolute top-2 right-2 z-20 p-1.5 rounded-full bg-white/90 shadow-xs transition-all cursor-pointer ${
-            isFavorite ? 'text-rose-500 bg-white' : 'text-slate-400 hover:text-rose-500'
-          }`}
-          title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
-        >
-          <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current text-rose-500' : ''}`} />
-        </button>
       </div>
 
-      {/* Video Creator & Structured 3+2 Metrics */}
+      {/* 2. Video Creator & 3+2 Metrics Grid */}
       {product.video ? (
-        <div className="rounded-xl border border-amber-200/70 bg-amber-50/40 p-2.5 space-y-2">
+        <div className="rounded-2xl border border-amber-200/70 bg-amber-50/40 p-3 space-y-2.5">
+          {/* Creator Header */}
           <div className="space-y-0.5">
-            <span className="text-[13px] sm:text-[14px] font-black text-slate-900 truncate block leading-tight">
+            <span className="text-sm sm:text-base font-black text-slate-900 truncate block leading-tight">
               @{product.video.author || 'creator'}
             </span>
             {product.video.authorFollowers !== null && product.video.authorFollowers !== undefined ? (
-              <span className="text-[11px] sm:text-[12px] text-slate-500 font-semibold block leading-tight">
+              <span className="text-xs text-slate-500 font-semibold block leading-tight">
                 {compactNumber(product.video.authorFollowers)} seguidores
               </span>
             ) : null}
           </div>
 
-          <div className="space-y-1.5 pt-1.5 border-t border-amber-200/50">
+          {/* 3+2 Metrics Grid */}
+          <div className="space-y-1.5 pt-2 border-t border-amber-200/50">
             {/* Linha 1: 3 colunas (Visualizações, Curtidas, Comentários) */}
-            <div className="grid grid-cols-3 gap-1 text-center bg-white/85 rounded-xl p-1.5 border border-amber-200/40">
+            <div className="grid grid-cols-3 gap-1.5 text-center bg-white/95 rounded-xl p-2 border border-amber-200/50 shadow-2xs">
               <div title="Visualizações" className="flex flex-col items-center min-w-0">
-                <Eye className="w-3.5 h-3.5 mb-0.5 text-cyan-600 shrink-0" />
-                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
+                <Eye className="w-4 h-4 mb-0.5 text-cyan-600 shrink-0" />
+                <span className="font-black text-slate-900 text-xs sm:text-sm leading-tight block truncate">
                   {compactNumber(product.video.views)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-tight block truncate">
                   Visualizações
                 </span>
               </div>
               <div title="Curtidas" className="flex flex-col items-center min-w-0">
-                <Heart className="w-3.5 h-3.5 mb-0.5 text-rose-500 fill-rose-500/20 shrink-0" />
-                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
+                <Heart className="w-4 h-4 mb-0.5 text-rose-500 fill-rose-500/20 shrink-0" />
+                <span className="font-black text-slate-900 text-xs sm:text-sm leading-tight block truncate">
                   {compactNumber(product.video.likes)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-tight block truncate">
                   Curtidas
                 </span>
               </div>
               <div title="Comentários" className="flex flex-col items-center min-w-0">
-                <MessageCircle className="w-3.5 h-3.5 mb-0.5 text-sky-600 shrink-0" />
-                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
+                <MessageCircle className="w-4 h-4 mb-0.5 text-sky-600 shrink-0" />
+                <span className="font-black text-slate-900 text-xs sm:text-sm leading-tight block truncate">
                   {compactNumber(product.video.comments)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
-                  Coment.
+                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-tight block truncate">
+                  Comentários
                 </span>
               </div>
             </div>
 
             {/* Linha 2: 2 colunas centralizadas (Compartilhamentos, Salvos) */}
-            <div className="grid grid-cols-2 gap-1 text-center bg-white/85 rounded-xl p-1.5 border border-amber-200/40 max-w-[90%] mx-auto">
+            <div className="grid grid-cols-2 gap-1.5 text-center bg-white/95 rounded-xl p-2 border border-amber-200/50 shadow-2xs max-w-[85%] mx-auto">
               <div title="Compartilhamentos" className="flex flex-col items-center min-w-0">
-                <Share2 className="w-3.5 h-3.5 mb-0.5 text-emerald-600 shrink-0" />
-                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
+                <Share2 className="w-4 h-4 mb-0.5 text-emerald-600 shrink-0" />
+                <span className="font-black text-slate-900 text-xs sm:text-sm leading-tight block truncate">
                   {compactNumber(product.video.shares)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-tight block truncate">
                   Compart.
                 </span>
               </div>
               <div title="Salvos" className="flex flex-col items-center min-w-0">
-                <Bookmark className="w-3.5 h-3.5 mb-0.5 text-amber-600 shrink-0" />
-                <span className="font-black text-slate-900 text-xs sm:text-[13px] leading-tight block truncate">
+                <Bookmark className="w-4 h-4 mb-0.5 text-amber-600 shrink-0" />
+                <span className="font-black text-slate-900 text-xs sm:text-sm leading-tight block truncate">
                   {compactNumber(product.video.saves)}
                 </span>
-                <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 leading-tight block truncate">
+                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-tight block truncate">
                   Salvos
                 </span>
               </div>
@@ -5161,49 +5132,93 @@ const MobileViralVideoCard: React.FC<{
         </div>
       ) : null}
 
-      {/* Secondary Product info */}
+      {/* 3. Produto Relacionado (Com imagem + Título + Preço Prioritário + Vendas) */}
       <div className="space-y-2 flex-1 flex flex-col justify-between">
-        <div className="space-y-1.5 rounded-xl bg-slate-50/90 p-2.5 border border-slate-200/70">
-          <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+        <div className="rounded-2xl bg-slate-50/90 p-3 border border-slate-200/80 shadow-2xs space-y-2">
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
             Produto Relacionado
           </span>
-          <h3 className="font-bold text-[12px] sm:text-[13px] text-slate-900 leading-snug line-clamp-2 min-h-[32px]" title={product.title}>
-            {product.title}
-          </h3>
 
-          <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-200/60">
-            {(() => {
-              const range = getProductPriceRange(product.priceCents, product.currencySymbol);
-              if (!range) {
-                return (
-                  <span className="font-black text-emerald-700 text-xs sm:text-[13px] truncate">
-                    {formatMoney(product.priceCents, product.currencySymbol)}
-                  </span>
-                );
-              }
-              return (
-                <span className="font-black text-emerald-700 text-xs sm:text-[13px] truncate">
-                  {range.formattedRange}
+          <div className="flex items-center gap-3">
+            {product.imageUrl ? (
+              <img
+                src={product.imageUrl}
+                alt={product.title}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-contain bg-white border border-slate-200 shrink-0 p-1"
+              />
+            ) : (
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-200/80 flex items-center justify-center text-slate-400 shrink-0">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+            )}
+
+            <div className="flex-1 min-w-0 space-y-1">
+              <h3
+                className="font-bold text-xs sm:text-[13px] text-slate-900 leading-snug line-clamp-2"
+                title={product.title}
+              >
+                {product.title}
+              </h3>
+
+              <div className="flex items-center justify-between gap-1 flex-wrap pt-0.5">
+                {(() => {
+                  const range = getProductPriceRange(product.priceCents, product.currencySymbol);
+                  if (!range) {
+                    return (
+                      <span className="font-black text-emerald-700 text-xs sm:text-sm">
+                        {formatMoney(product.priceCents, product.currencySymbol)}
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="font-black text-emerald-700 text-xs sm:text-sm">
+                      {range.formattedRange}
+                    </span>
+                  );
+                })()}
+
+                <span className="text-[10px] sm:text-[11px] text-amber-800 font-extrabold shrink-0 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                  {compactNumber(product.soldCount)} vendas
                 </span>
-              );
-            })()}
-
-            <span className="text-[10px] sm:text-[11px] text-amber-700 font-extrabold shrink-0 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60">
-              {compactNumber(product.soldCount)} vendas
-            </span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Action buttons (height 36-38px, font 11-12px) */}
-        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-          <button
-            type="button"
-            onClick={() => onOpenAnalysisModal?.(product)}
-            className="w-full h-[36px] sm:h-[38px] px-2 rounded-xl bg-white border border-amber-300 text-slate-800 hover:bg-amber-50 font-bold flex items-center justify-center gap-1 transition-all text-[11px] sm:text-[12px] shadow-2xs cursor-pointer"
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            🔍 Analisar
-          </button>
+        {/* 4. Action Buttons (Linha 1: Analisar + Favoritar | Linha 2: Ver Produto / Detalhes) */}
+        <div className="space-y-2 pt-1">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenAnalysisModal?.(product)}
+              className="h-10 px-3 rounded-xl bg-white border border-amber-300 text-slate-800 hover:bg-amber-50 active:scale-98 font-bold flex items-center justify-center gap-1.5 transition-all text-xs sm:text-[13px] shadow-2xs cursor-pointer"
+            >
+              <BarChart3 className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>🔍 Analisar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleFavorite?.(product);
+              }}
+              className={`h-10 px-3 rounded-xl border font-bold flex items-center justify-center gap-1.5 transition-all text-xs sm:text-[13px] shadow-2xs cursor-pointer active:scale-98 ${
+                isFavorite
+                  ? 'bg-rose-50 border-rose-300 text-rose-700 font-black'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-rose-50/50 hover:border-rose-200 hover:text-rose-600'
+              }`}
+              title={isFavorite ? 'Remover dos Favoritos' : 'Salvar nos Favoritos'}
+            >
+              <Heart
+                className={`w-4 h-4 shrink-0 ${
+                  isFavorite ? 'fill-rose-500 text-rose-500' : 'text-slate-400'
+                }`}
+              />
+              <span>{isFavorite ? 'Favoritado' : 'Favoritar'}</span>
+            </button>
+          </div>
 
           {targetProductUrl ? (
             <a
@@ -5211,17 +5226,18 @@ const MobileViralVideoCard: React.FC<{
               target="_blank"
               rel="noreferrer"
               onClick={() => onTrackClick?.(product)}
-              className="w-full h-[36px] sm:h-[38px] px-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-[11px] sm:text-[12px] text-center flex items-center justify-center gap-1 shadow-2xs transition-all"
+              className="w-full h-10 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-98 text-white font-extrabold text-xs sm:text-[13px] text-center flex items-center justify-center gap-1.5 shadow-xs transition-all"
             >
-              Produto <ExternalLink className="w-3 h-3 shrink-0" />
+              <span>Abrir Produto Oficial</span>
+              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
             </a>
           ) : (
             <button
               type="button"
               onClick={() => onOpenDetailModal?.(product)}
-              className="w-full h-[36px] sm:h-[38px] px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-bold text-[11px] sm:text-[12px] text-center transition-all cursor-pointer"
+              className="w-full h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-bold text-xs sm:text-[13px] text-center transition-all cursor-pointer"
             >
-              Detalhes
+              Ver Detalhes do Produto
             </button>
           )}
         </div>
@@ -7311,47 +7327,49 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
             ) : null}
           </div>
 
-          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-none sm:flex-wrap">
-            {VIDEO_FILTER_OPTIONS.map((opt) => {
-              const isActive = selectedVideoRange === opt.id;
+          <div className="w-full overflow-x-auto overflow-y-hidden pb-1.5 pt-0.5 scrollbar-none">
+            <div className="flex items-center justify-start gap-2.5 sm:gap-3.5 w-max min-w-max px-0.5 sm:w-auto sm:min-w-0 sm:flex-wrap">
+              {VIDEO_FILTER_OPTIONS.map((opt) => {
+                const isActive = selectedVideoRange === opt.id;
 
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  aria-label={opt.label}
-                  title={opt.label}
-                  onClick={() => {
-                    if (selectedVideoRange === opt.id) {
-                      setSelectedVideoRange(null);
-                      setMinVideoViews(null);
-                      setHasVideoOnly(false);
-                    } else {
-                      setSelectedVideoRange(opt.id);
-                      setMinVideoViews(opt.min);
-                      setHasVideoOnly(true);
-                    }
-                    setPage(1);
-                  }}
-                  className="group relative flex items-center justify-center h-[24px] sm:h-[26px] md:h-[28px] w-auto bg-transparent border-0 ring-0 shadow-none outline-none focus:outline-none cursor-pointer shrink-0 p-0 m-0"
-                >
-                  <div
-                    className={`flex items-center justify-center h-[24px] sm:h-[26px] md:h-[28px] w-auto transition-all duration-150 ${
-                      isActive
-                        ? 'opacity-100 brightness-110 drop-shadow-xs -translate-y-0.5'
-                        : 'opacity-80 hover:opacity-100'
-                    }`}
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    aria-label={opt.label}
+                    title={opt.label}
+                    onClick={() => {
+                      if (selectedVideoRange === opt.id) {
+                        setSelectedVideoRange(null);
+                        setMinVideoViews(null);
+                        setHasVideoOnly(false);
+                      } else {
+                        setSelectedVideoRange(opt.id);
+                        setMinVideoViews(opt.min);
+                        setHasVideoOnly(true);
+                      }
+                      setPage(1);
+                    }}
+                    className="group relative flex items-center justify-center h-[24px] sm:h-[26px] md:h-[28px] w-auto bg-transparent border-0 ring-0 shadow-none outline-none focus:outline-none cursor-pointer shrink-0 p-0 m-0"
                   >
-                    <FilterIconImage
-                      src={opt.iconUrl}
-                      fallbackSrc={opt.fallbackIconUrl}
-                      alt={opt.label}
-                      className="h-[24px] sm:h-[26px] md:h-[28px] w-auto max-w-none object-contain pointer-events-none"
-                    />
-                  </div>
-                </button>
-              );
-            })}
+                    <div
+                      className={`flex items-center justify-center h-[24px] sm:h-[26px] md:h-[28px] w-auto transition-all duration-150 ${
+                        isActive
+                          ? 'opacity-100 brightness-110 drop-shadow-xs -translate-y-0.5'
+                          : 'opacity-80 hover:opacity-100'
+                      }`}
+                    >
+                      <FilterIconImage
+                        src={opt.iconUrl}
+                        fallbackSrc={opt.fallbackIconUrl}
+                        alt={opt.label}
+                        className="h-[24px] sm:h-[26px] md:h-[28px] w-auto max-w-none object-contain pointer-events-none"
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : null}
@@ -7488,8 +7506,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
           {!(loading || rankingLoading) && displayProducts.length > 0 ? (
             <>
-              {/* Mobile View: 2-Column Grid (TikTok Shop style) */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:hidden items-stretch">
+              {/* Mobile View: 1-Column Grid for Viral Video Mode, 2-Column for standard products */}
+              <div className={`grid gap-3 sm:hidden items-stretch ${
+                selectedClassification === 'viral_video'
+                  ? 'grid-cols-1 max-w-lg mx-auto w-full'
+                  : 'grid-cols-2 gap-2 sm:gap-3'
+              }`}>
                 {currentRenderProducts.map((product, index) => {
                   const globalPos = index + 1;
                   const cardKey = product.video?.id ? `${product.productId}_${product.video.id}` : product.productId;
