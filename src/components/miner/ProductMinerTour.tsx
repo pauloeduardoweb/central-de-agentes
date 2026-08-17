@@ -156,7 +156,7 @@ export const ProductMinerTour: React.FC<ProductMinerTourProps> = ({
   const isFirstStep = currentStepIndex === 0;
   const isLastStep = currentStepIndex === steps.length - 1;
 
-  // Complete & Close
+  // Conclusão definitiva (GRAVA no localStorage)
   const handleFinish = useCallback(() => {
     try {
       localStorage.setItem(TOUR_STORAGE_KEY, 'true');
@@ -166,9 +166,10 @@ export const ProductMinerTour: React.FC<ProductMinerTourProps> = ({
     onClose();
   }, [onClose]);
 
-  const handleSkipOrClose = useCallback(() => {
-    handleFinish();
-  }, [handleFinish]);
+  // Fechamento temporário (NÃO grava no localStorage)
+  const handleCloseTemporarily = useCallback(() => {
+    onClose();
+  }, [onClose]);
 
   // Step change trigger
   const goToStep = useCallback(
@@ -201,7 +202,7 @@ export const ProductMinerTour: React.FC<ProductMinerTourProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        handleSkipOrClose();
+        handleCloseTemporarily();
       } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
         e.preventDefault();
         handleNext();
@@ -213,7 +214,7 @@ export const ProductMinerTour: React.FC<ProductMinerTourProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handleNext, handlePrev, handleSkipOrClose]);
+  }, [isOpen, handleNext, handlePrev, handleCloseTemporarily]);
 
   // Position calculation and element tracking
   const updateTargetPosition = useCallback(() => {
@@ -473,9 +474,9 @@ export const ProductMinerTour: React.FC<ProductMinerTourProps> = ({
 
               <button
                 type="button"
-                onClick={handleSkipOrClose}
+                onClick={handleCloseTemporarily}
                 className="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex items-center justify-center cursor-pointer"
-                title="Fechar tour (Esc)"
+                title="Fechar tour temporariamente (Esc)"
                 aria-label="Fechar tour"
               >
                 <X className="w-4 h-4" />
