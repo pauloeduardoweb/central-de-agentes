@@ -1,7 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { db, isDatabaseConfigured, ensureSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable, ensureSessionHistoryTable, ensureAgentInteractionsTable, ensureProgressTable, ensureChatTables } from './database.js';
+import { db, isDatabaseConfigured, ensureSessionsTable, ensureMasterSessionsTable, ensureProfilesTable, ensureAdminAccessTable, ensureCodigosAcessoTable, ensureSessionHistoryTable, ensureAgentInteractionsTable, ensureProgressTable, ensureChatTables } from './database.js';
 import { normalizeAccessCode, lookupKeyType, STUDENT_KEYS, MASTER_KEYS } from './authKeys.js';
 import { maskStudentCode } from './rankingService.js';
 import { memoryProfilesMap as chatMemoryProfilesMap } from './chatService.js';
@@ -360,7 +360,6 @@ let auditIdCounter = 1;
 const STORE_DIR = path.join(process.cwd(), '.data');
 const KEY_STATUS_FILE = path.join(STORE_DIR, 'key_status_store.json');
 const AUDIT_LOGS_FILE = path.join(STORE_DIR, 'audit_logs_store.json');
-const MASTER_SESSIONS_FILE = path.join(STORE_DIR, 'master_sessions_store.json');
 
 export interface MasterSession {
   sessionId: string;
@@ -370,96 +369,145 @@ export interface MasterSession {
   startedAt: string;
   lastHeartbeatAt: string;
   expiresAt: string;
+  revokedAt?: string | null;
 }
 
 export const memoryMasterSessionsMap = new Map<string, MasterSession>();
 
-export function loadMasterSessionsStore(): void {
-  try {
-    if (fs.existsSync(MASTER_SESSIONS_FILE)) {
-      const raw = fs.readFileSync(MASTER_SESSIONS_FILE, 'utf-8');
-      const data = JSON.parse(raw);
-      if (typeof data === 'object' && data !== null) {
-        for (const [key, val] of Object.entries(data)) {
-          if (val && typeof val === 'object') {
-            memoryMasterSessionsMap.set(key, val as MasterSession);
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('[MasterSessionsStore] Failed to load master sessions from disk:', err);
-  }
-}
-
-export function saveMasterSessionsStore(): void {
-  try {
-    if (!fs.existsSync(STORE_DIR)) {
-      fs.mkdirSync(STORE_DIR, { recursive: true });
-    }
-    const obj: Record<string, MasterSession> = {};
-    for (const [k, v] of memoryMasterSessionsMap.entries()) {
-      obj[k] = v;
-    }
-    fs.writeFileSync(MASTER_SESSIONS_FILE, JSON.stringify(obj, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('[MasterSessionsStore] Failed to save master sessions to disk:', err);
-  }
-}
-
-export function registerMasterSession(info: {
+export async function registerMasterSession(info: {
   sessionId: string;
   codigo: string;
   ipAddress?: string;
   userAgent?: string;
   expiresAt?: Date | string;
-}): void {
+}): Promise<void> {
   if (!info.sessionId || typeof info.sessionId !== 'string') return;
   const cleanSessionId = info.sessionId.trim();
   const expires = info.expiresAt instanceof Date
-    ? info.expiresAt.toISOString()
-    : (info.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
-  const nowIso = new Date().toISOString();
+    ? info.expiresAt
+    : new Date(info.expiresAt || Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const nowIso = now.toISOString();
   const normCode = normalizeAccessCode(info.codigo) || 'MENTOR-BIGODE';
+  const ip = info.ipAddress || '127.0.0.1';
+  const ua = info.userAgent || '';
 
   const existing = memoryMasterSessionsMap.get(cleanSessionId);
 
+  // Maintain runtime in-memory cache as fallback
   memoryMasterSessionsMap.set(cleanSessionId, {
     sessionId: cleanSessionId,
     codigo: normCode,
-    ipAddress: info.ipAddress || existing?.ipAddress || '127.0.0.1',
-    userAgent: info.userAgent || existing?.userAgent || '',
+    ipAddress: ip || existing?.ipAddress || '127.0.0.1',
+    userAgent: ua || existing?.userAgent || '',
     startedAt: existing?.startedAt || nowIso,
     lastHeartbeatAt: nowIso,
-    expiresAt: expires,
+    expiresAt: expires.toISOString(),
+    revokedAt: null,
   });
-  saveMasterSessionsStore();
+
+  // Primary authoritative persistence in MySQL master_sessions table
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureMasterSessionsTable();
+      await db.query(
+        `INSERT INTO master_sessions (session_id, codigo, ip_address, user_agent, started_at, last_heartbeat_at, expires_at, revoked_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+         ON DUPLICATE KEY UPDATE
+           codigo = VALUES(codigo),
+           ip_address = COALESCE(VALUES(ip_address), ip_address),
+           user_agent = COALESCE(VALUES(user_agent), user_agent),
+           last_heartbeat_at = VALUES(last_heartbeat_at),
+           expires_at = VALUES(expires_at),
+           revoked_at = NULL`,
+        [cleanSessionId, normCode, ip, ua, now, now, expires]
+      );
+    } catch (err: any) {
+      console.warn('[MasterSessions] Failed to upsert master session into MySQL:', err?.message || err);
+    }
+  }
 }
 
-export function revokeMasterSession(sessionId: string): void {
+export async function revokeMasterSession(sessionId: string): Promise<void> {
   if (!sessionId || typeof sessionId !== 'string') return;
-  memoryMasterSessionsMap.delete(sessionId.trim());
-  saveMasterSessionsStore();
+  const cleanSessionId = sessionId.trim();
+  memoryMasterSessionsMap.delete(cleanSessionId);
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureMasterSessionsTable();
+      await db.query(
+        `UPDATE master_sessions SET revoked_at = NOW() WHERE session_id = ?`,
+        [cleanSessionId]
+      );
+    } catch (err: any) {
+      console.warn('[MasterSessions] Failed to revoke master session in MySQL:', err?.message || err);
+    }
+  }
 }
 
 export async function validateMasterSessionId(sessionId: string): Promise<string | null> {
   if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') return null;
   const cleanSessionId = sessionId.trim();
+
+  // 1. Authoritative check in MySQL master_sessions table
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureMasterSessionsTable();
+      const [rows]: any = await db.query(
+        `SELECT codigo, expires_at, revoked_at
+         FROM master_sessions
+         WHERE session_id = ?
+         LIMIT 1`,
+        [cleanSessionId]
+      );
+
+      if (Array.isArray(rows) && rows.length > 0) {
+        const row = rows[0];
+
+        // Must not be revoked
+        if (row.revoked_at !== null && row.revoked_at !== undefined) {
+          return null;
+        }
+
+        // Must not be expired (expires_at > NOW())
+        if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) {
+          return null;
+        }
+
+        // Must continue being a valid MASTER key via checkCodeKeyType
+        const cleanCode = normalizeAccessCode(row.codigo);
+        const keyType = await checkCodeKeyType(cleanCode);
+        if (keyType !== 'MASTER') {
+          return null;
+        }
+
+        return cleanCode;
+      }
+
+      // If database is configured and row was not found, return null (session not found)
+      return null;
+    } catch (dbErr: any) {
+      console.warn('[MasterSessions] MySQL query failed, falling back to memory cache:', dbErr?.message || dbErr);
+    }
+  }
+
+  // 2. Fallback to memory map only when MySQL is not configured or throws an error
   const session = memoryMasterSessionsMap.get(cleanSessionId);
   if (!session) return null;
 
-  // Check expiration
-  if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
-    memoryMasterSessionsMap.delete(cleanSessionId);
-    saveMasterSessionsStore();
+  if (session.revokedAt) {
     return null;
   }
 
-  // Validate that session.codigo is a legitimate master key
+  if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
+    memoryMasterSessionsMap.delete(cleanSessionId);
+    return null;
+  }
+
   const keyType = await checkCodeKeyType(session.codigo);
   if (keyType !== 'MASTER') {
     memoryMasterSessionsMap.delete(cleanSessionId);
-    saveMasterSessionsStore();
     return null;
   }
 
@@ -529,7 +577,6 @@ export function saveAuditLogsStore(): void {
 
 // Load persisted status immediately on module initialization
 loadKeyStatusStore();
-loadMasterSessionsStore();
 
 export async function recordAdminAuditAction(
   targetKey: string,
@@ -767,7 +814,7 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
     // Master keys are exempt from session table persistence (Rule 3)
     if (keyType === 'MASTER') {
       if (sessionId) {
-        registerMasterSession({
+        await registerMasterSession({
           sessionId,
           codigo: cleanCode,
           ipAddress: getClientIp(req),
@@ -1053,7 +1100,7 @@ export async function presenceLogoutHandler(req: express.Request, res: express.R
 
     const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
     if (sessionId) {
-      revokeMasterSession(sessionId);
+      await revokeMasterSession(sessionId);
     }
 
     if (cleanCode && isDatabaseConfigured()) {

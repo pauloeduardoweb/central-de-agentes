@@ -171,6 +171,7 @@ export function ensureSessionsTable(): Promise<void> {
       await deduplicateSessionsTable();
       await ensureCodigosAcessoTable();
       await ensureAdminAccessTable();
+      await ensureMasterSessionsTable();
       await ensureSessionHistoryTable();
       await ensureAgentInteractionsTable();
       await cleanLegacyDisconnections();
@@ -182,6 +183,50 @@ export function ensureSessionsTable(): Promise<void> {
     });
   }
   return sessionsTablePromise;
+}
+
+let masterSessionsPromise: Promise<void> | null = null;
+export function ensureMasterSessionsTable(): Promise<void> {
+  if (!isDatabaseConfigured()) return Promise.resolve();
+  if (!masterSessionsPromise) {
+    masterSessionsPromise = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS master_sessions (
+          session_id VARCHAR(191) PRIMARY KEY,
+          codigo VARCHAR(100) NOT NULL,
+          ip_address VARCHAR(100) DEFAULT NULL,
+          user_agent TEXT DEFAULT NULL,
+          started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          last_heartbeat_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          expires_at DATETIME NOT NULL,
+          revoked_at DATETIME DEFAULT NULL,
+          INDEX idx_master_sessions_codigo (codigo),
+          INDEX idx_master_sessions_expires (expires_at),
+          INDEX idx_master_sessions_revoked (revoked_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      const alterQueries = [
+        `ALTER TABLE master_sessions ADD COLUMN ip_address VARCHAR(100) DEFAULT NULL`,
+        `ALTER TABLE master_sessions ADD COLUMN user_agent TEXT DEFAULT NULL`,
+        `ALTER TABLE master_sessions ADD COLUMN started_at DATETIME DEFAULT CURRENT_TIMESTAMP`,
+        `ALTER TABLE master_sessions ADD COLUMN last_heartbeat_at DATETIME DEFAULT CURRENT_TIMESTAMP`,
+        `ALTER TABLE master_sessions ADD COLUMN expires_at DATETIME NOT NULL`,
+        `ALTER TABLE master_sessions ADD COLUMN revoked_at DATETIME DEFAULT NULL`,
+        `ALTER TABLE master_sessions ADD INDEX idx_master_sessions_codigo (codigo)`,
+        `ALTER TABLE master_sessions ADD INDEX idx_master_sessions_expires (expires_at)`,
+        `ALTER TABLE master_sessions ADD INDEX idx_master_sessions_revoked (revoked_at)`,
+      ];
+      for (const q of alterQueries) {
+        await db.query(q).catch(() => {});
+      }
+    })().catch((err: any) => {
+      masterSessionsPromise = null;
+      console.warn('[MySQL ensureMasterSessionsTable Error]:', err?.message || err);
+      throw err;
+    });
+  }
+  return masterSessionsPromise;
 }
 
 let sessionHistoryPromise: Promise<void> | null = null;
