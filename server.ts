@@ -179,20 +179,15 @@ apiRouter.get(['/auth/status', '/api/auth/status'], async (_req, res) => {
   try {
     const { masterCount, studentCount } = verifyLoadedKeysCount();
     let dbConnected = false;
-    let masterKeysCount = masterCount;
     let studentKeysCount = studentCount;
 
     if (isDatabaseConfigured()) {
       try {
-        const [masterRows]: any = await db.query('SELECT COUNT(*) AS count FROM chaves_mestras');
         const [studentRows]: any = await db.query('SELECT COUNT(*) AS count FROM codigos_acesso');
 
         dbConnected = true;
-        if (Array.isArray(masterRows) && masterRows[0]) {
-          masterKeysCount = Number(masterRows[0].count);
-        }
         if (Array.isArray(studentRows) && studentRows[0]) {
-          studentKeysCount = Number(studentRows[0].count);
+          studentKeysCount = Math.max(studentCount, Number(studentRows[0].count));
         }
       } catch (err: any) {
         console.warn('[Auth Status MySQL Error]:', err?.message || err);
@@ -203,9 +198,9 @@ apiRouter.get(['/auth/status', '/api/auth/status'], async (_req, res) => {
       backendOnline: true,
       presenceVersion: PRESENCE_VERSION,
       databaseConnected: dbConnected,
-      masterKeysLoaded: masterKeysCount,
+      masterKeysLoaded: masterCount,
       studentKeysLoaded: studentKeysCount,
-      totalKeysLoaded: masterKeysCount + studentKeysCount,
+      totalKeysLoaded: masterCount + studentKeysCount,
       environment: process.env.VERCEL ? 'production' : 'development',
     });
   } catch (err: any) {
@@ -311,6 +306,15 @@ async function handleLogin(req: express.Request, res: express.Response) {
 
   const cleanCode = normalizeAccessCode(receivedCode);
   const maskedCode = maskCodeForLogs(cleanCode);
+
+  // Deprecated master keys must immediately return 401
+  if (cleanCode === 'MENTOR-BIGODE' || cleanCode === 'BIGODE-MENTOR') {
+    console.log(`[AUTH LOG] type=INVALID masked=${maskedCode} rejectedDeprecatedMasterKey=true http=401`);
+    return res.status(401).json({
+      error: 'INVALID_ACCESS_CODE',
+      message: 'O código informado é inválido.',
+    });
+  }
 
   let keyType = 'INVALID';
   try {
