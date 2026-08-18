@@ -854,7 +854,15 @@ export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
          WHERE codigo = ?`,
         [codigo]
       );
+      // Confirmed persistent update in MySQL
       localRevocationSuccess = true;
+
+      // Sync memory fallback store upon successful MySQL persistence
+      const memConn = memoryConnectionsMap.get(codigo);
+      if (memConn) {
+        memConn.revoked_at = new Date();
+        memConn.updated_at = new Date();
+      }
     } catch (err) {
       console.error('[MySQL TikTok Connection Revoke Error]:', err);
       localRevocationSuccess = false;
@@ -864,17 +872,8 @@ export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
     if (memConn) {
       memConn.revoked_at = new Date();
       memConn.updated_at = new Date();
-      localRevocationSuccess = true;
-    } else {
-      localRevocationSuccess = true;
     }
-  }
-
-  // Also sync memory store if it exists
-  const memConn = memoryConnectionsMap.get(codigo);
-  if (memConn) {
-    memConn.revoked_at = new Date();
-    memConn.updated_at = new Date();
+    localRevocationSuccess = true;
   }
 
   return localRevocationSuccess;

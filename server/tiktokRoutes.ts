@@ -12,38 +12,117 @@ import {
   getTikTokClientKey,
   getTikTokClientSecret,
 } from './tiktokService.js';
-import { extractChatCredentials } from './chatService.js';
 import { normalizeAccessCode } from './authKeys.js';
-import { checkCodeKeyType } from './presenceService.js';
+import { checkCodeKeyType, getKeyAccessStatus, memorySessionsMap } from './presenceService.js';
+import { db, isDatabaseConfigured, ensureSessionsTable } from './database.js';
 
 export const tiktokRouter = express.Router();
 
 /**
- * Helper to identify authenticated student session code.
+ * Helper to parse cookies from incoming HTTP request.
+ */
+function parseCookies(req: express.Request): Record<string, string> {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return {};
+  const list: Record<string, string> = {};
+  cookieHeader.split(';').forEach((cookie) => {
+    const parts = cookie.split('=');
+    if (parts.length >= 2) {
+      const name = parts[0].trim();
+      const val = parts.slice(1).join('=').trim();
+      try {
+        list[name] = decodeURIComponent(val);
+      } catch {
+        list[name] = val;
+      }
+    }
+  });
+  return list;
+}
+
+/**
+ * Resolves user code EXCLUSIVELY from authenticated backend session / headers / cookies.
+ * Disallows query/body parameters (req.query.code, req.body.code, etc.) from choosing
+ * or impersonating another student's TikTok connection.
  */
 async function getSessionUserCode(req: express.Request): Promise<string | null> {
-  const { accessCode } = extractChatCredentials(req);
-  const raw =
-    accessCode ||
+  const cookies = parseCookies(req);
+
+  // 1. Check active session ID from headers or cookies
+  const sessionId =
+    (req.headers['x-session-id'] as string) ||
+    (req.headers['x-student-session-id'] as string) ||
+    cookies['tiktok_auth_session'] ||
+    cookies['user_session_id'] ||
+    cookies['session_id'];
+
+  if (sessionId && isDatabaseConfigured()) {
+    try {
+      await ensureSessionsTable();
+      const [rows]: any = await db.query(
+        `SELECT codigo, expires_at, disconnect_source FROM sessoes WHERE active_session_id = ? LIMIT 1`,
+        [sessionId]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        const row = rows[0];
+        const isNotDisconnected = !row.disconnect_source || row.disconnect_source === 'NONE';
+        const isNotExpired = !row.expires_at || new Date(row.expires_at).getTime() > Date.now();
+        if (isNotDisconnected && isNotExpired && row.codigo) {
+          const cleanCode = normalizeAccessCode(row.codigo);
+          const keyStatus = await getKeyAccessStatus(cleanCode);
+          if (keyStatus.accessStatus !== 'SUSPENDED' && keyStatus.accessStatus !== 'BANNED') {
+            return cleanCode;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[getSessionUserCode DB Warning]:', err);
+    }
+  }
+
+  // Check memory sessions if DB not available or not found
+  if (sessionId) {
+    for (const [code, mem] of memorySessionsMap.entries()) {
+      if (mem.sessionId === sessionId) {
+        const cleanCode = normalizeAccessCode(code);
+        const keyStatus = await getKeyAccessStatus(cleanCode);
+        if (keyStatus.accessStatus !== 'SUSPENDED' && keyStatus.accessStatus !== 'BANNED') {
+          return cleanCode;
+        }
+      }
+    }
+  }
+
+  // 2. Authenticated access token/header/cookie resolution (Never from query or body code selector)
+  const authHeader = req.headers['authorization'];
+  const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+
+  const rawCode =
     req.headers['x-access-code'] ||
     req.headers['x-student-access-code'] ||
     req.headers['x-master-key'] ||
-    req.query.code ||
-    req.query.accessCode;
-  const cleanCode = normalizeAccessCode(raw);
+    bearerToken ||
+    cookies['tiktok_auth_code'] ||
+    cookies['user_access_code'];
+
+  const cleanCode = normalizeAccessCode(rawCode);
   if (!cleanCode) return null;
 
   const keyType = await checkCodeKeyType(cleanCode);
   if (keyType === 'STUDENT' || keyType === 'MASTER') {
-    return cleanCode;
+    const keyStatus = await getKeyAccessStatus(cleanCode);
+    if (keyStatus.accessStatus !== 'SUSPENDED' && keyStatus.accessStatus !== 'BANNED') {
+      return cleanCode;
+    }
   }
+
   return null;
 }
 
 /**
  * GET /api/tiktok/oauth/start
  * Initiates TikTok OAuth 2.0 PKCE flow with approved production scopes: user.info.basic,user.info.profile.
- * Requires validated user authentication via MySQL verified student or master code.
+ * Requires validated user authentication via MySQL verified student or master session.
  */
 tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Response) => {
   try {
