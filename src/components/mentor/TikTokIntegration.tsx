@@ -99,14 +99,26 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
     }
   }, []);
 
+  const getAuthHeaders = (): Record<string, string> => {
+    const activeCode = studentCode || (typeof window !== 'undefined' ? localStorage.getItem('user_student_access_code') || '' : '');
+    const activeSession = typeof window !== 'undefined' ? localStorage.getItem('user_session_id') || '' : '';
+    const headers: Record<string, string> = {};
+    if (activeCode) {
+      headers['x-student-access-code'] = activeCode;
+      headers['x-access-code'] = activeCode;
+    }
+    if (activeSession) {
+      headers['x-session-id'] = activeSession;
+    }
+    return headers;
+  };
+
   const fetchConnection = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/tiktok/connection', {
-        headers: {
-          'x-student-access-code': studentCode,
-          'x-access-code': studentCode,
-        },
+        headers: getAuthHeaders(),
+        credentials: 'same-origin',
       });
 
       if (res.ok) {
@@ -125,33 +137,41 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
   };
 
   useEffect(() => {
-    if (studentCode) {
-      fetchConnection();
-    }
+    fetchConnection();
   }, [studentCode]);
 
   const handleConnectTikTok = () => {
-    if (!studentCode) {
+    const activeCode = studentCode || (typeof window !== 'undefined' ? localStorage.getItem('user_student_access_code') || '' : '');
+    const activeSession = typeof window !== 'undefined' ? localStorage.getItem('user_session_id') || '' : '';
+
+    if (!activeCode) {
       setFeedback({
         type: 'error',
-        message: 'Código de acesso do usuário não fornecido.',
+        message: 'Código de acesso do usuário não fornecido ou sessão não autenticada.',
       });
       return;
     }
-    // Redirect to backend OAuth start endpoint with user's access code
-    window.location.href = `/api/tiktok/oauth/start?code=${encodeURIComponent(studentCode)}`;
+
+    // Set authenticated session cookie before navigation to authorize OAuth start endpoint
+    if (typeof document !== 'undefined') {
+      document.cookie = `tiktok_auth_code=${encodeURIComponent(activeCode)}; path=/; max-age=3600; SameSite=Lax`;
+      if (activeSession) {
+        document.cookie = `tiktok_auth_session=${encodeURIComponent(activeSession)}; path=/; max-age=3600; SameSite=Lax`;
+      }
+    }
+
+    // Direct redirect to backend OAuth start endpoint without passing student code in URL
+    window.location.href = '/api/tiktok/oauth/start';
   };
 
   const handleSyncProfile = async () => {
-    if (!studentCode || syncingProfile) return;
+    if (syncingProfile) return;
     setSyncingProfile(true);
     try {
       const res = await fetch('/api/tiktok/refresh-profile', {
         method: 'POST',
-        headers: {
-          'x-student-access-code': studentCode,
-          'x-access-code': studentCode,
-        },
+        headers: getAuthHeaders(),
+        credentials: 'same-origin',
       });
 
       const data = await res.json();
@@ -186,10 +206,8 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
     try {
       const res = await fetch('/api/tiktok/connection', {
         method: 'DELETE',
-        headers: {
-          'x-student-access-code': studentCode,
-          'x-access-code': studentCode,
-        },
+        headers: getAuthHeaders(),
+        credentials: 'same-origin',
       });
 
       const data = await res.json();
