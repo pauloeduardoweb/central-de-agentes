@@ -135,7 +135,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
     fetchConnection();
   }, [studentCode]);
 
-  const handleConnectTikTok = () => {
+  const handleConnectTikTok = async () => {
     const activeSession = typeof window !== 'undefined' ? localStorage.getItem('user_session_id') || '' : '';
 
     // Set authenticated session cookie before navigation to authorize OAuth start endpoint
@@ -143,8 +143,31 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
       document.cookie = `tiktok_auth_session=${encodeURIComponent(activeSession)}; path=/; max-age=3600; SameSite=Lax`;
     }
 
-    // Direct redirect to backend OAuth start endpoint without passing student code in URL
-    window.location.href = '/api/tiktok/oauth/start';
+    setLoading(true);
+    setFeedback(null);
+
+    try {
+      const res = await fetch('/api/tiktok/oauth/prepare', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        credentials: 'same-origin',
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.authUrl) {
+        window.location.href = data.authUrl;
+        return;
+      } else {
+        setFeedback({
+          type: 'error',
+          message: data.message || 'Falha ao iniciar conexão com o TikTok. Verifique sua autenticação.',
+        });
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Error initiating TikTok OAuth prepare:', err);
+      window.location.href = '/api/tiktok/oauth/start';
+    }
   };
 
   const handleSyncProfile = async () => {
