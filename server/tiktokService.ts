@@ -40,6 +40,28 @@ export function getTikTokClientSecret(): string {
   return normalizeEnvVar(process.env.TIKTOK_CLIENT_SECRET, '');
 }
 
+/**
+ * Gets normalized TikTok environment ('production' | 'sandbox').
+ * Defaults to 'production' unless explicitly configured as 'sandbox'.
+ */
+export function getTikTokEnvironment(): 'production' | 'sandbox' {
+  const env = normalizeEnvVar(process.env.TIKTOK_ENVIRONMENT, 'production').toLowerCase();
+  return env === 'sandbox' ? 'sandbox' : 'production';
+}
+
+/**
+ * Gets required OAuth scopes according to TikTok environment.
+ * Production: 'user.info.basic,user.info.profile' (approved production scopes)
+ * Sandbox: 'user.info.basic,user.info.profile,video.list' (for sandbox video.list review/testing)
+ */
+export function getTikTokOAuthScopes(): string {
+  const environment = getTikTokEnvironment();
+  if (environment === 'sandbox') {
+    return 'user.info.basic,user.info.profile,video.list';
+  }
+  return 'user.info.basic,user.info.profile';
+}
+
 export function getTikTokApiBaseUrl(): string {
   return 'https://open.tiktokapis.com';
 }
@@ -386,7 +408,7 @@ export async function saveTikTokConnection(data: {
     ? new Date(now.getTime() + data.refresh_expires_in * 1000)
     : null;
 
-  const scopes = data.scope || 'user.info.basic,user.info.profile,video.list';
+  const scopes = data.scope || getTikTokOAuthScopes();
   const cleanUsername = sanitizeTikTokUsername(data.username);
   const cleanDeepLink = sanitizeTikTokProfileUrl(data.profile_deep_link);
   const cleanWebLink = sanitizeTikTokProfileUrl(data.profile_web_link);
@@ -495,8 +517,9 @@ export interface SafeTikTokConnection {
  * NEVER returns access_token or refresh_token.
  */
 export async function getSafeTikTokConnection(codigo: string): Promise<SafeTikTokConnection> {
+  const currentEnv = getTikTokEnvironment();
   if (!codigo) {
-    return { connected: false };
+    return { connected: false, environment: currentEnv };
   }
 
   if (isDatabaseConfigured()) {
@@ -537,7 +560,7 @@ export async function getSafeTikTokConnection(codigo: string): Promise<SafeTikTo
           scopes: conn.scopes || 'user.info.basic',
           connected_at: conn.connected_at ? new Date(conn.connected_at).toISOString() : undefined,
           updated_at: conn.updated_at ? new Date(conn.updated_at).toISOString() : undefined,
-          environment: 'production',
+          environment: currentEnv,
         };
       }
     } catch (err) {
@@ -572,11 +595,11 @@ export async function getSafeTikTokConnection(codigo: string): Promise<SafeTikTo
       scopes: memConn.scopes || 'user.info.basic',
       connected_at: memConn.connected_at.toISOString(),
       updated_at: memConn.updated_at?.toISOString(),
-      environment: 'production',
+      environment: currentEnv,
     };
   }
 
-  return { connected: false };
+  return { connected: false, environment: currentEnv };
 }
 
 /**
