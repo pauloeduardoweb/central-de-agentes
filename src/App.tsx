@@ -18,6 +18,7 @@ import { TechGridBackground } from './components/TechGridBackground';
 import { TermsPage } from './pages/TermsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
 import { ProductMinerPage } from './components/miner/ProductMinerPage';
+import { TikTokIntegration } from './components/mentor/TikTokIntegration';
 import { getProductMinerAccess } from './services/productMinerApi';
 import { Agent } from './types';
 import { getStoredAgents, saveAgents, resetAgentsToDefault } from './utils/storage';
@@ -39,7 +40,7 @@ export default function App() {
     return localStorage.getItem('user_session_id') || '';
   });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [activeView, setActiveView] = useState<'hub' | 'mentor' | 'chat' | 'miner'>('hub');
+  const [activeView, setActiveView] = useState<'hub' | 'mentor' | 'chat' | 'miner' | 'tiktok'>('hub');
   const [productMinerAccess, setProductMinerAccess] = useState<{ enabled: boolean; canRefresh: boolean }>({ enabled: false, canRefresh: false });
   const [minerAccessLoading, setMinerAccessLoading] = useState<boolean>(() => {
     const savedCode = typeof window !== 'undefined' ? localStorage.getItem('user_student_access_code') || '' : '';
@@ -145,7 +146,7 @@ export default function App() {
     }
   }, [activeView, canAccessProductMiner, minerAccessLoading]);
 
-  const handleSelectView = (view: 'hub' | 'mentor' | 'chat' | 'miner') => {
+  const handleSelectView = (view: 'hub' | 'mentor' | 'chat' | 'miner' | 'tiktok') => {
     if (view === 'miner' && !canAccessProductMiner) {
       setActiveView('hub');
       if (typeof window !== 'undefined' && window.location.pathname.startsWith('/miner')) {
@@ -166,7 +167,7 @@ export default function App() {
     }
 
     if (view === 'hub') {
-      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/mentor') || window.location.pathname.startsWith('/miner'))) {
+      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/mentor') || window.location.pathname.startsWith('/miner') || window.location.pathname.startsWith('/integracoes/tiktok'))) {
         window.history.pushState({}, '', '/');
       }
       setCurrentPath('/');
@@ -178,7 +179,7 @@ export default function App() {
       setCurrentPath('/mentor');
       setActiveView('mentor');
     } else if (view === 'chat') {
-      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/mentor') || window.location.pathname.startsWith('/miner'))) {
+      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/mentor') || window.location.pathname.startsWith('/miner') || window.location.pathname.startsWith('/integracoes/tiktok'))) {
         window.history.pushState({}, '', '/');
         setCurrentPath('/');
       }
@@ -189,6 +190,12 @@ export default function App() {
         setCurrentPath('/miner');
       }
       setActiveView('miner');
+    } else if (view === 'tiktok') {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/integracoes/tiktok')) {
+        window.history.pushState({}, '', '/integracoes/tiktok');
+        setCurrentPath('/integracoes/tiktok');
+      }
+      setActiveView('tiktok');
     }
   };
 
@@ -204,6 +211,8 @@ export default function App() {
         setActiveView('hub');
         triggerToast('Este recurso não está habilitado para sua conta.');
       }
+    } else if (currentPath.startsWith('/integracoes/tiktok')) {
+      setActiveView('tiktok');
     } else if (currentPath.startsWith('/mentor')) {
       if (isMaster) {
         setActiveView('mentor');
@@ -213,15 +222,26 @@ export default function App() {
           setMentorTab('challenges');
         }
       } else {
-        // Redirect non-master keys away from /mentor URLs to Central de Agentes
-        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
-          window.history.replaceState({}, '', '/');
+        // If a non-master student reaches /mentor/integracoes/tiktok (e.g. from OAuth redirect callback), smoothly redirect to /integracoes/tiktok
+        if (currentPath.startsWith('/mentor/integracoes/tiktok')) {
+          const search = typeof window !== 'undefined' ? window.location.search : '';
+          const target = `/integracoes/tiktok${search}`;
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', target);
+          }
+          setCurrentPath(target);
+          setActiveView('tiktok');
+        } else {
+          // Redirect non-master keys away from /mentor URLs to Central de Agentes
+          if (typeof window !== 'undefined' && window.location.pathname.startsWith('/mentor')) {
+            window.history.replaceState({}, '', '/');
+          }
+          setCurrentPath('/');
+          setActiveView('hub');
         }
-        setCurrentPath('/');
-        setActiveView('hub');
       }
     } else {
-      if (activeView === 'mentor') {
+      if (activeView === 'mentor' || activeView === 'tiktok') {
         setActiveView('hub');
       }
     }
@@ -786,6 +806,14 @@ ${agent.conversationStarters.map((s) => `- ${s}`).join('\n')}`;
           />
         ) : activeView === 'miner' && canAccessProductMiner ? (
           <ProductMinerPage studentCode={studentCode} canRefresh={canRefreshProductMiner} />
+        ) : activeView === 'tiktok' ? (
+          <div className="w-full animate-in fade-in duration-300">
+            <TikTokIntegration
+              studentCode={studentCode}
+              onBack={() => handleSelectView('hub')}
+              backButtonLabel="Voltar à Central de Agentes"
+            />
+          </div>
         ) : isMaster && activeView === 'mentor' ? (
           <MentorPanel
             studentCode={studentCode}
