@@ -24,6 +24,10 @@ import {
   ArrowLeft,
   BadgeCheck,
   Share2,
+  Play,
+  Film,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 
 interface TikTokIntegrationProps {
@@ -31,6 +35,17 @@ interface TikTokIntegrationProps {
   onBackToMentor?: () => void;
   onBack?: () => void;
   backButtonLabel?: string;
+}
+
+export interface TikTokVideoItem {
+  id: string;
+  title?: string;
+  video_description?: string;
+  duration?: number;
+  cover_image_url?: string;
+  embed_link?: string;
+  create_time?: number;
+  share_url?: string;
 }
 
 interface ConnectionData {
@@ -119,6 +134,13 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  // Videos state
+  const [videos, setVideos] = useState<TikTokVideoItem[]>([]);
+  const [loadingVideos, setLoadingVideos] = useState<boolean>(false);
+  const [videosError, setVideosError] = useState<string | null>(null);
+  const [requiresVideoReauth, setRequiresVideoReauth] = useState<boolean>(false);
+  const [activeEmbedModal, setActiveEmbedModal] = useState<TikTokVideoItem | null>(null);
+
   // Check query params for status parameter from OAuth callback redirect
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -163,6 +185,63 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
     return headers;
   };
 
+  const formatDuration = (seconds?: number): string => {
+    if (typeof seconds !== 'number' || isNaN(seconds) || seconds <= 0) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatCreateTime = (timestampSeconds?: number): string => {
+    if (!timestampSeconds) return '';
+    try {
+      const d = new Date(timestampSeconds * 1000);
+      return d.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  const fetchVideos = async () => {
+    setLoadingVideos(true);
+    setVideosError(null);
+    setRequiresVideoReauth(false);
+
+    try {
+      const res = await fetch('/api/tiktok/videos', {
+        method: 'GET',
+        headers: getAuthHeaders(),
+        credentials: 'same-origin',
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setVideos(Array.isArray(data.videos) ? data.videos : []);
+        if (data.requires_reauth) {
+          setRequiresVideoReauth(true);
+        }
+      } else {
+        if (data.error === 'SCOPE_REQUIRED' || data.requires_reauth) {
+          setRequiresVideoReauth(true);
+          setVideosError(data.message || 'Permissão para vídeos ainda não autorizada.');
+        } else {
+          setVideosError(data.message || 'Não foi possível carregar seus vídeos agora. Tente novamente.');
+        }
+        setVideos([]);
+      }
+    } catch (err) {
+      console.error('Error fetching TikTok videos:', err);
+      setVideosError('Não foi possível carregar seus vídeos agora. Tente novamente.');
+      setVideos([]);
+    } finally {
+      setLoadingVideos(false);
+    }
+  };
+
   const fetchConnection = async () => {
     setLoading(true);
     try {
@@ -174,12 +253,17 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
       if (res.ok) {
         const data = await res.json();
         setConnection(data);
+        if (data.connected && data.scopes && data.scopes.includes('video.list')) {
+          fetchVideos();
+        }
       } else {
         setConnection({ connected: false });
+        setVideos([]);
       }
     } catch (err) {
       console.error('Failed to fetch TikTok connection:', err);
       setConnection({ connected: false });
+      setVideos([]);
     } finally {
       setLoading(false);
       setLastChecked(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
@@ -238,6 +322,9 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
       const data = await res.json();
       if (res.ok && data.success && data.connection) {
         setConnection(data.connection);
+        if (data.connection.connected && data.connection.scopes && data.connection.scopes.includes('video.list')) {
+          fetchVideos();
+        }
         setFeedback({
           type: 'success',
           message: 'Dados do perfil do TikTok atualizados com sucesso!',
@@ -274,6 +361,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
       const data = await res.json();
       if (res.ok && data.success) {
         setConnection({ connected: false });
+        setVideos([]);
         setFeedback({
           type: 'success',
           message: 'Conta do TikTok desconectada com sucesso.',
@@ -306,7 +394,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
     },
     {
       q: 'Quais dados são solicitados?',
-      a: 'Solicitamos estritamente as permissões aprovadas em produção pelo TikTok Developers: user.info.basic (nome de exibição, avatar e identificador) e user.info.profile (nome de usuário @, biografia pública e verificação). Nós nunca temos acesso a senhas ou dados confidenciais.',
+      a: 'Solicitamos estritamente as permissões aprovadas em produção pelo TikTok Developers: user.info.basic (nome de exibição, avatar e identificador), user.info.profile (nome de usuário @, biografia pública e verificação) e video.list (listagem dos seus vídeos públicos recentes). Nós nunca temos acesso a senhas ou dados confidenciais.',
     },
     {
       q: 'Posso desconectar quando quiser?',
@@ -322,6 +410,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
   ];
 
   const hasProfileScope = Boolean(connection.scopes && connection.scopes.includes('user.info.profile'));
+  const hasVideoListScope = Boolean(connection.scopes && connection.scopes.includes('video.list'));
   const profileUrl = resolveTikTokProfileUrl(connection);
   const avatarSrc = connection.avatar_large_url || connection.avatar_url;
 
@@ -761,6 +850,274 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
         )}
       </div>
 
+      {/* 5. SEÇÃO: MEUS VÍDEOS RECENTES (QUANDO CONECTADO) */}
+      {connection.connected && (
+        <div className="p-6 rounded-2xl bg-[#020d14]/90 border border-cyan-500/30 backdrop-blur-md shadow-2xl space-y-5 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-inner">
+                <Film className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>Meus vídeos recentes</span>
+                  {hasVideoListScope && videos.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      {videos.length} {videos.length === 1 ? 'vídeo' : 'vídeos'}
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Vídeos públicos recentes publicados na sua própria conta TikTok conectada
+                </p>
+              </div>
+            </div>
+
+            {hasVideoListScope && (
+              <button
+                onClick={fetchVideos}
+                disabled={loadingVideos}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/40 text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer self-start sm:self-center disabled:opacity-50 shadow-sm active:scale-95"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${loadingVideos ? 'animate-spin' : ''}`} />
+                <span>{loadingVideos ? 'Carregando vídeos...' : 'Atualizar vídeos'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Estado 1: Permissão video.list não autorizada */}
+          {!hasVideoListScope ? (
+            <div className="p-6 rounded-xl bg-gradient-to-br from-amber-950/30 via-slate-950/70 to-slate-900/40 border border-amber-500/30 text-center space-y-4 py-8">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400 shadow-inner">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1.5">
+                <h4 className="text-sm font-bold text-amber-200">
+                  Permissão para vídeos ainda não autorizada
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Autorize o acesso aos seus vídeos públicos para visualizar seus conteúdos no Geração Z Pro.
+                </p>
+              </div>
+              <button
+                onClick={handleConnectTikTok}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-950/40 transition-all cursor-pointer active:scale-95"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Atualizar autorização TikTok</span>
+              </button>
+            </div>
+          ) : loadingVideos ? (
+            /* Estado 2: Carregando vídeos */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 py-2">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="rounded-xl bg-slate-900/60 border border-slate-800 p-3 space-y-3 animate-pulse">
+                  <div className="aspect-[9/16] max-h-56 bg-slate-800 rounded-lg w-full" />
+                  <div className="h-3.5 bg-slate-800 rounded w-3/4" />
+                  <div className="h-3 bg-slate-800/60 rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : videosError ? (
+            /* Estado 3: Erro temporário / Reauth */
+            <div className="p-6 rounded-xl bg-rose-950/30 border border-rose-500/30 text-center space-y-4 py-8">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-400">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1.5">
+                <p className="text-xs text-rose-200 font-medium leading-relaxed">
+                  {videosError}
+                </p>
+              </div>
+              {requiresVideoReauth ? (
+                <button
+                  onClick={handleConnectTikTok}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer active:scale-95"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Atualizar autorização TikTok</span>
+                </button>
+              ) : (
+                <button
+                  onClick={fetchVideos}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-all cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Tentar novamente</span>
+                </button>
+              )}
+            </div>
+          ) : videos.length === 0 ? (
+            /* Estado 4: Nenhum vídeo público */
+            <div className="p-8 rounded-xl bg-slate-950/50 border border-slate-800 text-center space-y-3 py-10">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
+                <Film className="w-6 h-6" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <p className="text-sm font-semibold text-slate-300">
+                  Esta conta ainda não possui vídeos públicos disponíveis.
+                </p>
+                <p className="text-xs text-slate-500">
+                  Publique vídeos públicos no TikTok e clique em "Atualizar vídeos" para visualizá-los aqui.
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* Estado 5: Grid de vídeos responsivo */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {videos.map((video) => (
+                <div
+                  key={video.id}
+                  className="group rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-cyan-500/50 transition-all duration-300 flex flex-col overflow-hidden shadow-lg hover:shadow-cyan-950/30 relative"
+                >
+                  {/* Capa com overlay e duração */}
+                  <div className="relative aspect-[9/16] max-h-64 sm:max-h-72 w-full bg-slate-900 overflow-hidden">
+                    {video.cover_image_url ? (
+                      <img
+                        src={video.cover_image_url}
+                        alt={video.title || video.video_description || 'Capa do vídeo'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 gap-2 bg-gradient-to-b from-slate-900 to-slate-950">
+                        <Film className="w-10 h-10 opacity-50" />
+                        <span className="text-[11px] text-slate-500">Sem capa disponível</span>
+                      </div>
+                    )}
+
+                    {/* Badges de sobreposição: Duração e Data */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/30 pointer-events-none" />
+
+                    {typeof video.duration === 'number' && video.duration > 0 ? (
+                      <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-[11px] font-mono font-bold text-white border border-white/10 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-cyan-400" />
+                        <span>{formatDuration(video.duration)}</span>
+                      </div>
+                    ) : null}
+
+                    {video.create_time ? (
+                      <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-md text-[10px] font-medium text-slate-300 border border-white/10 flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-cyan-400" />
+                        <span>{formatCreateTime(video.create_time)}</span>
+                      </div>
+                    ) : null}
+
+                    {/* Botão Play rápido central no hover */}
+                    {video.embed_link && (
+                      <button
+                        onClick={() => setActiveEmbedModal(video)}
+                        className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-cyan-500/90 hover:bg-cyan-400 text-slate-950 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 transform scale-90 group-hover:scale-100 shadow-xl cursor-pointer"
+                        title="Assistir no player"
+                      >
+                        <Play className="w-5 h-5 fill-current ml-0.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Informações do vídeo */}
+                  <div className="p-3.5 flex-1 flex flex-col justify-between gap-3 bg-gradient-to-b from-slate-950 to-[#020d14]">
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-white line-clamp-2 leading-snug" title={video.video_description || video.title}>
+                        {video.video_description || video.title || 'Vídeo publicado no TikTok'}
+                      </p>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+                      {video.embed_link && (
+                        <button
+                          onClick={() => setActiveEmbedModal(video)}
+                          className="flex-1 py-1.5 px-2.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        >
+                          <Play className="w-3 h-3 fill-current" />
+                          <span>Assistir</span>
+                        </button>
+                      )}
+
+                      {video.share_url && (
+                        <a
+                          href={video.share_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`py-1.5 px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 hover:border-cyan-500/40 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                            video.embed_link ? '' : 'flex-1'
+                          }`}
+                          title="Abrir diretamente no TikTok"
+                        >
+                          <span>Assistir no TikTok</span>
+                          <ExternalLink className="w-3 h-3 text-cyan-400" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal Player Embed Oficial TikTok */}
+      {activeEmbedModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-slate-950 border border-cyan-500/40 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Film className="w-4 h-4 text-cyan-400" />
+                <h4 className="text-sm font-bold text-white truncate max-w-[260px]">
+                  {activeEmbedModal.title || activeEmbedModal.video_description || 'Vídeo do TikTok'}
+                </h4>
+              </div>
+              <button
+                onClick={() => setActiveEmbedModal(null)}
+                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
+                title="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="w-full aspect-[9/16] max-h-[500px] rounded-xl overflow-hidden bg-black flex items-center justify-center">
+              {activeEmbedModal.embed_link ? (
+                <iframe
+                  src={activeEmbedModal.embed_link}
+                  title={activeEmbedModal.title || 'TikTok Video Player'}
+                  className="w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              ) : (
+                <div className="text-center p-4 text-slate-400 text-xs">
+                  Player embed indisponível diretamente. Utilize o botão abaixo para assistir no TikTok.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+              {activeEmbedModal.share_url && (
+                <a
+                  href={activeEmbedModal.share_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-2 transition-all hover:text-white"
+                >
+                  <span>Abrir no TikTok oficial</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                </a>
+              )}
+              <button
+                onClick={() => setActiveEmbedModal(null)}
+                className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-all cursor-pointer ml-auto"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 6. SEÇÃO: SOBRE ESTA INTEGRAÇÃO */}
       <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md space-y-4">
         <div className="flex items-center gap-2 text-sm font-bold text-white tracking-tight">
@@ -784,7 +1141,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
               Privacidade Garantida
             </p>
             <p className="text-slate-400">
-              Solicitamos apenas dados públicos autorizados (<code className="text-teal-300">user.info.basic</code> e <code className="text-cyan-300">user.info.profile</code>). Senhas nunca são solicitadas.
+              Solicitamos apenas dados públicos autorizados (<code className="text-teal-300">user.info.basic</code>, <code className="text-cyan-300">user.info.profile</code> e <code className="text-indigo-300">video.list</code>). Senhas nunca são solicitadas.
             </p>
           </div>
 
