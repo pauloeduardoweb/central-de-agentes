@@ -12,6 +12,7 @@ import {
   getTikTokRedirectUri,
   getTikTokClientKey,
   getTikTokClientSecret,
+  getTikTokOAuthScopes,
   OAuthStateSession,
 } from './tiktokService.js';
 import { normalizeAccessCode } from './authKeys.js';
@@ -140,7 +141,7 @@ tiktokRouter.post('/oauth/prepare', async (req: express.Request, res: express.Re
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
-    const scope = 'user.info.basic,user.info.profile,video.list';
+    const scope = getTikTokOAuthScopes();
 
     if (!clientKey) {
       console.error('[TikTok OAuth Prepare Error]: TIKTOK_CLIENT_KEY is missing');
@@ -206,7 +207,7 @@ tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Respo
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
-    const scope = 'user.info.basic,user.info.profile,video.list';
+    const scope = getTikTokOAuthScopes();
 
     const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
     authUrl.searchParams.set('client_key', clientKey);
