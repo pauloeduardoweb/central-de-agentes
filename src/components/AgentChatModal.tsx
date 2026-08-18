@@ -245,11 +245,12 @@ export const AgentChatModal: React.FC<AgentChatModalProps> = ({ agent, onClose, 
     if (e) e.preventDefault();
     const rawInput = passwordInput.trim();
     const normalizedInput = rawInput.toUpperCase();
-    const validMasterCodes = ['MENTOR-BIGODE', 'BIGODE-MENTOR', 'BIGODE7144', '7144BIGODE'];
+    const validMasterCodes = ['BIGODE7144', '7144BIGODE'];
 
     if (
       validMasterCodes.includes(normalizedInput) ||
       rawInput.toLowerCase() === '7144bigode' ||
+      rawInput.toLowerCase() === 'bigode7144' ||
       isMasterKey(rawInput)
     ) {
       setIsPromptUnlocked(true);
