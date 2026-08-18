@@ -386,7 +386,7 @@ export async function saveTikTokConnection(data: {
     ? new Date(now.getTime() + data.refresh_expires_in * 1000)
     : null;
 
-  const scopes = data.scope || 'user.info.basic,user.info.profile';
+  const scopes = data.scope || 'user.info.basic,user.info.profile,video.list';
   const cleanUsername = sanitizeTikTokUsername(data.username);
   const cleanDeepLink = sanitizeTikTokProfileUrl(data.profile_deep_link);
   const cleanWebLink = sanitizeTikTokProfileUrl(data.profile_web_link);
@@ -951,4 +951,237 @@ export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
   }
 
   return localRevocationSuccess;
+}
+
+export interface TikTokVideoItem {
+  id: string;
+  title?: string;
+  video_description?: string;
+  duration?: number;
+  cover_image_url?: string;
+  embed_link?: string;
+  create_time?: number;
+  share_url?: string;
+}
+
+export interface TikTokVideoListResult {
+  success: boolean;
+  videos?: TikTokVideoItem[];
+  cursor?: number;
+  has_more?: boolean;
+  error?: string;
+  message?: string;
+  requires_reauth?: boolean;
+}
+
+/**
+ * Fetches recent public videos for the connected TikTok account using official TikTok Video List API v2.
+ * Endpoint: POST https://open.tiktokapis.com/v2/video/list/?fields=id,title,video_description,duration,cover_image_url,embed_link,create_time,share_url
+ * Scope required: video.list
+ * Token is managed strictly on the server (auto-refreshed via refresh_token when expired) and NEVER returned to client.
+ */
+export async function fetchUserTikTokVideos(
+  codigo: string,
+  cursor?: number
+): Promise<TikTokVideoListResult> {
+  if (!codigo) {
+    return {
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: 'Autenticação necessária para acessar seus vídeos.',
+    };
+  }
+
+  let encAccessToken: string | null = null;
+  let accessExpiresAt: Date | null = null;
+  let scopes = '';
+  let username = '';
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureTikTokConnectionsTable();
+      const [rows]: any = await db.query(
+        `SELECT access_token, access_token_expires_at, scopes, username, revoked_at
+         FROM tiktok_connections
+         WHERE codigo = ? AND revoked_at IS NULL
+         LIMIT 1`,
+        [codigo]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        encAccessToken = rows[0].access_token;
+        accessExpiresAt = rows[0].access_token_expires_at ? new Date(rows[0].access_token_expires_at) : null;
+        scopes = rows[0].scopes || '';
+        username = rows[0].username || '';
+      }
+    } catch (err) {
+      console.error('[MySQL fetchUserTikTokVideos lookup error]:', err);
+    }
+  } else {
+    const mem = memoryConnectionsMap.get(codigo);
+    if (mem && !mem.revoked_at) {
+      encAccessToken = mem.access_token;
+      accessExpiresAt = mem.access_token_expires_at || null;
+      scopes = mem.scopes || '';
+      username = mem.username || '';
+    }
+  }
+
+  if (!encAccessToken) {
+    return {
+      success: false,
+      error: 'NOT_CONNECTED',
+      message: 'Nenhuma conta TikTok conectada para este usuário.',
+    };
+  }
+
+  // Check if video.list scope is authorized
+  const hasVideoListScope = scopes.includes('video.list');
+  if (!hasVideoListScope) {
+    return {
+      success: false,
+      error: 'SCOPE_REQUIRED',
+      requires_reauth: true,
+      message: 'Permissão para vídeos ainda não autorizada. Autorize o acesso aos seus vídeos públicos para visualizar seus conteúdos no Geração Z Pro.',
+    };
+  }
+
+  let plainAccessToken = decryptToken(encAccessToken);
+
+  // If token is missing or expired, attempt refresh
+  const now = new Date();
+  if (!plainAccessToken || (accessExpiresAt && accessExpiresAt.getTime() <= now.getTime() + 60 * 1000)) {
+    const refreshedToken = await refreshTikTokAccessToken(codigo);
+    if (refreshedToken) {
+      plainAccessToken = refreshedToken;
+    }
+  }
+
+  if (!plainAccessToken) {
+    return {
+      success: false,
+      error: 'AUTH_EXPIRED',
+      requires_reauth: true,
+      message: 'Sessão do TikTok expirada. Atualize sua autorização.',
+    };
+  }
+
+  const apiBaseUrl = getTikTokApiBaseUrl();
+  const fields = 'id,title,video_description,duration,cover_image_url,embed_link,create_time,share_url';
+  const videoListUrl = `${apiBaseUrl}/v2/video/list/?fields=${fields}`;
+
+  const callApi = async (token: string): Promise<{ ok: boolean; status: number; data?: any; errorMsg?: string }> => {
+    try {
+      const res = await fetch(videoListUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          max_count: 20,
+          cursor: typeof cursor === 'number' && !isNaN(cursor) ? cursor : undefined,
+        }),
+      });
+
+      const rawText = await res.text();
+      let json: any = {};
+      try {
+        json = JSON.parse(rawText);
+      } catch {
+        return { ok: false, status: res.status, errorMsg: 'JSON_PARSE_ERROR' };
+      }
+
+      if (!res.ok) {
+        return {
+          ok: false,
+          status: res.status,
+          errorMsg: json?.error?.message || json?.message || 'HTTP_ERROR',
+          data: json,
+        };
+      }
+
+      if (json.error && json.error.code !== 'ok' && json.error.code !== '0' && json.error.code !== 0) {
+        return {
+          ok: false,
+          status: 400,
+          errorMsg: json.error.message || json.error.code,
+          data: json,
+        };
+      }
+
+      return { ok: true, status: 200, data: json.data || json };
+    } catch (err: any) {
+      return { ok: false, status: 500, errorMsg: err?.message || 'NETWORK_ERROR' };
+    }
+  };
+
+  let apiRes = await callApi(plainAccessToken);
+
+  // If 401 or token expired error, attempt refresh and retry once
+  if (!apiRes.ok && (apiRes.status === 401 || apiRes.errorMsg?.toLowerCase().includes('token') || apiRes.errorMsg?.toLowerCase().includes('auth'))) {
+    const refreshedToken = await refreshTikTokAccessToken(codigo);
+    if (refreshedToken) {
+      plainAccessToken = refreshedToken;
+      apiRes = await callApi(plainAccessToken);
+    }
+  }
+
+  if (!apiRes.ok) {
+    if (apiRes.errorMsg?.toLowerCase().includes('scope') || apiRes.data?.error?.code === 'scope_not_authorized') {
+      return {
+        success: false,
+        error: 'SCOPE_REQUIRED',
+        requires_reauth: true,
+        message: 'Permissão para vídeos ainda não autorizada. Atualize sua autorização.',
+      };
+    }
+
+    if (apiRes.status === 401 || apiRes.errorMsg?.toLowerCase().includes('token')) {
+      return {
+        success: false,
+        error: 'AUTH_EXPIRED',
+        requires_reauth: true,
+        message: 'Sessão do TikTok expirada. Atualize sua autorização.',
+      };
+    }
+
+    return {
+      success: false,
+      error: 'TIKTOK_API_ERROR',
+      message: 'Não foi possível carregar seus vídeos agora. Tente novamente.',
+    };
+  }
+
+  const rawVideos = Array.isArray(apiRes.data?.videos) ? apiRes.data.videos : [];
+  const nextCursor = typeof apiRes.data?.cursor === 'number' ? apiRes.data.cursor : undefined;
+  const hasMore = Boolean(apiRes.data?.has_more);
+
+  const cleanUser = sanitizeTikTokUsername(username);
+
+  const sanitizedVideos: TikTokVideoItem[] = rawVideos.map((v: any) => {
+    const id = String(v.id || '');
+    let shareUrl = v.share_url;
+    if (!shareUrl && id) {
+      shareUrl = cleanUser ? `https://www.tiktok.com/@${cleanUser}/video/${id}` : `https://www.tiktok.com/video/${id}`;
+    }
+
+    return {
+      id,
+      title: v.title || undefined,
+      video_description: v.video_description || v.title || undefined,
+      duration: typeof v.duration === 'number' ? v.duration : undefined,
+      cover_image_url: v.cover_image_url || undefined,
+      embed_link: v.embed_link || undefined,
+      create_time: typeof v.create_time === 'number' ? v.create_time : undefined,
+      share_url: shareUrl || undefined,
+    };
+  });
+
+  return {
+    success: true,
+    videos: sanitizedVideos,
+    cursor: nextCursor,
+    has_more: hasMore,
+    message: sanitizedVideos.length === 0 ? 'Esta conta ainda não possui vídeos públicos disponíveis.' : undefined,
+  };
 }

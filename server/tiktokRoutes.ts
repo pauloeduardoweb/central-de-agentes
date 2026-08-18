@@ -7,6 +7,7 @@ import {
   revokeTikTokConnection,
   fetchTikTokUserProfile,
   syncTikTokProfile,
+  fetchUserTikTokVideos,
   getTikTokApiBaseUrl,
   getTikTokRedirectUri,
   getTikTokClientKey,
@@ -139,7 +140,7 @@ tiktokRouter.post('/oauth/prepare', async (req: express.Request, res: express.Re
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
-    const scope = 'user.info.basic,user.info.profile';
+    const scope = 'user.info.basic,user.info.profile,video.list';
 
     if (!clientKey) {
       console.error('[TikTok OAuth Prepare Error]: TIKTOK_CLIENT_KEY is missing');
@@ -184,7 +185,7 @@ tiktokRouter.post('/oauth/prepare', async (req: express.Request, res: express.Re
 
 /**
  * GET /api/tiktok/oauth/start
- * Initiates TikTok OAuth 2.0 PKCE flow with approved production scopes: user.info.basic,user.info.profile.
+ * Initiates TikTok OAuth 2.0 PKCE flow with approved production scopes: user.info.basic,user.info.profile,video.list.
  * Requires validated user authentication via MySQL verified student or master session.
  */
 tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Response) => {
@@ -205,7 +206,7 @@ tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Respo
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
-    const scope = 'user.info.basic,user.info.profile';
+    const scope = 'user.info.basic,user.info.profile,video.list';
 
     const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
     authUrl.searchParams.set('client_key', clientKey);
@@ -542,5 +543,43 @@ tiktokRouter.delete('/connection', async (req: express.Request, res: express.Res
   } catch (err: any) {
     console.error('[TikTok Connection Delete Error]:', err);
     return res.status(500).json({ error: 'SERVER_ERROR', success: false });
+  }
+});
+
+/**
+ * GET /api/tiktok/videos
+ * Fetches recent public videos for the authenticated user's own connected TikTok account.
+ * Identity is derived EXCLUSIVELY from authenticated session.
+ * Never accepts codigo via query, body, or arbitrary parameter.
+ */
+tiktokRouter.get('/videos', async (req: express.Request, res: express.Response) => {
+  try {
+    const userCode = await getSessionUserCode(req);
+    if (!userCode) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Autenticação necessária para acessar seus vídeos.',
+      });
+    }
+
+    const cursorQuery = req.query.cursor ? Number(req.query.cursor) : undefined;
+    const cursor = typeof cursorQuery === 'number' && !isNaN(cursorQuery) ? cursorQuery : undefined;
+
+    const result = await fetchUserTikTokVideos(userCode, cursor);
+
+    if (!result.success) {
+      const statusCode = result.error === 'UNAUTHORIZED' ? 401 : result.error === 'SCOPE_REQUIRED' ? 403 : 400;
+      return res.status(statusCode).json(result);
+    }
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[TikTok Videos Route Error]:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'SERVER_ERROR',
+      message: 'Não foi possível carregar seus vídeos agora. Tente novamente.',
+    });
   }
 });
