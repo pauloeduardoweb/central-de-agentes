@@ -429,8 +429,17 @@ tiktokRouter.delete('/connection', async (req: express.Request, res: express.Res
     }
 
     const success = await revokeTikTokConnection(userCode);
+
+    if (!success) {
+      return res.status(400).json({
+        success: false,
+        error: 'TIKTOK_DISCONNECT_FAILED',
+        message: 'Não foi possível desconectar a conta TikTok. Tente novamente.',
+      });
+    }
+
     return res.json({
-      success,
+      success: true,
       message: 'Conta TikTok desconectada com sucesso.',
     });
   } catch (err: any) {
