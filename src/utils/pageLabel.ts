@@ -1,7 +1,7 @@
 import { Agent } from '../types';
 
 interface PageLabelParams {
-  activeView: 'hub' | 'mentor' | 'chat' | 'miner';
+  activeView: 'hub' | 'mentor' | 'chat' | 'miner' | 'tiktok';
   selectedChatAgent: Agent | null;
   showGeracaoZProModal: boolean;
   showCertificadosModal: boolean;
@@ -59,9 +59,11 @@ export function getCurrentPageLabel({
 
   if (activeView === 'chat') return 'Bate-papo';
   if (activeView === 'miner') return 'Minerar Produtos';
+  if (activeView === 'tiktok') return 'Integração TikTok';
 
   // 3. Mentor View tabs
   if (activeView === 'mentor') {
+    if (mentorTab === 'tiktok') return 'Integração TikTok';
     if (mentorTab === 'products') return 'Biblioteca de Produtos';
     if (mentorTab === 'challenges') return 'Criar Desafios';
     if (mentorTab === 'students') return 'Alunos';
