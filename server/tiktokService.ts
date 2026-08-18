@@ -102,6 +102,7 @@ export function decryptToken(encryptedData: string): string {
 export interface OAuthStateSession {
   codigo: string;
   codeVerifier: string;
+  returnPath: string;
   createdAt: number;
 }
 
@@ -119,9 +120,12 @@ setInterval(() => {
 
 /**
  * Creates a CSRF state & PKCE pair for TikTok OAuth initiation.
- * Stores state session shared in MySQL (with memory fallback).
+ * Stores state session shared in MySQL (with memory fallback) and records the returnPath.
  */
-export async function createOAuthSession(codigo: string): Promise<{
+export async function createOAuthSession(
+  codigo: string,
+  returnPath: string = '/integracoes/tiktok'
+): Promise<{
   state: string;
   codeVerifier: string;
   codeChallenge: string;
@@ -138,17 +142,18 @@ export async function createOAuthSession(codigo: string): Promise<{
       await ensureTikTokOAuthStatesTable();
       await db.query(`DELETE FROM tiktok_oauth_states WHERE created_at < NOW() - INTERVAL 10 MINUTE`).catch(() => {});
       await db.query(
-        `INSERT INTO tiktok_oauth_states (state, codigo, code_verifier, created_at) VALUES (?, ?, ?, NOW())`,
-        [state, codigo, codeVerifier]
+        `INSERT INTO tiktok_oauth_states (state, codigo, code_verifier, return_path, created_at) VALUES (?, ?, ?, ?, NOW())`,
+        [state, codigo, codeVerifier, returnPath]
       );
     } catch (err) {
       console.error('[MySQL Save OAuth State Error]:', err);
-      oauthStateMap.set(state, { codigo, codeVerifier, createdAt: Date.now() });
+      oauthStateMap.set(state, { codigo, codeVerifier, returnPath, createdAt: Date.now() });
     }
   } else {
     oauthStateMap.set(state, {
       codigo,
       codeVerifier,
+      returnPath,
       createdAt: Date.now(),
     });
   }
@@ -167,7 +172,7 @@ export async function validateAndConsumeOAuthState(state: string): Promise<OAuth
     try {
       await ensureTikTokOAuthStatesTable();
       const [rows]: any = await db.query(
-        `SELECT state, codigo, code_verifier AS codeVerifier, UNIX_TIMESTAMP(created_at) * 1000 AS createdAt
+        `SELECT state, codigo, code_verifier AS codeVerifier, return_path AS returnPath, UNIX_TIMESTAMP(created_at) * 1000 AS createdAt
          FROM tiktok_oauth_states
          WHERE state = ? AND created_at >= NOW() - INTERVAL 10 MINUTE`,
         [state]
@@ -180,6 +185,7 @@ export async function validateAndConsumeOAuthState(state: string): Promise<OAuth
         return {
           codigo: rows[0].codigo,
           codeVerifier: rows[0].codeVerifier,
+          returnPath: rows[0].returnPath || '/integracoes/tiktok',
           createdAt: Number(rows[0].createdAt),
         };
       }

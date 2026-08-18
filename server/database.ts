@@ -1456,10 +1456,13 @@ export function ensureTikTokOAuthStatesTable(): Promise<void> {
           state VARCHAR(100) PRIMARY KEY,
           codigo VARCHAR(100) NOT NULL,
           code_verifier VARCHAR(255) NOT NULL,
+          return_path VARCHAR(255) DEFAULT '/integracoes/tiktok',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      await db.query(`ALTER TABLE tiktok_oauth_states ADD COLUMN return_path VARCHAR(255) DEFAULT '/integracoes/tiktok'`).catch(() => {});
     })().catch((err: any) => {
       tiktokOAuthStatesPromise = null;
       console.warn('[MySQL ensureTikTokOAuthStatesTable Error]:', err?.message || err);

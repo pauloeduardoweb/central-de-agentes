@@ -11,6 +11,7 @@ import {
   getTikTokRedirectUri,
   getTikTokClientKey,
   getTikTokClientSecret,
+  OAuthStateSession,
 } from './tiktokService.js';
 import { normalizeAccessCode } from './authKeys.js';
 import { checkCodeKeyType, getKeyAccessStatus, memorySessionsMap } from './presenceService.js';
@@ -101,6 +102,74 @@ async function getSessionUserCode(req: express.Request): Promise<string | null> 
 }
 
 /**
+ * POST /api/tiktok/oauth/prepare
+ * Authenticated preparation endpoint for TikTok OAuth 2.0 PKCE flow.
+ * Validates session ID from x-session-id header / cookie, generates PKCE & state session,
+ * persists the correct returnPath (Mentor vs Student), and returns the official TikTok authorize URL.
+ */
+tiktokRouter.post('/oauth/prepare', async (req: express.Request, res: express.Response) => {
+  try {
+    const userCode = await getSessionUserCode(req);
+
+    if (!userCode) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Autenticação necessária. Faça login para conectar sua conta TikTok.',
+      });
+    }
+
+    const keyType = await checkCodeKeyType(userCode);
+    const returnPath = keyType === 'MASTER' ? '/mentor/integracoes/tiktok' : '/integracoes/tiktok';
+
+    const { state, codeChallenge } = await createOAuthSession(userCode, returnPath);
+
+    const clientKey = getTikTokClientKey();
+    const redirectUri = getTikTokRedirectUri();
+    const scope = 'user.info.basic,user.info.profile';
+
+    if (!clientKey) {
+      console.error('[TikTok OAuth Prepare Error]: TIKTOK_CLIENT_KEY is missing');
+      return res.status(500).json({
+        success: false,
+        error: 'CONFIGURATION_ERROR',
+        message: 'Configuração da chave TikTok não encontrada no servidor.',
+      });
+    }
+
+    const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
+    authUrl.searchParams.set('client_key', clientKey);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', scope);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('code_challenge', codeChallenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
+
+    // Secondary HTTP cookie for extra CSRF safety
+    res.cookie('tiktok_oauth_state', state, {
+      httpOnly: true,
+      secure: true,
+      maxAge: 10 * 60 * 1000,
+      sameSite: 'lax',
+    });
+
+    return res.json({
+      success: true,
+      authUrl: authUrl.toString(),
+      returnPath,
+    });
+  } catch (err: any) {
+    console.error('[TikTok OAuth Prepare Error]:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'SERVER_ERROR',
+      message: 'Erro interno ao preparar autorização do TikTok.',
+    });
+  }
+});
+
+/**
  * GET /api/tiktok/oauth/start
  * Initiates TikTok OAuth 2.0 PKCE flow with approved production scopes: user.info.basic,user.info.profile.
  * Requires validated user authentication via MySQL verified student or master session.
@@ -110,10 +179,16 @@ tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Respo
     const userCode = await getSessionUserCode(req);
 
     if (!userCode) {
-      return res.status(401).redirect('/mentor/integracoes/tiktok?status=error&message=Autenticacao_Necessaria');
+      const referer = req.headers['referer'] || '';
+      const isMentor = referer.includes('/mentor');
+      const fallbackReturn = isMentor ? '/mentor/integracoes/tiktok' : '/integracoes/tiktok';
+      return res.status(401).redirect(`${fallbackReturn}?status=error&message=Autenticacao_Necessaria`);
     }
 
-    const { state, codeChallenge } = await createOAuthSession(userCode);
+    const keyType = await checkCodeKeyType(userCode);
+    const returnPath = keyType === 'MASTER' ? '/mentor/integracoes/tiktok' : '/integracoes/tiktok';
+
+    const { state, codeChallenge } = await createOAuthSession(userCode, returnPath);
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
@@ -139,7 +214,7 @@ tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Respo
     return res.redirect(authUrl.toString());
   } catch (err: any) {
     console.error('[TikTok OAuth Start Error]:', err);
-    return res.redirect('/mentor/integracoes/tiktok?status=error&message=Erro_Ao_Iniciar_OAuth');
+    return res.redirect('/integracoes/tiktok?status=error&message=Erro_Ao_Iniciar_OAuth');
   }
 });
 
@@ -152,6 +227,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
   let currentStage = '[CALLBACK 01] Callback iniciado';
   let lastHttpStatus: number | null = null;
   let lastHttpStatusText: string | null = null;
+  let returnPath = '/integracoes/tiktok';
 
   try {
     currentStage = '[CALLBACK 02] Query recebida';
@@ -161,6 +237,15 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
       statePresent: Boolean(state),
       hasError: Boolean(error),
     });
+
+    // If state is present, validate and consume state to retrieve the authentic session & returnPath
+    let session: OAuthStateSession | null = null;
+    if (state) {
+      session = await validateAndConsumeOAuthState(String(state));
+      if (session?.returnPath) {
+        returnPath = session.returnPath;
+      }
+    }
 
     if (error) {
       console.warn('[CALLBACK 02.1] Parametro error retornado pelo TikTok:', error, error_description);
@@ -179,24 +264,23 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
 
       if (isCanceled) {
         console.log('[CALLBACK 02.2] Cancelamento/recusa de autorizacao detectado.');
-        return res.redirect('/mentor/integracoes/tiktok?status=canceled&message=Conexao_Cancelada');
+        return res.redirect(`${returnPath}?status=canceled&message=Conexao_Cancelada`);
       }
 
       const errReason = String(error_description || error || 'Autorizacao_Negada');
-      return res.redirect(`/mentor/integracoes/tiktok?status=error&message=${encodeURIComponent(errReason)}`);
+      return res.redirect(`${returnPath}?status=error&message=${encodeURIComponent(errReason)}`);
     }
 
     if (!code || !state) {
       console.warn('[CALLBACK 02.2] Parametros obrigatorios ausentes:', { codePresent: Boolean(code), statePresent: Boolean(state) });
-      return res.redirect('/mentor/integracoes/tiktok?status=error&message=Parametros_Ausentes');
+      return res.redirect(`${returnPath}?status=error&message=Parametros_Ausentes`);
     }
 
     currentStage = '[CALLBACK 03] State validado';
     console.log('[CALLBACK 03] Validando CSRF state no banco/memoria...');
-    const session = await validateAndConsumeOAuthState(String(state));
     if (!session) {
       console.warn('[CALLBACK 03.1] State invalido ou expirado');
-      return res.redirect('/mentor/integracoes/tiktok?status=error&message=State_Invalido_ou_Expirado');
+      return res.redirect(`${returnPath}?status=error&message=State_Invalido_ou_Expirado`);
     }
     console.log('[CALLBACK 03.2] State validado com sucesso.');
 
@@ -248,7 +332,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
       tokenJson = JSON.parse(rawText);
     } catch (parseErr: any) {
       console.error('[CALLBACK 07.1] Erro ao fazer parse do JSON do token');
-      return res.redirect('/mentor/integracoes/tiktok?status=error&message=Resposta_Invalida_TikTok');
+      return res.redirect(`${returnPath}?status=error&message=Resposta_Invalida_TikTok`);
     }
 
     // Support both direct object or tokenJson.data (TikTok API v2 response wrapper)
@@ -264,7 +348,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
         errorCode: tokenJson.error?.code || tokenJson.error,
         errorMessage: errMsg,
       });
-      return res.redirect(`/mentor/integracoes/tiktok?status=error&message=${encodeURIComponent(errMsg)}`);
+      return res.redirect(`${returnPath}?status=error&message=${encodeURIComponent(errMsg)}`);
     }
 
     const accessToken = payload.access_token;
@@ -352,18 +436,18 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
 
     if (!saved) {
       console.error('[CALLBACK 09.1] Falha ao salvar conexao no banco de dados.');
-      return res.redirect('/mentor/integracoes/tiktok?status=error&message=Erro_Ao_Salvar_Conexao');
+      return res.redirect(`${returnPath}?status=error&message=Erro_Ao_Salvar_Conexao`);
     }
 
     currentStage = '[CALLBACK 10] Finalizado com sucesso';
-    console.log(currentStage, 'Redirecionando para status=success');
-    return res.redirect('/mentor/integracoes/tiktok?status=success');
+    console.log(currentStage, 'Redirecionando para status=success na rota', returnPath);
+    return res.redirect(`${returnPath}?status=success`);
   } catch (err: any) {
     console.error(`[CALLBACK ERROR] Erro capturado na etapa [${currentStage}]:`);
     console.error('Mensagem:', err?.message || 'Erro desconhecido');
     console.error('Ultimo HTTP Status:', { status: lastHttpStatus, statusText: lastHttpStatusText });
 
-    return res.redirect('/mentor/integracoes/tiktok?status=error&message=Erro_Interno_Callback');
+    return res.redirect(`${returnPath}?status=error&message=Erro_Interno_Callback`);
   }
 });
 
