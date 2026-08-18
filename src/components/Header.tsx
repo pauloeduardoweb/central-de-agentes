@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, AlertTriangle, Lock, Unlock, Copy, Check, Crown, Bot, MessageSquare, LogOut, Flame } from 'lucide-react';
+import { Key, AlertTriangle, Lock, Unlock, Copy, Check, Crown, Bot, MessageSquare, LogOut, Flame, Video } from 'lucide-react';
 import { resolveChatMediaUrl } from '../utils/chatMediaUrl';
 import { getNicknameInitials } from '../utils/avatarUtils';
 import { isMasterKey } from '../data/studentCodes';
@@ -18,8 +18,8 @@ interface HeaderProps {
   agentCount: number;
   isMaster?: boolean;
   showProductMiner?: boolean;
-  activeView?: 'hub' | 'mentor' | 'chat' | 'miner';
-  onSelectView?: (view: 'hub' | 'mentor' | 'chat' | 'miner') => void;
+  activeView?: 'hub' | 'mentor' | 'chat' | 'miner' | 'tiktok';
+  onSelectView?: (view: 'hub' | 'mentor' | 'chat' | 'miner' | 'tiktok') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -118,6 +118,20 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Minerar</span>
                   </button>
                 )}
+
+                {/* Integração TikTok */}
+                <button
+                  type="button"
+                  onClick={() => onSelectView('tiktok')}
+                  className={`flex-1 min-w-0 px-2 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1 transition-all whitespace-nowrap cursor-pointer ${
+                    activeView === 'tiktok'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>TikTok</span>
+                </button>
 
                 {/* Bate-papo */}
                 <button
@@ -259,6 +273,20 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>Minerar Produtos</span>
                     </button>
                   )}
+
+                  {/* Integração TikTok */}
+                  <button
+                    type="button"
+                    onClick={() => onSelectView('tiktok')}
+                    className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                      activeView === 'tiktok'
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Video className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>Integração TikTok</span>
+                  </button>
 
                   {/* Bate-papo */}
                   <button
