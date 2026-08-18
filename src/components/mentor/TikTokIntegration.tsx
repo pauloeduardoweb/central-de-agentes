@@ -22,6 +22,8 @@ import {
   Check,
   Zap,
   ArrowLeft,
+  BadgeCheck,
+  Share2,
 } from 'lucide-react';
 
 interface TikTokIntegrationProps {
@@ -32,14 +34,23 @@ interface TikTokIntegrationProps {
 interface ConnectionData {
   connected: boolean;
   display_name?: string;
+  username?: string;
+  bio_description?: string;
   avatar_url?: string;
+  avatar_large_url?: string;
+  profile_deep_link?: string;
+  profile_web_link?: string;
+  is_verified?: boolean;
   open_id_masked?: string;
   scopes?: string;
   connected_at?: string;
+  updated_at?: string;
+  environment?: 'production' | 'sandbox';
 }
 
 export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCode, onBackToMentor }) => {
   const [loading, setLoading] = useState<boolean>(true);
+  const [syncingProfile, setSyncingProfile] = useState<boolean>(false);
   const [disconnecting, setDisconnecting] = useState<boolean>(false);
   const [connection, setConnection] = useState<ConnectionData>({ connected: false });
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -124,6 +135,43 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
     window.location.href = `/api/tiktok/oauth/start?code=${encodeURIComponent(studentCode)}`;
   };
 
+  const handleSyncProfile = async () => {
+    if (!studentCode || syncingProfile) return;
+    setSyncingProfile(true);
+    try {
+      const res = await fetch('/api/tiktok/refresh-profile', {
+        method: 'POST',
+        headers: {
+          'x-student-access-code': studentCode,
+          'x-access-code': studentCode,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.connection) {
+        setConnection(data.connection);
+        setFeedback({
+          type: 'success',
+          message: 'Dados do perfil do TikTok atualizados com sucesso!',
+        });
+      } else {
+        setFeedback({
+          type: 'error',
+          message: data.message || 'Não foi possível atualizar os dados do TikTok.',
+        });
+      }
+    } catch (err) {
+      console.error('Error syncing TikTok profile:', err);
+      setFeedback({
+        type: 'error',
+        message: 'Erro de conexão ao sincronizar perfil do TikTok.',
+      });
+    } finally {
+      setSyncingProfile(false);
+      setLastChecked(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    }
+  };
+
   const handleDisconnectTikTok = async () => {
     if (!confirm('Deseja realmente desconectar a sua conta do TikTok?')) return;
 
@@ -171,21 +219,25 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
       a: 'Sim, totalmente segura. Utilizamos a API oficial TikTok Login Kit v2 baseada no protocolo OAuth 2.0 padrão da indústria com verificação PKCE. Suas credenciais e dados são protegidos por criptografia de ponta.',
     },
     {
-      q: 'Posso desconectar quando quiser?',
-      a: 'Com certeza. Ao clicar no botão "Desconectar TikTok", sua conta é desvinculada instantaneamente e os tokens de acesso associados à sua chave são revogados do nosso servidor.',
+      q: 'Quais dados são solicitados?',
+      a: 'Solicitamos estritamente as permissões aprovadas em produção pelo TikTok Developers: user.info.basic (nome de exibição, avatar e identificador) e user.info.profile (nome de usuário @, biografia pública e verificação). Nós nunca temos acesso a senhas ou dados confidenciais.',
     },
     {
-      q: 'Meus dados ficam protegidos?',
-      a: 'Sim. Solicitamos estritamente a autorização mínima necessária para identificação do perfil (user.info.basic). Nós nunca solicitamos, temos acesso ou armazenamos sua senha do TikTok.',
+      q: 'Posso desconectar quando quiser?',
+      a: 'Com certeza. Ao clicar no botão "Desconectar TikTok", sua conta é desvinculada instantaneamente e os tokens de acesso associados à sua chave são revogados do nosso servidor.',
     },
   ];
 
   const steps = [
     { num: '1', title: 'Conectar conta', desc: 'Iniciar fluxo OAuth' },
-    { num: '2', title: 'Autorizar TikTok', desc: 'Permissão oficial' },
+    { num: '2', title: 'Autorizar TikTok', desc: 'Permissões oficiais' },
     { num: '3', title: 'Conta protegida', desc: 'Criptografia AES-256' },
-    { num: '4', title: 'Integração ativa', desc: 'Acesso liberado' },
+    { num: '4', title: 'Perfil integrado', desc: 'Dados sincronizados' },
   ];
+
+  const hasProfileScope = Boolean(connection.scopes && connection.scopes.includes('user.info.profile'));
+  const profileUrl = connection.profile_web_link || (connection.username ? `https://www.tiktok.com/@${connection.username}` : null);
+  const avatarSrc = connection.avatar_large_url || connection.avatar_url;
 
   return (
     <div className="space-y-6 w-full animate-fade-in transition-all duration-300">
@@ -212,7 +264,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
                 Conecte sua conta do TikTok com segurança utilizando OAuth 2.0 oficial para vincular seu perfil e utilizar recursos exclusivos no ecossistema Geração Z Pro.
               </p>
 
-              {/* 3. Indicadores Visuais (Badges Status) */}
+              {/* Badges Status */}
               <div className="flex items-center gap-2.5 flex-wrap mt-3.5 text-[11px] font-medium text-slate-300">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-700/80" title="Autenticação padrão da indústria">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -247,12 +299,12 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
 
             <button
               onClick={fetchConnection}
-              disabled={loading}
+              disabled={loading || syncingProfile}
               className="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95 shadow-lg"
-              title="Atualizar informações da conexão"
+              title="Atualizar status da conexão"
             >
               <RefreshCw className={`w-4 h-4 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
-              <span>{loading ? 'Atualizando...' : 'Atualizar status'}</span>
+              <span>{loading ? 'Verificando...' : 'Atualizar status'}</span>
             </button>
           </div>
         </div>
@@ -328,13 +380,14 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
         </div>
 
         <div className="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-sm flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-amber-950/60 text-amber-400 border border-amber-500/30 shrink-0">
+          <div className="p-2 rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-500/30 shrink-0">
             <Globe2 className="w-4 h-4" />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] text-slate-400 font-medium">Ambiente</p>
-            <p className="text-xs font-bold text-amber-300 mt-0.5 truncate">
-              Sandbox / V2
+            <p className="text-xs font-bold text-emerald-300 mt-0.5 truncate flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              Produção / V2
             </p>
           </div>
         </div>
@@ -344,9 +397,9 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
             <KeyRound className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] text-slate-400 font-medium">Escopo Autorizado</p>
-            <p className="text-xs font-mono font-bold text-teal-300 mt-0.5 truncate">
-              user.info.basic
+            <p className="text-[11px] text-slate-400 font-medium">Escopos Oficiais</p>
+            <p className="text-xs font-mono font-bold text-teal-300 mt-0.5 truncate" title={connection.scopes || 'user.info.basic, user.info.profile'}>
+              {connection.scopes || 'user.info.basic, user.info.profile'}
             </p>
           </div>
         </div>
@@ -363,6 +416,30 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
           </div>
         </div>
       </div>
+
+      {/* Reauthorization Alert Banner if user only has legacy basic scope */}
+      {connection.connected && !hasProfileScope && (
+        <div className="p-4 rounded-xl border border-cyan-500/40 bg-gradient-to-r from-cyan-950/80 via-slate-900/90 to-blue-950/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-md shadow-xl animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shrink-0 mt-0.5">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-cyan-200">Novas informações de perfil estão disponíveis!</p>
+              <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                Os escopos oficiais <code className="text-cyan-300 bg-slate-950 px-1.5 py-0.5 rounded text-[11px]">user.info.profile</code> foram aprovados em produção. Atualize sua autorização para sincronizar @username, biografia e selo de verificação.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleConnectTikTok}
+            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2 shrink-0 cursor-pointer shadow-md hover:shadow-cyan-500/30 active:scale-95 self-start sm:self-center"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Atualizar autorização TikTok</span>
+          </button>
+        </div>
+      )}
 
       {/* Feedback Alert Banners */}
       {feedback && (
@@ -426,16 +503,17 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
         ) : connection.connected ? (
           /* State 1: CONNECTED PREMIUM CARD */
           <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 p-6 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/95 border border-emerald-500/40 shadow-2xl relative overflow-hidden group">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 p-6 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/95 border border-emerald-500/40 shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/15 transition-all" />
 
-              <div className="flex items-center gap-5 relative z-10">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 relative z-10">
                 <div className="relative shrink-0">
-                  {connection.avatar_url ? (
+                  {avatarSrc ? (
                     <img
-                      src={connection.avatar_url}
-                      alt={connection.display_name}
+                      src={avatarSrc}
+                      alt={connection.display_name || 'TikTok Avatar'}
                       className="w-20 h-20 rounded-full border-2 border-emerald-400 object-cover shadow-xl shadow-emerald-500/20"
+                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     <div className="w-20 h-20 rounded-full bg-slate-800 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/20">
@@ -447,58 +525,108 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
                   </span>
                 </div>
 
-                <div>
+                <div className="space-y-1.5">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h3 className="text-xl font-black text-white tracking-tight">
                       {connection.display_name || 'Usuário TikTok'}
                     </h3>
 
+                    {/* Username Pill */}
+                    {connection.username && (
+                      <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-slate-800 text-cyan-300 border border-slate-700">
+                        @{connection.username}
+                      </span>
+                    )}
+
                     {/* Selo Conta Verificada */}
-                    <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 flex items-center gap-1.5 shadow-sm">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      Conta verificada
-                    </span>
+                    {connection.is_verified && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-cyan-950/90 text-cyan-300 border border-cyan-500/60 flex items-center gap-1 shadow-sm">
+                        <BadgeCheck className="w-3.5 h-3.5 text-cyan-400" />
+                        Conta verificada
+                      </span>
+                    )}
                   </div>
 
-                  {connection.open_id_masked && (
-                    <p className="text-xs text-slate-300 mt-1.5 font-mono flex items-center gap-2">
-                      <span className="text-slate-400 font-sans">ID do TikTok:</span>
-                      <span className="bg-slate-950 px-2.5 py-0.5 rounded border border-slate-800 text-slate-200">
-                        {connection.open_id_masked}
-                      </span>
+                  {/* Bio Description if available */}
+                  {connection.bio_description && (
+                    <p className="text-xs text-slate-300 max-w-xl line-clamp-2 leading-relaxed bg-slate-950/50 p-2 rounded-lg border border-slate-800/80">
+                      {connection.bio_description}
                     </p>
                   )}
 
-                  {connection.connected_at && (
-                    <p className="text-xs text-slate-400 mt-1">
-                      Conectado em: {new Date(connection.connected_at).toLocaleString('pt-BR')}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-3 flex-wrap text-xs text-slate-400 pt-0.5">
+                    {connection.open_id_masked && (
+                      <span className="font-mono flex items-center gap-1.5">
+                        <span className="text-slate-400 font-sans">ID:</span>
+                        <span className="bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-slate-200">
+                          {connection.open_id_masked}
+                        </span>
+                      </span>
+                    )}
+
+                    {connection.connected_at && (
+                      <span>
+                        Conectado em: {new Date(connection.connected_at).toLocaleString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <button
-                onClick={handleDisconnectTikTok}
-                disabled={disconnecting}
-                className="px-4 py-2.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 hover:text-white text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg hover:shadow-rose-900/30 active:scale-95 self-start sm:self-center shrink-0"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>{disconnecting ? 'Desconectando...' : 'Desconectar TikTok'}</span>
-              </button>
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-stretch sm:items-center gap-2.5 relative z-10 self-start md:self-center shrink-0">
+                {profileUrl && (
+                  <a
+                    href={profileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-95"
+                  >
+                    <span>Abrir no TikTok</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                  </a>
+                )}
+
+                <button
+                  onClick={handleSyncProfile}
+                  disabled={syncingProfile}
+                  className="px-3.5 py-2 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-md active:scale-95"
+                  title="Buscar dados atualizados do TikTok"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${syncingProfile ? 'animate-spin' : ''}`} />
+                  <span>{syncingProfile ? 'Atualizando...' : 'Atualizar dados'}</span>
+                </button>
+
+                <button
+                  onClick={handleDisconnectTikTok}
+                  disabled={disconnecting}
+                  className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 hover:text-white text-xs font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg hover:shadow-rose-900/30 active:scale-95"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{disconnecting ? 'Desconectando...' : 'Desconectar'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Scopes & Security Specs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-all">
-                <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 mb-2">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Escopos Autorizados</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-cyan-400">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Escopos Autorizados</span>
+                  </div>
+                  {hasProfileScope && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                      Completo
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-200 font-mono bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                  {connection.scopes || 'user.info.basic'}
+                  {connection.scopes || 'user.info.basic, user.info.profile'}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                  Acesso limitado estritamente a informações básicas de perfil autorizadas pelo TikTok Login Kit v2.
+                  Permissões oficiais em produção: identificação pública básica (<code className="text-cyan-300">user.info.basic</code>) e perfil (<code className="text-teal-300">user.info.profile</code>).
                 </p>
               </div>
 
@@ -510,6 +638,10 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
                 <p className="text-xs text-slate-300 leading-relaxed">
                   Tokens de acesso são armazenados com criptografia AES-256 no servidor. Sua senha do TikTok nunca é solicitada nem armazenada.
                 </p>
+                <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span>Isolamento estrito por chave de aluno</span>
+                </div>
               </div>
             </div>
           </div>
@@ -553,10 +685,10 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
           <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
             <p className="font-bold text-cyan-300 flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-              Protocolo OAuth 2.0
+              Protocolo OAuth 2.0 Oficial
             </p>
             <p className="text-slate-400">
-              A autenticação é feita diretamente na infraestrutura segura do TikTok. Você concede permissão e retorna com segurança para a nossa plataforma.
+              A autenticação é feita diretamente na infraestrutura segura do TikTok Developers em ambiente de Produção.
             </p>
           </div>
 
@@ -566,7 +698,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
               Privacidade Garantida
             </p>
             <p className="text-slate-400">
-              Solicitamos apenas informações públicas básicas de perfil (<code className="text-teal-300">user.info.basic</code>). Sua senha nunca é acessada ou gravada.
+              Solicitamos apenas dados públicos autorizados (<code className="text-teal-300">user.info.basic</code> e <code className="text-cyan-300">user.info.profile</code>). Senhas nunca são solicitadas.
             </p>
           </div>
 
@@ -576,7 +708,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
               Isolamento por Aluno
             </p>
             <p className="text-slate-400">
-              Cada chave de acesso possui sua própria conexão TikTok independente e encriptada com chave exclusiva no servidor.
+              Cada chave de acesso possui sua própria conexão TikTok independente e encriptada com AES-256 no banco de dados.
             </p>
           </div>
         </div>
