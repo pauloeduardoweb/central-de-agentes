@@ -197,17 +197,98 @@ interface MemoryConnection {
   open_id: string;
   union_id?: string;
   display_name: string;
+  username?: string;
+  bio_description?: string;
   avatar_url: string;
+  avatar_large_url?: string;
+  avatar_url_100?: string;
+  profile_deep_link?: string;
+  profile_web_link?: string;
+  is_verified?: boolean;
   access_token: string;
   refresh_token?: string;
   access_token_expires_at?: Date;
   refresh_token_expires_at?: Date;
   scopes: string;
   connected_at: Date;
+  updated_at?: Date;
   revoked_at?: Date | null;
 }
 
 const memoryConnectionsMap = new Map<string, MemoryConnection>();
+
+export interface TikTokProfileData {
+  open_id?: string;
+  union_id?: string;
+  display_name?: string;
+  username?: string;
+  bio_description?: string;
+  avatar_url?: string;
+  avatar_large_url?: string;
+  avatar_url_100?: string;
+  profile_deep_link?: string;
+  profile_web_link?: string;
+  is_verified?: boolean;
+}
+
+/**
+ * Fetches user profile from official TikTok Login Kit v2 endpoint.
+ * Requests ONLY approved fields: basic info + profile info (NO stats).
+ */
+export async function fetchTikTokUserProfile(accessToken: string): Promise<TikTokProfileData | null> {
+  if (!accessToken) return null;
+  const apiBaseUrl = getTikTokApiBaseUrl();
+  const fields = [
+    'open_id',
+    'union_id',
+    'avatar_url',
+    'avatar_url_100',
+    'avatar_large_url',
+    'display_name',
+    'bio_description',
+    'profile_deep_link',
+    'profile_web_link',
+    'is_verified',
+    'username',
+  ].join(',');
+
+  try {
+    const res = await fetch(`${apiBaseUrl}/v2/user/info/?fields=${fields}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      console.warn('[TikTok fetchUserProfile HTTP Error]:', res.status, res.statusText);
+      return null;
+    }
+
+    const json = await res.json();
+    const userData = json.data?.user || json.data || json.user;
+    if (!userData) {
+      console.warn('[TikTok fetchUserProfile]: No user data returned', json);
+      return null;
+    }
+
+    return {
+      open_id: userData.open_id,
+      union_id: userData.union_id,
+      display_name: userData.display_name,
+      username: userData.username,
+      bio_description: userData.bio_description,
+      avatar_url: userData.avatar_url,
+      avatar_large_url: userData.avatar_large_url,
+      avatar_url_100: userData.avatar_url_100,
+      profile_deep_link: userData.profile_deep_link,
+      profile_web_link: userData.profile_web_link,
+      is_verified: Boolean(userData.is_verified),
+    };
+  } catch (err) {
+    console.error('[TikTok fetchUserProfile Exception]:', err);
+    return null;
+  }
+}
 
 /**
  * Saves or updates a TikTok connection for a student code.
@@ -217,7 +298,14 @@ export async function saveTikTokConnection(data: {
   open_id: string;
   union_id?: string;
   display_name?: string;
+  username?: string;
+  bio_description?: string;
   avatar_url?: string;
+  avatar_large_url?: string;
+  avatar_url_100?: string;
+  profile_deep_link?: string;
+  profile_web_link?: string;
+  is_verified?: boolean;
   access_token: string;
   refresh_token?: string;
   expires_in?: number;
@@ -235,22 +323,30 @@ export async function saveTikTokConnection(data: {
     ? new Date(now.getTime() + data.refresh_expires_in * 1000)
     : null;
 
-  const scopes = data.scope || 'user.info.basic';
+  const scopes = data.scope || 'user.info.basic,user.info.profile';
 
   if (isDatabaseConfigured()) {
     try {
       await ensureTikTokConnectionsTable();
       await db.query(
         `INSERT INTO tiktok_connections (
-          codigo, open_id, union_id, display_name, avatar_url,
+          codigo, open_id, union_id, display_name, username, bio_description,
+          avatar_url, avatar_large_url, avatar_url_100, profile_deep_link, profile_web_link, is_verified,
           access_token, refresh_token, access_token_expires_at, refresh_token_expires_at,
           scopes, connected_at, revoked_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NULL)
         ON DUPLICATE KEY UPDATE
           open_id = VALUES(open_id),
           union_id = VALUES(union_id),
           display_name = VALUES(display_name),
+          username = VALUES(username),
+          bio_description = VALUES(bio_description),
           avatar_url = VALUES(avatar_url),
+          avatar_large_url = VALUES(avatar_large_url),
+          avatar_url_100 = VALUES(avatar_url_100),
+          profile_deep_link = VALUES(profile_deep_link),
+          profile_web_link = VALUES(profile_web_link),
+          is_verified = VALUES(is_verified),
           access_token = VALUES(access_token),
           refresh_token = VALUES(refresh_token),
           access_token_expires_at = VALUES(access_token_expires_at),
@@ -263,7 +359,14 @@ export async function saveTikTokConnection(data: {
           data.open_id,
           data.union_id || null,
           data.display_name || 'Conta TikTok',
+          data.username || null,
+          data.bio_description || null,
           data.avatar_url || null,
+          data.avatar_large_url || null,
+          data.avatar_url_100 || null,
+          data.profile_deep_link || null,
+          data.profile_web_link || null,
+          data.is_verified ? 1 : 0,
           encAccessToken,
           encRefreshToken,
           accessExpiresAt,
@@ -283,31 +386,49 @@ export async function saveTikTokConnection(data: {
     open_id: data.open_id,
     union_id: data.union_id,
     display_name: data.display_name || 'Conta TikTok',
+    username: data.username,
+    bio_description: data.bio_description,
     avatar_url: data.avatar_url || '',
+    avatar_large_url: data.avatar_large_url,
+    avatar_url_100: data.avatar_url_100,
+    profile_deep_link: data.profile_deep_link,
+    profile_web_link: data.profile_web_link,
+    is_verified: Boolean(data.is_verified),
     access_token: encAccessToken,
     refresh_token: encRefreshToken || undefined,
     access_token_expires_at: accessExpiresAt || undefined,
     refresh_token_expires_at: refreshExpiresAt || undefined,
     scopes,
     connected_at: new Date(),
+    updated_at: new Date(),
     revoked_at: null,
   });
 
   return true;
 }
 
+export interface SafeTikTokConnection {
+  connected: boolean;
+  display_name?: string;
+  username?: string;
+  bio_description?: string;
+  avatar_url?: string;
+  avatar_large_url?: string;
+  profile_deep_link?: string;
+  profile_web_link?: string;
+  is_verified?: boolean;
+  open_id_masked?: string;
+  scopes?: string;
+  connected_at?: string;
+  updated_at?: string;
+  environment?: 'production' | 'sandbox';
+}
+
 /**
  * Gets safe connection info for frontend display.
  * NEVER returns access_token or refresh_token.
  */
-export async function getSafeTikTokConnection(codigo: string): Promise<{
-  connected: boolean;
-  display_name?: string;
-  avatar_url?: string;
-  open_id_masked?: string;
-  scopes?: string;
-  connected_at?: string;
-}> {
+export async function getSafeTikTokConnection(codigo: string): Promise<SafeTikTokConnection> {
   if (!codigo) {
     return { connected: false };
   }
@@ -316,7 +437,8 @@ export async function getSafeTikTokConnection(codigo: string): Promise<{
     try {
       await ensureTikTokConnectionsTable();
       const [rows]: any = await db.query(
-        `SELECT open_id, display_name, avatar_url, scopes, connected_at, revoked_at
+        `SELECT open_id, display_name, username, bio_description, avatar_url, avatar_large_url,
+                profile_deep_link, profile_web_link, is_verified, scopes, connected_at, updated_at, revoked_at
          FROM tiktok_connections
          WHERE codigo = ? AND revoked_at IS NULL
          LIMIT 1`,
@@ -333,10 +455,18 @@ export async function getSafeTikTokConnection(codigo: string): Promise<{
         return {
           connected: true,
           display_name: conn.display_name || 'Conta TikTok',
+          username: conn.username || undefined,
+          bio_description: conn.bio_description || undefined,
           avatar_url: conn.avatar_url || '',
+          avatar_large_url: conn.avatar_large_url || undefined,
+          profile_deep_link: conn.profile_deep_link || undefined,
+          profile_web_link: conn.profile_web_link || (conn.username ? `https://www.tiktok.com/@${conn.username}` : undefined),
+          is_verified: Boolean(conn.is_verified),
           open_id_masked: maskedOpenId,
           scopes: conn.scopes || 'user.info.basic',
           connected_at: conn.connected_at ? new Date(conn.connected_at).toISOString() : undefined,
+          updated_at: conn.updated_at ? new Date(conn.updated_at).toISOString() : undefined,
+          environment: 'production',
         };
       }
     } catch (err) {
@@ -355,14 +485,257 @@ export async function getSafeTikTokConnection(codigo: string): Promise<{
     return {
       connected: true,
       display_name: memConn.display_name || 'Conta TikTok',
+      username: memConn.username,
+      bio_description: memConn.bio_description,
       avatar_url: memConn.avatar_url || '',
+      avatar_large_url: memConn.avatar_large_url,
+      profile_deep_link: memConn.profile_deep_link,
+      profile_web_link: memConn.profile_web_link || (memConn.username ? `https://www.tiktok.com/@${memConn.username}` : undefined),
+      is_verified: Boolean(memConn.is_verified),
       open_id_masked: maskedOpenId,
       scopes: memConn.scopes || 'user.info.basic',
       connected_at: memConn.connected_at.toISOString(),
+      updated_at: memConn.updated_at?.toISOString(),
+      environment: 'production',
     };
   }
 
   return { connected: false };
+}
+
+/**
+ * Refreshes TikTok access token using saved refresh token.
+ * Stores new decrypted access token and updated expiry in MySQL.
+ */
+export async function refreshTikTokAccessToken(codigo: string): Promise<string | null> {
+  if (!codigo) return null;
+
+  let encRefreshToken: string | null = null;
+  let currentOpenId = '';
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureTikTokConnectionsTable();
+      const [rows]: any = await db.query(
+        `SELECT open_id, refresh_token, revoked_at FROM tiktok_connections WHERE codigo = ? AND revoked_at IS NULL LIMIT 1`,
+        [codigo]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        encRefreshToken = rows[0].refresh_token;
+        currentOpenId = rows[0].open_id;
+      }
+    } catch (err) {
+      console.error('[MySQL refreshTikTokAccessToken lookup error]:', err);
+    }
+  } else {
+    const mem = memoryConnectionsMap.get(codigo);
+    if (mem && !mem.revoked_at) {
+      encRefreshToken = mem.refresh_token || null;
+      currentOpenId = mem.open_id;
+    }
+  }
+
+  if (!encRefreshToken) {
+    console.warn('[TikTok Token Refresh]: No refresh token found for code:', codigo);
+    return null;
+  }
+
+  const plainRefreshToken = decryptToken(encRefreshToken);
+  if (!plainRefreshToken) {
+    console.warn('[TikTok Token Refresh]: Failed to decrypt refresh token for code:', codigo);
+    return null;
+  }
+
+  const clientKey = getTikTokClientKey();
+  const clientSecret = getTikTokClientSecret();
+  const apiBaseUrl = getTikTokApiBaseUrl();
+  const tokenUrl = `${apiBaseUrl}/v2/oauth/token/`;
+
+  try {
+    const bodyParams = new URLSearchParams();
+    bodyParams.append('client_key', clientKey);
+    bodyParams.append('client_secret', clientSecret);
+    bodyParams.append('grant_type', 'refresh_token');
+    bodyParams.append('refresh_token', plainRefreshToken);
+
+    const res = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cache-Control': 'no-cache',
+      },
+      body: bodyParams.toString(),
+    });
+
+    const rawText = await res.text();
+    let json: any = {};
+    try {
+      json = JSON.parse(rawText);
+    } catch {
+      return null;
+    }
+
+    const payload = json.data || json;
+    if (!res.ok || !payload.access_token) {
+      console.warn('[TikTok Token Refresh Failed]:', json);
+      return null;
+    }
+
+    const newAccessToken = payload.access_token;
+    const newRefreshToken = payload.refresh_token || plainRefreshToken;
+    const expiresIn = payload.expires_in;
+    const refreshExpiresIn = payload.refresh_expires_in;
+    const scope = payload.scope;
+
+    const encNewAccess = encryptToken(newAccessToken);
+    const encNewRefresh = encryptToken(newRefreshToken);
+    const now = new Date();
+    const accessExpiresAt = expiresIn ? new Date(now.getTime() + expiresIn * 1000) : null;
+    const refreshExpiresAt = refreshExpiresIn ? new Date(now.getTime() + refreshExpiresIn * 1000) : null;
+
+    if (isDatabaseConfigured()) {
+      await db.query(
+        `UPDATE tiktok_connections
+         SET access_token = ?,
+             refresh_token = ?,
+             access_token_expires_at = ?,
+             refresh_token_expires_at = ?,
+             scopes = COALESCE(?, scopes),
+             updated_at = NOW()
+         WHERE codigo = ?`,
+        [encNewAccess, encNewRefresh, accessExpiresAt, refreshExpiresAt, scope || null, codigo]
+      );
+    }
+
+    const mem = memoryConnectionsMap.get(codigo);
+    if (mem) {
+      mem.access_token = encNewAccess;
+      mem.refresh_token = encNewRefresh;
+      mem.access_token_expires_at = accessExpiresAt || undefined;
+      mem.refresh_token_expires_at = refreshExpiresAt || undefined;
+      if (scope) mem.scopes = scope;
+      mem.updated_at = new Date();
+    }
+
+    return newAccessToken;
+  } catch (err) {
+    console.error('[TikTok Token Refresh Exception]:', err);
+    return null;
+  }
+}
+
+/**
+ * Synchronizes/refreshes TikTok user profile with TikTok API v2 without requiring re-auth
+ * if current token or refresh token is valid.
+ */
+export async function syncTikTokProfile(codigo: string): Promise<{ success: boolean; connection?: SafeTikTokConnection; error?: string }> {
+  if (!codigo) return { success: false, error: 'MISSING_CODE' };
+
+  let currentAccessToken: string | null = null;
+  let accessExpiresAt: Date | null = null;
+
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureTikTokConnectionsTable();
+      const [rows]: any = await db.query(
+        `SELECT access_token, access_token_expires_at, revoked_at FROM tiktok_connections WHERE codigo = ? AND revoked_at IS NULL LIMIT 1`,
+        [codigo]
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        currentAccessToken = decryptToken(rows[0].access_token);
+        if (rows[0].access_token_expires_at) {
+          accessExpiresAt = new Date(rows[0].access_token_expires_at);
+        }
+      }
+    } catch (err) {
+      console.error('[MySQL syncTikTokProfile error]:', err);
+    }
+  } else {
+    const mem = memoryConnectionsMap.get(codigo);
+    if (mem && !mem.revoked_at) {
+      currentAccessToken = decryptToken(mem.access_token);
+      accessExpiresAt = mem.access_token_expires_at || null;
+    }
+  }
+
+  if (!currentAccessToken) {
+    return { success: false, error: 'NOT_CONNECTED' };
+  }
+
+  // Check if token is expired (or expires within 2 minutes)
+  const isExpired = accessExpiresAt && accessExpiresAt.getTime() - Date.now() < 2 * 60 * 1000;
+  if (isExpired) {
+    const refreshedToken = await refreshTikTokAccessToken(codigo);
+    if (refreshedToken) {
+      currentAccessToken = refreshedToken;
+    }
+  }
+
+  // Fetch updated profile
+  let profile = await fetchTikTokUserProfile(currentAccessToken);
+  if (!profile) {
+    // If failed, try refreshing token once more and retry
+    const refreshedToken = await refreshTikTokAccessToken(codigo);
+    if (refreshedToken) {
+      currentAccessToken = refreshedToken;
+      profile = await fetchTikTokUserProfile(currentAccessToken);
+    }
+  }
+
+  if (!profile) {
+    return { success: false, error: 'PROFILE_FETCH_FAILED' };
+  }
+
+  // Update profile details in database
+  if (isDatabaseConfigured()) {
+    try {
+      await db.query(
+        `UPDATE tiktok_connections
+         SET display_name = COALESCE(?, display_name),
+             username = COALESCE(?, username),
+             bio_description = COALESCE(?, bio_description),
+             avatar_url = COALESCE(?, avatar_url),
+             avatar_large_url = COALESCE(?, avatar_large_url),
+             avatar_url_100 = COALESCE(?, avatar_url_100),
+             profile_deep_link = COALESCE(?, profile_deep_link),
+             profile_web_link = COALESCE(?, profile_web_link),
+             is_verified = ?,
+             updated_at = NOW()
+         WHERE codigo = ?`,
+        [
+          profile.display_name || null,
+          profile.username || null,
+          profile.bio_description || null,
+          profile.avatar_url || null,
+          profile.avatar_large_url || null,
+          profile.avatar_url_100 || null,
+          profile.profile_deep_link || null,
+          profile.profile_web_link || null,
+          profile.is_verified ? 1 : 0,
+          codigo,
+        ]
+      );
+    } catch (err) {
+      console.error('[MySQL syncTikTokProfile update error]:', err);
+    }
+  }
+
+  const mem = memoryConnectionsMap.get(codigo);
+  if (mem) {
+    if (profile.display_name) mem.display_name = profile.display_name;
+    if (profile.username) mem.username = profile.username;
+    if (profile.bio_description) mem.bio_description = profile.bio_description;
+    if (profile.avatar_url) mem.avatar_url = profile.avatar_url;
+    if (profile.avatar_large_url) mem.avatar_large_url = profile.avatar_large_url;
+    if (profile.avatar_url_100) mem.avatar_url_100 = profile.avatar_url_100;
+    if (profile.profile_deep_link) mem.profile_deep_link = profile.profile_deep_link;
+    if (profile.profile_web_link) mem.profile_web_link = profile.profile_web_link;
+    mem.is_verified = Boolean(profile.is_verified);
+    mem.updated_at = new Date();
+  }
+
+  const safeConn = await getSafeTikTokConnection(codigo);
+  return { success: true, connection: safeConn };
 }
 
 /**

@@ -5,6 +5,8 @@ import {
   saveTikTokConnection,
   getSafeTikTokConnection,
   revokeTikTokConnection,
+  fetchTikTokUserProfile,
+  syncTikTokProfile,
   getTikTokApiBaseUrl,
   getTikTokRedirectUri,
   getTikTokClientKey,
@@ -25,6 +27,7 @@ async function getSessionUserCode(req: express.Request): Promise<string | null> 
     accessCode ||
     req.headers['x-access-code'] ||
     req.headers['x-student-access-code'] ||
+    req.headers['x-master-key'] ||
     req.query.code ||
     req.query.accessCode;
   const cleanCode = normalizeAccessCode(raw);
@@ -39,7 +42,7 @@ async function getSessionUserCode(req: express.Request): Promise<string | null> 
 
 /**
  * GET /api/tiktok/oauth/start
- * Initiates TikTok OAuth 2.0 PKCE flow.
+ * Initiates TikTok OAuth 2.0 PKCE flow with approved production scopes: user.info.basic,user.info.profile.
  * Requires user authentication via x-student-access-code header or code query param.
  */
 tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Response) => {
@@ -54,7 +57,7 @@ tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Respo
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
-    const scope = 'user.info.basic';
+    const scope = 'user.info.basic,user.info.profile';
 
     const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
     authUrl.searchParams.set('client_key', clientKey);
@@ -209,37 +212,39 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
     const expiresIn = payload.expires_in;
     const refreshExpiresIn = payload.refresh_expires_in;
     const openId = payload.open_id;
-    const scope = payload.scope || 'user.info.basic';
+    const scope = payload.scope || 'user.info.basic,user.info.profile';
 
-    console.log('[CALLBACK 07.3] Token de acesso obtido com sucesso. OpenID:', openId);
+    console.log('[CALLBACK 07.3] Token de acesso obtido com sucesso. OpenID:', openId, 'Scope:', scope);
 
-    // 2. Fetch basic profile info from TikTok User Info API v2 (Sandbox or Production)
+    // 2. Fetch profile info from TikTok User Info API v2 (Approved scopes: basic + profile)
     currentStage = '[CALLBACK 08] Iniciando User Info';
     console.log(currentStage);
 
     let displayName = 'Conta TikTok';
+    let username: string | undefined = undefined;
+    let bioDescription: string | undefined = undefined;
     let avatarUrl = '';
+    let avatarLargeUrl: string | undefined = undefined;
+    let avatarUrl100: string | undefined = undefined;
+    let profileDeepLink: string | undefined = undefined;
+    let profileWebLink: string | undefined = undefined;
+    let isVerified = false;
     let unionId = payload.union_id || '';
 
     if (accessToken) {
       try {
-        const userInfoRes = await fetch(
-          `${apiBaseUrl}/v2/user/info/?fields=open_id,union_id,avatar_url,display_name`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
-        console.log('[CALLBACK 08.1] UserInfo HTTP status:', userInfoRes.status);
-        const userInfoJson = await userInfoRes.json();
-        console.log('[CALLBACK 08.2] UserInfo JSON:', userInfoJson);
-
-        const userData = userInfoJson.data?.user || userInfoJson.data || userInfoJson.user;
-        if (userData) {
-          if (userData.display_name) displayName = userData.display_name;
-          if (userData.avatar_url) avatarUrl = userData.avatar_url;
-          if (userData.union_id) unionId = userData.union_id;
+        const profile = await fetchTikTokUserProfile(accessToken);
+        if (profile) {
+          if (profile.display_name) displayName = profile.display_name;
+          if (profile.username) username = profile.username;
+          if (profile.bio_description) bioDescription = profile.bio_description;
+          if (profile.avatar_url) avatarUrl = profile.avatar_url;
+          if (profile.avatar_large_url) avatarLargeUrl = profile.avatar_large_url;
+          if (profile.avatar_url_100) avatarUrl100 = profile.avatar_url_100;
+          if (profile.profile_deep_link) profileDeepLink = profile.profile_deep_link;
+          if (profile.profile_web_link) profileWebLink = profile.profile_web_link;
+          if (profile.is_verified) isVerified = profile.is_verified;
+          if (profile.union_id) unionId = profile.union_id;
         }
       } catch (userInfoErr) {
         console.warn('[CALLBACK 08.3] Aviso ao buscar dados do usuario TikTok:', userInfoErr);
@@ -255,7 +260,14 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
       open_id: openId || 'unknown_openid',
       union_id: unionId,
       display_name: displayName,
+      username,
+      bio_description: bioDescription,
       avatar_url: avatarUrl,
+      avatar_large_url: avatarLargeUrl,
+      avatar_url_100: avatarUrl100,
+      profile_deep_link: profileDeepLink,
+      profile_web_link: profileWebLink,
+      is_verified: isVerified,
       access_token: accessToken,
       refresh_token: refreshToken,
       expires_in: expiresIn,
@@ -280,7 +292,7 @@ tiktokRouter.get('/oauth/callback', async (req: express.Request, res: express.Re
 
 /**
  * GET /api/tiktok/connection
- * Retrieves connection status for the authenticated user.
+ * Retrieves safe connection status for the authenticated user.
  */
 tiktokRouter.get('/connection', async (req: express.Request, res: express.Response) => {
   try {
@@ -294,6 +306,37 @@ tiktokRouter.get('/connection', async (req: express.Request, res: express.Respon
   } catch (err: any) {
     console.error('[TikTok Connection Get Error]:', err);
     return res.status(500).json({ error: 'SERVER_ERROR', connected: false });
+  }
+});
+
+/**
+ * POST /api/tiktok/refresh-profile
+ * Synchronizes/refreshes user profile with TikTok API v2 using current active token or refresh token.
+ */
+tiktokRouter.post(['/refresh-profile', '/sync'], async (req: express.Request, res: express.Response) => {
+  try {
+    const userCode = await getSessionUserCode(req);
+    if (!userCode) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', success: false });
+    }
+
+    const result = await syncTikTokProfile(userCode);
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error || 'SYNC_FAILED',
+        success: false,
+        message: 'Não foi possível sincronizar o perfil com o TikTok. Tente novamente ou atualize a autorização.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Dados do perfil do TikTok sincronizados com sucesso!',
+      connection: result.connection,
+    });
+  } catch (err: any) {
+    console.error('[TikTok Profile Refresh Error]:', err);
+    return res.status(500).json({ error: 'SERVER_ERROR', success: false });
   }
 });
 

@@ -1408,12 +1408,19 @@ export function ensureTikTokConnectionsTable(): Promise<void> {
           open_id VARCHAR(255) NOT NULL,
           union_id VARCHAR(255) DEFAULT NULL,
           display_name VARCHAR(255) DEFAULT NULL,
+          username VARCHAR(255) DEFAULT NULL,
+          bio_description TEXT DEFAULT NULL,
           avatar_url VARCHAR(500) DEFAULT NULL,
+          avatar_large_url VARCHAR(500) DEFAULT NULL,
+          avatar_url_100 VARCHAR(500) DEFAULT NULL,
+          profile_deep_link VARCHAR(500) DEFAULT NULL,
+          profile_web_link VARCHAR(500) DEFAULT NULL,
+          is_verified TINYINT(1) DEFAULT 0,
           access_token TEXT NOT NULL,
           refresh_token TEXT DEFAULT NULL,
           access_token_expires_at DATETIME DEFAULT NULL,
           refresh_token_expires_at DATETIME DEFAULT NULL,
-          scopes VARCHAR(255) DEFAULT 'user.info.basic',
+          scopes VARCHAR(255) DEFAULT 'user.info.basic,user.info.profile',
           connected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           revoked_at DATETIME DEFAULT NULL,
@@ -1421,6 +1428,15 @@ export function ensureTikTokConnectionsTable(): Promise<void> {
           INDEX idx_tiktok_openid (open_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      // Incremental column migrations for existing databases
+      await db.query(`ALTER TABLE tiktok_connections ADD COLUMN username VARCHAR(255) DEFAULT NULL`).catch(() => {});
+      await db.query(`ALTER TABLE tiktok_connections ADD COLUMN bio_description TEXT DEFAULT NULL`).catch(() => {});
+      await db.query(`ALTER TABLE tiktok_connections ADD COLUMN avatar_large_url VARCHAR(500) DEFAULT NULL`).catch(() => {});
+      await db.query(`ALTER TABLE tiktok_connections ADD COLUMN avatar_url_100 VARCHAR(500) DEFAULT NULL`).catch(() => {});
+      await db.query(`ALTER TABLE tiktok_connections ADD COLUMN profile_deep_link VARCHAR(500) DEFAULT NULL`).catch(() => {});
+      await db.query(`ALTER TABLE tiktok_connections ADD COLUMN profile_web_link VARCHAR(500) DEFAULT NULL`).catch(() => {});
+      await db.query(`ALTER TABLE tiktok_connections ADD COLUMN is_verified TINYINT(1) DEFAULT 0`).catch(() => {});
     })().catch((err: any) => {
       tiktokConnectionsPromise = null;
       console.warn('[MySQL ensureTikTokConnectionsTable Error]:', err?.message || err);
