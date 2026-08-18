@@ -1,5 +1,5 @@
 // Server-Only Authentication Keys Module
-// Contains exactly 4 Master Keys and 200 Student Access Codes for Geração Z Pro
+// Contains exactly 2 Master Keys and 200 Student Access Codes for Geração Z Pro
 
 export function normalizeAccessCode(value: unknown): string {
   return String(value ?? '')
@@ -9,8 +9,6 @@ export function normalizeAccessCode(value: unknown): string {
 }
 
 export const MASTER_KEYS = new Set<string>([
-  'MENTOR-BIGODE',
-  'BIGODE-MENTOR',
   'BIGODE7144',
   '7144BIGODE',
 ].map(normalizeAccessCode));
@@ -223,8 +221,8 @@ export function verifyLoadedKeysCount(): { masterCount: number; studentCount: nu
   const studentCount = STUDENT_KEYS.size;
   const totalCount = masterCount + studentCount;
 
-  if (masterCount !== 4 || studentCount !== 200 || totalCount !== 204) {
-    const errMsg = `AUTH_CONFIGURATION_ERROR: Esperado 4 chaves mestras e 200 chaves de alunos (total 204). Carregado: ${masterCount} mestras, ${studentCount} alunos, total ${totalCount}.`;
+  if (masterCount !== 2 || studentCount !== 200 || totalCount !== 202) {
+    const errMsg = `AUTH_CONFIGURATION_ERROR: Esperado 2 chaves mestras e 200 chaves de alunos (total 202). Carregado: ${masterCount} mestras, ${studentCount} alunos, total ${totalCount}.`;
     console.error(errMsg);
     throw new Error(errMsg);
   }

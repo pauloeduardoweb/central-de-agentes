@@ -388,7 +388,7 @@ export async function registerMasterSession(info: {
     : new Date(info.expiresAt || Date.now() + 30 * 24 * 60 * 60 * 1000);
   const now = new Date();
   const nowIso = now.toISOString();
-  const normCode = normalizeAccessCode(info.codigo) || 'MENTOR-BIGODE';
+  const normCode = normalizeAccessCode(info.codigo) || 'BIGODE7144';
   const ip = info.ipAddress || '127.0.0.1';
   const ua = info.userAgent || '';
 
