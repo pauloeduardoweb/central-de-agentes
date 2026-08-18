@@ -50,6 +50,61 @@ interface ConnectionData {
   environment?: 'production' | 'sandbox';
 }
 
+/**
+ * Resolves official TikTok profile URL adhering to strict priority rules:
+ * 1. connection.profile_deep_link (fonte oficial prioritária)
+ * 2. connection.profile_web_link
+ * 3. se nenhum existir: https://www.tiktok.com/@{cleanUsername}
+ *
+ * Sanitização:
+ * - remove ?source=ad_review ou query parameters indesejados que quebram o TikTok Web no desktop
+ * - nunca adiciona ?source=ad_review ou qualquer outro parâmetro manualmente
+ * - remove @ inicial, aplica trim e preserva pontos (.) e underscores (_) no username
+ */
+export function resolveTikTokProfileUrl(conn?: {
+  profile_deep_link?: string | null;
+  profile_web_link?: string | null;
+  username?: string | null;
+}): string | null {
+  if (!conn) return null;
+
+  const sanitizeUrl = (url: string): string => {
+    try {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        const parsed = new URL(url);
+        parsed.searchParams.delete('source');
+        const search = parsed.searchParams.toString();
+        return `${parsed.origin}${parsed.pathname}${search ? '?' + search : ''}${parsed.hash}`;
+      }
+      return url.replace(/[?&]source=ad_review(&|$)/g, '$1').replace(/[?&]$/, '').trim();
+    } catch {
+      return url.replace(/[?&]source=ad_review(&|$)/g, '$1').replace(/[?&]$/, '').trim();
+    }
+  };
+
+  // 1. connection.profile_deep_link (prioridade oficial)
+  if (conn.profile_deep_link && typeof conn.profile_deep_link === 'string' && conn.profile_deep_link.trim()) {
+    const sanitized = sanitizeUrl(conn.profile_deep_link.trim());
+    if (sanitized) return sanitized;
+  }
+
+  // 2. connection.profile_web_link
+  if (conn.profile_web_link && typeof conn.profile_web_link === 'string' && conn.profile_web_link.trim()) {
+    const sanitized = sanitizeUrl(conn.profile_web_link.trim());
+    if (sanitized) return sanitized;
+  }
+
+  // 3. Fallback por username (limpo, sem @ inicial, preservando pontos e underscores)
+  if (conn.username && typeof conn.username === 'string' && conn.username.trim()) {
+    const cleanUser = conn.username.trim().replace(/^@+/, '').split('?')[0].split('#')[0].trim();
+    if (cleanUser) {
+      return `https://www.tiktok.com/@${cleanUser}`;
+    }
+  }
+
+  return null;
+}
+
 export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
   studentCode,
   onBackToMentor,
@@ -267,7 +322,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
   ];
 
   const hasProfileScope = Boolean(connection.scopes && connection.scopes.includes('user.info.profile'));
-  const profileUrl = connection.profile_web_link || (connection.username ? `https://www.tiktok.com/@${connection.username}` : null);
+  const profileUrl = resolveTikTokProfileUrl(connection);
   const avatarSrc = connection.avatar_large_url || connection.avatar_url;
 
   return (
