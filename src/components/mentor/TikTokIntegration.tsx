@@ -29,6 +29,8 @@ import {
 interface TikTokIntegrationProps {
   studentCode: string;
   onBackToMentor?: () => void;
+  onBack?: () => void;
+  backButtonLabel?: string;
 }
 
 interface ConnectionData {
@@ -48,7 +50,12 @@ interface ConnectionData {
   environment?: 'production' | 'sandbox';
 }
 
-export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCode, onBackToMentor }) => {
+export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
+  studentCode,
+  onBackToMentor,
+  onBack,
+  backButtonLabel,
+}) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [syncingProfile, setSyncingProfile] = useState<boolean>(false);
   const [disconnecting, setDisconnecting] = useState<boolean>(false);
@@ -287,13 +294,13 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({ studentCod
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 self-start md:self-center shrink-0">
-            {onBackToMentor && (
+            {(onBack || onBackToMentor) && (
               <button
-                onClick={onBackToMentor}
+                onClick={onBack || onBackToMentor}
                 className="px-4 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/30 text-xs font-bold text-cyan-300 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Voltar ao Painel do Mentor</span>
+                <span>{backButtonLabel || (onBackToMentor ? 'Voltar ao Painel do Mentor' : 'Voltar à Central de Agentes')}</span>
               </button>
             )}
 
