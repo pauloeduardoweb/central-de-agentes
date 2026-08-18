@@ -841,7 +841,9 @@ export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
     });
   }
 
-  // 4. Always apply local revocation in MySQL and memory fallback to prevent new local use
+  // 4. Local revocation in MySQL or memory fallback
+  let localRevocationSuccess = false;
+
   if (isDatabaseConfigured()) {
     try {
       await ensureTikTokConnectionsTable();
@@ -852,16 +854,28 @@ export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
          WHERE codigo = ?`,
         [codigo]
       );
+      localRevocationSuccess = true;
     } catch (err) {
       console.error('[MySQL TikTok Connection Revoke Error]:', err);
+      localRevocationSuccess = false;
+    }
+  } else {
+    const memConn = memoryConnectionsMap.get(codigo);
+    if (memConn) {
+      memConn.revoked_at = new Date();
+      memConn.updated_at = new Date();
+      localRevocationSuccess = true;
+    } else {
+      localRevocationSuccess = true;
     }
   }
 
+  // Also sync memory store if it exists
   const memConn = memoryConnectionsMap.get(codigo);
   if (memConn) {
     memConn.revoked_at = new Date();
     memConn.updated_at = new Date();
   }
 
-  return true;
+  return localRevocationSuccess;
 }
