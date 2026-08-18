@@ -311,7 +311,7 @@ export const Header: React.FC<HeaderProps> = ({
                       }`}
                     >
                       <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      <span className="hidden xl:inline">Painel do </span><span>Mentor</span>
+                      <span>Painel</span>
                     </button>
                   )}
                 </div>
