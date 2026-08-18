@@ -326,7 +326,7 @@ async function handleLogin(req: express.Request, res: express.Response) {
   // Rule 3: Master Keys can enter on multiple devices and MUST NOT be saved in sessoes table
   if (keyType === 'MASTER') {
     const masterSessionId = existingSessionId || 'MASTER-SESSION-' + crypto.randomUUID();
-    registerMasterSession({
+    await registerMasterSession({
       sessionId: masterSessionId,
       codigo: cleanCode,
       ipAddress: getClientIp(req),
@@ -678,7 +678,7 @@ apiRouter.post(
       }
 
       if (sessionId) {
-        revokeMasterSession(sessionId);
+        await revokeMasterSession(sessionId);
       }
 
       if (cleanCode && keyType === 'STUDENT' && isDatabaseConfigured()) {
