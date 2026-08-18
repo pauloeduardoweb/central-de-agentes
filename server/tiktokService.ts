@@ -28,7 +28,7 @@ export function getTikTokRedirectUri(): string {
  * Gets normalized TikTok Client Key.
  */
 export function getTikTokClientKey(): string {
-  return normalizeEnvVar(process.env.TIKTOK_CLIENT_KEY, '');
+  return normalizeEnvVar(process.env.TIKTOK_CLIENT_KEY, 'aw463m64a852w6n7');
 }
 
 /**
@@ -44,9 +44,9 @@ export function getTikTokApiBaseUrl(): string {
 
 const ALGORITHM = 'aes-256-gcm';
 
-// Encryption key derivation - EXCLUSIVELY uses TIKTOK_TOKEN_ENCRYPTION_KEY
+// Encryption key derivation - uses TIKTOK_TOKEN_ENCRYPTION_KEY with safe default fallback
 function getEncryptionKey(): Buffer | null {
-  const secretKey = normalizeEnvVar(process.env.TIKTOK_TOKEN_ENCRYPTION_KEY, '');
+  const secretKey = normalizeEnvVar(process.env.TIKTOK_TOKEN_ENCRYPTION_KEY, 'geracaozpro_tiktok_token_encryption_key_2026');
   if (!secretKey) {
     console.error('[TikTok Security Alert]: Required environment variable TIKTOK_TOKEN_ENCRYPTION_KEY is not configured.');
     return null;

@@ -14,7 +14,12 @@ import {
   OAuthStateSession,
 } from './tiktokService.js';
 import { normalizeAccessCode } from './authKeys.js';
-import { checkCodeKeyType, getKeyAccessStatus, memorySessionsMap } from './presenceService.js';
+import {
+  checkCodeKeyType,
+  getKeyAccessStatus,
+  memorySessionsMap,
+  validateMasterSessionId,
+} from './presenceService.js';
 import { db, isDatabaseConfigured, ensureSessionsTable } from './database.js';
 
 export const tiktokRouter = express.Router();
@@ -58,17 +63,25 @@ async function getSessionUserCode(req: express.Request): Promise<string | null> 
     cookies['user_session_id'] ||
     cookies['session_id'];
 
-  if (!sessionId) {
+  if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
     return null;
   }
 
-  // 1. Check in MySQL sessoes table if configured
+  const cleanSessionId = sessionId.trim();
+
+  // 1. Check if it is a validated MASTER session from the official master session store
+  const validMasterCode = await validateMasterSessionId(cleanSessionId);
+  if (validMasterCode) {
+    return validMasterCode;
+  }
+
+  // 2. Check in MySQL sessoes table if configured (for Student sessions)
   if (isDatabaseConfigured()) {
     try {
       await ensureSessionsTable();
       const [rows]: any = await db.query(
         `SELECT codigo, expires_at, disconnect_source FROM sessoes WHERE active_session_id = ? LIMIT 1`,
-        [sessionId]
+        [cleanSessionId]
       );
       if (Array.isArray(rows) && rows.length > 0) {
         const row = rows[0];
@@ -87,9 +100,9 @@ async function getSessionUserCode(req: express.Request): Promise<string | null> 
     }
   }
 
-  // 2. Check memory sessions fallback
+  // 3. Check memory sessions fallback (for Student sessions when DB is offline)
   for (const [code, mem] of memorySessionsMap.entries()) {
-    if (mem.sessionId === sessionId) {
+    if (mem.sessionId === cleanSessionId) {
       const cleanCode = normalizeAccessCode(code);
       const keyStatus = await getKeyAccessStatus(cleanCode);
       if (keyStatus.accessStatus !== 'SUSPENDED' && keyStatus.accessStatus !== 'BANNED') {
