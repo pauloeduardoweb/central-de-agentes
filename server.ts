@@ -60,6 +60,8 @@ import {
   recordSessionHistoryEvent,
   checkCodeKeyType,
   memorySessionsMap,
+  registerMasterSession,
+  revokeMasterSession,
   getClientIp,
   parseUserAgent,
   PRESENCE_VERSION,
@@ -324,7 +326,14 @@ async function handleLogin(req: express.Request, res: express.Response) {
   // Rule 3: Master Keys can enter on multiple devices and MUST NOT be saved in sessoes table
   if (keyType === 'MASTER') {
     const masterSessionId = existingSessionId || 'MASTER-SESSION-' + crypto.randomUUID();
-    console.log(`[AUTH LOG] type=MASTER masked=${maskedCode} sessionFound=false sessionValid=false recorded=false http=200`);
+    registerMasterSession({
+      sessionId: masterSessionId,
+      codigo: cleanCode,
+      ipAddress: getClientIp(req),
+      userAgent: (req.headers['user-agent'] as string) || '',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+    console.log(`[AUTH LOG] type=MASTER masked=${maskedCode} sessionId=${masterSessionId} registered=true http=200`);
     return res.status(200).json({
       success: true,
       status: 'ok',
@@ -666,6 +675,10 @@ apiRouter.post(
 
       if (cleanCode) {
         memorySessionsMap.delete(cleanCode);
+      }
+
+      if (sessionId) {
+        revokeMasterSession(sessionId);
       }
 
       if (cleanCode && keyType === 'STUDENT' && isDatabaseConfigured()) {
