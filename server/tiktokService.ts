@@ -44,22 +44,27 @@ export function getTikTokApiBaseUrl(): string {
 
 const ALGORITHM = 'aes-256-gcm';
 
-// Encryption key derivation
-function getEncryptionKey(): Buffer {
-  const secretKey =
-    process.env.TIKTOK_TOKEN_ENCRYPTION_KEY ||
-    process.env.DB_PASSWORD ||
-    'gzpro_tiktok_secure_encryption_key_2026';
+// Encryption key derivation - EXCLUSIVELY uses TIKTOK_TOKEN_ENCRYPTION_KEY
+function getEncryptionKey(): Buffer | null {
+  const secretKey = normalizeEnvVar(process.env.TIKTOK_TOKEN_ENCRYPTION_KEY, '');
+  if (!secretKey) {
+    console.error('[TikTok Security Alert]: Required environment variable TIKTOK_TOKEN_ENCRYPTION_KEY is not configured.');
+    return null;
+  }
   return crypto.createHash('sha256').update(secretKey).digest();
 }
 
 /**
  * Encrypt sensitive tokens before saving in database.
+ * Returns null if encryption key is missing.
  */
-export function encryptToken(plainText: string): string {
+export function encryptToken(plainText: string): string | null {
   if (!plainText) return '';
-  const iv = crypto.randomBytes(12);
   const key = getEncryptionKey();
+  if (!key) {
+    return null;
+  }
+  const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   let encrypted = cipher.update(plainText, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -69,23 +74,27 @@ export function encryptToken(plainText: string): string {
 
 /**
  * Decrypt tokens retrieved from database.
+ * Returns '' if encryption key is missing or decryption fails.
  */
 export function decryptToken(encryptedData: string): string {
   if (!encryptedData) return '';
+  const key = getEncryptionKey();
+  if (!key) {
+    return '';
+  }
   try {
     const parts = encryptedData.split(':');
-    if (parts.length !== 3) return encryptedData;
+    if (parts.length !== 3) return '';
     const [ivHex, authTagHex, encryptedTextHex] = parts;
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
-    const key = getEncryptionKey();
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
     let decrypted = decipher.update(encryptedTextHex, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (err) {
-    console.error('[TikTok Encryption Error]: Failed to decrypt token', err);
+    console.error('[TikTok Encryption Error]: Failed to decrypt token');
     return '';
   }
 }
@@ -314,6 +323,11 @@ export async function saveTikTokConnection(data: {
 }): Promise<boolean> {
   const encAccessToken = encryptToken(data.access_token);
   const encRefreshToken = data.refresh_token ? encryptToken(data.refresh_token) : null;
+
+  if (!encAccessToken || (data.refresh_token && !encRefreshToken)) {
+    console.error('[TikTok Security Error]: Cannot save connection because token encryption is unavailable (TIKTOK_TOKEN_ENCRYPTION_KEY missing).');
+    return false;
+  }
 
   const now = new Date();
   const accessExpiresAt = data.expires_in
@@ -577,7 +591,7 @@ export async function refreshTikTokAccessToken(codigo: string): Promise<string |
 
     const payload = json.data || json;
     if (!res.ok || !payload.access_token) {
-      console.warn('[TikTok Token Refresh Failed]:', json);
+      console.warn('[TikTok Token Refresh Failed]: HTTP', res.status, json?.error?.message || json?.error || json?.message || 'Unknown error');
       return null;
     }
 
@@ -589,6 +603,11 @@ export async function refreshTikTokAccessToken(codigo: string): Promise<string |
 
     const encNewAccess = encryptToken(newAccessToken);
     const encNewRefresh = encryptToken(newRefreshToken);
+
+    if (!encNewAccess || !encNewRefresh) {
+      console.error('[TikTok Token Refresh Error]: Encryption failed when updating tokens.');
+      return null;
+    }
     const now = new Date();
     const accessExpiresAt = expiresIn ? new Date(now.getTime() + expiresIn * 1000) : null;
     const refreshExpiresAt = refreshExpiresIn ? new Date(now.getTime() + refreshExpiresIn * 1000) : null;
