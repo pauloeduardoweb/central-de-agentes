@@ -223,16 +223,10 @@ export const Header: React.FC<HeaderProps> = ({
                   const isMentorUser = isMaster || Boolean(profile?.is_mentor) || Boolean(studentCode && isMasterKey(studentCode));
                   const userNickname = profile?.nickname || (isMentorUser ? 'Mentor Bigode' : 'Aluno Z Pro');
                   return (
-                    <div className="flex items-center space-x-1 lg:space-x-1.5 min-w-0">
-                      <span className="font-extrabold text-xs lg:text-sm text-white truncate max-w-[80px] md:max-w-[100px] lg:max-w-[140px] xl:max-w-[180px]">
+                    <div className="flex items-center min-w-0">
+                      <span className="font-extrabold text-xs lg:text-sm text-white truncate max-w-[120px] md:max-w-[160px] lg:max-w-[220px] xl:max-w-none" title={userNickname}>
                         {userNickname}
                       </span>
-                      {isMentorUser && (
-                        <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[10px] lg:text-xs shrink-0">
-                          <span>👑</span>
-                          <span className="hidden xl:inline">Mentor</span>
-                        </span>
-                      )}
                     </div>
                   );
                 })()}
@@ -403,16 +397,10 @@ export const Header: React.FC<HeaderProps> = ({
                     const isMentorUser = isMaster || Boolean(profile?.is_mentor) || Boolean(studentCode && isMasterKey(studentCode));
                     const userNickname = profile?.nickname || (isMentorUser ? 'Mentor Bigode' : 'Aluno Z Pro');
                     return (
-                      <div className="flex items-center space-x-1.5 min-w-0">
-                        <span className="font-extrabold text-xs text-white truncate max-w-[110px] sm:max-w-[160px]">
+                      <div className="flex items-center min-w-0">
+                        <span className="font-extrabold text-xs text-white truncate max-w-[140px] sm:max-w-[200px]" title={userNickname}>
                           {userNickname}
                         </span>
-                        {isMentorUser && (
-                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-[10px] shrink-0">
-                            <span>👑</span>
-                            <span>Mentor</span>
-                          </span>
-                        )}
                       </div>
                     );
                   })()}
