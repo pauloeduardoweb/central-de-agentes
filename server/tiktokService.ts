@@ -49,6 +49,12 @@ export function getTikTokEnvironment(): 'production' | 'sandbox' {
   return env === 'sandbox' ? 'sandbox' : 'production';
 }
 
+console.log('[TIKTOK_ENV_DIAGNOSTIC]', {
+  rawPresent: Boolean(process.env.TIKTOK_ENVIRONMENT),
+  rawValue: process.env.TIKTOK_ENVIRONMENT || '(missing)',
+  resolvedEnvironment: getTikTokEnvironment()
+});
+
 /**
  * Gets required OAuth scopes according to TikTok environment.
  * Production: 'user.info.basic,user.info.profile' (approved production scopes)

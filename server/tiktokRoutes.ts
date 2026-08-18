@@ -12,6 +12,8 @@ import {
   getTikTokRedirectUri,
   getTikTokClientKey,
   getTikTokClientSecret,
+  getTikTokEnvironment,
+  getTikTokOAuthScopes,
   OAuthStateSession,
 } from './tiktokService.js';
 import { normalizeAccessCode } from './authKeys.js';
@@ -140,7 +142,7 @@ tiktokRouter.post('/oauth/prepare', async (req: express.Request, res: express.Re
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
-    const scope = 'user.info.basic,user.info.profile,video.list';
+    const scope = getTikTokOAuthScopes();
 
     if (!clientKey) {
       console.error('[TikTok OAuth Prepare Error]: TIKTOK_CLIENT_KEY is missing');
@@ -206,7 +208,7 @@ tiktokRouter.get('/oauth/start', async (req: express.Request, res: express.Respo
 
     const clientKey = getTikTokClientKey();
     const redirectUri = getTikTokRedirectUri();
-    const scope = 'user.info.basic,user.info.profile,video.list';
+    const scope = getTikTokOAuthScopes();
 
     const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
     authUrl.searchParams.set('client_key', clientKey);
@@ -477,6 +479,12 @@ tiktokRouter.get('/connection', async (req: express.Request, res: express.Respon
     }
 
     const conn = await getSafeTikTokConnection(userCode);
+    console.log('[TIKTOK_ENV_DIAGNOSTIC]', {
+      rawPresent: Boolean(process.env.TIKTOK_ENVIRONMENT),
+      rawValue: process.env.TIKTOK_ENVIRONMENT || '(missing)',
+      resolvedEnvironment: getTikTokEnvironment(),
+      returnedEnvironment: conn.environment
+    });
     return res.json(conn);
   } catch (err: any) {
     console.error('[TikTok Connection Get Error]:', err);
