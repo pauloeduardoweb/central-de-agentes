@@ -759,16 +759,96 @@ export async function syncTikTokProfile(codigo: string): Promise<{ success: bool
 
 /**
  * Revokes / disconnects TikTok connection for a user.
+ * 1. Fetches encrypted access_token for the active connection.
+ * 2. Decrypts token using TIKTOK_TOKEN_ENCRYPTION_KEY (via decryptToken).
+ * 3. Calls official TikTok Login Kit v2 revocation endpoint (https://open.tiktokapis.com/v2/oauth/revoke/).
+ * 4. Never logs tokens or sensitive secrets.
+ * 5. Regardless of external API response, updates local revoked_at timestamp in MySQL and memory store.
+ * 6. Preserves history/profile/records without deleting rows.
  */
 export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
   if (!codigo) return false;
 
+  const maskedCode =
+    codigo.length > 6 ? `${codigo.slice(0, 3)}...${codigo.slice(-3)}` : '***';
+
+  let encAccessToken: string | null = null;
+
+  // 1. Retrieve encrypted token from database or memory store
+  if (isDatabaseConfigured()) {
+    try {
+      await ensureTikTokConnectionsTable();
+      const [rows]: any = await db.query(
+        `SELECT access_token, refresh_token FROM tiktok_connections WHERE codigo = ? AND revoked_at IS NULL LIMIT 1`,
+        [codigo]
+      );
+      if (Array.isArray(rows) && rows.length > 0 && rows[0].access_token) {
+        encAccessToken = rows[0].access_token;
+      }
+    } catch (err) {
+      console.error('[MySQL TikTok Revoke Query Error]:', err);
+    }
+  } else {
+    const mem = memoryConnectionsMap.get(codigo);
+    if (mem && !mem.revoked_at && mem.access_token) {
+      encAccessToken = mem.access_token;
+    }
+  }
+
+  // 2. Decrypt token using TIKTOK_TOKEN_ENCRYPTION_KEY
+  const plainAccessToken = encAccessToken ? decryptToken(encAccessToken) : '';
+
+  // 3. Call official TikTok v2 revocation endpoint if token is present
+  let revokeAttempted = false;
+  let revokeSuccess = false;
+  let httpStatus: number | null = null;
+
+  if (plainAccessToken) {
+    revokeAttempted = true;
+    const clientKey = getTikTokClientKey();
+    const clientSecret = getTikTokClientSecret();
+    const apiBaseUrl = getTikTokApiBaseUrl();
+    const revokeUrl = `${apiBaseUrl}/v2/oauth/revoke/`;
+
+    try {
+      const bodyParams = new URLSearchParams();
+      bodyParams.append('client_key', clientKey);
+      bodyParams.append('client_secret', clientSecret);
+      bodyParams.append('token', plainAccessToken);
+
+      const res = await fetch(revokeUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Cache-Control': 'no-cache',
+        },
+        body: bodyParams.toString(),
+      });
+
+      httpStatus = res.status;
+      if (res.ok) {
+        revokeSuccess = true;
+      }
+    } catch (err) {
+      revokeSuccess = false;
+    }
+
+    console.log('[TikTok Revoke Summary]:', {
+      'TikTok revoke attempted': revokeAttempted,
+      'TikTok revoke success': revokeSuccess,
+      'HTTP status': httpStatus,
+      'codigo mascarado': maskedCode,
+    });
+  }
+
+  // 4. Always apply local revocation in MySQL and memory fallback to prevent new local use
   if (isDatabaseConfigured()) {
     try {
       await ensureTikTokConnectionsTable();
       await db.query(
         `UPDATE tiktok_connections
-         SET revoked_at = NOW()
+         SET revoked_at = NOW(),
+             updated_at = NOW()
          WHERE codigo = ?`,
         [codigo]
       );
@@ -780,6 +860,7 @@ export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
   const memConn = memoryConnectionsMap.get(codigo);
   if (memConn) {
     memConn.revoked_at = new Date();
+    memConn.updated_at = new Date();
   }
 
   return true;
