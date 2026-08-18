@@ -41,14 +41,15 @@ function parseCookies(req: express.Request): Record<string, string> {
 }
 
 /**
- * Resolves user code EXCLUSIVELY from authenticated backend session / headers / cookies.
- * Disallows query/body parameters (req.query.code, req.body.code, etc.) from choosing
- * or impersonating another student's TikTok connection.
+ * Resolves user code EXCLUSIVELY from authenticated backend session ID (header/cookie).
+ * Disallows access code headers (x-access-code, x-student-access-code, x-master-key),
+ * cookies (tiktok_auth_code, user_access_code), or query/body parameters from acting as identity fallback.
+ * If no valid active session is found: returns null (resulting in 401).
  */
 async function getSessionUserCode(req: express.Request): Promise<string | null> {
   const cookies = parseCookies(req);
 
-  // 1. Check active session ID from headers or cookies
+  // Check active session ID exclusively from headers or session cookie
   const sessionId =
     (req.headers['x-session-id'] as string) ||
     (req.headers['x-student-session-id'] as string) ||
@@ -56,7 +57,12 @@ async function getSessionUserCode(req: express.Request): Promise<string | null> 
     cookies['user_session_id'] ||
     cookies['session_id'];
 
-  if (sessionId && isDatabaseConfigured()) {
+  if (!sessionId) {
+    return null;
+  }
+
+  // 1. Check in MySQL sessoes table if configured
+  if (isDatabaseConfigured()) {
     try {
       await ensureSessionsTable();
       const [rows]: any = await db.query(
@@ -80,39 +86,14 @@ async function getSessionUserCode(req: express.Request): Promise<string | null> 
     }
   }
 
-  // Check memory sessions if DB not available or not found
-  if (sessionId) {
-    for (const [code, mem] of memorySessionsMap.entries()) {
-      if (mem.sessionId === sessionId) {
-        const cleanCode = normalizeAccessCode(code);
-        const keyStatus = await getKeyAccessStatus(cleanCode);
-        if (keyStatus.accessStatus !== 'SUSPENDED' && keyStatus.accessStatus !== 'BANNED') {
-          return cleanCode;
-        }
+  // 2. Check memory sessions fallback
+  for (const [code, mem] of memorySessionsMap.entries()) {
+    if (mem.sessionId === sessionId) {
+      const cleanCode = normalizeAccessCode(code);
+      const keyStatus = await getKeyAccessStatus(cleanCode);
+      if (keyStatus.accessStatus !== 'SUSPENDED' && keyStatus.accessStatus !== 'BANNED') {
+        return cleanCode;
       }
-    }
-  }
-
-  // 2. Authenticated access token/header/cookie resolution (Never from query or body code selector)
-  const authHeader = req.headers['authorization'];
-  const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
-
-  const rawCode =
-    req.headers['x-access-code'] ||
-    req.headers['x-student-access-code'] ||
-    req.headers['x-master-key'] ||
-    bearerToken ||
-    cookies['tiktok_auth_code'] ||
-    cookies['user_access_code'];
-
-  const cleanCode = normalizeAccessCode(rawCode);
-  if (!cleanCode) return null;
-
-  const keyType = await checkCodeKeyType(cleanCode);
-  if (keyType === 'STUDENT' || keyType === 'MASTER') {
-    const keyStatus = await getKeyAccessStatus(cleanCode);
-    if (keyStatus.accessStatus !== 'SUSPENDED' && keyStatus.accessStatus !== 'BANNED') {
-      return cleanCode;
     }
   }
 

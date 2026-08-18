@@ -847,21 +847,27 @@ export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
   if (isDatabaseConfigured()) {
     try {
       await ensureTikTokConnectionsTable();
-      await db.query(
+      const [result]: any = await db.query(
         `UPDATE tiktok_connections
          SET revoked_at = NOW(),
              updated_at = NOW()
-         WHERE codigo = ?`,
+         WHERE codigo = ? AND revoked_at IS NULL`,
         [codigo]
       );
-      // Confirmed persistent update in MySQL
-      localRevocationSuccess = true;
 
-      // Sync memory fallback store upon successful MySQL persistence
-      const memConn = memoryConnectionsMap.get(codigo);
-      if (memConn) {
-        memConn.revoked_at = new Date();
-        memConn.updated_at = new Date();
+      const affectedRows = result && typeof result.affectedRows === 'number' ? result.affectedRows : 0;
+
+      if (affectedRows > 0) {
+        localRevocationSuccess = true;
+        // Sync memory fallback store upon successful MySQL persistence
+        const memConn = memoryConnectionsMap.get(codigo);
+        if (memConn) {
+          memConn.revoked_at = new Date();
+          memConn.updated_at = new Date();
+        }
+      } else {
+        // No active connection was found or changed in MySQL
+        localRevocationSuccess = false;
       }
     } catch (err) {
       console.error('[MySQL TikTok Connection Revoke Error]:', err);
@@ -869,11 +875,13 @@ export async function revokeTikTokConnection(codigo: string): Promise<boolean> {
     }
   } else {
     const memConn = memoryConnectionsMap.get(codigo);
-    if (memConn) {
+    if (memConn && !memConn.revoked_at) {
       memConn.revoked_at = new Date();
       memConn.updated_at = new Date();
+      localRevocationSuccess = true;
+    } else {
+      localRevocationSuccess = false;
     }
-    localRevocationSuccess = true;
   }
 
   return localRevocationSuccess;
