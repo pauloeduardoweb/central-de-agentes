@@ -247,6 +247,47 @@ export interface TikTokProfileData {
 }
 
 /**
+ * Sanitizes TikTok username:
+ * - removes leading @
+ * - trims whitespace
+ * - preserves dots (.) and underscores (_)
+ * - removes accidental query parameters
+ */
+export function sanitizeTikTokUsername(username?: string | null): string | undefined {
+  if (!username || typeof username !== 'string') return undefined;
+  const trimmed = username.trim();
+  if (!trimmed) return undefined;
+  const clean = trimmed.replace(/^@+/, '').split('?')[0].split('#')[0].trim();
+  return clean || undefined;
+}
+
+/**
+ * Sanitizes TikTok profile URLs (profile_deep_link, profile_web_link):
+ * - trims whitespace
+ * - strips ?source=ad_review or any query parameter that breaks TikTok Web desktop
+ * - never adds ?source=ad_review or any other query parameter manually
+ */
+export function sanitizeTikTokProfileUrl(url?: string | null): string | undefined {
+  if (!url || typeof url !== 'string') return undefined;
+  const raw = url.trim();
+  if (!raw) return undefined;
+
+  try {
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      const parsed = new URL(raw);
+      parsed.searchParams.delete('source');
+      const search = parsed.searchParams.toString();
+      return `${parsed.origin}${parsed.pathname}${search ? '?' + search : ''}${parsed.hash}`;
+    }
+    const cleaned = raw.replace(/[?&]source=ad_review(&|$)/g, '$1').replace(/[?&]$/, '').trim();
+    return cleaned || undefined;
+  } catch {
+    const cleaned = raw.replace(/[?&]source=ad_review(&|$)/g, '$1').replace(/[?&]$/, '').trim();
+    return cleaned || undefined;
+  }
+}
+
+/**
  * Fetches user profile from official TikTok Login Kit v2 endpoint.
  * Requests ONLY approved fields: basic info + profile info (NO stats).
  */
@@ -344,6 +385,9 @@ export async function saveTikTokConnection(data: {
     : null;
 
   const scopes = data.scope || 'user.info.basic,user.info.profile';
+  const cleanUsername = sanitizeTikTokUsername(data.username);
+  const cleanDeepLink = sanitizeTikTokProfileUrl(data.profile_deep_link);
+  const cleanWebLink = sanitizeTikTokProfileUrl(data.profile_web_link);
 
   if (isDatabaseConfigured()) {
     try {
@@ -379,13 +423,13 @@ export async function saveTikTokConnection(data: {
           data.open_id,
           data.union_id || null,
           data.display_name || 'Conta TikTok',
-          data.username || null,
+          cleanUsername || null,
           data.bio_description || null,
           data.avatar_url || null,
           data.avatar_large_url || null,
           data.avatar_url_100 || null,
-          data.profile_deep_link || null,
-          data.profile_web_link || null,
+          cleanDeepLink || null,
+          cleanWebLink || null,
           data.is_verified ? 1 : 0,
           encAccessToken,
           encRefreshToken,
@@ -406,13 +450,13 @@ export async function saveTikTokConnection(data: {
     open_id: data.open_id,
     union_id: data.union_id,
     display_name: data.display_name || 'Conta TikTok',
-    username: data.username,
+    username: cleanUsername,
     bio_description: data.bio_description,
     avatar_url: data.avatar_url || '',
     avatar_large_url: data.avatar_large_url,
     avatar_url_100: data.avatar_url_100,
-    profile_deep_link: data.profile_deep_link,
-    profile_web_link: data.profile_web_link,
+    profile_deep_link: cleanDeepLink,
+    profile_web_link: cleanWebLink,
     is_verified: Boolean(data.is_verified),
     access_token: encAccessToken,
     refresh_token: encRefreshToken || undefined,
@@ -472,15 +516,20 @@ export async function getSafeTikTokConnection(codigo: string): Promise<SafeTikTo
           ? `${openId.slice(0, 4)}...${openId.slice(-4)}`
           : openId;
 
+        const cleanUsername = sanitizeTikTokUsername(conn.username);
+        const cleanDeepLink = sanitizeTikTokProfileUrl(conn.profile_deep_link);
+        const cleanWebLink = sanitizeTikTokProfileUrl(conn.profile_web_link);
+        const resolvedWebLink = cleanWebLink || (cleanUsername ? `https://www.tiktok.com/@${cleanUsername}` : undefined);
+
         return {
           connected: true,
           display_name: conn.display_name || 'Conta TikTok',
-          username: conn.username || undefined,
+          username: cleanUsername,
           bio_description: conn.bio_description || undefined,
           avatar_url: conn.avatar_url || '',
           avatar_large_url: conn.avatar_large_url || undefined,
-          profile_deep_link: conn.profile_deep_link || undefined,
-          profile_web_link: conn.profile_web_link || (conn.username ? `https://www.tiktok.com/@${conn.username}` : undefined),
+          profile_deep_link: cleanDeepLink || undefined,
+          profile_web_link: resolvedWebLink || undefined,
           is_verified: Boolean(conn.is_verified),
           open_id_masked: maskedOpenId,
           scopes: conn.scopes || 'user.info.basic',
@@ -502,15 +551,20 @@ export async function getSafeTikTokConnection(codigo: string): Promise<SafeTikTo
       ? `${openId.slice(0, 4)}...${openId.slice(-4)}`
       : openId;
 
+    const cleanUsername = sanitizeTikTokUsername(memConn.username);
+    const cleanDeepLink = sanitizeTikTokProfileUrl(memConn.profile_deep_link);
+    const cleanWebLink = sanitizeTikTokProfileUrl(memConn.profile_web_link);
+    const resolvedWebLink = cleanWebLink || (cleanUsername ? `https://www.tiktok.com/@${cleanUsername}` : undefined);
+
     return {
       connected: true,
       display_name: memConn.display_name || 'Conta TikTok',
-      username: memConn.username,
+      username: cleanUsername,
       bio_description: memConn.bio_description,
       avatar_url: memConn.avatar_url || '',
       avatar_large_url: memConn.avatar_large_url,
-      profile_deep_link: memConn.profile_deep_link,
-      profile_web_link: memConn.profile_web_link || (memConn.username ? `https://www.tiktok.com/@${memConn.username}` : undefined),
+      profile_deep_link: cleanDeepLink || undefined,
+      profile_web_link: resolvedWebLink || undefined,
       is_verified: Boolean(memConn.is_verified),
       open_id_masked: maskedOpenId,
       scopes: memConn.scopes || 'user.info.basic',
@@ -711,6 +765,10 @@ export async function syncTikTokProfile(codigo: string): Promise<{ success: bool
     return { success: false, error: 'PROFILE_FETCH_FAILED' };
   }
 
+  const cleanSyncUsername = sanitizeTikTokUsername(profile.username);
+  const cleanSyncDeepLink = sanitizeTikTokProfileUrl(profile.profile_deep_link);
+  const cleanSyncWebLink = sanitizeTikTokProfileUrl(profile.profile_web_link);
+
   // Update profile details in database
   if (isDatabaseConfigured()) {
     try {
@@ -729,13 +787,13 @@ export async function syncTikTokProfile(codigo: string): Promise<{ success: bool
          WHERE codigo = ?`,
         [
           profile.display_name || null,
-          profile.username || null,
+          cleanSyncUsername || null,
           profile.bio_description || null,
           profile.avatar_url || null,
           profile.avatar_large_url || null,
           profile.avatar_url_100 || null,
-          profile.profile_deep_link || null,
-          profile.profile_web_link || null,
+          cleanSyncDeepLink || null,
+          cleanSyncWebLink || null,
           profile.is_verified ? 1 : 0,
           codigo,
         ]
@@ -748,13 +806,13 @@ export async function syncTikTokProfile(codigo: string): Promise<{ success: bool
   const mem = memoryConnectionsMap.get(codigo);
   if (mem) {
     if (profile.display_name) mem.display_name = profile.display_name;
-    if (profile.username) mem.username = profile.username;
+    if (cleanSyncUsername) mem.username = cleanSyncUsername;
     if (profile.bio_description) mem.bio_description = profile.bio_description;
     if (profile.avatar_url) mem.avatar_url = profile.avatar_url;
     if (profile.avatar_large_url) mem.avatar_large_url = profile.avatar_large_url;
     if (profile.avatar_url_100) mem.avatar_url_100 = profile.avatar_url_100;
-    if (profile.profile_deep_link) mem.profile_deep_link = profile.profile_deep_link;
-    if (profile.profile_web_link) mem.profile_web_link = profile.profile_web_link;
+    if (cleanSyncDeepLink) mem.profile_deep_link = cleanSyncDeepLink;
+    if (cleanSyncWebLink) mem.profile_web_link = cleanSyncWebLink;
     mem.is_verified = Boolean(profile.is_verified);
     mem.updated_at = new Date();
   }
