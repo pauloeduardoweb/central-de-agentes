@@ -394,7 +394,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
     },
     {
       q: 'Quais dados são solicitados?',
-      a: 'Solicitamos estritamente as permissões aprovadas em produção pelo TikTok Developers: user.info.basic (nome de exibição, avatar e identificador), user.info.profile (nome de usuário @, biografia pública e verificação) e video.list (listagem dos seus vídeos públicos recentes). Nós nunca temos acesso a senhas ou dados confidenciais.',
+      a: `Solicitamos estritamente as permissões aprovadas ${connection.environment === 'sandbox' ? 'em sandbox' : 'em produção'} pelo TikTok Developers: user.info.basic (nome de exibição, avatar e identificador), user.info.profile (nome de usuário @, biografia pública e verificação) e video.list (listagem dos seus vídeos públicos recentes). Nós nunca temos acesso a senhas ou dados confidenciais.`,
     },
     {
       q: 'Posso desconectar quando quiser?',
@@ -411,6 +411,18 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
 
   const hasProfileScope = Boolean(connection.scopes && connection.scopes.includes('user.info.profile'));
   const hasVideoListScope = Boolean(connection.scopes && connection.scopes.includes('video.list'));
+  const isSandbox = connection.environment === 'sandbox';
+  const isProduction = connection.environment === 'production';
+  const environmentDisplay = connection.environment === 'sandbox'
+    ? 'Sandbox / V2'
+    : connection.environment === 'production'
+    ? 'Produção / V2'
+    : 'Carregando...';
+  const permissionsDescText = connection.environment === 'sandbox'
+    ? 'Permissões oficiais em sandbox'
+    : connection.environment === 'production'
+    ? 'Permissões oficiais em produção'
+    : 'Permissões oficiais';
   const profileUrl = resolveTikTokProfileUrl(connection);
   const avatarSrc = connection.avatar_large_url || connection.avatar_url;
 
@@ -561,8 +573,8 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
           <div className="min-w-0">
             <p className="text-[11px] text-slate-400 font-medium">Ambiente</p>
             <p className="text-xs font-bold text-emerald-300 mt-0.5 truncate flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              Produção / V2
+              <span className={`w-1.5 h-1.5 rounded-full ${!connection.environment ? 'bg-slate-400 animate-pulse' : 'bg-emerald-400'}`} />
+              {environmentDisplay}
             </p>
           </div>
         </div>
@@ -602,7 +614,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
             <div>
               <p className="text-xs font-bold text-cyan-200">Novas informações de perfil estão disponíveis!</p>
               <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
-                Os escopos oficiais <code className="text-cyan-300 bg-slate-950 px-1.5 py-0.5 rounded text-[11px]">user.info.profile</code> foram aprovados em produção. Atualize sua autorização para sincronizar @username, biografia e selo de verificação.
+                Os escopos oficiais <code className="text-cyan-300 bg-slate-950 px-1.5 py-0.5 rounded text-[11px]">user.info.profile</code> foram aprovados em {isSandbox ? 'sandbox' : 'produção'}. Atualize sua autorização para sincronizar @username, biografia e selo de verificação.
               </p>
             </div>
           </div>
@@ -801,7 +813,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
                   {connection.scopes || 'user.info.basic, user.info.profile'}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                  Permissões oficiais em produção: identificação pública básica (<code className="text-cyan-300">user.info.basic</code>) e perfil (<code className="text-teal-300">user.info.profile</code>).
+                  {permissionsDescText}: identificação pública básica (<code className="text-cyan-300">user.info.basic</code>) e perfil (<code className="text-teal-300">user.info.profile</code>).
                 </p>
               </div>
 
@@ -1131,7 +1143,7 @@ export const TikTokIntegration: React.FC<TikTokIntegrationProps> = ({
               Protocolo OAuth 2.0 Oficial
             </p>
             <p className="text-slate-400">
-              A autenticação é feita diretamente na infraestrutura segura do TikTok Developers em ambiente de Produção.
+              A autenticação é feita diretamente na infraestrutura segura do TikTok Developers em ambiente de {isSandbox ? 'Sandbox' : 'Produção'}.
             </p>
           </div>
 
