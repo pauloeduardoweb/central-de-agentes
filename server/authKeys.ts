@@ -239,6 +239,11 @@ export function lookupKeyType(rawCode: unknown): KeyCategory {
   const normalized = normalizeAccessCode(rawCode);
   if (!normalized) return 'INVALID';
 
+  // Explicit hard rejection: MENTOR-BIGODE and BIGODE-MENTOR must NEVER be accepted
+  if (normalized === 'MENTOR-BIGODE' || normalized === 'BIGODE-MENTOR') {
+    return 'INVALID';
+  }
+
   // Rule 9: Validation order
   // PRIMEIRO: Verificar se existe em MASTER_KEYS
   if (MASTER_KEYS.has(normalized)) {

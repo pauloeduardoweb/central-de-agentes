@@ -681,23 +681,30 @@ export async function getKeyAccessStatus(studentCode: string): Promise<KeyStatus
   return { accessStatus: 'ACTIVE' };
 }
 
-// Helper function to check key type (MySQL first, fallback to authKeys)
+// Helper function to check key type (authoritative MASTER_KEYS, then STUDENT_KEYS/MySQL)
 export async function checkCodeKeyType(cleanCode: string): Promise<'MASTER' | 'STUDENT' | 'INVALID'> {
   if (!cleanCode) return 'INVALID';
   const normalized = normalizeAccessCode(cleanCode);
+  if (!normalized) return 'INVALID';
 
+  // 1. Authoritative MASTER check: ONLY keys in MASTER_KEYS (BIGODE7144, 7144BIGODE) are MASTER.
+  if (MASTER_KEYS.has(normalized)) {
+    return 'MASTER';
+  }
+
+  // Explicit hard rejection: MENTOR-BIGODE and BIGODE-MENTOR must NEVER be accepted under any circumstances.
+  if (normalized === 'MENTOR-BIGODE' || normalized === 'BIGODE-MENTOR') {
+    return 'INVALID';
+  }
+
+  // 2. Check in-memory Student Keys
+  if (STUDENT_KEYS.has(normalized)) {
+    return 'STUDENT';
+  }
+
+  // 3. Check dynamically persisted student keys in Hostinger MySQL codigos_acesso
   if (isDatabaseConfigured()) {
     try {
-      // 1. Check chaves_mestras in Hostinger MySQL
-      const [masterRows]: any = await db.query(
-        'SELECT id FROM chaves_mestras WHERE UPPER(TRIM(codigo)) = ? AND ativo = 1 LIMIT 1',
-        [normalized]
-      );
-      if (Array.isArray(masterRows) && masterRows.length > 0) {
-        return 'MASTER';
-      }
-
-      // 2. Check codigos_acesso in Hostinger MySQL
       const [studentRows]: any = await db.query(
         'SELECT id, codigo, usado, usuario_id FROM codigos_acesso WHERE UPPER(TRIM(codigo)) = ? LIMIT 1',
         [normalized]
@@ -710,8 +717,7 @@ export async function checkCodeKeyType(cleanCode: string): Promise<'MASTER' | 'S
     }
   }
 
-  // Fallback to in-memory authKeys list
-  return lookupKeyType(normalized);
+  return 'INVALID';
 }
 
 // In-memory sessions store fallback for presence tracking when DB is offline
