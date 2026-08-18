@@ -224,7 +224,7 @@ export const Header: React.FC<HeaderProps> = ({
                   const userNickname = profile?.nickname || (isMentorUser ? 'Mentor Bigode' : 'Aluno Z Pro');
                   return (
                     <div className="flex items-center space-x-1.5 lg:space-x-2 min-w-0">
-                      <span className="font-extrabold text-xs lg:text-sm text-white truncate max-w-[100px] md:max-w-[130px] lg:max-w-[180px]">
+                      <span className="font-extrabold text-xs lg:text-sm text-white truncate max-w-[110px] md:max-w-[140px] lg:max-w-[200px]">
                         {userNickname}
                       </span>
                       {isMentorUser && (
@@ -233,9 +233,6 @@ export const Header: React.FC<HeaderProps> = ({
                           <span className="hidden lg:inline">Mentor</span>
                         </span>
                       )}
-                      <span className="text-[11px] lg:text-xs text-cyan-300 font-mono font-medium shrink-0 ml-0.5 lg:ml-1">
-                        🏆 Nível {profile?.level || 1}
-                      </span>
                     </div>
                   );
                 })()}
@@ -248,7 +245,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectView('hub')}
-                    className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2 lg:px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
                       activeView === 'hub'
                         ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
                         : 'text-slate-400 hover:text-white'
@@ -263,7 +260,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <button
                       type="button"
                       onClick={() => onSelectView('miner')}
-                      className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                      className={`px-2 lg:px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
                         activeView === 'miner'
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
                           : 'text-slate-400 hover:text-white'
@@ -278,7 +275,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectView('tiktok')}
-                    className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2 lg:px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
                       activeView === 'tiktok'
                         ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
                         : 'text-slate-400 hover:text-white'
@@ -292,7 +289,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectView('chat')}
-                    className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2 lg:px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
                       activeView === 'chat'
                         ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-xs'
                         : 'text-slate-400 hover:text-white'
@@ -307,7 +304,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <button
                       type="button"
                       onClick={() => onSelectView('mentor')}
-                      className={`px-2.5 lg:px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                      className={`px-2 lg:px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all whitespace-nowrap cursor-pointer ${
                         activeView === 'mentor'
                           ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white shadow-md'
                           : 'text-cyan-300 hover:text-white hover:bg-cyan-950/40'
@@ -321,9 +318,9 @@ export const Header: React.FC<HeaderProps> = ({
               )}
 
               {/* Lado Direito: Chave de Acesso + Indicador Online + Botão Sair */}
-              <div className="flex items-center space-x-1.5 lg:space-x-2.5 shrink-0">
+              <div className="flex items-center space-x-1.5 lg:space-x-2 shrink-0">
                 {studentCode && (
-                  <div className="flex items-center space-x-1 lg:space-x-1.5 px-2 lg:px-2.5 py-1 rounded-lg bg-slate-900/90 border border-cyan-500/30 text-cyan-200 text-[11px] lg:text-xs font-mono font-bold">
+                  <div className="flex items-center space-x-1 lg:space-x-1.5 px-2 lg:px-2.5 py-1 rounded-lg bg-slate-900/90 border border-cyan-500/30 text-cyan-200 text-[11px] lg:text-xs font-mono font-bold shrink-0 whitespace-nowrap">
                     <span className="tracking-wider text-emerald-400 select-all">
                       🔑 {formatKeyDisplay(studentCode)}
                     </span>
@@ -357,7 +354,7 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
 
                 <div 
-                  className="flex items-center space-x-1 lg:space-x-1.5 px-2 lg:px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] lg:text-xs font-semibold"
+                  className="flex items-center space-x-1 lg:space-x-1.5 px-2 lg:px-2.5 py-1 rounded-lg bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] lg:text-xs font-semibold shrink-0 whitespace-nowrap"
                   title="Online 1/1"
                 >
                   <span className="relative flex h-2 w-2">
@@ -372,11 +369,11 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={onDisconnectApiKey}
-                    className="px-2 lg:px-2.5 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-rose-100 text-[11px] lg:text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all cursor-pointer shadow-xs shrink-0"
+                    className="px-2 lg:px-2.5 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-rose-100 text-[11px] lg:text-xs font-bold flex items-center space-x-1 lg:space-x-1.5 transition-all cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
                     title="Sair da conta / Desconectar"
                   >
                     <LogOut className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                    <span className="hidden sm:inline">Sair</span>
+                    <span>Sair</span>
                   </button>
                 )}
               </div>
@@ -457,13 +454,8 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </div>
 
-              {/* Linha 2 do Card (Abaixo do divisor): 🏆 Nível 1 (à esquerda) | 🟢 Online 1/1 + 🔴 Sair (à direita) */}
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-cyan-500/20 text-xs">
-                {/* Esquerda: Nível */}
-                <div className="text-[11px] text-cyan-300 font-mono font-medium shrink-0 flex items-center space-x-1">
-                  <span>🏆 Nível {profile?.level || 1}</span>
-                </div>
-
+              {/* Linha 2 do Card (Abaixo do divisor): 🟢 Online 1/1 + 🔴 Sair */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-cyan-500/20 text-xs">
                 {/* Direita: Badge Online 1/1 + Botão Sair */}
                 <div className="flex items-center space-x-1.5 shrink-0">
                   {/* Badge Online 1/1 */}
@@ -478,7 +470,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Online 1/1</span>
                   </div>
 
-                  {/* Botão Sair Mobile (Posicionado dentro do card, ao lado do Online 1/1) */}
+                  {/* Botão Sair Mobile */}
                   {onDisconnectApiKey && (
                     <button
                       type="button"
