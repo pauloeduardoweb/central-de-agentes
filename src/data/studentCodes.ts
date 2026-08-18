@@ -16,5 +16,5 @@ export function isValidStudentCode(value: unknown): boolean {
 
 export function isMasterKey(value: unknown): boolean {
   const norm = normalizeAccessCode(value);
-  return ['MENTOR-BIGODE', 'BIGODE-MENTOR', 'BIGODE7144', '7144BIGODE'].includes(norm);
+  return ['BIGODE7144', '7144BIGODE'].includes(norm);
 }
