@@ -5983,7 +5983,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
         unclassifiedProducts: result.totalUnclassified || 0,
         updatedProducts: result.totalUpdated || 0,
         creditsUsed: result.totalCreditsUsed || 0,
-        categoriesProcessed: result.categoriesCompleted || result.categorySummaries?.length || 0,
+        categoriesProcessed: result.categorySummaries?.length || result.categoriesCompleted || 0,
         totalCategoriesRequested: categoriesToProcess.length,
         categorySummaries: result.categorySummaries || [],
       });
