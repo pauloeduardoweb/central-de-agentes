@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import {
   Search, Flame, ShoppingBag, Star, Store, ExternalLink, Play, Eye, Heart,
   MessageCircle, Share2, Bookmark, TrendingUp, Loader2, Database, Zap, RefreshCw,
-  Layers, ShieldCheck, AlertCircle, CheckCircle2, X, Sparkles, Home, Shirt, Utensils,
+  Layers, ShieldCheck, AlertCircle, AlertTriangle, CheckCircle2, X, Sparkles, Home, Shirt, Utensils,
   Cpu, Dumbbell, Baby, Dog, Copy, Check, Video, Download, FileText, BarChart3, Wand2, Filter,
   Trophy, ThumbsUp, SlidersHorizontal, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   BadgeDollarSign, Clock3, Rocket, Clapperboard, Gauge, Target
@@ -5770,6 +5770,11 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
   // Batch Execution Modal and Progress State
   const [showBatchConfirmModal, setShowBatchConfirmModal] = useState<boolean>(false);
   const [isBatchExecuting, setIsBatchExecuting] = useState<boolean>(false);
+  const [batchExecutionError, setBatchExecutionError] = useState<{
+    title: string;
+    message: string;
+    code?: string;
+  } | null>(null);
   const [batchProgress, setBatchProgress] = useState<{
     currentCategory: string;
     currentSubcategory?: string;
@@ -5872,34 +5877,46 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     setOpenCategoryDrawers((prev) => ({ ...prev, [catName]: !prev[catName] }));
   };
 
+  const handleCloseBatchProgress = () => {
+    setIsBatchExecuting(false);
+    setBatchProgress(null);
+    setBatchExecutionError(null);
+  };
+
   const handleExecuteBatchExpansion = async () => {
     setShowBatchConfirmModal(false);
     if (selectedExpansionCategories.length === 0 || isBatchExecuting) return;
 
     // Reset integral do estado de progresso de qualquer execução anterior
     setBatchProgress(null);
+    setBatchExecutionError(null);
     setIsBatchExecuting(true);
     setError('');
     setCollectorNotice(null);
 
     const categoriesToProcess = [...selectedExpansionCategories];
+    const firstCat = categoriesToProcess[0];
+    const firstCatStat = collectorCategories.find((c) => c.category === firstCat);
+    const firstProductCount = firstCatStat?.productCount || 0;
+    const firstRemainingNeeded = Math.max(0, expansionTargetCount - firstProductCount);
+    const firstCatPlan = activeExpansionPlans.find((p) => p.category === firstCat);
 
     try {
       setBatchProgress({
-        currentCategory: categoriesToProcess[0] || '',
+        currentCategory: firstCat || '',
         currentSubcategory: 'Iniciando job no servidor...',
         currentPage: 1,
         maxPagesForThisSub: 1,
         categoryIndex: 1,
         totalCategories: categoriesToProcess.length,
         subcategoryIndex: 1,
-        totalSubcategoriesInCategory: 1,
+        totalSubcategoriesInCategory: firstCatPlan?.subcategories?.length || 1,
         categoryTargetLimit: expansionTargetCount,
-        initialValidCount: 0,
-        currentValidTargetCount: 0,
-        remainingNeeded: 0,
+        initialValidCount: firstProductCount,
+        currentValidTargetCount: firstProductCount,
+        remainingNeeded: firstRemainingNeeded > 0 ? firstRemainingNeeded : 1,
         categoryCreditsUsed: 0,
-        categoryCreditLimit: 0,
+        categoryCreditLimit: firstCatPlan?.estimatedCredits || 0,
         validNewProductsForTarget: 0,
         offTargetProducts: 0,
         unclassifiedProducts: 0,
@@ -5950,6 +5967,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
       setIsBatchExecuting(false);
       setBatchProgress(null);
+      setBatchExecutionError(null);
 
       // RELEITURA OBRIGATÓRIA DOS STATS OFICIAIS DO MYSQL ANTES DE EXIBIR O MODAL
       await loadCategories();
@@ -5970,9 +5988,15 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       });
     } catch (err: any) {
       console.error('[Batch Expansion Error]:', err?.message || err);
-      setIsBatchExecuting(false);
-      setBatchProgress(null);
-      setError(`Erro na expansão: ${err?.message || 'Falha ao executar job de expansão'}`);
+      // NÃO fechar o modal nem apagar o progresso
+      const errorMessage = err?.message || 'Falha ao executar job de expansão no servidor.';
+      const errorCode = err?.code || (err?.name === 'ProductMinerApiError' ? err.code : undefined);
+      setBatchExecutionError({
+        title: 'Falha ao iniciar expansão',
+        message: errorMessage,
+        code: errorCode,
+      });
+      setError(errorMessage);
     }
   };
 
@@ -8383,163 +8407,214 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       {/* MODAL 2: BATCH EXECUTION PROGRESS OVERLAY */}
       {isBatchExecuting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-lg rounded-2xl border border-amber-300 bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 shrink-0">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
+          <div className={`w-full max-w-lg rounded-2xl border ${batchExecutionError ? 'border-rose-300' : 'border-amber-300'} bg-white p-6 shadow-2xl space-y-4`}>
+            {batchExecutionError ? (
+              <>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-rose-100 border border-rose-300 flex items-center justify-center text-rose-600 shrink-0">
+                    <AlertTriangle className="w-6 h-6 text-rose-600" />
+                  </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-black text-lg text-slate-900 leading-tight">
-                    Expandindo Base de Produtos...
-                  </h3>
-                  {(batchProgress?.totalCategories || 1) > 1 && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-700">
-                      Categoria {batchProgress?.categoryIndex || 1} de {batchProgress?.totalCategories || 1}
-                    </span>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-black text-lg text-rose-900 leading-tight">
+                      {batchExecutionError.title || 'Falha ao iniciar expansão'}
+                    </h3>
+                    <p className="text-xs text-rose-600 mt-0.5 font-medium">
+                      Ocorreu uma falha no processamento do job persistente.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 space-y-3">
+                  {batchExecutionError.code && (
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-100 border border-rose-300 text-[11px] font-mono font-bold text-rose-800">
+                      <span>CÓDIGO:</span>
+                      <span>{batchExecutionError.code}</span>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-rose-800 font-medium leading-relaxed bg-white/70 p-3 rounded-lg border border-rose-200">
+                    {batchExecutionError.message}
+                  </div>
+
+                  {batchProgress?.currentCategory && (
+                    <div className="text-[11px] text-rose-700 flex items-center justify-between pt-1 border-t border-rose-200">
+                      <span>Categoria em execução:</span>
+                      <span className="font-bold">{batchProgress.currentCategory}</span>
+                    </div>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Coletando dados na SocialCrawl com classificação estrita
-                </p>
-              </div>
-            </div>
 
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3.5">
-              {/* Category and Subcategory Details */}
-              <div className="space-y-1.5 pb-3 border-b border-slate-200">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                  <span className="text-slate-500">Categoria Atual:</span>
-                  <span className="text-amber-800 font-extrabold text-sm truncate max-w-[260px]">
-                    {batchProgress?.currentCategory}
-                  </span>
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseBatchProgress}
+                    className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors shadow-md"
+                  >
+                    Fechar
+                  </button>
                 </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-600 shrink-0">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
 
-                <div className="flex items-center justify-between text-xs font-medium text-slate-700">
-                  <span className="text-slate-500">Subcategoria:</span>
-                  <span className="font-bold text-slate-900 truncate max-w-[260px]">
-                    {batchProgress?.currentSubcategory || 'Avançando...'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Página / Subcategoria:</span>
-                  <div className="flex items-center gap-2 font-semibold text-slate-700">
-                    <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px]">
-                      Página {batchProgress?.currentPage || 1}
-                    </span>
-                    <span>
-                      ({batchProgress?.subcategoryIndex || 1}/{batchProgress?.totalSubcategoriesInCategory || 1} subcats)
-                    </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-black text-lg text-slate-900 leading-tight">
+                        Expandindo Base de Produtos...
+                      </h3>
+                      {(batchProgress?.totalCategories || 1) > 1 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-slate-700">
+                          Categoria {batchProgress?.categoryIndex || 1} de {batchProgress?.totalCategories || 1}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Coletando dados na SocialCrawl com classificação estrita
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* Dynamic Step Status */}
-              {batchProgress?.statusText && (
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50/80 border border-amber-200/80 text-amber-900 text-xs font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                  <span className="truncate">{batchProgress.statusText}</span>
-                </div>
-              )}
-
-              {/* Real Category Growth Progress bar towards target */}
-              {(() => {
-                const catProgressPercent = calculateCategoryProgressPercent({
-                  currentValidTargetCount: batchProgress?.currentValidTargetCount,
-                  initialValidCount: batchProgress?.initialValidCount,
-                  categoryTargetLimit: batchProgress?.categoryTargetLimit ?? expansionTargetCount,
-                  remainingNeeded: batchProgress?.remainingNeeded,
-                  validNewProductsForTarget: batchProgress?.validNewProductsForTarget,
-                  isTargetReached: (batchProgress?.remainingNeeded ?? 1) <= 0,
-                  stopReason: batchProgress?.stopReason,
-                });
-
-                return (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
-                      <span>
-                        Progresso: {batchProgress?.currentValidTargetCount || 0} de {batchProgress?.categoryTargetLimit || expansionTargetCount} produtos confirmados
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3.5">
+                  {/* Category and Subcategory Details */}
+                  <div className="space-y-1.5 pb-3 border-b border-slate-200">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                      <span className="text-slate-500">Categoria Atual:</span>
+                      <span className="text-amber-800 font-extrabold text-sm truncate max-w-[260px]">
+                        {batchProgress?.currentCategory}
                       </span>
-                      <span className="text-amber-800 font-extrabold text-xs">{catProgressPercent}%</span>
                     </div>
 
-                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden p-0.5 border border-slate-300">
-                      <div
-                        className="bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 h-full rounded-full transition-all duration-300"
-                        style={{
-                          width: `${Math.max(4, catProgressPercent)}%`,
-                        }}
-                      />
+                    <div className="flex items-center justify-between text-xs font-medium text-slate-700">
+                      <span className="text-slate-500">Subcategoria:</span>
+                      <span className="font-bold text-slate-900 truncate max-w-[260px]">
+                        {batchProgress?.currentSubcategory || 'Avançando...'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>Página / Subcategoria:</span>
+                      <div className="flex items-center gap-2 font-semibold text-slate-700">
+                        <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[10px]">
+                          Página {batchProgress?.currentPage || 1}
+                        </span>
+                        <span>
+                          ({batchProgress?.subcategoryIndex || 1}/{batchProgress?.totalSubcategoriesInCategory || 1} subcats)
+                        </span>
+                      </div>
                     </div>
                   </div>
-                );
-              })()}
 
-              {/* Live Metric Grid */}
-              <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-200 text-left text-[11px]">
-                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Recebidos</div>
-                  <div className="font-black text-slate-900 text-xs mt-0.5">
-                    {batchProgress?.totalProcessed || 0}
+                  {/* Dynamic Step Status */}
+                  {batchProgress?.statusText && (
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-50/80 border border-amber-200/80 text-amber-900 text-xs font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                      <span className="truncate">{batchProgress.statusText}</span>
+                    </div>
+                  )}
+
+                  {/* Real Category Growth Progress bar towards target */}
+                  {(() => {
+                    const catProgressPercent = calculateCategoryProgressPercent({
+                      currentValidTargetCount: batchProgress?.currentValidTargetCount,
+                      initialValidCount: batchProgress?.initialValidCount,
+                      categoryTargetLimit: batchProgress?.categoryTargetLimit ?? expansionTargetCount,
+                      remainingNeeded: batchProgress?.remainingNeeded,
+                      validNewProductsForTarget: batchProgress?.validNewProductsForTarget,
+                      isTargetReached: (batchProgress?.remainingNeeded ?? 1) <= 0,
+                      stopReason: batchProgress?.stopReason,
+                    });
+
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                          <span>
+                            Progresso: {batchProgress?.currentValidTargetCount || 0} de {batchProgress?.categoryTargetLimit || expansionTargetCount} produtos confirmados
+                          </span>
+                          <span className="text-amber-800 font-extrabold text-xs">{catProgressPercent}%</span>
+                        </div>
+
+                        <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden p-0.5 border border-slate-300">
+                          <div
+                            className="bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-500 h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${Math.max(4, catProgressPercent)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Live Metric Grid */}
+                  <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-200 text-left text-[11px]">
+                    <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                      <div className="text-[9px] text-slate-500 font-semibold leading-tight">Recebidos</div>
+                      <div className="font-black text-slate-900 text-xs mt-0.5">
+                        {batchProgress?.totalProcessed || 0}
+                      </div>
+                    </div>
+
+                    <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                      <div className="text-[9px] text-slate-500 font-semibold leading-tight">Novos Inseridos</div>
+                      <div className="font-black text-blue-700 text-xs mt-0.5">
+                        {batchProgress?.newProductsCount || 0}
+                      </div>
+                    </div>
+
+                    <div className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                      <div className="text-[9px] text-emerald-800 font-bold leading-tight">Válidos (+Meta)</div>
+                      <div className="font-black text-emerald-700 text-xs mt-0.5">
+                        +{batchProgress?.validNewProductsForTarget || 0}
+                      </div>
+                    </div>
+
+                    <div className="p-1.5 rounded-lg bg-indigo-50 border border-indigo-200">
+                      <div className="text-[9px] text-indigo-800 font-bold leading-tight">Déficit Restante</div>
+                      <div className="font-black text-indigo-700 text-xs mt-0.5">
+                        {batchProgress?.remainingNeeded ?? 0}
+                      </div>
+                    </div>
+
+                    <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                      <div className="text-[9px] text-slate-500 font-semibold leading-tight">Fora do Alvo</div>
+                      <div className="font-black text-slate-700 text-xs mt-0.5">
+                        {batchProgress?.offTargetProducts || 0}
+                      </div>
+                    </div>
+
+                    <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                      <div className="text-[9px] text-slate-500 font-semibold leading-tight">Sem Classif.</div>
+                      <div className="font-black text-slate-700 text-xs mt-0.5">
+                        {batchProgress?.unclassifiedProducts || 0}
+                      </div>
+                    </div>
+
+                    <div className="p-1.5 rounded-lg bg-white border border-slate-200">
+                      <div className="text-[9px] text-slate-500 font-semibold leading-tight">Atualizados</div>
+                      <div className="font-black text-slate-700 text-xs mt-0.5">
+                        {batchProgress?.updatedProductsCount || 0}
+                      </div>
+                    </div>
+
+                    <div className="p-1.5 rounded-lg bg-amber-50 border border-amber-200">
+                      <div className="text-[9px] text-amber-800 font-bold leading-tight">Créditos Usados</div>
+                      <div className="font-black text-amber-800 text-xs mt-0.5">
+                        {batchProgress?.categoryCreditsUsed || 0} crs
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Novos Inseridos</div>
-                  <div className="font-black text-blue-700 text-xs mt-0.5">
-                    {batchProgress?.newProductsCount || 0}
-                  </div>
-                </div>
-
-                <div className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                  <div className="text-[9px] text-emerald-800 font-bold leading-tight">Válidos (+Meta)</div>
-                  <div className="font-black text-emerald-700 text-xs mt-0.5">
-                    +{batchProgress?.validNewProductsForTarget || 0}
-                  </div>
-                </div>
-
-                <div className="p-1.5 rounded-lg bg-indigo-50 border border-indigo-200">
-                  <div className="text-[9px] text-indigo-800 font-bold leading-tight">Déficit Restante</div>
-                  <div className="font-black text-indigo-700 text-xs mt-0.5">
-                    {batchProgress?.remainingNeeded ?? 0}
-                  </div>
-                </div>
-
-                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Fora do Alvo</div>
-                  <div className="font-black text-slate-700 text-xs mt-0.5">
-                    {batchProgress?.offTargetProducts || 0}
-                  </div>
-                </div>
-
-                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Sem Classif.</div>
-                  <div className="font-black text-slate-700 text-xs mt-0.5">
-                    {batchProgress?.unclassifiedProducts || 0}
-                  </div>
-                </div>
-
-                <div className="p-1.5 rounded-lg bg-white border border-slate-200">
-                  <div className="text-[9px] text-slate-500 font-semibold leading-tight">Atualizados</div>
-                  <div className="font-black text-slate-700 text-xs mt-0.5">
-                    {batchProgress?.updatedProductsCount || 0}
-                  </div>
-                </div>
-
-                <div className="p-1.5 rounded-lg bg-amber-50 border border-amber-200">
-                  <div className="text-[9px] text-amber-800 font-bold leading-tight">Créditos Usados</div>
-                  <div className="font-black text-amber-800 text-xs mt-0.5">
-                    {batchProgress?.categoryCreditsUsed || 0} crs
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-slate-500 text-center">
-              🔒 As chamadas são realizadas sequencialmente para proteger a taxa da API e salvar produtos com integridade.
-            </p>
+                <p className="text-[11px] text-slate-500 text-center">
+                  🔒 As chamadas são realizadas sequencialmente para proteger a taxa da API e salvar produtos com integridade.
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}
