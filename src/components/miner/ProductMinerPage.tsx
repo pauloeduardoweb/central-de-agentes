@@ -5884,159 +5884,95 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
 
     const categoriesToProcess = [...selectedExpansionCategories];
 
-    let totalProcessedCount = 0;
-    let totalNewCount = 0;
-    let totalUpdatedCount = 0;
-    let totalValidNewCount = 0;
-    let totalOffTargetCount = 0;
-    let totalUnclassifiedCount = 0;
-    let totalCreditsUsed = 0;
-    let processedCats = 0;
-    const allCategorySummaries: CategoryExecutionSummaryApi[] = [];
-    const failedErrors: string[] = [];
-
-    for (let i = 0; i < categoriesToProcess.length; i++) {
-      const cat = categoriesToProcess[i];
-      const catStat = collectorCategories.find((c) => c.category === cat);
-      const currentCount = catStat?.productCount || 0;
-      const remainingTarget = Math.max(0, expansionTargetCount - currentCount);
-
-      // Orçamento de créditos derivado EXCLUSIVAMENTE do plano atual da categoria
-      const catPlan = activeExpansionPlans.find((p) => p.category === cat);
-      const catCreditBudget = catPlan?.estimatedCredits !== undefined && catPlan.estimatedCredits > 0
-        ? catPlan.estimatedCredits
-        : Math.max(1, Math.ceil(remainingTarget / 30));
-
+    try {
       setBatchProgress({
-        currentCategory: cat,
-        currentSubcategory: 'Iniciando análise...',
+        currentCategory: categoriesToProcess[0] || '',
+        currentSubcategory: 'Iniciando job no servidor...',
         currentPage: 1,
         maxPagesForThisSub: 1,
-        categoryIndex: i + 1,
+        categoryIndex: 1,
         totalCategories: categoriesToProcess.length,
         subcategoryIndex: 1,
-        totalSubcategoriesInCategory: catPlan?.subcategories?.length || 1,
+        totalSubcategoriesInCategory: 1,
         categoryTargetLimit: expansionTargetCount,
-        initialValidCount: currentCount,
-        currentValidTargetCount: currentCount,
-        remainingNeeded: remainingTarget,
+        initialValidCount: 0,
+        currentValidTargetCount: 0,
+        remainingNeeded: 0,
         categoryCreditsUsed: 0,
-        categoryCreditLimit: catCreditBudget,
-        validNewProductsForTarget: totalValidNewCount,
-        offTargetProducts: totalOffTargetCount,
-        unclassifiedProducts: totalUnclassifiedCount,
-        newProductsCount: totalNewCount,
-        updatedProductsCount: totalUpdatedCount,
-        totalProcessed: totalProcessedCount,
-        creditsUsed: totalCreditsUsed,
-        statusText: `Consultando SocialCrawl...`,
+        categoryCreditLimit: 0,
+        validNewProductsForTarget: 0,
+        offTargetProducts: 0,
+        unclassifiedProducts: 0,
+        newProductsCount: 0,
+        updatedProductsCount: 0,
+        totalProcessed: 0,
+        creditsUsed: 0,
+        statusText: 'Iniciando motor de expansão...',
       });
 
-      try {
-        // Se a categoria já atingiu a meta ou deficit <= 0, avança para a próxima
-        if (remainingTarget <= 0) {
-          allCategorySummaries.push({
-            category: cat,
-            initialValidCount: currentCount,
-            finalValidCount: currentCount,
-            actualValidGrowth: 0,
-            categoryTargetLimit: expansionTargetCount,
-            validNewProductsForTarget: 0,
-            offTargetProducts: 0,
-            unclassifiedProducts: 0,
-            updatedProducts: 0,
-            totalReceived: 0,
-            creditsUsed: 0,
-            subcategoriesConsulted: 0,
-            stopReason: 'TARGET_REACHED',
+      // Chamar o serviço oficial de expansão do backend com streaming e classificação estrita
+      const result = await executeSubcategoryExpansionApi(
+        studentCode,
+        {
+          selectedCategories: categoriesToProcess,
+          selectedSubcategoriesMap: selectedSubcategoriesMap,
+          categoryTargetLimit: expansionTargetCount,
+          perSubcategoryMax: 60,
+        },
+        (progress) => {
+          setBatchProgress({
+            currentCategory: progress.currentCategory,
+            currentSubcategory: progress.currentSubcategory,
+            currentPage: progress.currentPage,
+            maxPagesForThisSub: progress.maxPagesForThisSub,
+            categoryIndex: progress.categoryIndex,
+            totalCategories: progress.totalCategories || categoriesToProcess.length,
+            subcategoryIndex: progress.subcategoryIndex,
+            totalSubcategoriesInCategory: progress.totalSubcategoriesInCategory,
+            categoryTargetLimit: progress.categoryTargetLimit,
+            initialValidCount: progress.initialValidCount,
+            currentValidTargetCount: progress.currentValidTargetCount,
+            remainingNeeded: progress.remainingNeeded,
+            categoryCreditsUsed: progress.categoryCreditsUsed,
+            categoryCreditLimit: progress.categoryCreditLimit,
+            validNewProductsForTarget: progress.validNewProductsForTarget,
+            offTargetProducts: progress.offTargetProducts,
+            unclassifiedProducts: progress.unclassifiedProducts,
+            newProductsCount: progress.totalNewProducts,
+            updatedProductsCount: progress.totalUpdatedProducts,
+            totalProcessed: progress.totalReceived,
+            creditsUsed: progress.totalCreditsUsed,
+            statusText: progress.stepStatus,
+            stopReason: progress.stopReason,
           });
-          processedCats++;
-          continue;
         }
+      );
 
-        // Chamar o serviço oficial de expansão do backend com streaming e classificação estrita
-        const result = await executeSubcategoryExpansionApi(
-          studentCode,
-          {
-            selectedCategories: [cat],
-            selectedSubcategoriesMap: selectedSubcategoriesMap,
-            categoryTargetLimit: expansionTargetCount,
-            perSubcategoryMax: 60,
-          },
-          (progress) => {
-            setBatchProgress({
-              currentCategory: progress.currentCategory,
-              currentSubcategory: progress.currentSubcategory,
-              currentPage: progress.currentPage,
-              maxPagesForThisSub: progress.maxPagesForThisSub,
-              categoryIndex: i + 1,
-              totalCategories: categoriesToProcess.length,
-              subcategoryIndex: progress.subcategoryIndex,
-              totalSubcategoriesInCategory: progress.totalSubcategoriesInCategory,
-              categoryTargetLimit: progress.categoryTargetLimit,
-              initialValidCount: progress.initialValidCount ?? currentCount,
-              currentValidTargetCount: progress.currentValidTargetCount,
-              remainingNeeded: progress.remainingNeeded,
-              categoryCreditsUsed: progress.categoryCreditsUsed,
-              categoryCreditLimit: progress.categoryCreditLimit || catCreditBudget,
-              validNewProductsForTarget: totalValidNewCount + progress.validNewProductsForTarget,
-              offTargetProducts: totalOffTargetCount + progress.offTargetProducts,
-              unclassifiedProducts: totalUnclassifiedCount + progress.unclassifiedProducts,
-              newProductsCount: totalNewCount + (progress.validNewProductsForTarget + progress.offTargetProducts + progress.unclassifiedProducts),
-              updatedProductsCount: totalUpdatedCount + progress.catUpdatedCount,
-              totalProcessed: totalProcessedCount + progress.catTotalReceived,
-              creditsUsed: totalCreditsUsed + progress.categoryCreditsUsed,
-              statusText: progress.stepStatus,
-              stopReason: progress.stopReason,
-            });
-          }
-        );
+      setIsBatchExecuting(false);
+      setBatchProgress(null);
 
-        totalProcessedCount += (result.totalProcessed || 0);
-        totalNewCount += (result.totalNew || 0);
-        totalUpdatedCount += (result.totalUpdated || 0);
-        totalValidNewCount += (result.totalValidNewForTarget || 0);
-        totalOffTargetCount += (result.totalOffTarget || 0);
-        totalUnclassifiedCount += (result.totalUnclassified || 0);
-        totalCreditsUsed += (result.totalCreditsUsed || 0);
+      // RELEITURA OBRIGATÓRIA DOS STATS OFICIAIS DO MYSQL ANTES DE EXIBIR O MODAL
+      await loadCategories();
 
-        if (Array.isArray(result.categorySummaries) && result.categorySummaries.length > 0) {
-          allCategorySummaries.push(...result.categorySummaries);
-        } else {
-          console.error('[Expansion Job Error]: Ausência de categorySummaries no resultado oficial:', result);
-          throw new Error('EXPANSION_RESULT_MISSING_SUMMARY: O servidor concluiu a expansão sem o relatório consolidado de categorias.');
-        }
-
-        processedCats++;
-      } catch (err: any) {
-        console.warn(`[Batch Expansion Error for ${cat}]:`, err?.message || err);
-        failedErrors.push(`${cat}: ${err?.message || 'Falha na requisição'}`);
-      }
-    }
-
-    setIsBatchExecuting(false);
-    setBatchProgress(null);
-
-    // RELEITURA OBRIGATÓRIA DOS STATS OFICIAIS DO MYSQL ANTES DE EXIBIR O MODAL
-    await loadCategories();
-
-    // GARANTIA ABSOLUTA: O modal de resumo SEMPRE será aberto com o relatório consolidado
-    setBatchSummaryModal({
-      open: true,
-      totalProcessed: totalProcessedCount,
-      newProducts: totalNewCount,
-      validNewProductsForTarget: totalValidNewCount,
-      offTargetProducts: totalOffTargetCount,
-      unclassifiedProducts: totalUnclassifiedCount,
-      updatedProducts: totalUpdatedCount,
-      creditsUsed: totalCreditsUsed,
-      categoriesProcessed: processedCats,
-      totalCategoriesRequested: categoriesToProcess.length,
-      categorySummaries: allCategorySummaries,
-    });
-
-    if (failedErrors.length > 0) {
-      console.warn('Avisos durante a expansão:', failedErrors.join('; '));
+      // GARANTIA ABSOLUTA: O modal de resumo SEMPRE será aberto com o relatório consolidado
+      setBatchSummaryModal({
+        open: true,
+        totalProcessed: result.totalProcessed || 0,
+        newProducts: result.totalNew || 0,
+        validNewProductsForTarget: result.totalValidNewForTarget || 0,
+        offTargetProducts: result.totalOffTarget || 0,
+        unclassifiedProducts: result.totalUnclassified || 0,
+        updatedProducts: result.totalUpdated || 0,
+        creditsUsed: result.totalCreditsUsed || 0,
+        categoriesProcessed: result.categoriesCompleted || result.categorySummaries?.length || 0,
+        totalCategoriesRequested: categoriesToProcess.length,
+        categorySummaries: result.categorySummaries || [],
+      });
+    } catch (err: any) {
+      console.error('[Batch Expansion Error]:', err?.message || err);
+      setIsBatchExecuting(false);
+      setBatchProgress(null);
+      setError(`Erro na expansão: ${err?.message || 'Falha ao executar job de expansão'}`);
     }
   };
 
