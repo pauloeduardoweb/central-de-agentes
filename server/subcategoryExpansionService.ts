@@ -49,6 +49,7 @@ export interface CategoryExpansionPlan {
   hasHistoricalData: boolean;
   historicalValidPerCredit?: number;
   sampleCount: number;
+  coverageBefore?: number;
   subcategories: SubcategoryTargetPlan[];
 }
 
@@ -448,6 +449,7 @@ export function buildSubcategoryExpansionPlan(params: {
       hasHistoricalData,
       historicalValidPerCredit,
       sampleCount,
+      coverageBefore: catStat?.coverageCount || 0,
       subcategories: subPlans,
     });
   }
@@ -1329,8 +1331,8 @@ export function finalizeExpansionJobState(state: ExpansionJobState): {
         totalSelectedSubcategories: currentPlan.subcategories.length,
         subcategoriesConsulted: state.catSubcategoriesConsulted,
         subcategoriesExhausted: state.catSubcategoriesExhausted,
-        coverageBefore: 0,
-        coverageAfter: 0,
+        coverageBefore: currentPlan.coverageBefore || 0,
+        coverageAfter: currentPlan.coverageBefore || 0,
         technicalErrors: state.technicalErrors,
         subcategoriesFailed: state.subcategoriesFailed,
         executionId: state.jobId,
@@ -1478,8 +1480,8 @@ export async function executeSubcategoryExpansionStep(
       totalSelectedSubcategories: catPlan.subcategories.length,
       subcategoriesConsulted: state.catSubcategoriesConsulted,
       subcategoriesExhausted: state.catSubcategoriesExhausted,
-      coverageBefore: 0,
-      coverageAfter: catStatAfter?.coverageCount || 0,
+      coverageBefore: catPlan.coverageBefore || 0,
+      coverageAfter: catStatAfter?.coverageCount ?? catPlan.coverageBefore ?? 0,
       technicalErrors: state.technicalErrors,
       subcategoriesFailed: state.subcategoriesFailed,
       executionId: state.jobId,
