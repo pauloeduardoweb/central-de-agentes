@@ -1175,11 +1175,24 @@ export async function initializeExpansionJobState(params: {
     initialCategories = customCategoryStats;
   } else {
     try {
+      console.log(`[ExpansionJob DB] operation=get_category_stats start jobId=${jobId}`);
       const statsBefore = await getCollectorCategoriesStats();
       initialCategories = statsBefore.categories;
+      console.log(`[ExpansionJob DB] operation=get_category_stats success jobId=${jobId} totalCategories=${initialCategories.length} totalProducts=${statsBefore.totalStoredProducts}`);
     } catch (err: any) {
-      console.error('[initializeExpansionJobState Error fetching stats]:', err?.message || err);
-      throw new Error(`STATS_INITIALIZATION_FAILED: Falha ao obter estatísticas das categorias no banco de dados (${err?.message || 'Erro de conexão/consulta MySQL'})`);
+      console.error('[ExpansionJob DB ERROR]', {
+        operation: 'get_category_stats',
+        executionId: jobId,
+        name: err?.name,
+        code: err?.code,
+        errno: err?.errno,
+        syscall: err?.syscall,
+        sqlState: err?.sqlState,
+        sqlMessage: err?.sqlMessage,
+        message: err?.message,
+        stack: err?.stack,
+      });
+      throw err;
     }
   }
 

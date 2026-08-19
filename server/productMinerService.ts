@@ -3615,12 +3615,11 @@ export async function getCollectorCategoriesStats(): Promise<{
     return { categories: fallbackCategories, totalStoredProducts: 0 };
   }
 
-  await ensureProductMinerTables();
-
   let totalStoredProducts = 0;
   let rows: any[] = [];
 
   try {
+    await ensureProductMinerTables();
     const [pRows]: any = await db.query(
       `SELECT product_id, title, category_path, query_source, last_seen_at, updated_at
        FROM tiktok_shop_products`
@@ -3630,7 +3629,16 @@ export async function getCollectorCategoriesStats(): Promise<{
       totalStoredProducts = rows.length;
     }
   } catch (err: any) {
-    console.error('[getCollectorCategoriesStats SQL Query Error]:', err?.message || err);
+    console.error('[getCollectorCategoriesStats SQL Query Error]:', {
+      name: err?.name,
+      code: err?.code,
+      errno: err?.errno,
+      syscall: err?.syscall,
+      sqlState: err?.sqlState,
+      sqlMessage: err?.sqlMessage,
+      message: err?.message,
+      stack: err?.stack,
+    });
     throw err;
   }
 

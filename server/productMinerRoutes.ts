@@ -3144,7 +3144,7 @@ productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
     console.log(`[ExpansionJob State Initialized] executionId=${executionId} plansCount=${state.plans.length} totalSelectedSubcategories=${state.totalSelectedSubcategories}`);
 
     stage = 'persist_job';
-    console.log(`[ExpansionJob Persist Attempt] executionId=${executionId}`);
+    console.log(`[ExpansionJob DB] operation=insert_job start executionId=${executionId}`);
     await createExpansionJobInDb({
       id: executionId,
       studentCode,
@@ -3156,15 +3156,21 @@ productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
       plansJson: JSON.stringify(state.plans),
       stateJson: JSON.stringify(state),
     });
-    console.log(`[ExpansionJob Persisted] executionId=${executionId}`);
+    console.log(`[ExpansionJob DB] operation=insert_job success executionId=${executionId}`);
 
     stage = 'read_after_write';
+    console.log(`[ExpansionJob DB] operation=read_after_write start executionId=${executionId}`);
     const persistedJob = await getExpansionJobFromDb(executionId);
     if (!persistedJob) {
-      console.error(`[ExpansionJob Start Failed] executionId=${executionId} stage=read_after_write errorCode=EXPANSION_JOB_PERSISTENCE_FAILED message="Job could not be read back after insert"`);
+      console.error('[ExpansionJob DB ERROR]', {
+        operation: 'read_after_write',
+        executionId,
+        message: 'Job could not be read back after insert',
+        code: 'EXPANSION_JOB_PERSISTENCE_FAILED',
+      });
       throw new Error('EXPANSION_JOB_PERSISTENCE_FAILED');
     }
-    console.log(`[ExpansionJob ReadAfterWrite OK] executionId=${executionId}`);
+    console.log(`[ExpansionJob DB] operation=read_after_write success executionId=${executionId}`);
 
     return res.json({
       success: true,
@@ -3183,13 +3189,26 @@ productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
       ? 'EXPANSION_JOB_PERSISTENCE_FAILED'
       : error?.code || error?.name || 'START_JOB_ERROR';
 
-    console.error(`[ExpansionJob Start Failed] executionId=${executionId} stage=${stage} errorCode=${errorCode} message=${error?.message || error}`);
+    console.error('[ExpansionJob Start Failed]', {
+      executionId,
+      stage,
+      name: error?.name,
+      code: error?.code,
+      errno: error?.errno,
+      syscall: error?.syscall,
+      sqlState: error?.sqlState,
+      sqlMessage: error?.sqlMessage,
+      message: error?.message,
+      stack: error?.stack,
+    });
+
     return res.status(500).json({
       success: false,
       error: error?.message || 'START_JOB_ERROR',
       code: errorCode,
       stage,
       executionId,
+      message: error?.message || 'Falha ao iniciar job de expansão no servidor.',
     });
   }
 });

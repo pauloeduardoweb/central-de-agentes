@@ -1646,38 +1646,54 @@ export async function createExpansionJobInDb(job: {
   if (!isDatabaseConfigured()) {
     throw new Error('DATABASE_NOT_CONFIGURED');
   }
-  await ensureExpansionJobsTable();
-  const [result]: any = await db.query(
-    `
-    INSERT INTO product_miner_expansion_jobs (
-      id, student_code, selected_categories, selected_subcategories_map,
-      category_target_limit, per_subcategory_max, total_categories,
-      status, plans_json, state_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'RUNNING', ?, ?)
-    ON DUPLICATE KEY UPDATE
-      selected_categories = VALUES(selected_categories),
-      selected_subcategories_map = VALUES(selected_subcategories_map),
-      category_target_limit = VALUES(category_target_limit),
-      per_subcategory_max = VALUES(per_subcategory_max),
-      total_categories = VALUES(total_categories),
-      status = 'RUNNING',
-      plans_json = VALUES(plans_json),
-      state_json = VALUES(state_json)
-    `,
-    [
-      job.id,
-      job.studentCode,
-      JSON.stringify(job.selectedCategories),
-      job.selectedSubcategoriesMap ? JSON.stringify(job.selectedSubcategoriesMap) : null,
-      job.categoryTargetLimit,
-      job.perSubcategoryMax,
-      job.totalCategories,
-      job.plansJson || null,
-      job.stateJson || null,
-    ]
-  );
-  if (!result || (result.affectedRows === undefined && result.warningStatus === undefined)) {
-    throw new Error('EXPANSION_JOB_INSERT_FAILED');
+  try {
+    await ensureExpansionJobsTable();
+    const [result]: any = await db.query(
+      `
+      INSERT INTO product_miner_expansion_jobs (
+        id, student_code, selected_categories, selected_subcategories_map,
+        category_target_limit, per_subcategory_max, total_categories,
+        status, plans_json, state_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'RUNNING', ?, ?)
+      ON DUPLICATE KEY UPDATE
+        selected_categories = VALUES(selected_categories),
+        selected_subcategories_map = VALUES(selected_subcategories_map),
+        category_target_limit = VALUES(category_target_limit),
+        per_subcategory_max = VALUES(per_subcategory_max),
+        total_categories = VALUES(total_categories),
+        status = 'RUNNING',
+        plans_json = VALUES(plans_json),
+        state_json = VALUES(state_json)
+      `,
+      [
+        job.id,
+        job.studentCode,
+        JSON.stringify(job.selectedCategories),
+        job.selectedSubcategoriesMap ? JSON.stringify(job.selectedSubcategoriesMap) : null,
+        job.categoryTargetLimit,
+        job.perSubcategoryMax,
+        job.totalCategories,
+        job.plansJson || null,
+        job.stateJson || null,
+      ]
+    );
+    if (!result || (result.affectedRows === undefined && result.warningStatus === undefined)) {
+      throw new Error('EXPANSION_JOB_INSERT_FAILED');
+    }
+  } catch (err: any) {
+    console.error('[ExpansionJob DB ERROR]', {
+      operation: 'insert_job',
+      executionId: job.id,
+      name: err?.name,
+      code: err?.code,
+      errno: err?.errno,
+      syscall: err?.syscall,
+      sqlState: err?.sqlState,
+      sqlMessage: err?.sqlMessage,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    throw err;
   }
 }
 
@@ -1685,12 +1701,28 @@ export async function getExpansionJobFromDb(jobId: string): Promise<ExpansionJob
   if (!isDatabaseConfigured()) {
     throw new Error('DATABASE_NOT_CONFIGURED');
   }
-  await ensureExpansionJobsTable();
-  const [rows]: any = await db.query(
-    `SELECT * FROM product_miner_expansion_jobs WHERE id = ? LIMIT 1`,
-    [jobId]
-  );
-  return Array.isArray(rows) && rows.length > 0 ? (rows[0] as ExpansionJobRow) : null;
+  try {
+    await ensureExpansionJobsTable();
+    const [rows]: any = await db.query(
+      `SELECT * FROM product_miner_expansion_jobs WHERE id = ? LIMIT 1`,
+      [jobId]
+    );
+    return Array.isArray(rows) && rows.length > 0 ? (rows[0] as ExpansionJobRow) : null;
+  } catch (err: any) {
+    console.error('[ExpansionJob DB ERROR]', {
+      operation: 'get_job',
+      executionId: jobId,
+      name: err?.name,
+      code: err?.code,
+      errno: err?.errno,
+      syscall: err?.syscall,
+      sqlState: err?.sqlState,
+      sqlMessage: err?.sqlMessage,
+      message: err?.message,
+      stack: err?.stack,
+    });
+    throw err;
+  }
 }
 
 /**
