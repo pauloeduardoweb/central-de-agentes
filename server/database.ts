@@ -44,7 +44,7 @@ export function isTransientDbError(err: any): boolean {
 
 /**
  * Executa uma operação no MySQL com aquisição dedicada e retry seguro exclusivo para erros transitórios de conexão (ex: ECONNRESET).
- * Destrói conexões quebradas (stale sockets) para não poluírem o pool e suporta checagem de idempotência antes de repetir INSERTs.
+ * Destrói conexões quebradas (stale sockets) com destroy() para não retornarem ao pool e suporta checagem de idempotência antes de repetir INSERTs.
  */
 export async function executeWithTransientDbRetry<T>(
   operationName: string,
@@ -52,62 +52,78 @@ export async function executeWithTransientDbRetry<T>(
   fn: (conn: mysql.PoolConnection) => Promise<T>,
   idempotencyCheck?: (conn: mysql.PoolConnection) => Promise<boolean | T | null>
 ): Promise<T> {
-  const opTag = executionId ? `operation=${operationName} executionId=${executionId}` : `operation=${operationName}`;
-  const startTotal = Date.now();
+  const execTag = executionId || 'none';
 
   // Tentativa 1
   let conn1: mysql.PoolConnection | null = null;
   const startAcquire1 = Date.now();
+  console.log(`[ExpansionJob DB] acquire connection start operation=${operationName} executionId=${execTag}`);
   try {
     conn1 = await db.getConnection();
-    const acquireMs1 = Date.now() - startAcquire1;
+    const acquireConnectionMs = Date.now() - startAcquire1;
+    console.log(`[ExpansionJob DB] acquire connection success operation=${operationName} executionId=${execTag} durationMs=${acquireConnectionMs}`);
+    
+    console.log(`[ExpansionJob DB] ${operationName} start executionId=${execTag}`);
     const startQuery1 = Date.now();
     const result = await fn(conn1);
-    const queryMs1 = Date.now() - startQuery1;
-    const totalMs1 = Date.now() - startTotal;
-    console.log(`[ExpansionJob DB Timing] ${opTag} attempt=1 acquireMs=${acquireMs1} queryMs=${queryMs1} totalMs=${totalMs1}`);
+    const insertQueryMs = Date.now() - startQuery1;
+    console.log(`[ExpansionJob DB] ${operationName} success executionId=${execTag} durationMs=${insertQueryMs} acquireConnectionMs=${acquireConnectionMs}`);
+    
+    // Devolve conexão saudável ao pool
+    conn1.release();
+    conn1 = null;
     return result;
   } catch (err1: any) {
-    const totalMs1 = Date.now() - startTotal;
-    // Se a conexão sofreu falha transitória ou socket reset, destruímos o socket quebrado
+    const insertQueryMs = Date.now() - startAcquire1;
+    const errCode = err1?.code || err1?.errno || err1?.message || 'UNKNOWN_ERROR';
+    console.error(`[ExpansionJob DB ERROR] ${operationName} code=${errCode} executionId=${execTag} durationMs=${insertQueryMs}`, err1?.message);
+
+    const isTransient = isTransientDbError(err1);
+
+    // Conexão com falha: se for erro transitório ou quebra de socket, destruímos explicitamente
     if (conn1) {
-      try {
-        if (typeof (conn1 as any).destroy === 'function') {
-          (conn1 as any).destroy();
-        } else if (typeof conn1.release === 'function') {
-          conn1.release();
-        }
-      } catch (_) {}
+      if (isTransient) {
+        console.warn(`[ExpansionJob DB Retry] destroying bad connection executionId=${execTag}`);
+        try {
+          if (typeof (conn1 as any).destroy === 'function') {
+            (conn1 as any).destroy();
+          } else if ((conn1 as any).connection && typeof (conn1 as any).connection.destroy === 'function') {
+            (conn1 as any).connection.destroy();
+          }
+        } catch (_) {}
+      } else {
+        try { conn1.release(); } catch (_) {}
+      }
       conn1 = null;
     }
 
-    const isTransient = isTransientDbError(err1);
     if (!isTransient) {
-      // Erro não transitório (sintaxe, constraint, business): falha imediatamente sem retry
+      // Erro não transitório (sintaxe, constraint, database not configured): propaga imediatamente sem retry
       throw err1;
     }
 
-    const errCode = err1?.code || err1?.errno || err1?.message || 'TRANSIENT_ERROR';
-    console.warn(`[DB Retry] operation=${operationName} attempt=1 code=${errCode} durationMs=${totalMs1}`);
-
     // Se temos checagem de idempotência, verificar se a gravação ocorreu antes da perda do socket
     if (idempotencyCheck) {
-      console.log(`[DB Retry] operation=${operationName} checking_idempotency executionId=${executionId || 'none'}`);
+      console.log(`[ExpansionJob DB Retry] checking executionId executionId=${execTag}`);
       let checkConn: mysql.PoolConnection | null = null;
+      const startIdempotency = Date.now();
       try {
         checkConn = await db.getConnection();
         const existing = await idempotencyCheck(checkConn);
+        const idempotencyCheckMs = Date.now() - startIdempotency;
         if (existing !== null && existing !== undefined && existing !== false) {
-          console.log(`[DB Retry] operation=${operationName} already_persisted=true executionId=${executionId || 'none'}`);
-          console.log(`[DB Retry] operation=${operationName} recovered=true executionId=${executionId || 'none'}`);
+          console.log(`[ExpansionJob DB Retry] existing=true executionId=${execTag} durationMs=${idempotencyCheckMs}`);
+          console.log(`[ExpansionJob DB Retry] already_persisted=true executionId=${execTag}`);
+          checkConn.release();
+          checkConn = null;
           return (typeof existing === 'boolean' ? (undefined as unknown as T) : (existing as T));
         } else {
-          console.log(`[DB Retry] operation=${operationName} already_persisted=false executionId=${executionId || 'none'}`);
+          console.log(`[ExpansionJob DB Retry] existing=false executionId=${execTag} durationMs=${idempotencyCheckMs}`);
         }
       } catch (checkErr: any) {
-        console.warn(`[DB Retry] ${opTag} idempotency_check_error:`, checkErr?.message || checkErr?.code);
+        console.warn(`[ExpansionJob DB Retry] checking executionId error executionId=${execTag}:`, checkErr?.message || checkErr?.code);
         if (checkConn) {
-          try { (checkConn as any).destroy?.() || checkConn.release(); } catch (_) {}
+          try { (checkConn as any).destroy?.() || (checkConn as any).connection?.destroy?.(); } catch (_) {}
           checkConn = null;
         }
       } finally {
@@ -118,31 +134,35 @@ export async function executeWithTransientDbRetry<T>(
     }
 
     // Tentativa 2 (Máximo 1 retry com nova conexão do pool)
-    console.log(`[DB Retry] operation=${operationName} attempt=2 executionId=${executionId || 'none'}`);
+    console.log(`[ExpansionJob DB Retry] acquiring fresh connection executionId=${execTag}`);
     let conn2: mysql.PoolConnection | null = null;
-    const startAcquire2 = Date.now();
+    const startRetryAcquire = Date.now();
     try {
       conn2 = await db.getConnection();
-      const acquireMs2 = Date.now() - startAcquire2;
-      const startQuery2 = Date.now();
+      const retryAcquireMs = Date.now() - startRetryAcquire;
+      console.log(`[ExpansionJob DB Retry] acquire connection success executionId=${execTag} durationMs=${retryAcquireMs}`);
+      
+      console.log(`[ExpansionJob DB Retry] retry ${operationName} start executionId=${execTag}`);
+      const startRetryInsert = Date.now();
       const result2 = await fn(conn2);
-      const queryMs2 = Date.now() - startQuery2;
-      const totalMs2 = Date.now() - startAcquire2;
-      console.log(`[ExpansionJob DB Timing] ${opTag} attempt=2 acquireMs=${acquireMs2} queryMs=${queryMs2} totalMs=${totalMs2}`);
-      console.log(`[DB Retry] operation=${operationName} recovered=true executionId=${executionId || 'none'}`);
+      const retryInsertMs = Date.now() - startRetryInsert;
+      console.log(`[ExpansionJob DB Retry] retry ${operationName} success executionId=${execTag} durationMs=${retryInsertMs} retryAcquireMs=${retryAcquireMs}`);
+      
+      conn2.release();
+      conn2 = null;
       return result2;
     } catch (err2: any) {
       if (conn2) {
         try {
           if (typeof (conn2 as any).destroy === 'function') {
             (conn2 as any).destroy();
-          } else if (typeof conn2.release === 'function') {
-            conn2.release();
+          } else if ((conn2 as any).connection && typeof (conn2 as any).connection.destroy === 'function') {
+            (conn2 as any).connection.destroy();
           }
         } catch (_) {}
         conn2 = null;
       }
-      console.error(`[DB Retry Failed] ${opTag} attempt=2 code=${err2?.code || err2?.message}`);
+      console.error(`[ExpansionJob DB Retry Failed] retry ${operationName} code=${err2?.code || err2?.message} executionId=${execTag}`);
       throw err2;
     } finally {
       if (conn2) {
