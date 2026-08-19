@@ -82,6 +82,20 @@ export interface ProductSearchResponse {
   cacheExpired: boolean;
 }
 
+export class ProductMinerApiError extends Error {
+  code?: string;
+  status?: number;
+  data?: any;
+
+  constructor(message: string, code?: string, status?: number, data?: any) {
+    super(message);
+    this.name = 'ProductMinerApiError';
+    this.code = code;
+    this.status = status;
+    this.data = data;
+  }
+}
+
 function authHeaders(studentCode: string): HeadersInit {
   return {
     'x-student-access-code': studentCode,
@@ -89,61 +103,81 @@ function authHeaders(studentCode: string): HeadersInit {
   };
 }
 
-function accessError(data: any): Error {
-  const code = String(data?.error || '');
+function accessError(data: any, status?: number): ProductMinerApiError {
+  const code = String(data?.code || data?.error || '');
+
+  // Erros específicos de Expansão e Banco de Dados
+  if (code === 'DATABASE_NOT_CONFIGURED') {
+    return new ProductMinerApiError('Banco de dados MySQL não está configurado no servidor (DATABASE_NOT_CONFIGURED).', code, status, data);
+  }
+  if (code === 'EXPANSION_JOB_PERSISTENCE_FAILED') {
+    return new ProductMinerApiError('Falha crítica: o job não foi persistido no banco MySQL (EXPANSION_JOB_PERSISTENCE_FAILED).', code, status, data);
+  }
+  if (code === 'JOB_NOT_FOUND' || status === 404) {
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Job de expansão não encontrado no banco de dados (JOB_NOT_FOUND).', 'JOB_NOT_FOUND', status || 404, data);
+  }
+  if (code === 'STEP_IN_PROGRESS' || status === 409) {
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Já existe um passo deste job em execução.', 'STEP_IN_PROGRESS', status || 409, data);
+  }
+  if (code === 'STATS_INITIALIZATION_FAILED') {
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Falha ao obter estatísticas das categorias no banco de dados.', code, status, data);
+  }
+  if (code === 'START_JOB_ERROR') {
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Erro ao inicializar job de expansão no servidor (START_JOB_ERROR).', code, status, data);
+  }
 
   // Erros específicos de Transcrição e Modelagem
   if (code === 'AUDIO_UNAVAILABLE') {
-    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível acessar o áudio deste vídeo.');
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível acessar o áudio deste vídeo.', code, status, data);
   }
   if (code === 'TRANSCRIPTION_ERROR') {
-    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível transcrever o áudio deste vídeo. Tente novamente.');
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível transcrever o áudio deste vídeo. Tente novamente.', code, status, data);
   }
   if (code === 'TRANSCRIPTION_INTERNAL_ERROR') {
-    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível processar a transcrição neste momento.');
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível processar a transcrição neste momento.', code, status, data);
   }
   if (code === 'MISSING_TRANSCRIPTION') {
-    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'É necessário gerar uma transcrição válida antes de modelar o conteúdo.');
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'É necessário gerar uma transcrição válida antes de modelar o conteúdo.', code, status, data);
   }
   if (code === 'MODEL_CONTENT_ERROR') {
-    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível gerar a modelagem deste conteúdo. Tente novamente.');
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível gerar a modelagem deste conteúdo. Tente novamente.', code, status, data);
   }
   if (code === 'MODEL_CONTENT_INTERNAL_ERROR') {
-    return new Error(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível processar a modelagem neste momento.');
+    return new ProductMinerApiError(typeof data?.message === 'string' && data.message ? data.message : 'Não foi possível processar a modelagem neste momento.', code, status, data);
   }
 
   // Erros de permissão e configurações gerais
   if (code === 'PRODUCT_MINER_STUDENTS_DISABLED') {
-    return new Error('O Minerador de Produtos ainda não foi liberado para alunos.');
+    return new ProductMinerApiError('O Minerador de Produtos ainda não foi liberado para alunos.', code, status, data);
   }
   if (code === 'PRODUCT_MINER_REFRESH_MENTOR_ONLY') {
-    return new Error('Somente o Mentor pode atualizar dados da SocialCrawl.');
+    return new ProductMinerApiError('Somente o Mentor pode atualizar dados da SocialCrawl.', code, status, data);
   }
   if (code === 'SOCIALCRAWL_NOT_CONFIGURED') {
-    return new Error('SocialCrawl ainda não foi configurada no servidor.');
+    return new ProductMinerApiError('SocialCrawl ainda não foi configurada no servidor.', code, status, data);
   }
   if (code === 'AUTH_REQUIRED' || code === 'ACCESS_DENIED') {
-    return new Error('Sua sessão não tem acesso ao minerador.');
+    return new ProductMinerApiError('Sua sessão não tem acesso ao minerador.', code, status, data);
   }
   if (code === 'PRODUCT_MINER_RANKING_ERROR') {
-    return new Error('Não foi possível carregar o ranking no momento. Tente novamente.');
+    return new ProductMinerApiError('Não foi possível carregar o ranking no momento. Tente novamente.', code, status, data);
   }
   if (code === 'PRODUCT_MINER_SEARCH_ERROR') {
-    return new Error('Não foi possível realizar a busca de produtos no momento.');
+    return new ProductMinerApiError('Não foi possível realizar a busca de produtos no momento.', code, status, data);
   }
   if (code === 'PRODUCT_MINER_COLLECTOR_STATS_ERROR') {
-    return new Error('Não foi possível carregar as estatísticas do coletor.');
+    return new ProductMinerApiError('Não foi possível carregar as estatísticas do coletor.', code, status, data);
   }
   if (data?.message && typeof data.message === 'string') {
-    return new Error(data.message);
+    return new ProductMinerApiError(data.message, code || 'API_ERROR', status, data);
   }
   if (data?.detail && typeof data.detail === 'string') {
-    return new Error(data.detail);
+    return new ProductMinerApiError(data.detail, code || 'API_ERROR', status, data);
   }
   if (data?.error && typeof data.error === 'string' && !data.error.includes('_ERROR')) {
-    return new Error(data.error);
+    return new ProductMinerApiError(data.error, code || 'API_ERROR', status, data);
   }
-  return new Error('Falha no Minerador de Produtos. Tente novamente em alguns instantes.');
+  return new ProductMinerApiError('Falha no Minerador de Produtos. Tente novamente em alguns instantes.', code || 'API_ERROR', status, data);
 }
 
 export async function getProductMinerAccess(studentCode: string): Promise<ProductMinerAccess> {
@@ -1126,7 +1160,7 @@ export async function startExpansionJobApi(
     body: JSON.stringify(payload),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw accessError(data);
+  if (!response.ok) throw accessError(data, response.status);
   return data;
 }
 
@@ -1139,10 +1173,10 @@ export async function stepExpansionJobApi(
     headers: authHeaders(studentCode),
   });
   const data = await response.json().catch(() => ({}));
-  if (response.status === 409 || data.error === 'STEP_IN_PROGRESS') {
+  if (response.status === 409 || data.error === 'STEP_IN_PROGRESS' || data.code === 'STEP_IN_PROGRESS') {
     return { success: false, executionId, isCompleted: false, stepInProgress: true };
   }
-  if (!response.ok) throw accessError(data);
+  if (!response.ok) throw accessError(data, response.status);
   return data;
 }
 
@@ -1154,7 +1188,7 @@ export async function getExpansionJobStatusApi(
     headers: authHeaders(studentCode),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw accessError(data);
+  if (!response.ok) throw accessError(data, response.status);
   return data;
 }
 
@@ -1167,7 +1201,7 @@ export async function cancelExpansionJobApi(
     headers: authHeaders(studentCode),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw accessError(data);
+  if (!response.ok) throw accessError(data, response.status);
   return data;
 }
 
@@ -1230,8 +1264,26 @@ export async function executeSubcategoryExpansionApi(
         throw new Error('EXPANSION_CANCELLED');
       }
 
+      const errCode = err?.code || (err instanceof ProductMinerApiError ? err.code : '');
+      const errStatus = err?.status || (err instanceof ProductMinerApiError ? err.status : 0);
+
+      // Erros LÓGICOS não transitórios (ex: 404 JOB_NOT_FOUND, 401, 403, DB não configurado): interromper IMEDIATAMENTE sem retries
+      if (
+        errStatus === 404 ||
+        errCode === 'JOB_NOT_FOUND' ||
+        errCode === 'INVALID_JOB_STATE' ||
+        errCode === 'EXPANSION_JOB_PERSISTENCE_FAILED' ||
+        errCode === 'DATABASE_NOT_CONFIGURED' ||
+        errCode === 'AUTH_REQUIRED' ||
+        errCode === 'ACCESS_DENIED' ||
+        errCode === 'PRODUCT_MINER_REFRESH_MENTOR_ONLY'
+      ) {
+        console.error(`[Expansion Job] Erro lógico fatal no step para job ${executionId} (${errCode || errStatus}):`, err?.message || err);
+        throw err;
+      }
+
       networkFailures++;
-      console.warn(`[Expansion Job] Falha de comunicação no step (${networkFailures}/${MAX_NETWORK_RETRIES}) para job ${executionId}:`, err?.message || err);
+      console.warn(`[Expansion Job] Falha transitória de comunicação no step (${networkFailures}/${MAX_NETWORK_RETRIES}) para job ${executionId}:`, err?.message || err);
 
       if (networkFailures > MAX_NETWORK_RETRIES) {
         throw new Error(`Falha de comunicação persistente com o servidor após ${MAX_NETWORK_RETRIES} tentativas: ${err?.message || err}`);
@@ -1256,6 +1308,10 @@ export async function executeSubcategoryExpansionApi(
           }
         }
       } catch (statusErr: any) {
+        const statusErrCode = statusErr?.code || (statusErr instanceof ProductMinerApiError ? statusErr.code : '');
+        if (statusErrCode === 'JOB_NOT_FOUND' || statusErr?.status === 404) {
+          throw statusErr;
+        }
         console.warn(`[Expansion Job] Falha ao consultar status após erro de rede:`, statusErr?.message || statusErr);
       }
     }
