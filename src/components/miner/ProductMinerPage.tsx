@@ -5774,6 +5774,7 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
     title: string;
     message: string;
     code?: string;
+    stage?: string;
   } | null>(null);
   const [batchProgress, setBatchProgress] = useState<{
     currentCategory: string;
@@ -5991,10 +5992,12 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
       // NÃO fechar o modal nem apagar o progresso
       const errorMessage = err?.message || 'Falha ao executar job de expansão no servidor.';
       const errorCode = err?.code || (err?.name === 'ProductMinerApiError' ? err.code : undefined);
+      const stage = err?.stage || err?.data?.stage;
       setBatchExecutionError({
         title: 'Falha ao iniciar expansão',
         message: errorMessage,
         code: errorCode,
+        stage,
       });
       setError(errorMessage);
     }
@@ -8426,12 +8429,20 @@ export const ProductMinerPage: React.FC<ProductMinerPageProps> = ({
                 </div>
 
                 <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 space-y-3">
-                  {batchExecutionError.code && (
-                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-100 border border-rose-300 text-[11px] font-mono font-bold text-rose-800">
-                      <span>CÓDIGO:</span>
-                      <span>{batchExecutionError.code}</span>
-                    </div>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {batchExecutionError.code && (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-100 border border-rose-300 text-[11px] font-mono font-bold text-rose-800">
+                        <span>CÓDIGO:</span>
+                        <span>{batchExecutionError.code}</span>
+                      </div>
+                    )}
+                    {batchExecutionError.stage && (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-300 text-[11px] font-mono font-bold text-slate-700">
+                        <span>Etapa técnica:</span>
+                        <span>{batchExecutionError.stage}</span>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="text-xs text-rose-800 font-medium leading-relaxed bg-white/70 p-3 rounded-lg border border-rose-200">
                     {batchExecutionError.message}
