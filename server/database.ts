@@ -16,10 +16,145 @@ export const db = mysql.createPool({
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
+  connectTimeout: 15000,
   ssl: process.env.DB_SSL === 'true'
     ? { rejectUnauthorized: false }
     : undefined,
 });
+
+export const TRANSIENT_DB_ERROR_CODES = new Set([
+  'ECONNRESET',
+  'PROTOCOL_CONNECTION_LOST',
+  'ETIMEDOUT',
+  'EPIPE',
+  'ECONNREFUSED',
+]);
+
+export function isTransientDbError(err: any): boolean {
+  if (!err) return false;
+  const code = err.code || err.errno;
+  if (typeof code === 'string' && TRANSIENT_DB_ERROR_CODES.has(code)) return true;
+  if (typeof err.message === 'string') {
+    for (const c of TRANSIENT_DB_ERROR_CODES) {
+      if (err.message.includes(c)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Executa uma operação no MySQL com aquisição dedicada e retry seguro exclusivo para erros transitórios de conexão (ex: ECONNRESET).
+ * Destrói conexões quebradas (stale sockets) para não poluírem o pool e suporta checagem de idempotência antes de repetir INSERTs.
+ */
+export async function executeWithTransientDbRetry<T>(
+  operationName: string,
+  executionId: string | undefined,
+  fn: (conn: mysql.PoolConnection) => Promise<T>,
+  idempotencyCheck?: (conn: mysql.PoolConnection) => Promise<boolean | T | null>
+): Promise<T> {
+  const opTag = executionId ? `operation=${operationName} executionId=${executionId}` : `operation=${operationName}`;
+  const startTotal = Date.now();
+
+  // Tentativa 1
+  let conn1: mysql.PoolConnection | null = null;
+  const startAcquire1 = Date.now();
+  try {
+    conn1 = await db.getConnection();
+    const acquireMs1 = Date.now() - startAcquire1;
+    const startQuery1 = Date.now();
+    const result = await fn(conn1);
+    const queryMs1 = Date.now() - startQuery1;
+    const totalMs1 = Date.now() - startTotal;
+    console.log(`[ExpansionJob DB Timing] ${opTag} attempt=1 acquireMs=${acquireMs1} queryMs=${queryMs1} totalMs=${totalMs1}`);
+    return result;
+  } catch (err1: any) {
+    const totalMs1 = Date.now() - startTotal;
+    // Se a conexão sofreu falha transitória ou socket reset, destruímos o socket quebrado
+    if (conn1) {
+      try {
+        if (typeof (conn1 as any).destroy === 'function') {
+          (conn1 as any).destroy();
+        } else if (typeof conn1.release === 'function') {
+          conn1.release();
+        }
+      } catch (_) {}
+      conn1 = null;
+    }
+
+    const isTransient = isTransientDbError(err1);
+    if (!isTransient) {
+      // Erro não transitório (sintaxe, constraint, business): falha imediatamente sem retry
+      throw err1;
+    }
+
+    const errCode = err1?.code || err1?.errno || err1?.message || 'TRANSIENT_ERROR';
+    console.warn(`[DB Retry] operation=${operationName} attempt=1 code=${errCode} durationMs=${totalMs1}`);
+
+    // Se temos checagem de idempotência, verificar se a gravação ocorreu antes da perda do socket
+    if (idempotencyCheck) {
+      console.log(`[DB Retry] operation=${operationName} checking_idempotency executionId=${executionId || 'none'}`);
+      let checkConn: mysql.PoolConnection | null = null;
+      try {
+        checkConn = await db.getConnection();
+        const existing = await idempotencyCheck(checkConn);
+        if (existing !== null && existing !== undefined && existing !== false) {
+          console.log(`[DB Retry] operation=${operationName} already_persisted=true executionId=${executionId || 'none'}`);
+          console.log(`[DB Retry] operation=${operationName} recovered=true executionId=${executionId || 'none'}`);
+          return (typeof existing === 'boolean' ? (undefined as unknown as T) : (existing as T));
+        } else {
+          console.log(`[DB Retry] operation=${operationName} already_persisted=false executionId=${executionId || 'none'}`);
+        }
+      } catch (checkErr: any) {
+        console.warn(`[DB Retry] ${opTag} idempotency_check_error:`, checkErr?.message || checkErr?.code);
+        if (checkConn) {
+          try { (checkConn as any).destroy?.() || checkConn.release(); } catch (_) {}
+          checkConn = null;
+        }
+      } finally {
+        if (checkConn) {
+          try { checkConn.release(); } catch (_) {}
+        }
+      }
+    }
+
+    // Tentativa 2 (Máximo 1 retry com nova conexão do pool)
+    console.log(`[DB Retry] operation=${operationName} attempt=2 executionId=${executionId || 'none'}`);
+    let conn2: mysql.PoolConnection | null = null;
+    const startAcquire2 = Date.now();
+    try {
+      conn2 = await db.getConnection();
+      const acquireMs2 = Date.now() - startAcquire2;
+      const startQuery2 = Date.now();
+      const result2 = await fn(conn2);
+      const queryMs2 = Date.now() - startQuery2;
+      const totalMs2 = Date.now() - startAcquire2;
+      console.log(`[ExpansionJob DB Timing] ${opTag} attempt=2 acquireMs=${acquireMs2} queryMs=${queryMs2} totalMs=${totalMs2}`);
+      console.log(`[DB Retry] operation=${operationName} recovered=true executionId=${executionId || 'none'}`);
+      return result2;
+    } catch (err2: any) {
+      if (conn2) {
+        try {
+          if (typeof (conn2 as any).destroy === 'function') {
+            (conn2 as any).destroy();
+          } else if (typeof conn2.release === 'function') {
+            conn2.release();
+          }
+        } catch (_) {}
+        conn2 = null;
+      }
+      console.error(`[DB Retry Failed] ${opTag} attempt=2 code=${err2?.code || err2?.message}`);
+      throw err2;
+    } finally {
+      if (conn2) {
+        try { conn2.release(); } catch (_) {}
+      }
+    }
+  } finally {
+    if (conn1) {
+      try { conn1.release(); } catch (_) {}
+    }
+  }
+}
 
 try {
   const poolObj = (db as any).pool || db;
@@ -1522,69 +1657,75 @@ export function ensureExpansionJobsTable(): Promise<void> {
   if (!isDatabaseConfigured()) return Promise.resolve();
   if (!expansionJobsPromise) {
     expansionJobsPromise = (async () => {
-      await db.query(`
-        CREATE TABLE IF NOT EXISTS product_miner_expansion_jobs (
-          id VARCHAR(64) PRIMARY KEY,
-          student_code VARCHAR(128) NOT NULL,
-          selected_categories TEXT NOT NULL,
-          selected_subcategories_map TEXT DEFAULT NULL,
-          category_target_limit INT NOT NULL DEFAULT 300,
-          per_subcategory_max INT NOT NULL DEFAULT 60,
-          status VARCHAR(32) NOT NULL DEFAULT 'RUNNING',
-          current_category_index INT NOT NULL DEFAULT 0,
-          current_subcategory_index INT NOT NULL DEFAULT 0,
-          current_page INT NOT NULL DEFAULT 1,
-          consecutive_no_valid_pages INT NOT NULL DEFAULT 0,
-          total_categories INT NOT NULL DEFAULT 0,
-          categories_completed INT NOT NULL DEFAULT 0,
-          total_received INT NOT NULL DEFAULT 0,
-          total_new_products INT NOT NULL DEFAULT 0,
-          total_updated_products INT NOT NULL DEFAULT 0,
-          total_valid_new_target INT NOT NULL DEFAULT 0,
-          total_off_target INT NOT NULL DEFAULT 0,
-          total_unclassified INT NOT NULL DEFAULT 0,
-          total_credits_used INT NOT NULL DEFAULT 0,
-          total_requests_made INT NOT NULL DEFAULT 0,
-          total_pages_processed INT NOT NULL DEFAULT 0,
-          technical_errors INT NOT NULL DEFAULT 0,
-          subcategories_failed INT NOT NULL DEFAULT 0,
-          plans_json LONGTEXT DEFAULT NULL,
-          state_json LONGTEXT DEFAULT NULL,
-          category_summaries_json LONGTEXT DEFAULT NULL,
-          result_json LONGTEXT DEFAULT NULL,
-          last_progress_json LONGTEXT DEFAULT NULL,
-          step_lock_token VARCHAR(64) DEFAULT NULL,
-          step_lock_until DATETIME(3) DEFAULT NULL,
-          error_message TEXT DEFAULT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          completed_at DATETIME DEFAULT NULL,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX idx_pmej_student_code (student_code),
-          INDEX idx_pmej_status (status),
-          INDEX idx_pmej_updated (updated_at),
-          INDEX idx_pmej_lock (step_lock_until)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-      `);
+      await executeWithTransientDbRetry(
+        'ensure_expansion_jobs_table',
+        undefined,
+        async (conn) => {
+          await conn.query(`
+            CREATE TABLE IF NOT EXISTS product_miner_expansion_jobs (
+              id VARCHAR(64) PRIMARY KEY,
+              student_code VARCHAR(128) NOT NULL,
+              selected_categories TEXT NOT NULL,
+              selected_subcategories_map TEXT DEFAULT NULL,
+              category_target_limit INT NOT NULL DEFAULT 300,
+              per_subcategory_max INT NOT NULL DEFAULT 60,
+              status VARCHAR(32) NOT NULL DEFAULT 'RUNNING',
+              current_category_index INT NOT NULL DEFAULT 0,
+              current_subcategory_index INT NOT NULL DEFAULT 0,
+              current_page INT NOT NULL DEFAULT 1,
+              consecutive_no_valid_pages INT NOT NULL DEFAULT 0,
+              total_categories INT NOT NULL DEFAULT 0,
+              categories_completed INT NOT NULL DEFAULT 0,
+              total_received INT NOT NULL DEFAULT 0,
+              total_new_products INT NOT NULL DEFAULT 0,
+              total_updated_products INT NOT NULL DEFAULT 0,
+              total_valid_new_target INT NOT NULL DEFAULT 0,
+              total_off_target INT NOT NULL DEFAULT 0,
+              total_unclassified INT NOT NULL DEFAULT 0,
+              total_credits_used INT NOT NULL DEFAULT 0,
+              total_requests_made INT NOT NULL DEFAULT 0,
+              total_pages_processed INT NOT NULL DEFAULT 0,
+              technical_errors INT NOT NULL DEFAULT 0,
+              subcategories_failed INT NOT NULL DEFAULT 0,
+              plans_json LONGTEXT DEFAULT NULL,
+              state_json LONGTEXT DEFAULT NULL,
+              category_summaries_json LONGTEXT DEFAULT NULL,
+              result_json LONGTEXT DEFAULT NULL,
+              last_progress_json LONGTEXT DEFAULT NULL,
+              step_lock_token VARCHAR(64) DEFAULT NULL,
+              step_lock_until DATETIME(3) DEFAULT NULL,
+              error_message TEXT DEFAULT NULL,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              completed_at DATETIME DEFAULT NULL,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              INDEX idx_pmej_student_code (student_code),
+              INDEX idx_pmej_status (status),
+              INDEX idx_pmej_updated (updated_at),
+              INDEX idx_pmej_lock (step_lock_until)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+          `);
 
-      // Idempotent column additions if table already existed
-      try {
-        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN technical_errors INT NOT NULL DEFAULT 0 AFTER total_pages_processed`);
-      } catch {}
-      try {
-        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN subcategories_failed INT NOT NULL DEFAULT 0 AFTER technical_errors`);
-      } catch {}
-      try {
-        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN step_lock_token VARCHAR(64) DEFAULT NULL AFTER status`);
-      } catch {}
-      try {
-        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN step_lock_until DATETIME(3) DEFAULT NULL AFTER step_lock_token`);
-      } catch {}
-      try {
-        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD INDEX idx_pmej_lock (step_lock_until)`);
-      } catch {}
-      try {
-        await db.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN completed_at DATETIME DEFAULT NULL AFTER created_at`);
-      } catch {}
+          // Idempotent column additions if table already existed
+          try {
+            await conn.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN technical_errors INT NOT NULL DEFAULT 0 AFTER total_pages_processed`);
+          } catch {}
+          try {
+            await conn.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN subcategories_failed INT NOT NULL DEFAULT 0 AFTER technical_errors`);
+          } catch {}
+          try {
+            await conn.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN step_lock_token VARCHAR(64) DEFAULT NULL AFTER status`);
+          } catch {}
+          try {
+            await conn.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN step_lock_until DATETIME(3) DEFAULT NULL AFTER step_lock_token`);
+          } catch {}
+          try {
+            await conn.query(`ALTER TABLE product_miner_expansion_jobs ADD INDEX idx_pmej_lock (step_lock_until)`);
+          } catch {}
+          try {
+            await conn.query(`ALTER TABLE product_miner_expansion_jobs ADD COLUMN completed_at DATETIME DEFAULT NULL AFTER created_at`);
+          } catch {}
+        }
+      );
     })().catch((err: any) => {
       expansionJobsPromise = null;
       console.warn('[MySQL ensureExpansionJobsTable Error]:', err?.message || err);
@@ -1648,38 +1789,54 @@ export async function createExpansionJobInDb(job: {
   }
   try {
     await ensureExpansionJobsTable();
-    const [result]: any = await db.query(
-      `
-      INSERT INTO product_miner_expansion_jobs (
-        id, student_code, selected_categories, selected_subcategories_map,
-        category_target_limit, per_subcategory_max, total_categories,
-        status, plans_json, state_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'RUNNING', ?, ?)
-      ON DUPLICATE KEY UPDATE
-        selected_categories = VALUES(selected_categories),
-        selected_subcategories_map = VALUES(selected_subcategories_map),
-        category_target_limit = VALUES(category_target_limit),
-        per_subcategory_max = VALUES(per_subcategory_max),
-        total_categories = VALUES(total_categories),
-        status = 'RUNNING',
-        plans_json = VALUES(plans_json),
-        state_json = VALUES(state_json)
-      `,
-      [
-        job.id,
-        job.studentCode,
-        JSON.stringify(job.selectedCategories),
-        job.selectedSubcategoriesMap ? JSON.stringify(job.selectedSubcategoriesMap) : null,
-        job.categoryTargetLimit,
-        job.perSubcategoryMax,
-        job.totalCategories,
-        job.plansJson || null,
-        job.stateJson || null,
-      ]
+    await executeWithTransientDbRetry(
+      'insert_job',
+      job.id,
+      async (conn) => {
+        const [result]: any = await conn.query(
+          `
+          INSERT INTO product_miner_expansion_jobs (
+            id, student_code, selected_categories, selected_subcategories_map,
+            category_target_limit, per_subcategory_max, total_categories,
+            status, plans_json, state_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'RUNNING', ?, ?)
+          ON DUPLICATE KEY UPDATE
+            selected_categories = VALUES(selected_categories),
+            selected_subcategories_map = VALUES(selected_subcategories_map),
+            category_target_limit = VALUES(category_target_limit),
+            per_subcategory_max = VALUES(per_subcategory_max),
+            total_categories = VALUES(total_categories),
+            status = 'RUNNING',
+            plans_json = VALUES(plans_json),
+            state_json = VALUES(state_json)
+          `,
+          [
+            job.id,
+            job.studentCode,
+            JSON.stringify(job.selectedCategories),
+            job.selectedSubcategoriesMap ? JSON.stringify(job.selectedSubcategoriesMap) : null,
+            job.categoryTargetLimit,
+            job.perSubcategoryMax,
+            job.totalCategories,
+            job.plansJson || null,
+            job.stateJson || null,
+          ]
+        );
+        if (!result || (result.affectedRows === undefined && result.warningStatus === undefined)) {
+          throw new Error('EXPANSION_JOB_INSERT_FAILED');
+        }
+      },
+      async (checkConn) => {
+        const [rows]: any = await checkConn.query(
+          `SELECT id, status, created_at FROM product_miner_expansion_jobs WHERE id = ? LIMIT 1`,
+          [job.id]
+        );
+        if (Array.isArray(rows) && rows.length > 0) {
+          return true;
+        }
+        return null;
+      }
     );
-    if (!result || (result.affectedRows === undefined && result.warningStatus === undefined)) {
-      throw new Error('EXPANSION_JOB_INSERT_FAILED');
-    }
   } catch (err: any) {
     console.error('[ExpansionJob DB ERROR]', {
       operation: 'insert_job',
@@ -1703,11 +1860,17 @@ export async function getExpansionJobFromDb(jobId: string): Promise<ExpansionJob
   }
   try {
     await ensureExpansionJobsTable();
-    const [rows]: any = await db.query(
-      `SELECT * FROM product_miner_expansion_jobs WHERE id = ? LIMIT 1`,
-      [jobId]
+    return await executeWithTransientDbRetry(
+      'get_job',
+      jobId,
+      async (conn) => {
+        const [rows]: any = await conn.query(
+          `SELECT * FROM product_miner_expansion_jobs WHERE id = ? LIMIT 1`,
+          [jobId]
+        );
+        return Array.isArray(rows) && rows.length > 0 ? (rows[0] as ExpansionJobRow) : null;
+      }
     );
-    return Array.isArray(rows) && rows.length > 0 ? (rows[0] as ExpansionJobRow) : null;
   } catch (err: any) {
     console.error('[ExpansionJob DB ERROR]', {
       operation: 'get_job',
@@ -1732,18 +1895,24 @@ export async function getExpansionJobFromDb(jobId: string): Promise<ExpansionJob
 export async function tryAcquireExpansionJobStepLock(jobId: string, token: string, leaseSeconds = 60): Promise<boolean> {
   if (!isDatabaseConfigured()) return true;
   await ensureExpansionJobsTable();
-  const [res]: any = await db.query(
-    `
-    UPDATE product_miner_expansion_jobs
-    SET step_lock_token = ?,
-        step_lock_until = DATE_ADD(NOW(3), INTERVAL ? SECOND)
-    WHERE id = ?
-      AND status = 'RUNNING'
-      AND (step_lock_until IS NULL OR step_lock_until < NOW(3))
-    `,
-    [token, leaseSeconds, jobId]
+  return await executeWithTransientDbRetry(
+    'acquire_step_lock',
+    jobId,
+    async (conn) => {
+      const [res]: any = await conn.query(
+        `
+        UPDATE product_miner_expansion_jobs
+        SET step_lock_token = ?,
+            step_lock_until = DATE_ADD(NOW(3), INTERVAL ? SECOND)
+        WHERE id = ?
+          AND status = 'RUNNING'
+          AND (step_lock_until IS NULL OR step_lock_until < NOW(3))
+        `,
+        [token, leaseSeconds, jobId]
+      );
+      return Boolean(res && res.affectedRows > 0);
+    }
   );
-  return Boolean(res && res.affectedRows > 0);
 }
 
 /**
@@ -1752,17 +1921,23 @@ export async function tryAcquireExpansionJobStepLock(jobId: string, token: strin
 export async function releaseExpansionJobStepLock(jobId: string, token: string): Promise<boolean> {
   if (!isDatabaseConfigured()) return true;
   await ensureExpansionJobsTable();
-  const [res]: any = await db.query(
-    `
-    UPDATE product_miner_expansion_jobs
-    SET step_lock_token = NULL,
-        step_lock_until = NULL
-    WHERE id = ?
-      AND step_lock_token = ?
-    `,
-    [jobId, token]
+  return await executeWithTransientDbRetry(
+    'release_step_lock',
+    jobId,
+    async (conn) => {
+      const [res]: any = await conn.query(
+        `
+        UPDATE product_miner_expansion_jobs
+        SET step_lock_token = NULL,
+            step_lock_until = NULL
+        WHERE id = ?
+          AND step_lock_token = ?
+        `,
+        [jobId, token]
+      );
+      return Boolean(res && res.affectedRows > 0);
+    }
   );
-  return Boolean(res && res.affectedRows > 0);
 }
 
 export async function updateExpansionJobInDb(jobId: string, updates: Partial<{
@@ -1816,11 +1991,17 @@ export async function updateExpansionJobInDb(jobId: string, updates: Partial<{
     ? `WHERE id = ? AND status != 'CANCELLED'`
     : `WHERE id = ?`;
 
-  const [res]: any = await db.query(
-    `UPDATE product_miner_expansion_jobs SET ${setClauses.join(', ')} ${whereClause}`,
-    values
+  return await executeWithTransientDbRetry(
+    'update_job',
+    jobId,
+    async (conn) => {
+      const [res]: any = await conn.query(
+        `UPDATE product_miner_expansion_jobs SET ${setClauses.join(', ')} ${whereClause}`,
+        values
+      );
+      return Boolean(res && res.affectedRows > 0);
+    }
   );
-  return Boolean(res && res.affectedRows > 0);
 }
 
 
