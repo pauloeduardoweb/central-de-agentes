@@ -3257,7 +3257,7 @@ productMinerRouter.post('/admin/expansion-jobs/:executionId/step', async (req, r
     let result = stepOutcome.result;
 
     if (updatedState.isCompleted || result) {
-      const finalized = finalizeExpansionJobState(updatedState);
+      const finalized = await finalizeExpansionJobState(updatedState);
       updatedState = finalized.state;
       progress = finalized.progress;
       result = finalized.result;
@@ -3305,7 +3305,7 @@ productMinerRouter.post('/admin/expansion-jobs/:executionId/step', async (req, r
         state.errors = state.errors || [];
         state.errors.push(error?.message || 'STEP_JOB_ERROR');
         state.status = 'FAILED';
-        const finalized = finalizeExpansionJobState(state);
+        const finalized = await finalizeExpansionJobState(state);
         await updateExpansionJobInDb(executionId, {
           status: 'FAILED',
           error_message: error?.message || 'STEP_JOB_ERROR',
@@ -3380,7 +3380,7 @@ productMinerRouter.post('/admin/expansion-jobs/:executionId/cancel', async (req,
         const state = JSON.parse(jobRow.state_json);
         state.status = 'CANCELLED';
         state.stopReason = 'CANCELLED';
-        const finalized = finalizeExpansionJobState(state);
+        const finalized = await finalizeExpansionJobState(state);
         finalResultJson = JSON.stringify(finalized.result);
       } catch {}
     }

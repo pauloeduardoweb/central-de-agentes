@@ -1274,13 +1274,16 @@ export async function initializeExpansionJobState(params: {
 
 /**
  * Centraliza a finalização e construção do relatório final estruturado de um Job de Expansão.
- * Garante que result_json e categorySummaries estejam sempre completos e consistentes.
+ * Garante que result_json e categorySummaries estejam sempre completos, consistentes e sincronizados com a leitura oficial do MySQL.
  */
-export function finalizeExpansionJobState(state: ExpansionJobState): {
+export async function finalizeExpansionJobState(
+  state: ExpansionJobState,
+  getStatsFn: typeof getCollectorCategoriesStats = getCollectorCategoriesStats
+): Promise<{
   state: ExpansionJobState;
   progress: SubcategoryBatchProgress;
   result: SubcategoryExpansionResult;
-} {
+}> {
   state.isCompleted = true;
 
   if (state.status === 'RUNNING' || !state.status) {
@@ -1295,30 +1298,46 @@ export function finalizeExpansionJobState(state: ExpansionJobState): {
     }
   }
 
+  // Leitura oficial do MySQL (read-after-write) para garantir que todas as métricas finais reflitam a persistência real
+  const statsAfter = await getStatsFn().catch(() => ({ totalStoredProducts: 0, categories: [] }));
+  const statsCategoryMap = new Map<string, CollectorCategoryStat>();
+  if (statsAfter && Array.isArray(statsAfter.categories)) {
+    for (const cat of statsAfter.categories) {
+      statsCategoryMap.set(cat.category, cat);
+    }
+  }
+
   // Se a categoria em andamento ainda não foi adicionada a categorySummaries, adiciona o sumário final dela
   if (state.currentCatIdx < state.plans.length) {
     const currentPlan = state.plans[state.currentCatIdx];
     const alreadySummarized = state.categorySummaries.some((s) => s.category === currentPlan.category);
     if (!alreadySummarized) {
-      const growth = Math.max(0, state.currentValidTargetCount - state.initialValidCount);
+      const catStat = statsCategoryMap.get(currentPlan.category);
+      const officialFinalValid = (statsAfter.totalStoredProducts > 0 && catStat !== undefined)
+        ? catStat.productCount
+        : state.currentValidTargetCount;
+      const actualValidGrowth = officialFinalValid - state.initialValidCount;
+
       let catStopReason = state.stopReason as CategoryExecutionSummary['stopReason'] | undefined;
       if (!catStopReason) {
-        if (state.currentValidTargetCount >= currentPlan.categoryTargetLimit) {
+        if (officialFinalValid >= currentPlan.categoryTargetLimit) {
           catStopReason = 'TARGET_REACHED';
         } else if (state.status === 'CANCELLED') {
           catStopReason = 'CANCELLED';
         } else if (state.technicalErrors > 0 || state.subcategoriesFailed > 0) {
           catStopReason = 'PARTIAL_ERROR';
-        } else {
+        } else if (state.catSubcategoriesExhausted === currentPlan.subcategories.length) {
           catStopReason = 'ALL_SUBCATEGORIES_EXHAUSTED';
+        } else {
+          catStopReason = 'NO_MORE_RESULTS';
         }
       }
 
-      state.categorySummaries.push({
+      const pendingSummary: CategoryExecutionSummary = {
         category: currentPlan.category,
         initialValidCount: state.initialValidCount,
-        finalValidCount: state.currentValidTargetCount,
-        actualValidGrowth: growth,
+        finalValidCount: officialFinalValid,
+        actualValidGrowth,
         categoryTargetLimit: currentPlan.categoryTargetLimit,
         validNewProductsForTarget: state.catValidNewCount,
         offTargetProducts: state.catOffTargetCount,
@@ -1332,14 +1351,52 @@ export function finalizeExpansionJobState(state: ExpansionJobState): {
         subcategoriesConsulted: state.catSubcategoriesConsulted,
         subcategoriesExhausted: state.catSubcategoriesExhausted,
         coverageBefore: currentPlan.coverageBefore || 0,
-        coverageAfter: currentPlan.coverageBefore || 0,
+        coverageAfter: catStat?.coverageCount ?? currentPlan.coverageBefore ?? 0,
         technicalErrors: state.technicalErrors,
         subcategoriesFailed: state.subcategoriesFailed,
         executionId: state.jobId,
         stopReason: catStopReason,
-      });
+      };
+
+      state.categorySummaries.push(pendingSummary);
+      if (pendingSummary.creditsUsed > 0 && pendingSummary.stopReason !== 'CANCELLED' && pendingSummary.requestsMade > 0) {
+        await recordCategoryExecutionHistory(pendingSummary, state.jobId).catch(() => {});
+      }
     }
   }
+
+  // Revalidação e sincronização read-after-write de todas as categorias sumarizadas diretamente com o MySQL
+  for (const sum of state.categorySummaries) {
+    const catStat = statsCategoryMap.get(sum.category);
+    if (catStat !== undefined && statsAfter.totalStoredProducts > 0) {
+      const memoryValid = sum.finalValidCount;
+      sum.finalValidCount = catStat.productCount;
+      sum.actualValidGrowth = sum.finalValidCount - sum.initialValidCount;
+      sum.coverageAfter = catStat.coverageCount;
+      if (sum.finalValidCount >= sum.categoryTargetLimit && sum.stopReason !== 'CANCELLED') {
+        sum.stopReason = 'TARGET_REACHED';
+      }
+      console.log(`[Expansion Summary DB] category="${sum.category}" initialValid=${sum.initialValidCount} officialFinalValid=${sum.finalValidCount} memoryValid=${memoryValid} growth=${sum.actualValidGrowth} coverageBefore=${sum.coverageBefore ?? 0} coverageAfter=${sum.coverageAfter ?? 0} stopReason=${sum.stopReason}`);
+    }
+  }
+
+  // Garantia absoluta de coerência: categoriesCompleted reflete todas as categorias processadas e consolidadas
+  state.categoriesCompleted = state.categorySummaries.length;
+
+  // Cobertura total após expansão
+  let finalTotalCoverage = 0;
+  for (const cat of statsAfter.categories || []) {
+    finalTotalCoverage += cat.coverageCount || 0;
+  }
+  if (finalTotalCoverage === 0) {
+    finalTotalCoverage = state.initialCoverage;
+  }
+
+  // Logs de instrumentação exigidos
+  console.log(`[Expansion Summary] jobId=${state.jobId} categoriesCompleted=${state.categoriesCompleted} totalCategories=${state.plans.length} totalReceived=${state.totalProcessed} totalNew=${state.totalNew} totalValidNew=${state.totalValidNewForTarget} totalOffTarget=${state.totalOffTarget} totalUnclassified=${state.totalUnclassified} totalUpdated=${state.totalUpdated} totalCreditsUsed=${state.totalCreditsUsed}`);
+
+  const allSummariesMatchDb = state.categorySummaries.length === state.plans.length;
+  console.log(`[Expansion Summary Consistency] jobId=${state.jobId} expectedCategories=${state.plans.length} summarizedCategories=${state.categorySummaries.length} allSummariesMatchDb=${allSummariesMatchDb}`);
 
   const lastPlan = state.plans[state.plans.length - 1];
   const lastSummary = state.categorySummaries[state.categorySummaries.length - 1];
@@ -1393,12 +1450,12 @@ export function finalizeExpansionJobState(state: ExpansionJobState): {
     totalCreditsUsed: state.totalCreditsUsed,
     totalRequestsMade: state.totalRequestsMade,
     totalPagesProcessed: state.totalPagesProcessed,
-    categoriesCompleted: state.categoriesCompleted,
+    categoriesCompleted: state.categorySummaries.length,
     totalSelectedSubcategories: state.totalSelectedSubcategories,
     subcategoriesConsulted: state.subcategoriesConsulted,
     subcategoriesExhausted: state.subcategoriesExhausted,
     subcategoriesCoverageBefore: state.initialCoverage,
-    subcategoriesCoverageAfter: state.initialCoverage,
+    subcategoriesCoverageAfter: finalTotalCoverage,
     categorySummaries: state.categorySummaries,
     plans: state.plans,
     errors: state.errors,
@@ -1436,7 +1493,7 @@ export async function executeSubcategoryExpansionStep(
   result?: SubcategoryExpansionResult;
 }> {
   if (state.isCompleted || state.currentCatIdx >= state.plans.length) {
-    return finalizeExpansionJobState(state);
+    return finalizeExpansionJobState(state, getStatsFn);
   }
 
   const catPlan = state.plans[state.currentCatIdx];
@@ -1444,7 +1501,7 @@ export async function executeSubcategoryExpansionStep(
 
   // Se a categoria já atingiu a meta ou não tem subcategorias selecionadas ou percorreu todas
   if (remainingNeeded <= 0 || catPlan.subcategories.length === 0 || state.currentSubIdx >= catPlan.subcategories.length) {
-    // Finalizar categoria atual
+    // Finalizar categoria atual com leitura oficial read-after-write do MySQL
     const statsAfterCat = await getStatsFn().catch(() => ({ totalStoredProducts: 0, categories: [] }));
     const catStatAfter = statsAfterCat.categories.find((c) => c.category === catPlan.category);
     const officialFinalValidCount = (statsAfterCat.totalStoredProducts > 0 && catStatAfter !== undefined)
@@ -1488,12 +1545,14 @@ export async function executeSubcategoryExpansionStep(
       stopReason: catStopReason,
     };
 
+    console.log(`[Expansion Summary DB] category="${catSummary.category}" initialValid=${catSummary.initialValidCount} officialFinalValid=${catSummary.finalValidCount} memoryValid=${state.currentValidTargetCount} growth=${catSummary.actualValidGrowth} coverageBefore=${catSummary.coverageBefore ?? 0} coverageAfter=${catSummary.coverageAfter ?? 0} stopReason=${catSummary.stopReason}`);
+
     state.categorySummaries.push(catSummary);
     if (catSummary.creditsUsed > 0 && catSummary.stopReason !== 'CANCELLED' && catSummary.requestsMade > 0) {
       await recordCategoryExecutionHistory(catSummary, state.jobId).catch(() => {});
     }
 
-    state.categoriesCompleted++;
+    state.categoriesCompleted = state.categorySummaries.length;
     state.currentCatIdx++;
     state.currentSubIdx = 0;
     state.currentPage = 1;
@@ -1516,7 +1575,7 @@ export async function executeSubcategoryExpansionStep(
       state.catSubcategoriesConsulted = 0;
       state.catSubcategoriesExhausted = 0;
     } else {
-      return finalizeExpansionJobState(state);
+      return finalizeExpansionJobState(state, getStatsFn);
     }
 
     return executeSubcategoryExpansionStep(state, searchFn, getStatsFn);
