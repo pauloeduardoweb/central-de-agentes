@@ -3114,9 +3114,11 @@ productMinerRouter.post('/admin/execute-subcategory-expansion-stream', async (re
 // Admin Route: Iniciar Job de Expansão Passo a Passo (Resumable Job)
 productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
   if (!await requireMentorRefresh(req, res)) return;
+  const executionId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  let stage = 'init';
   try {
     const { initializeExpansionJobState } = await import('./subcategoryExpansionService.js');
-    const { createExpansionJobInDb, updateExpansionJobInDb } = await import('./database.js');
+    const { createExpansionJobInDb, getExpansionJobFromDb } = await import('./database.js');
 
     const selectedCategories = Array.isArray(req.body?.selectedCategories) ? req.body.selectedCategories : undefined;
     const selectedSubcategoriesMap = (req.body?.selectedSubcategoriesMap && typeof req.body.selectedSubcategoriesMap === 'object')
@@ -3127,8 +3129,9 @@ productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
     const rawCode = req.header('x-access-code') || req.header('x-student-access-code') || '';
     const studentCode = normalizeAccessCode(rawCode) || 'MENTOR';
 
-    const executionId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    console.log(`[ExpansionJob Start] executionId=${executionId} selectedCategoriesCount=${selectedCategories?.length ?? 'all'} categoryTargetLimit=${categoryTargetLimit} perSubcategoryMax=${perSubcategoryMax}`);
 
+    stage = 'initialize_state';
     const state = await initializeExpansionJobState({
       jobId: executionId,
       studentCode,
@@ -3138,6 +3141,10 @@ productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
       perSubcategoryMax,
     });
 
+    console.log(`[ExpansionJob State Initialized] executionId=${executionId} plansCount=${state.plans.length} totalSelectedSubcategories=${state.totalSelectedSubcategories}`);
+
+    stage = 'persist_job';
+    console.log(`[ExpansionJob Persist Attempt] executionId=${executionId}`);
     await createExpansionJobInDb({
       id: executionId,
       studentCode,
@@ -3149,6 +3156,15 @@ productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
       plansJson: JSON.stringify(state.plans),
       stateJson: JSON.stringify(state),
     });
+    console.log(`[ExpansionJob Persisted] executionId=${executionId}`);
+
+    stage = 'read_after_write';
+    const persistedJob = await getExpansionJobFromDb(executionId);
+    if (!persistedJob) {
+      console.error(`[ExpansionJob Start Failed] executionId=${executionId} stage=read_after_write errorCode=EXPANSION_JOB_PERSISTENCE_FAILED message="Job could not be read back after insert"`);
+      throw new Error('EXPANSION_JOB_PERSISTENCE_FAILED');
+    }
+    console.log(`[ExpansionJob ReadAfterWrite OK] executionId=${executionId}`);
 
     return res.json({
       success: true,
@@ -3161,8 +3177,20 @@ productMinerRouter.post('/admin/expansion-jobs/start', async (req, res) => {
       },
     });
   } catch (error: any) {
-    console.error('[Start Expansion Job Error]:', error);
-    return res.status(500).json({ success: false, error: error?.message || 'START_JOB_ERROR' });
+    const errorCode = error?.message?.includes('DATABASE_NOT_CONFIGURED')
+      ? 'DATABASE_NOT_CONFIGURED'
+      : error?.message?.includes('EXPANSION_JOB_PERSISTENCE_FAILED')
+      ? 'EXPANSION_JOB_PERSISTENCE_FAILED'
+      : error?.code || error?.name || 'START_JOB_ERROR';
+
+    console.error(`[ExpansionJob Start Failed] executionId=${executionId} stage=${stage} errorCode=${errorCode} message=${error?.message || error}`);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'START_JOB_ERROR',
+      code: errorCode,
+      stage,
+      executionId,
+    });
   }
 });
 

@@ -1643,9 +1643,11 @@ export async function createExpansionJobInDb(job: {
   plansJson?: string;
   stateJson?: string;
 }): Promise<void> {
-  if (!isDatabaseConfigured()) return;
+  if (!isDatabaseConfigured()) {
+    throw new Error('DATABASE_NOT_CONFIGURED');
+  }
   await ensureExpansionJobsTable();
-  await db.query(
+  const [result]: any = await db.query(
     `
     INSERT INTO product_miner_expansion_jobs (
       id, student_code, selected_categories, selected_subcategories_map,
@@ -1658,6 +1660,7 @@ export async function createExpansionJobInDb(job: {
       category_target_limit = VALUES(category_target_limit),
       per_subcategory_max = VALUES(per_subcategory_max),
       total_categories = VALUES(total_categories),
+      status = 'RUNNING',
       plans_json = VALUES(plans_json),
       state_json = VALUES(state_json)
     `,
@@ -1673,10 +1676,15 @@ export async function createExpansionJobInDb(job: {
       job.stateJson || null,
     ]
   );
+  if (!result || (result.affectedRows === undefined && result.warningStatus === undefined)) {
+    throw new Error('EXPANSION_JOB_INSERT_FAILED');
+  }
 }
 
 export async function getExpansionJobFromDb(jobId: string): Promise<ExpansionJobRow | null> {
-  if (!isDatabaseConfigured()) return null;
+  if (!isDatabaseConfigured()) {
+    throw new Error('DATABASE_NOT_CONFIGURED');
+  }
   await ensureExpansionJobsTable();
   const [rows]: any = await db.query(
     `SELECT * FROM product_miner_expansion_jobs WHERE id = ? LIMIT 1`,

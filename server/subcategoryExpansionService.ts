@@ -1174,8 +1174,13 @@ export async function initializeExpansionJobState(params: {
   if (customCategoryStats) {
     initialCategories = customCategoryStats;
   } else {
-    const statsBefore = await getCollectorCategoriesStats().catch(() => ({ categories: [], totalStoredProducts: 0 }));
-    initialCategories = statsBefore.categories;
+    try {
+      const statsBefore = await getCollectorCategoriesStats();
+      initialCategories = statsBefore.categories;
+    } catch (err: any) {
+      console.error('[initializeExpansionJobState Error fetching stats]:', err?.message || err);
+      throw new Error(`STATS_INITIALIZATION_FAILED: Falha ao obter estatísticas das categorias no banco de dados (${err?.message || 'Erro de conexão/consulta MySQL'})`);
+    }
   }
 
   const plans = buildSubcategoryExpansionPlan({

@@ -3630,7 +3630,8 @@ export async function getCollectorCategoriesStats(): Promise<{
       totalStoredProducts = rows.length;
     }
   } catch (err: any) {
-    console.warn('[getCollectorCategoriesStats SQL Query Error]:', err?.message || err);
+    console.error('[getCollectorCategoriesStats SQL Query Error]:', err?.message || err);
+    throw err;
   }
 
   // Aggregate counts with strict single-winner classification per product
