@@ -611,7 +611,7 @@ async function runIntegrationSuite() {
     });
 
     state.stopReason = 'API_AUTH_ERROR';
-    const finalized = finalizeExpansionJobState(state);
+    const finalized = await finalizeExpansionJobState(state);
 
     assert(finalized.state.isCompleted === true, 'Estado marcado como isCompleted');
     assert(finalized.state.status === 'FAILED', 'Status finalizado como FAILED para erro de autenticação');
@@ -639,7 +639,7 @@ async function runIntegrationSuite() {
 
     state.status = 'CANCELLED';
     state.stopReason = 'CANCELLED';
-    const finalized = finalizeExpansionJobState(state);
+    const finalized = await finalizeExpansionJobState(state);
 
     assert(finalized.state.status === 'CANCELLED', 'Status preservado como CANCELLED');
     assert(finalized.result.success === false, 'Result success é false para job cancelado');
