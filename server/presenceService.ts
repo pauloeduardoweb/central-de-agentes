@@ -1089,12 +1089,14 @@ export async function presenceHeartbeatHandler(req: express.Request, res: expres
 }
 
 /**
- * POST /api/presence/logout
- * Marks session as logged out / offline
+ * Authoritative Unified Logout Handler
+ * Receives:
+ * - studentCode / accessCode (from body or headers)
+ * - sessionId (from body or headers)
  */
 export async function presenceLogoutHandler(req: express.Request, res: express.Response) {
   try {
-    const studentCode =
+    let studentCode =
       req.body?.accessCode ??
       req.body?.studentAccessCode ??
       req.body?.accessKey ??
@@ -1102,45 +1104,249 @@ export async function presenceLogoutHandler(req: express.Request, res: express.R
       req.headers['x-access-code'] ??
       req.headers['x-student-access-code'];
 
+    let sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
+
+    if (req.body && typeof req.body === 'string') {
+      try {
+        const parsed = JSON.parse(req.body);
+        studentCode = studentCode || parsed.accessCode || parsed.studentAccessCode || parsed.code;
+        sessionId = sessionId || parsed.sessionId;
+      } catch (e) {}
+    }
+
     const cleanCode = normalizeAccessCode(studentCode);
+    const cleanSessionId = typeof sessionId === 'string' ? sessionId.trim() : '';
 
-    const sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
-    if (sessionId) {
-      await revokeMasterSession(sessionId);
+    const maskedCode = cleanCode ? maskKeyForAdmin(cleanCode) : 'UNKNOWN';
+    const maskedSessionId = cleanSessionId ? `${cleanSessionId.slice(0, 8)}...` : 'NONE';
+
+    if (!cleanCode && !cleanSessionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'ACCESS_CODE_REQUIRED',
+        message: 'Código de acesso ou ID da sessão é obrigatório para encerrar a sessão.',
+      });
     }
 
-    if (cleanCode && isDatabaseConfigured()) {
-      await ensureSessionsTable();
-      await db.query(
-        `UPDATE sessoes
-         SET
-           active_session_id = NULL,
-           device_id = NULL,
-           is_online = 0,
-           status = 'offline',
-           logout_at = NOW(),
-           disconnected_at = NOW(),
-           disconnect_source = 'STUDENT_LOGOUT'
-         WHERE codigo = ?`,
-        [cleanCode]
-      );
+    const keyType = cleanCode ? await checkCodeKeyType(cleanCode) : (cleanSessionId ? 'MASTER' : 'INVALID');
+
+    // Master Key Logout Flow
+    if (keyType === 'MASTER' || (cleanCode && isMasterKey(cleanCode))) {
+      console.log(`[Master Logout] start maskedCode=${maskedCode} sessionId=${maskedSessionId}`);
+      if (cleanSessionId) {
+        await revokeMasterSession(cleanSessionId);
+      }
+      console.log(`[Master Logout] success maskedCode=${maskedCode} sessionId=${maskedSessionId}`);
+      return res.json({
+        success: true,
+        status: 'unbound',
+        sessionReleased: true,
+        isMaster: true,
+        message: 'Sessão Master encerrada com sucesso.',
+      });
     }
 
-    if (cleanCode) {
+    // Student Key Logout Flow
+    console.log(`[Student Logout] start maskedCode=${maskedCode} sessionId=${maskedSessionId}`);
+
+    if (isDatabaseConfigured()) {
+      try {
+        await ensureSessionsTable();
+
+        // 1. Query current session state in MySQL
+        const [rows]: any = await db.query(
+          `SELECT
+             active_session_id,
+             device_id,
+             is_online,
+             status,
+             logout_at,
+             disconnected_at,
+             disconnect_source
+           FROM sessoes
+           WHERE codigo = ?
+           LIMIT 1`,
+          [cleanCode]
+        );
+
+        // If no row exists in sessoes table -> already logged out
+        if (!Array.isArray(rows) || rows.length === 0) {
+          memorySessionsMap.delete(cleanCode);
+          console.log(`[Student Logout] no-session-row maskedCode=${maskedCode}`);
+          return res.json({
+            success: true,
+            status: 'unbound',
+            sessionReleased: true,
+            alreadyLoggedOut: true,
+            message: 'Sessão já se encontrava encerrada.',
+          });
+        }
+
+        const r = rows[0];
+        const activeSessionIdInDb = r.active_session_id;
+
+        // If active_session_id is already NULL in DB -> already logged out (idempotent)
+        if (!activeSessionIdInDb) {
+          memorySessionsMap.delete(cleanCode);
+          console.log(`[Student Logout] already-logged-out maskedCode=${maskedCode}`);
+          return res.json({
+            success: true,
+            status: 'unbound',
+            sessionReleased: true,
+            alreadyLoggedOut: true,
+            message: 'Sessão já se encontrava encerrada.',
+          });
+        }
+
+        // 2. Protect against old/obsolete sessionId:
+        // If client sent a sessionId, but MySQL currently has a DIFFERENT active_session_id
+        if (cleanSessionId && activeSessionIdInDb !== cleanSessionId) {
+          console.log(
+            `[Student Logout] obsolete-session maskedCode=${maskedCode} dbActiveSession=${activeSessionIdInDb.slice(0, 8)}... reqSessionId=${maskedSessionId}`
+          );
+          return res.json({
+            success: true,
+            status: 'local_session_obsolete',
+            sessionReleased: false,
+            obsoleteSession: true,
+            message: 'Sessão local obsoleta. Sessão oficial mantida no outro dispositivo.',
+          });
+        }
+
+        // 3. Execute authoritative UPDATE matching active_session_id
+        const targetSessionIdToMatch = cleanSessionId || activeSessionIdInDb;
+        const [updateRes]: any = await db.query(
+          `UPDATE sessoes
+           SET
+             active_session_id = NULL,
+             device_id = NULL,
+             is_online = 0,
+             status = 'offline',
+             logout_at = NOW(),
+             disconnected_at = NOW(),
+             disconnect_source = 'STUDENT_LOGOUT'
+           WHERE codigo = ?
+           AND active_session_id = ?`,
+          [cleanCode, targetSessionIdToMatch]
+        );
+
+        const affectedRows = (updateRes && typeof updateRes.affectedRows === 'number') ? updateRes.affectedRows : 0;
+        console.log(`[Student Logout] update affectedRows=${affectedRows} maskedCode=${maskedCode}`);
+
+        // 4. Mandatory READ-AFTER-WRITE verification
+        const [checkRows]: any = await db.query(
+          `SELECT
+             active_session_id,
+             device_id,
+             is_online,
+             status,
+             logout_at,
+             disconnected_at,
+             disconnect_source
+           FROM sessoes
+           WHERE codigo = ?
+           LIMIT 1`,
+          [cleanCode]
+        );
+
+        const checkRow = Array.isArray(checkRows) && checkRows.length > 0 ? checkRows[0] : null;
+        const activeSessionExists = Boolean(checkRow && checkRow.active_session_id !== null);
+        const isOnline = Boolean(checkRow && Number(checkRow.is_online) === 1);
+
+        console.log(
+          `[Student Logout] read-after-write activeSessionExists=${activeSessionExists} isOnline=${isOnline} maskedCode=${maskedCode}`
+        );
+
+        if (activeSessionExists || isOnline) {
+          console.error(`[Student Logout ERROR] code=LOGOUT_DATABASE_ERROR message=Read-after-write failed to confirm session termination`);
+          return res.status(500).json({
+            success: false,
+            error: 'LOGOUT_DATABASE_ERROR',
+            message: 'Não foi possível encerrar sua sessão. Tente novamente.',
+          });
+        }
+
+        // 5. Cleanup memory and record history only after DB confirmed session is cleared
+        memorySessionsMap.delete(cleanCode);
+
+        recordSessionHistoryEvent({
+          codigo: cleanCode,
+          sessionId: cleanSessionId || activeSessionIdInDb,
+          eventType: 'LOGOUT',
+          details: 'Aluno encerrou a sessão (logout)',
+        }).catch(() => {});
+
+        console.log(`[Student Logout] success sessionReleased=true maskedCode=${maskedCode}`);
+
+        return res.json({
+          success: true,
+          status: 'unbound',
+          sessionReleased: true,
+          alreadyLoggedOut: false,
+          message: 'Sessão encerrada com sucesso.',
+        });
+      } catch (dbErr: any) {
+        console.error('[Student Logout ERROR]', {
+          code: dbErr?.code || 'LOGOUT_DATABASE_ERROR',
+          message: dbErr?.message || String(dbErr),
+          errno: dbErr?.errno,
+          sqlState: dbErr?.sqlState,
+        });
+
+        return res.status(500).json({
+          success: false,
+          error: 'LOGOUT_DATABASE_ERROR',
+          message: 'Não foi possível encerrar sua sessão. Tente novamente.',
+        });
+      }
+    } else {
+      // Memory fallback when MySQL is not configured
+      const memSession = memorySessionsMap.get(cleanCode);
+
+      if (!memSession || !memSession.sessionId) {
+        console.log(`[Student Logout] already-logged-out (memory) maskedCode=${maskedCode}`);
+        return res.json({
+          success: true,
+          status: 'unbound',
+          sessionReleased: true,
+          alreadyLoggedOut: true,
+          message: 'Sessão já se encontrava encerrada.',
+        });
+      }
+
+      if (cleanSessionId && memSession.sessionId !== cleanSessionId) {
+        console.log(
+          `[Student Logout] obsolete-session (memory) maskedCode=${maskedCode} memSessionId=${memSession.sessionId.slice(0, 8)}... reqSessionId=${maskedSessionId}`
+        );
+        return res.json({
+          success: true,
+          status: 'local_session_obsolete',
+          sessionReleased: false,
+          obsoleteSession: true,
+          message: 'Sessão local obsoleta. Sessão oficial mantida no outro dispositivo.',
+        });
+      }
+
       memorySessionsMap.delete(cleanCode);
-      recordSessionHistoryEvent({
-        codigo: cleanCode,
-        eventType: 'LOGOUT',
-        details: 'Aluno encerrou a sessão (logout)',
-      }).catch(() => {});
-    }
+      console.log(`[Student Logout] success sessionReleased=true (memory) maskedCode=${maskedCode}`);
 
-    return res.json({ status: 'unbound', message: 'Sessão encerrada com sucesso.' });
+      return res.json({
+        success: true,
+        status: 'unbound',
+        sessionReleased: true,
+        alreadyLoggedOut: false,
+        message: 'Sessão encerrada com sucesso.',
+      });
+    }
   } catch (err: any) {
-    console.error('[Presence Logout Error]:', err?.message || err);
+    console.error('[Student Logout ERROR]', {
+      code: 'UNHANDLED_LOGOUT_ERROR',
+      message: err?.message || String(err),
+    });
     return res.status(500).json({
-      error: 'SESSION_DATABASE_ERROR',
-      message: 'Erro ao encerrar sessão.',
+      success: false,
+      error: 'LOGOUT_DATABASE_ERROR',
+      message: 'Não foi possível encerrar sua sessão. Tente novamente.',
     });
   }
 }
