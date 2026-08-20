@@ -642,7 +642,7 @@ apiRouter.post(
   handleLogin
 );
 
-// Logout Route (Rule 13)
+// Unified Authoritative Logout Routes
 apiRouter.post(
   [
     '/auth/logout',
@@ -653,80 +653,10 @@ apiRouter.post(
     '/api/session/logout',
     '/unbind',
     '/api/unbind',
+    '/presence/logout',
+    '/api/presence/logout',
   ],
-  async (req, res) => {
-    try {
-      let studentCode =
-        req.body?.accessCode ??
-        req.body?.studentAccessCode ??
-        req.body?.accessKey ??
-        req.body?.code ??
-        req.headers['x-access-code'] ??
-        req.headers['x-student-access-code'];
-
-      let sessionId = (req.headers['x-session-id'] as string) || (req.body && req.body.sessionId);
-
-      if (req.body && typeof req.body === 'string') {
-        try {
-          const parsed = JSON.parse(req.body);
-          studentCode = studentCode || parsed.accessCode || parsed.studentAccessCode;
-          sessionId = sessionId || parsed.sessionId;
-        } catch (e) {}
-      }
-
-      const cleanCode = normalizeAccessCode(studentCode);
-      const keyType = await checkCodeKeyType(cleanCode);
-
-      if (cleanCode) {
-        memorySessionsMap.delete(cleanCode);
-      }
-
-      if (sessionId) {
-        await revokeMasterSession(sessionId);
-      }
-
-      if (cleanCode && keyType === 'STUDENT' && isDatabaseConfigured()) {
-        try {
-          await ensureSessionsTable();
-          if (sessionId) {
-            await db.query(
-              `UPDATE sessoes
-               SET
-                 active_session_id = NULL,
-                 device_id = NULL,
-                 is_online = 0,
-                 status = 'offline',
-                 logout_at = NOW()
-               WHERE codigo = ?
-               AND active_session_id = ?`,
-              [cleanCode, sessionId]
-            );
-          } else {
-            await db.query(
-              `UPDATE sessoes
-               SET
-                 active_session_id = NULL,
-                 device_id = NULL,
-                 is_online = 0,
-                 status = 'offline',
-                 logout_at = NOW()
-               WHERE codigo = ?`,
-              [cleanCode]
-            );
-          }
-        } catch (dbErr: any) {
-          console.warn('[MySQL Logout Error]:', dbErr?.message || dbErr);
-        }
-      }
-
-      return res.json({ status: 'unbound', message: 'Sessão encerrada com sucesso.' });
-    } catch (err: any) {
-      return res.status(500).json({
-        error: 'SESSION_DATABASE_ERROR',
-        message: 'O servidor de autenticação está temporariamente indisponível.',
-      });
-    }
-  }
+  presenceLogoutHandler
 );
 
 // Heartbeat & Presence Routes
@@ -740,14 +670,6 @@ apiRouter.post(
     '/api/session/heartbeat',
   ],
   presenceHeartbeatHandler
-);
-
-apiRouter.post(
-  [
-    '/presence/logout',
-    '/api/presence/logout',
-  ],
-  presenceLogoutHandler
 );
 
 // Middleware Helper to validate active session on AI requests
