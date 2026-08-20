@@ -566,15 +566,34 @@ export default function App() {
   };
 
   const handleDisconnectApiKey = async () => {
-    await unbindCurrentDevice();
-    localStorage.removeItem('user_gemini_api_key');
-    localStorage.removeItem('user_student_access_code');
-    localStorage.removeItem('user_session_id');
-    setUserApiKey('');
-    setStudentCode('');
-    setSessionId('');
-    setShowApiKeyModal(true);
-    triggerToast('Código de acesso removido do navegador.');
+    try {
+      const result = await unbindCurrentDevice();
+
+      if (!result.success) {
+        triggerToast(result.message || 'Não foi possível encerrar sua sessão no servidor. Tente novamente.');
+        return;
+      }
+
+      localStorage.removeItem('user_gemini_api_key');
+      localStorage.removeItem('user_student_access_code');
+      localStorage.removeItem('user_session_id');
+      setSelectedChatAgent(null);
+      setEditingAgent(null);
+      setShowCreateModal(false);
+      setShowImportModal(false);
+      setShowMultiAgentModal(false);
+      setShowExportModal(false);
+      setShowGeracaoZProModal(false);
+      setShowCertificadosModal(false);
+      setShowAfiliadosModal(false);
+      setUserApiKey('');
+      setStudentCode('');
+      setSessionId('');
+      setShowApiKeyModal(true);
+      triggerToast('Sessão encerrada com sucesso.');
+    } catch (err) {
+      triggerToast('Erro ao encerrar sessão. Tente novamente.');
+    }
   };
 
   const updateAgentsList = (newAgents: Agent[]) => {
